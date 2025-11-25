@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <defs>
+    <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#e8f4e8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f5f4f0;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="trunkGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#6b4423;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#8b5a2b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6b4423;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="leafGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4a7c23;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2d5016;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="leafGrad2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#5d9a2b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4a7c23;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="400" height="300" fill="url(#skyGrad)"/>
+
+  <!-- Ground -->
+  <ellipse cx="200" cy="290" rx="180" ry="20" fill="#3d6b1d" opacity="0.2"/>
+
+  <!-- Tree trunk -->
+  <path d="M185 290 L190 200 L175 200 L180 160 L195 160 L195 290 Z" fill="url(#trunkGrad)"/>
+  <path d="M215 290 L210 200 L225 200 L220 160 L205 160 L205 290 Z" fill="url(#trunkGrad)"/>
+
+  <!-- Roots hint -->
+  <path d="M175 285 Q160 290 150 285" stroke="#6b4423" stroke-width="3" fill="none"/>
+  <path d="M225 285 Q240 290 250 285" stroke="#6b4423" stroke-width="3" fill="none"/>
+
+  <!-- Tree canopy layers -->
+  <ellipse cx="200" cy="130" rx="110" ry="80" fill="url(#leafGrad1)"/>
+  <ellipse cx="160" cy="100" rx="60" ry="50" fill="url(#leafGrad2)"/>
+  <ellipse cx="240" cy="95" rx="55" ry="45" fill="url(#leafGrad2)"/>
+  <ellipse cx="200" cy="70" rx="70" ry="50" fill="url(#leafGrad1)"/>
+  <ellipse cx="180" cy="55" rx="40" ry="35" fill="url(#leafGrad2)"/>
+  <ellipse cx="220" cy="50" rx="35" ry="30" fill="url(#leafGrad2)"/>
+
+  <!-- Highlight spots -->
+  <circle cx="150" cy="90" r="15" fill="#6ba832" opacity="0.6"/>
+  <circle cx="220" cy="60" r="12" fill="#6ba832" opacity="0.5"/>
+  <circle cx="250" cy="110" r="10" fill="#6ba832" opacity="0.4"/>
+
+  <!-- Decorative elements - small leaves/detail -->
+  <circle cx="130" cy="120" r="8" fill="#5d9a2b" opacity="0.7"/>
+  <circle cx="270" cy="130" r="7" fill="#5d9a2b" opacity="0.7"/>
+  <circle cx="180" cy="40" r="6" fill="#6ba832" opacity="0.6"/>
+</svg>

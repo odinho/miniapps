@@ -7,7 +7,7 @@ Create a professional, mobile-responsive brochure website for Trekonsult AS, an 
 - [ ] Create index.html as the main landing page
 - [ ] Create style.css with professional, clean styling
 - [ ] Implement fully responsive mobile-first design
-- [ ] Add placeholder images for visual elements
+- [ ] Add placeholder images for visual elements (ie. https://placehold.co/ or https://placecats.com/300/200)
 - [ ] Include company contact information (Phone: 45 22 55 22)
 - [ ] Display service area information (Stavanger og områder i nærheten)
 - [ ] Present company description and services offered
@@ -71,3 +71,36 @@ Create a professional, mobile-responsive brochure website for Trekonsult AS, an 
   - Proper meta tags for SEO
   - Accessible markup with aria-labels, proper headings, and semantic elements
   - SVG icons embedded inline for phone, Instagram, and location
+
+### Iteration 2 - Completed
+- [x] Created `style.css` with comprehensive professional styling
+  - CSS Custom Properties for consistent theming (colors, typography, spacing)
+  - Natural, earthy color palette (forest greens, browns) appropriate for tree care business
+  - Mobile-first responsive design with breakpoints at 768px and 1024px
+  - Professional button styles with hover states
+  - Sticky header with navigation
+  - Hero section with gradient background and subtle pattern
+  - Service cards with hover effects
+  - About section with credentials styling
+  - Service area section with contrasting green background
+  - Contact section with CTA card
+  - Footer with dark green background
+  - Accessibility features:
+    - Skip link support
+    - Focus-visible states
+    - prefers-reduced-motion support
+    - prefers-contrast support
+    - Print styles
+  - Smooth scroll behavior
+  - Box shadows and transitions for visual polish
+
+- [x] Created placeholder SVG images in `/images/` directory:
+  - `hero-tree.svg` - Illustrated tree for hero section
+  - `arborist-work.svg` - Arborist working on tree illustration
+  - `icon-assessment.svg` - Service icon for tree assessment
+  - `icon-pruning.svg` - Service icon for pruning advice
+  - `icon-preservation.svg` - Service icon for tree preservation
+  - `icon-consulting.svg` - Service icon for general consulting
+  - `icon-location.svg` - Location marker icon with tree
+
+**Next iteration:** Test the site for visual quality, validate HTML/CSS, and make 2 design improvements
