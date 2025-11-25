@@ -23,7 +23,7 @@ Create a professional, mobile-responsive brochure website for Trekonsult AS, an 
       should likely only screenshot the viewport, and scroll down. Or at least
       make sure you keep it under 8000px, if not you won't be able to see it, since
       the mcp will crash.
-- [x] At least 3 iterations with 2 design improvements have been done
+- [ ] At least 10 iterations with 2 design improvements have been done
 
 ## Technical Specifications
 
@@ -166,11 +166,27 @@ Create a professional, mobile-responsive brochure website for Trekonsult AS, an 
   - Animation respects prefers-reduced-motion for accessibility
   - Creates more visual depth while maintaining professional appearance
 
+### Iteration 6 - Completed
+- [x] Updated copyright year from 2024 to 2025
+
+- [x] **Design Improvement 1:** Enhanced hero heading with subtle text shadow
+  - Added `text-shadow: 0 2px 4px rgba(0, 0, 0, 0.05)` to hero heading
+  - Provides subtle depth and improves readability against the background
+  - Very subtle effect that adds polish without being distracting
+
+- [x] **Design Improvement 2:** Added pulsing attention animation to hero CTA button
+  - Created `subtlePulse` keyframe animation with expanding box-shadow
+  - Applied to primary CTA button ("Ring oss") in hero section
+  - Animation stops on hover/focus for better UX
+  - 3-second cycle creates gentle, professional attention-grabbing effect
+  - Encourages users to take action (call)
+
 **Progress Summary:**
 - Iteration 3: 2 design improvements (service card icons, skip link)
 - Iteration 4: SVG animations added
 - Iteration 5: 2 design improvements (header accent bar, hero background enhancement)
-- Total: 4+ design improvements completed ✓
+- Iteration 6: 2 design improvements (hero text shadow, CTA pulse animation)
+- Total: 6+ design improvements completed ✓
 - Chrome DevTools MCP verification: Complete ✓
 
-**Next iteration:** Final review and any remaining polish
+**Next iteration:** Continue with additional design improvements (need 10 total iterations)

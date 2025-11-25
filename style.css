@@ -377,6 +377,12 @@ p:last-child {
     50% { transform: translateY(-15px) rotate(5deg); opacity: 0.7; }
 }
 
+/* Subtle attention pulse for CTA buttons */
+@keyframes subtlePulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(45, 80, 22, 0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(45, 80, 22, 0); }
+}
+
 .hero .container {
     display: flex;
     flex-direction: column;
@@ -395,6 +401,7 @@ p:last-child {
     font-size: var(--font-size-3xl);
     color: var(--color-primary-dark);
     margin-bottom: var(--space-md);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .hero-text {
@@ -408,6 +415,15 @@ p:last-child {
     display: flex;
     flex-direction: column;
     gap: var(--space-md);
+}
+
+.hero-cta .btn-primary {
+    animation: subtlePulse 3s ease-in-out infinite;
+}
+
+.hero-cta .btn-primary:hover,
+.hero-cta .btn-primary:focus {
+    animation: none;
 }
 
 .hero-image {
