@@ -104,6 +104,7 @@
 
 html {
     scroll-behavior: smooth;
+    scroll-padding-top: 60px; /* Offset for sticky header */
     -webkit-text-size-adjust: 100%;
 }
 
@@ -625,6 +626,8 @@ p:last-child {
     color: var(--color-text);
     margin-bottom: var(--space-md);
     letter-spacing: -0.015em;
+    word-wrap: break-word;
+    hyphens: auto;
 }
 
 .service-card p {
@@ -833,12 +836,15 @@ p:last-child {
     display: flex;
     flex-direction: column;
     gap: var(--space-2xl);
+    align-items: center;
 }
 
 .contact-info {
     display: flex;
     flex-direction: column;
-    gap: var(--space-xl);
+    gap: var(--space-lg);
+    width: 100%;
+    max-width: 600px;
 }
 
 .contact-item h3 {
@@ -911,13 +917,17 @@ p:last-child {
 .cta-card {
     background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
     color: #ffffff;
-    padding: var(--space-2xl);
-    border-radius: var(--radius-xl);
+    padding: var(--space-xl) var(--space-lg);
+    border-radius: var(--radius-lg);
     text-align: center;
     position: relative;
     box-shadow: 0 16px 48px rgba(26, 77, 46, 0.28);
     transition: all var(--transition-base);
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 280px;
 }
 
 .cta-card::before {
@@ -929,27 +939,28 @@ p:last-child {
 }
 
 .cta-card:hover {
-    transform: translateY(-4px) scale(1.02);
+    transform: translateY(-4px);
     box-shadow: 0 24px 64px rgba(26, 77, 46, 0.35);
 }
 
 .cta-card h3 {
     color: #ffffff;
-    font-size: var(--font-size-2xl);
-    font-weight: var(--font-weight-black);
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
     margin-bottom: var(--space-md);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.015em;
 }
 
 .cta-card p {
     color: rgba(255, 255, 255, 0.92);
-    margin-bottom: var(--space-xl);
+    margin-bottom: var(--space-lg);
     line-height: var(--line-height-relaxed);
+    font-size: var(--font-size-sm);
 }
 
 .cta-card .btn-primary {
-    background-color: #ffffff;
-    color: var(--color-primary);
+    background: #ffffff;
+    color: var(--color-primary-dark);
     border-color: #ffffff;
     font-weight: var(--font-weight-bold);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -1181,21 +1192,25 @@ p:last-child {
 
     .contact-grid {
         flex-direction: row;
-        align-items: flex-start;
+        align-items: center;
+        gap: var(--space-3xl);
     }
 
     .contact-info {
         flex: 1;
         flex-direction: row;
         flex-wrap: wrap;
+        gap: var(--space-xl) var(--space-2xl);
+        max-width: none;
     }
 
     .contact-item {
-        flex: 1 1 45%;
+        flex: 1 1 calc(50% - var(--space-xl));
+        min-width: 200px;
     }
 
     .contact-cta {
-        flex: 0 0 320px;
+        flex: 0 0 360px;
     }
 
     /* Footer */
