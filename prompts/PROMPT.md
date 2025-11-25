@@ -23,7 +23,7 @@ Create a professional, mobile-responsive brochure website for Trekonsult AS, an 
       should likely only screenshot the viewport, and scroll down. Or at least
       make sure you keep it under 8000px, if not you won't be able to see it, since
       the mcp will crash.
-- [ ] At least 10 iterations with 2 design improvements have been done
+- [ ] At least 10 iterations with 4-5 design improvements have been done
 
 ## Technical Specifications
 
@@ -233,6 +233,47 @@ Interpret creatively and make unexpected choices that feel genuinely designed fo
 - Iteration 6: 2 design improvements (hero text shadow, CTA pulse animation)
 - Iteration 7: 2 design improvements (wave section dividers, footer gradient)
 - Total: 8+ design improvements completed ✓
+- Chrome DevTools MCP verification: Complete ✓
+
+### Iteration 8 - Completed
+- [x] Verified visual rendering with Chrome DevTools MCP
+  - Checked header, hero, services, about, service area, contact, and footer sections
+  - Verified all previous improvements still display correctly
+
+- [x] **Design Improvement 1:** Added hover animation to logo
+  - Logo text now scales up 2% on hover
+  - Color transitions to lighter green for visual feedback
+  - Smooth transition effect for professional feel
+
+- [x] **Design Improvement 2:** Enhanced navigation with uppercase styling
+  - Navigation links are now uppercase with letter-spacing (0.03em)
+  - Smaller font size for refined appearance
+  - More elegant, professional look typical of premium websites
+
+- [x] **Design Improvement 3:** Enhanced credentials card
+  - Added inner shadow for subtle depth effect
+  - Added decorative leaf SVG accent in top-right corner
+  - Leaf is rotated 25deg for visual interest
+  - Creates more visual richness in the about section
+
+- [x] **Design Improvement 4:** Improved service area section with gradient and pattern
+  - Changed from flat background to diagonal gradient (green → dark green → green)
+  - Added subtle dot pattern overlay for texture
+  - Creates more visual depth and premium appearance
+
+- [x] **Design Improvement 5:** Added bounce animation to service area icon
+  - Location pin icon now has gentle vertical bounce animation (3s cycle)
+  - 6px movement creates subtle attention-drawing effect
+  - Respects prefers-reduced-motion accessibility setting
+
+**Progress Summary:**
+- Iteration 3: 2 design improvements (service card icons, skip link)
+- Iteration 4: SVG animations added
+- Iteration 5: 2 design improvements (header accent bar, hero background enhancement)
+- Iteration 6: 2 design improvements (hero text shadow, CTA pulse animation)
+- Iteration 7: 2 design improvements (wave section dividers, footer gradient)
+- Iteration 8: 5 design improvements (logo hover, nav uppercase, credentials card, service area gradient, icon bounce)
+- Total: 13+ design improvements completed ✓
 - Chrome DevTools MCP verification: Complete ✓
 
 **Next iteration:** Continue with additional design improvements (need 10 total iterations)
