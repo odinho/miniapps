@@ -17,6 +17,8 @@ Create a professional, mobile-responsive brochure website for Trekonsult AS, an 
 - [x] Use semantic HTML5 elements
 - [x] JavaScript only for progressive enhancement (if used at all)
 - [x] Perform 2 design improvements per iteration when reviewing
+- [x] The SVGs can have smooth nice animations that look professional
+- [ ] Check with chrome devtools mcp with the image in iterations
 
 ## Technical Specifications
 
@@ -124,4 +126,20 @@ Create a professional, mobile-responsive brochure website for Trekonsult AS, an 
   - Skip link styled (hidden by default, visible on focus)
   - Improves keyboard navigation for users
 
-**Next iteration:** Review remaining checklist items and mark all requirements as complete
+### Iteration 4 - Completed
+- [x] Added smooth professional CSS animations to SVG images
+  - **hero-tree.svg**:
+    - Gentle sway animation on canopy layers (6s, 5s, 4s at different speeds)
+    - Floating animation on highlight spots
+    - Pulsing effect on decorative elements
+    - All animations respect `prefers-reduced-motion` media query
+  - **arborist-work.svg**:
+    - Tree sway animation for main tree
+    - Canopy floating effect
+    - Arborist arm working animation (simulates pruning motion)
+    - Tool work animation
+    - Background tree gentle sway
+    - All animations respect `prefers-reduced-motion` media query
+  - Animations are subtle and professional, enhancing the visual appeal without being distracting
+
+**Next iteration:** Check with Chrome DevTools MCP to verify visual rendering

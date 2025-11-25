@@ -19,6 +19,35 @@
     </linearGradient>
   </defs>
 
+  <style>
+    @media (prefers-reduced-motion: no-preference) {
+      .sway-slow { animation: sway 6s ease-in-out infinite; transform-origin: 200px 160px; }
+      .sway-medium { animation: sway 5s ease-in-out infinite 0.5s; transform-origin: 200px 160px; }
+      .sway-fast { animation: sway 4s ease-in-out infinite 1s; transform-origin: 200px 160px; }
+      .float { animation: float 4s ease-in-out infinite; }
+      .float-delayed { animation: float 4s ease-in-out infinite 1s; }
+      .float-slow { animation: float 5s ease-in-out infinite 2s; }
+      .pulse { animation: pulse 3s ease-in-out infinite; }
+      .pulse-delayed { animation: pulse 3s ease-in-out infinite 1.5s; }
+
+      @keyframes sway {
+        0%, 100% { transform: rotate(0deg); }
+        25% { transform: rotate(1deg); }
+        75% { transform: rotate(-1deg); }
+      }
+
+      @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-3px); }
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 0.6; }
+        50% { opacity: 0.8; }
+      }
+    }
+  </style>
+
   <!-- Background -->
   <rect width="400" height="300" fill="url(#skyGrad)"/>
 
@@ -33,21 +62,27 @@
   <path d="M175 285 Q160 290 150 285" stroke="#6b4423" stroke-width="3" fill="none"/>
   <path d="M225 285 Q240 290 250 285" stroke="#6b4423" stroke-width="3" fill="none"/>
 
-  <!-- Tree canopy layers -->
-  <ellipse cx="200" cy="130" rx="110" ry="80" fill="url(#leafGrad1)"/>
-  <ellipse cx="160" cy="100" rx="60" ry="50" fill="url(#leafGrad2)"/>
-  <ellipse cx="240" cy="95" rx="55" ry="45" fill="url(#leafGrad2)"/>
-  <ellipse cx="200" cy="70" rx="70" ry="50" fill="url(#leafGrad1)"/>
-  <ellipse cx="180" cy="55" rx="40" ry="35" fill="url(#leafGrad2)"/>
-  <ellipse cx="220" cy="50" rx="35" ry="30" fill="url(#leafGrad2)"/>
+  <!-- Tree canopy layers with gentle sway animation -->
+  <g class="sway-slow">
+    <ellipse cx="200" cy="130" rx="110" ry="80" fill="url(#leafGrad1)"/>
+  </g>
+  <g class="sway-medium">
+    <ellipse cx="160" cy="100" rx="60" ry="50" fill="url(#leafGrad2)"/>
+    <ellipse cx="240" cy="95" rx="55" ry="45" fill="url(#leafGrad2)"/>
+  </g>
+  <g class="sway-fast">
+    <ellipse cx="200" cy="70" rx="70" ry="50" fill="url(#leafGrad1)"/>
+    <ellipse cx="180" cy="55" rx="40" ry="35" fill="url(#leafGrad2)"/>
+    <ellipse cx="220" cy="50" rx="35" ry="30" fill="url(#leafGrad2)"/>
+  </g>
 
-  <!-- Highlight spots -->
-  <circle cx="150" cy="90" r="15" fill="#6ba832" opacity="0.6"/>
-  <circle cx="220" cy="60" r="12" fill="#6ba832" opacity="0.5"/>
-  <circle cx="250" cy="110" r="10" fill="#6ba832" opacity="0.4"/>
+  <!-- Highlight spots with floating animation -->
+  <circle cx="150" cy="90" r="15" fill="#6ba832" opacity="0.6" class="float"/>
+  <circle cx="220" cy="60" r="12" fill="#6ba832" opacity="0.5" class="float-delayed"/>
+  <circle cx="250" cy="110" r="10" fill="#6ba832" opacity="0.4" class="float-slow"/>
 
-  <!-- Decorative elements - small leaves/detail -->
-  <circle cx="130" cy="120" r="8" fill="#5d9a2b" opacity="0.7"/>
-  <circle cx="270" cy="130" r="7" fill="#5d9a2b" opacity="0.7"/>
-  <circle cx="180" cy="40" r="6" fill="#6ba832" opacity="0.6"/>
+  <!-- Decorative elements with pulse animation -->
+  <circle cx="130" cy="120" r="8" fill="#5d9a2b" class="pulse"/>
+  <circle cx="270" cy="130" r="7" fill="#5d9a2b" class="pulse-delayed"/>
+  <circle cx="180" cy="40" r="6" fill="#6ba832" class="pulse"/>
 </svg>
