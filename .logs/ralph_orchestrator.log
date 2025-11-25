@@ -1,0 +1,10 @@
+2025-11-25 17:45:13,452 - ralph.orchestrator - INFO - Logging initialized - Level: INFO, Console: True, File: None, Dir: .logs
+2025-11-25 17:49:11,944 - ralph.orchestrator - INFO - Logging initialized - Level: INFO, Console: True, File: None, Dir: .logs
+2025-11-25 17:49:19,796 - ralph.orchestrator - INFO - Logging initialized - Level: INFO, Console: True, File: None, Dir: .logs
+2025-11-25 17:53:04,883 - ralph.orchestrator - INFO - Logging initialized - Level: INFO, Console: True, File: None, Dir: .logs
+2025-11-25 17:54:41,308 - ralph.orchestrator - INFO - Logging initialized - Level: INFO, Console: True, File: None, Dir: .logs
+2025-11-25 17:54:41,335 - ralph.adapter.qchat - INFO - Q Chat adapter initialized - Command: q, Default timeout: 600s, Trust tools: True
+2025-11-25 19:24:59,192 - ralph.orchestrator - INFO - Logging initialized - Level: INFO, Console: True, File: None, Dir: .logs
+2025-11-25 19:24:59,224 - ralph.adapter.qchat - INFO - Q Chat adapter initialized - Command: q, Default timeout: 600s, Trust tools: True
+2025-11-25 20:04:31,897 - ralph.orchestrator - INFO - Logging initialized - Level: INFO, Console: True, File: None, Dir: .logs
+2025-11-25 20:04:31,924 - ralph.adapter.qchat - INFO - Q Chat adapter initialized - Command: q, Default timeout: 600s, Trust tools: True
