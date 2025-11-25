@@ -459,17 +459,33 @@ p:last-child {
 
 .service-card {
     background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     padding: var(--space-xl);
     text-align: center;
     transition: all var(--transition-base);
+    position: relative;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+/* Gradient border effect using pseudo-element */
+.service-card::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: calc(var(--radius-lg) + 2px);
+    background: var(--color-border);
+    z-index: -1;
+    transition: background var(--transition-base);
 }
 
 .service-card:hover {
     transform: translateY(-4px);
     box-shadow: var(--shadow-lg);
-    border-color: var(--color-primary-light);
+}
+
+.service-card:hover::before {
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
 }
 
 .service-icon {
@@ -759,6 +775,22 @@ p:last-child {
     background-color: var(--color-primary-dark);
     color: rgba(255, 255, 255, 0.9);
     padding: var(--space-xl) 0 var(--space-md);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Decorative tree silhouette in footer background */
+.site-footer::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    right: -20px;
+    width: 200px;
+    height: 180px;
+    background: url("data:image/svg+xml,%3Csvg viewBox='0 0 100 90' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M50 0 L65 30 L55 30 L70 55 L60 55 L75 80 L25 80 L40 55 L30 55 L45 30 L35 30 Z' fill='%23ffffff' fill-opacity='0.03'/%3E%3Crect x='45' y='80' width='10' height='10' fill='%23ffffff' fill-opacity='0.03'/%3E%3C/svg%3E") no-repeat center;
+    background-size: contain;
+    pointer-events: none;
+    opacity: 0.8;
 }
 
 .footer-content {
