@@ -492,31 +492,6 @@ p:last-child {
     width: 100%;
 }
 
-/* Animated gradient underline for section headings */
-.services h2::after,
-.about-text h2::after,
-.contact h2::after {
-    content: '';
-    position: absolute;
-    bottom: -8px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 80px;
-    height: 3px;
-    background: linear-gradient(90deg,
-        var(--color-primary) 0%,
-        var(--color-accent) 50%,
-        var(--color-primary) 100%);
-    background-size: 200% 100%;
-    border-radius: var(--radius-full);
-    animation: gradientShift 3s ease-in-out infinite;
-}
-
-@keyframes gradientShift {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-}
-
 .services-grid {
     display: grid;
     grid-template-columns: 1fr;
