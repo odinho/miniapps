@@ -424,19 +424,27 @@ p:last-child {
 }
 
 .service-icon {
-    width: 64px;
-    height: 64px;
+    width: 80px;
+    height: 80px;
     margin: 0 auto var(--space-md);
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: var(--color-surface-alt);
+    background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-primary) 100%);
     border-radius: var(--radius-full);
+    box-shadow: 0 4px 12px rgba(45, 80, 22, 0.25);
+    transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+.service-card:hover .service-icon {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(45, 80, 22, 0.35);
 }
 
 .service-icon img {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
+    filter: brightness(0) invert(1);
 }
 
 .service-card h3 {
