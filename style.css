@@ -486,6 +486,34 @@ p:last-child {
     font-size: var(--font-size-2xl);
     color: var(--color-primary-dark);
     margin-bottom: var(--space-sm);
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+/* Animated gradient underline for section headings */
+.services h2::after,
+.about-text h2::after,
+.contact h2::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    height: 3px;
+    background: linear-gradient(90deg,
+        var(--color-primary) 0%,
+        var(--color-accent) 50%,
+        var(--color-primary) 100%);
+    background-size: 200% 100%;
+    border-radius: var(--radius-full);
+    animation: gradientShift 3s ease-in-out infinite;
+}
+
+@keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
 }
 
 .services-grid {
@@ -503,6 +531,24 @@ p:last-child {
     position: relative;
     border: 2px solid transparent;
     background-clip: padding-box;
+    /* Staggered entrance animation */
+    animation: cardReveal 0.6s ease-out backwards;
+}
+
+.service-card:nth-child(1) { animation-delay: 0.1s; }
+.service-card:nth-child(2) { animation-delay: 0.2s; }
+.service-card:nth-child(3) { animation-delay: 0.3s; }
+.service-card:nth-child(4) { animation-delay: 0.4s; }
+
+@keyframes cardReveal {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* Gradient border effect using pseudo-element */
@@ -781,12 +827,21 @@ p:last-child {
 }
 
 .contact-link .icon {
-    width: 24px;
-    height: 24px;
+    width: 40px;
+    height: 40px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
+    background: linear-gradient(135deg, var(--color-surface-alt) 0%, var(--color-border-light) 100%);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-base);
+}
+
+.contact-link:hover .icon,
+.contact-link:focus .icon {
+    background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-primary) 100%);
+    color: #ffffff;
 }
 
 .contact-link .icon svg {
@@ -803,13 +858,15 @@ p:last-child {
 }
 
 .contact-item p .icon {
-    width: 24px;
-    height: 24px;
+    width: 40px;
+    height: 40px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--color-primary);
+    background: linear-gradient(135deg, var(--color-surface-alt) 0%, var(--color-border-light) 100%);
+    border-radius: var(--radius-md);
 }
 
 .cta-card {
@@ -818,6 +875,18 @@ p:last-child {
     padding: var(--space-xl);
     border-radius: var(--radius-lg);
     text-align: center;
+    position: relative;
+    box-shadow:
+        0 10px 40px rgba(45, 80, 22, 0.3),
+        0 0 60px rgba(45, 80, 22, 0.1);
+    transition: box-shadow var(--transition-base), transform var(--transition-base);
+}
+
+.cta-card:hover {
+    transform: translateY(-3px);
+    box-shadow:
+        0 15px 50px rgba(45, 80, 22, 0.4),
+        0 0 80px rgba(45, 80, 22, 0.15);
 }
 
 .cta-card h3 {
