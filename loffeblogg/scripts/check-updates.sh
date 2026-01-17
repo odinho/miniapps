@@ -44,23 +44,29 @@ NEEDS_REBUILD=false
 
 # Read config
 FOLDER_ID=$(jq -r '.folderId' "$CONFIG_FILE")
-DOCS=$(jq -c '.documents[]' "$CONFIG_FILE")
+
+# Get known documents from meta cache (populated by previous builds)
+DOC_IDS=$(jq -r 'keys[]' "$META_FILE" 2>/dev/null)
+
+if [[ -z "$DOC_IDS" ]]; then
+  echo "No cached documents found. Run 'npm run build' first to populate cache."
+  echo "Or use --check-new to discover documents from Drive folder."
+  exit 0
+fi
 
 echo "Checking for document updates..."
 echo
 
-# Check each document
-while IFS= read -r doc; do
-  DOC_ID=$(echo "$doc" | jq -r '.id')
-  DOC_NAME=$(echo "$doc" | jq -r '.name')
-
-  # Get current modified time from Google Drive
+# Check each cached document
+for DOC_ID in $DOC_IDS; do
+  # Get current info from Google Drive
   INFO=$($GDRIVE files info "$DOC_ID" 2>/dev/null) || {
-    echo "  ⚠ $DOC_NAME: Failed to get info (auth issue?)"
+    echo "  ⚠ $DOC_ID: Failed to get info (auth issue?)"
     continue
   }
 
-  MODIFIED=$(echo "$INFO" | grep -i "modified:" | awk '{print $2, $3}')
+  DOC_NAME=$(echo "$INFO" | grep -i "^Name:" | sed 's/^Name: *//')
+  MODIFIED=$(echo "$INFO" | grep -i "^Modified:" | sed 's/^Modified: *//')
 
   # Get cached modified time
   CACHED=$(jq -r --arg id "$DOC_ID" '.[$id].modifiedTime // ""' "$META_FILE")
@@ -68,14 +74,14 @@ while IFS= read -r doc; do
   if [[ "$MODIFIED" != "$CACHED" ]]; then
     echo "  ✓ $DOC_NAME: Changed ($MODIFIED)"
     # Update cache
-    jq --arg id "$DOC_ID" --arg time "$MODIFIED" \
-      '.[$id] = {modifiedTime: $time}' "$META_FILE" > "$META_FILE.tmp" \
+    jq --arg id "$DOC_ID" --arg time "$MODIFIED" --arg name "$DOC_NAME" \
+      '.[$id] = {modifiedTime: $time, name: $name}' "$META_FILE" > "$META_FILE.tmp" \
       && mv "$META_FILE.tmp" "$META_FILE"
     NEEDS_REBUILD=true
   else
     echo "  · $DOC_NAME: No changes"
   fi
-done <<< "$DOCS"
+done
 
 # Optionally check for new documents
 if $CHECK_NEW; then
@@ -87,8 +93,8 @@ if $CHECK_NEW; then
     echo "  ⚠ Failed to list folder"
   }
 
-  # Extract IDs we already know about
-  KNOWN_IDS=$(jq -r '.documents[].id' "$CONFIG_FILE")
+  # Extract IDs we already know about (from meta cache)
+  KNOWN_IDS=$(jq -r 'keys[]' "$META_FILE" 2>/dev/null)
 
   # Parse gdrive output (skip header line)
   # Format: Id  Name  Type  Size  Created
