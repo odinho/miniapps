@@ -157,12 +157,13 @@ export function splitIntoDays(html, defaultYear = 2026) {
 
   // Content before first heading (intro)
   if (headings[0].index > 0) {
-    const introContent = elements
-      .slice(0, headings[0].index)
-      .map(el => $.html(el))
-      .join('\n');
+    const introElements = elements.slice(0, headings[0].index);
+    const introContent = introElements.map(el => $.html(el)).join('\n');
 
-    if (introContent.trim()) {
+    // Check if intro has actual text content (not just empty tags)
+    const introText = introElements.map(el => $(el).text()).join('').trim();
+
+    if (introText) {
       sections.push({
         heading: 'Intro',
         dateInfo: null,
@@ -322,6 +323,14 @@ function removeIntroTitle(html, title) {
 }
 
 /**
+ * Check if HTML content has any actual text (not just empty tags)
+ */
+function hasTextContent(html) {
+  const $ = load(html);
+  return $('body').text().trim().length > 0 || $('img').length > 0;
+}
+
+/**
  * Parse a complete document into structured format
  */
 export function parseDocument(docId, html, name, imageMap = new Map()) {
@@ -345,6 +354,12 @@ export function parseDocument(docId, html, name, imageMap = new Map()) {
       content: cleanedContent,
       images
     };
+  }).filter(day => {
+    // Filter out empty intro sections (no text and no images)
+    if (day.heading === 'Intro') {
+      return hasTextContent(day.content) || day.images.length > 0;
+    }
+    return true;
   });
 
   return {
