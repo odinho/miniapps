@@ -6,7 +6,7 @@ showHero: true
 
 <section class="posts-list">
   {% for post in posts %}
-  <article class="post-card">
+  <a href="/{{ post.slug }}/" class="post-card">
     <div class="post-card-thumbnail">
       {% set firstImage = null %}
       {% for day in post.days %}
@@ -23,7 +23,7 @@ showHero: true
       {% endif %}
     </div>
     <div class="post-card-content">
-      <h2><a href="/{{ post.slug }}/">{{ post.title }}</a></h2>
+      <h2>{{ post.title }}</h2>
       {% set firstDay = post.days | selectattr("date") | first %}
       {% set lastDay = post.days | selectattr("date") | last %}
       {% if firstDay and lastDay %}
@@ -33,9 +33,9 @@ showHero: true
       </p>
       {% endif %}
       <p class="post-summary">{{ post.days | length }} dagar</p>
-      <a href="/{{ post.slug }}/" class="read-more">Les meir &rarr;</a>
+      <span class="read-more">Les meir &rarr;</span>
     </div>
-  </article>
+  </a>
   {% else %}
   <p class="no-posts">Ingen innlegg enno. Køyr <code>npm run build</code> for å henta innhald.</p>
   {% endfor %}
