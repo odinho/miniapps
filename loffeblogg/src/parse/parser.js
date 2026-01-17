@@ -226,6 +226,7 @@ export function extractImagesFromSection(html, imageMap = new Map()) {
 /**
  * Clean up Google Docs HTML
  * Removes unnecessary styles and classes while preserving structure
+ * Also detects and marks image captions
  */
 export function cleanHtml(html) {
   const $ = load(html);
@@ -249,7 +250,40 @@ export function cleanHtml(html) {
   $('a[id^="cmnt"]').parent().remove(); // Comment links
   $('sup').has('a[id^="cmnt"]').remove(); // Comment reference superscripts
 
-  return $.html();
+  // Detect and mark image captions
+  // A caption is a short paragraph that follows a paragraph containing an image
+  // (may have empty paragraphs in between)
+  const paragraphs = $('p').toArray();
+  for (let i = 0; i < paragraphs.length - 1; i++) {
+    const current = $(paragraphs[i]);
+
+    // Check if current paragraph has an image (can be nested in spans)
+    if (current.find('img').length > 0) {
+      // Look for caption in next few paragraphs (skip empty ones)
+      for (let j = i + 1; j < Math.min(i + 4, paragraphs.length); j++) {
+        const candidate = $(paragraphs[j]);
+        const candidateText = candidate.text().trim();
+
+        // Skip empty paragraphs
+        if (candidateText.length === 0) continue;
+
+        // Check if this looks like a caption:
+        // - Short (< 80 chars)
+        // - Doesn't contain an image
+        // - Doesn't look like a date heading
+        if (candidateText.length < 80 &&
+            candidate.find('img').length === 0 &&
+            !containsDate(candidateText)) {
+          candidate.addClass('image-caption');
+        }
+        // Stop looking after first non-empty paragraph
+        break;
+      }
+    }
+  }
+
+  // Return just the body content, not the html wrapper
+  return $('body').html() || $.html();
 }
 
 /**

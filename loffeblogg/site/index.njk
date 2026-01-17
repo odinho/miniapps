@@ -1,27 +1,40 @@
 ---
 layout: base.njk
 title: Heim
+showHero: true
 ---
-
-<section class="intro">
-  <h1>Reisebrev</h1>
-  <p class="lead">Opplevingar og eventyr frå reisa.</p>
-</section>
 
 <section class="posts-list">
   {% for post in posts %}
   <article class="post-card">
-    <h2><a href="/{{ post.slug }}/">{{ post.title }}</a></h2>
-    {% set firstDay = post.days | selectattr("date") | first %}
-    {% set lastDay = post.days | selectattr("date") | last %}
-    {% if firstDay and lastDay %}
-    <p class="post-dates">
-      {{ firstDay.date | kortdato }} – {{ lastDay.date | kortdato }}
-      {% if firstDay.location %}· {{ firstDay.location }}{% endif %}
-    </p>
-    {% endif %}
-    <p class="post-summary">{{ post.days | length }} dagar</p>
-    <a href="/{{ post.slug }}/" class="read-more">Les meir →</a>
+    <div class="post-card-thumbnail">
+      {% set firstImage = null %}
+      {% for day in post.days %}
+        {% if not firstImage and day.images and day.images.length > 0 %}
+          {% set firstImage = day.images[0] %}
+        {% endif %}
+      {% endfor %}
+      {% if firstImage %}
+        <img src="{{ firstImage.thumbnail }}" alt="{{ post.title }}">
+      {% else %}
+        <div class="no-image">
+          <span>&#9992;</span>
+        </div>
+      {% endif %}
+    </div>
+    <div class="post-card-content">
+      <h2><a href="/{{ post.slug }}/">{{ post.title }}</a></h2>
+      {% set firstDay = post.days | selectattr("date") | first %}
+      {% set lastDay = post.days | selectattr("date") | last %}
+      {% if firstDay and lastDay %}
+      <p class="post-dates">
+        {{ firstDay.date | kortdato }} – {{ lastDay.date | kortdato }}
+        {% if firstDay.location %} · {{ firstDay.location }}{% endif %}
+      </p>
+      {% endif %}
+      <p class="post-summary">{{ post.days | length }} dagar</p>
+      <a href="/{{ post.slug }}/" class="read-more">Les meir &rarr;</a>
+    </div>
   </article>
   {% else %}
   <p class="no-posts">Ingen innlegg enno. Køyr <code>npm run build</code> for å henta innhald.</p>

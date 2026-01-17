@@ -10,13 +10,13 @@ permalink: "/{{ post.slug }}/"
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ post.title }} - Reiseblogg</title>
+  <title>{{ post.title }} - Loffetur</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <header class="site-header">
     <nav>
-      <a href="/" class="site-title">← Tilbake</a>
+      <a href="/" class="site-title">Loffetur</a>
     </nav>
   </header>
 
@@ -47,8 +47,8 @@ permalink: "/{{ post.slug }}/"
         <section class="day-section" {% if day.date %}id="dag-{{ loop.index }}"{% endif %}>
           {% if day.heading and day.heading != 'Intro' %}
           <h2 class="day-heading">
-            {% if day.location %}{{ day.location }} · {% endif %}
-            {% if day.dateFormatted %}{{ day.dateFormatted }}{% else %}{{ day.heading }}{% endif %}
+            {% if day.location %}<span class="location-name">{{ day.location }}</span> · {% endif %}
+            <span class="date-text">{{ day.dateFormatted }}</span>
           </h2>
           {% endif %}
 

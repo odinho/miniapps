@@ -3,15 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ title }}{% if title %} - {% endif %}Reiseblogg</title>
+  <title>{{ title }}{% if title %} - {% endif %}Loffetur</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <header class="site-header">
     <nav>
-      <a href="/" class="site-title">Reiseblogg</a>
+      <a href="/" class="site-title">Loffetur</a>
     </nav>
   </header>
+
+  {% if showHero %}
+  <section class="hero">
+    <div class="hero-content">
+      <h1>Loffetur</h1>
+      <p class="tagline">Me, Skjalg og Unni Elisabeth, skal reise på loffetur i ca 90 dagar frå Thailand i nord til Australia i sør. Store delar av turen er vert til undervegs.</p>
+    </div>
+  </section>
+  {% endif %}
 
   <main>
     {{ content | safe }}
