@@ -251,6 +251,18 @@ export function cleanHtml(html) {
   $('a[id^="cmnt"]').parent().remove(); // Comment links
   $('sup').has('a[id^="cmnt"]').remove(); // Comment reference superscripts
 
+  // Clean up images - remove all inline styles
+  $('img').each((i, el) => {
+    $(el).removeAttr('style');
+  });
+
+  // Unwrap image wrapper spans (Google Docs wraps images in styled spans)
+  $('span').has('img').each((i, el) => {
+    const $span = $(el);
+    const $img = $span.find('img');
+    $span.replaceWith($img);
+  });
+
   // Detect and mark image captions
   // A caption is a short paragraph that follows a paragraph containing an image
   // (may have empty paragraphs in between)

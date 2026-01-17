@@ -442,27 +442,15 @@ a.post-card:hover h2 {
   display: none;
 }
 
-/* ===== Images - Full Width & Beautiful ===== */
+/* ===== Images ===== */
 .day-content img {
   display: block;
-  width: 100% !important;
-  max-width: 100% !important;
-  height: auto !important;
-  margin: 2rem 0;
+  max-width: 100%;
+  max-height: var(--content-width);
+  height: auto;
+  margin: 1.5rem auto 0.5rem;
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-/* Override Google Docs inline styles on image wrappers */
-.day-content span[style*="overflow: hidden"] {
-  display: block !important;
-  width: 100% !important;
-  height: auto !important;
-  overflow: visible !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: none !important;
-  transform: none !important;
 }
 
 /* Image captions */
@@ -471,8 +459,7 @@ a.post-card:hover h2 {
   font-size: 0.9rem;
   color: var(--color-text-muted);
   font-style: italic;
-  margin: -1.2rem 0 2rem;
-  padding: 0 1rem;
+  margin: 0 0 1.5rem;
 }
 
 /* ===== Footer ===== */
