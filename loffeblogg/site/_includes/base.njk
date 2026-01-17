@@ -6,10 +6,11 @@
   <title>{{ title }}{% if title %} - {% endif %}Loffetur</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
-<body>
+<body id="top">
   <header class="site-header">
     <nav>
       <a href="/" class="site-title">Loffetur</a>
+      {% if not showHero %}<span class="site-tagline">90 dagar frå Thailand til Australia</span>{% endif %}
     </nav>
   </header>
 
@@ -27,7 +28,20 @@
   </main>
 
   <footer class="site-footer">
-    <p>Reisebrev frå verdas krå</p>
+    <div class="footer-content">
+      <nav class="footer-route">
+        {% for p in posts | reverse %}
+        {% if isPost and p.slug == post.slug %}
+        <span class="route-stop">{{ p.title }}</span>
+        {% else %}
+        <a href="/{{ p.slug }}/" class="route-stop">{{ p.title }}</a>
+        {% endif %}
+        <span class="route-arrow">→</span>
+        {% endfor %}
+        <span class="route-stop">Australia</span>
+      </nav>
+      <p class="footer-links"><a href="/">Heim</a> · <a href="#top">Til toppen ↑</a></p>
+    </div>
   </footer>
 
   <script>
@@ -51,6 +65,91 @@
 
       lastScroll = currentScroll;
     }, { passive: true });
+
+    {% if isPost %}
+    // Day navigation - scroll tracking and mobile dropdown
+    (function() {
+      const dayNav = document.querySelector('.day-nav');
+      const dayIndicator = document.querySelector('.day-indicator');
+      const indicatorText = document.querySelector('.indicator-text');
+      const daySections = document.querySelectorAll('.day-section[data-day]');
+      const navItems = document.querySelectorAll('.day-nav li');
+
+      if (!dayNav || !daySections.length) return;
+
+      // Build data for indicator text
+      const dayData = [];
+      navItems.forEach((item, i) => {
+        const link = item.querySelector('a');
+        const date = link.querySelector('.date')?.textContent || '';
+        const location = link.querySelector('.location')?.textContent || '';
+        dayData.push({ date, location });
+      });
+
+      // Update active day in nav and indicator
+      function setActiveDay(dayNum) {
+        navItems.forEach((item, i) => {
+          item.classList.toggle('active', i + 1 === dayNum);
+        });
+
+        if (indicatorText && dayData[dayNum - 1]) {
+          const data = dayData[dayNum - 1];
+          indicatorText.textContent = data.location
+            ? `${data.date} · ${data.location}`
+            : data.date;
+        }
+      }
+
+      // Intersection Observer for scroll tracking
+      let currentDay = 1;
+      const observerOptions = {
+        root: null,
+        rootMargin: '-20% 0px -60% 0px',
+        threshold: 0
+      };
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const dayNum = parseInt(entry.target.dataset.day, 10);
+            if (dayNum && dayNum !== currentDay) {
+              currentDay = dayNum;
+              setActiveDay(dayNum);
+            }
+          }
+        });
+      }, observerOptions);
+
+      daySections.forEach(section => observer.observe(section));
+
+      // Initialize active state
+      setActiveDay(1);
+
+      // Mobile dropdown toggle
+      if (dayIndicator) {
+        dayIndicator.addEventListener('click', () => {
+          const isOpen = dayNav.classList.toggle('open');
+          dayIndicator.setAttribute('aria-expanded', isOpen);
+        });
+
+        // Close dropdown when clicking a link
+        dayNav.addEventListener('click', (e) => {
+          if (e.target.closest('a')) {
+            dayNav.classList.remove('open');
+            dayIndicator.setAttribute('aria-expanded', 'false');
+          }
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+          if (!e.target.closest('.day-sidebar')) {
+            dayNav.classList.remove('open');
+            dayIndicator.setAttribute('aria-expanded', 'false');
+          }
+        });
+      }
+    })();
+    {% endif %}
   </script>
 </body>
 </html>

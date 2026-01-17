@@ -4,47 +4,44 @@ pagination:
   size: 1
   alias: post
 permalink: "/{{ post.slug }}/"
+layout: base.njk
+title: "{{ post.title }}"
+isPost: true
 ---
-<!DOCTYPE html>
-<html lang="nn">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ post.title }} - Loffetur</title>
-  <link rel="stylesheet" href="/css/style.css">
-</head>
-<body>
-  <header class="site-header">
-    <nav>
-      <a href="/" class="site-title">Loffetur</a>
-    </nav>
-  </header>
+<article class="post">
+  {% set daysWithDates = post.days | selectattr("date") | list %}
+  <div class="post-layout">
+    {% if daysWithDates | length > 0 %}
+    <aside class="day-sidebar">
+      <button class="day-indicator" aria-expanded="false" aria-controls="day-nav">
+        <span class="indicator-text">Dag 1</span>
+        <svg class="indicator-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <nav class="day-nav" id="day-nav">
+        <ul>
+          {% for day in daysWithDates %}
+          <li{% if loop.first %} class="active"{% endif %}>
+            <a href="#dag-{{ loop.index }}" data-day="{{ loop.index }}">
+              <span class="date">{{ day.date | kortdato }}</span>
+              {% if day.location %}<span class="location">{{ day.location }}</span>{% endif %}
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </nav>
+    </aside>
+    {% endif %}
 
-  <main>
-    <article class="post">
+    <div class="post-main">
       <header class="post-header">
         <h1>{{ post.title }}</h1>
-        {% set daysWithDates = post.days | selectattr("date") | list %}
-        {% if daysWithDates | length > 0 %}
-        <nav class="day-nav">
-          <p>Gå til dag:</p>
-          <ul>
-            {% for day in daysWithDates %}
-            <li>
-              <a href="#dag-{{ loop.index }}">
-                <span class="date">{{ day.date | kortdato }}</span>
-                {% if day.location %}<span class="location">{{ day.location }}</span>{% endif %}
-              </a>
-            </li>
-            {% endfor %}
-          </ul>
-        </nav>
-        {% endif %}
       </header>
 
       <div class="post-content">
         {% for day in post.days %}
-        <section class="day-section" {% if day.date %}id="dag-{{ loop.index }}"{% endif %}>
+        <section class="day-section" {% if day.date %}id="dag-{{ loop.index }}" data-day="{{ loop.index }}"{% endif %}>
           {% if day.heading and day.heading != 'Intro' %}
           <h2 class="day-heading">
             {% if day.location %}<span class="location-name">{{ day.location }}</span> · {% endif %}
@@ -58,34 +55,6 @@ permalink: "/{{ post.slug }}/"
         </section>
         {% endfor %}
       </div>
-    </article>
-  </main>
-
-  <footer class="site-footer">
-    <p>Reisebrev frå verdas krå</p>
-  </footer>
-
-  <script>
-    // Hide header on scroll down, show on scroll up
-    let lastScroll = 0;
-    const header = document.querySelector('.site-header');
-
-    window.addEventListener('scroll', () => {
-      const currentScroll = window.scrollY;
-
-      if (currentScroll <= 0) {
-        header.classList.remove('hidden');
-        return;
-      }
-
-      if (currentScroll > lastScroll && currentScroll > 60) {
-        header.classList.add('hidden');
-      } else if (currentScroll < lastScroll) {
-        header.classList.remove('hidden');
-      }
-
-      lastScroll = currentScroll;
-    }, { passive: true });
-  </script>
-</body>
-</html>
+    </div>
+  </div>
+</article>
