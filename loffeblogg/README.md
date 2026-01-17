@@ -54,10 +54,24 @@ Parseren kjenner att desse datformata i dokumenta:
 
 Datoar i starten av korte avsnitt vert brukt til å dele dokumentet i dagseksjonar.
 
+## Automatisk oppdatering
+
+For å køyre på ein server med cron/systemd-timer, bruk `scripts/check-updates.sh`.
+Krev [gdrive v3](https://github.com/glotlabs/gdrive/releases) med `gdrive account add`.
+
+```bash
+# Sjekk om dokument har endra seg
+./scripts/check-updates.sh
+
+# Sjekk også etter nye dokument i mappa
+./scripts/check-updates.sh --check-new
+```
+
 ## Mappestruktur
 
 ```
 cache/          # Nedlasta dokument og bilete (gitignorert)
+scripts/        # Hjelpeskript (cron-oppdatering)
 site/           # 11ty malar og stil
 src/            # Hentings- og parsingskript
 _site/          # Generert nettstad (gitignorert)

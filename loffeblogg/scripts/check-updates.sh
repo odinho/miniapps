@@ -1,0 +1,108 @@
+#!/bin/bash
+# Check for Google Doc updates using gdrive CLI
+#
+# Requires gdrive v3: https://github.com/glotlabs/gdrive/releases
+# One-time auth: gdrive account add
+#
+# Usage:
+#   ./scripts/check-updates.sh              # Check existing docs
+#   ./scripts/check-updates.sh --check-new  # Also check for new docs in folder
+#
+# Cron examples:
+#   */30 * * * * cd /path/to/loffeblogg && ./scripts/check-updates.sh
+#   0 6 * * *    cd /path/to/loffeblogg && ./scripts/check-updates.sh --check-new
+#
+# New documents are reported but must be added to config.json manually.
+# Documents prefixed "Kopi av " (Google's copy prefix) are ignored.
+
+set -e
+cd "$(dirname "$0")/.."
+
+CONFIG_FILE="config.json"
+META_FILE="cache/meta/documents.json"
+CHECK_NEW=false
+
+[[ "$1" == "--check-new" ]] && CHECK_NEW=true
+
+# Ensure meta directory exists
+mkdir -p cache/meta
+
+# Initialize meta file if missing
+[[ -f "$META_FILE" ]] || echo '{}' > "$META_FILE"
+
+NEEDS_REBUILD=false
+
+# Read config
+FOLDER_ID=$(jq -r '.folderId' "$CONFIG_FILE")
+DOCS=$(jq -c '.documents[]' "$CONFIG_FILE")
+
+echo "Checking for document updates..."
+echo
+
+# Check each document
+while IFS= read -r doc; do
+  DOC_ID=$(echo "$doc" | jq -r '.id')
+  DOC_NAME=$(echo "$doc" | jq -r '.name')
+
+  # Get current modified time from Google Drive
+  INFO=$(gdrive files info "$DOC_ID" 2>/dev/null) || {
+    echo "  ⚠ $DOC_NAME: Failed to get info (auth issue?)"
+    continue
+  }
+
+  MODIFIED=$(echo "$INFO" | grep -i "modified:" | awk '{print $2, $3}')
+
+  # Get cached modified time
+  CACHED=$(jq -r --arg id "$DOC_ID" '.[$id].modifiedTime // ""' "$META_FILE")
+
+  if [[ "$MODIFIED" != "$CACHED" ]]; then
+    echo "  ✓ $DOC_NAME: Changed ($MODIFIED)"
+    # Update cache
+    jq --arg id "$DOC_ID" --arg time "$MODIFIED" \
+      '.[$id] = {modifiedTime: $time}' "$META_FILE" > "$META_FILE.tmp" \
+      && mv "$META_FILE.tmp" "$META_FILE"
+    NEEDS_REBUILD=true
+  else
+    echo "  · $DOC_NAME: No changes"
+  fi
+done <<< "$DOCS"
+
+# Optionally check for new documents
+if $CHECK_NEW; then
+  echo
+  echo "Checking for new documents in folder..."
+
+  # List all Google Docs in folder
+  FOLDER_DOCS=$(gdrive files list --query "'$FOLDER_ID' in parents and mimeType='application/vnd.google-apps.document'" 2>/dev/null) || {
+    echo "  ⚠ Failed to list folder"
+  }
+
+  # Extract IDs we already know about
+  KNOWN_IDS=$(jq -r '.documents[].id' "$CONFIG_FILE")
+
+  # Parse gdrive output (skip header line)
+  # Format: Id  Name  Type  Size  Created
+  echo "$FOLDER_DOCS" | tail -n +2 | while IFS= read -r line; do
+    NEW_ID=$(echo "$line" | awk '{print $1}')
+    # Name is between ID and "document" type
+    NEW_NAME=$(echo "$line" | sed -E 's/^[^ ]+\s+//' | sed -E 's/\s+document\s+.*//')
+
+    # Skip copies and already-known docs
+    if [[ "$NEW_NAME" == "Kopi av "* ]]; then
+      continue
+    fi
+    if ! echo "$KNOWN_IDS" | grep -q "$NEW_ID"; then
+      echo "  📄 New document: $NEW_NAME"
+      echo "     ID: $NEW_ID"
+    fi
+  done
+fi
+
+echo
+
+if $NEEDS_REBUILD; then
+  echo "🔨 Changes detected, rebuilding..."
+  node src/build.js --force && npx @11ty/eleventy
+else
+  echo "✓ No changes detected"
+fi
