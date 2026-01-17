@@ -19,11 +19,11 @@ export default async function() {
         })
     );
 
-    // Sort by first date in each post (earliest first)
+    // Sort by first date in each post (latest first)
     posts.sort((a, b) => {
-      const dateA = a.days.find(d => d.date)?.date || '9999';
-      const dateB = b.days.find(d => d.date)?.date || '9999';
-      return dateA.localeCompare(dateB);
+      const dateA = a.days.find(d => d.date)?.date || '0000';
+      const dateB = b.days.find(d => d.date)?.date || '0000';
+      return dateB.localeCompare(dateA);
     });
 
     return posts;

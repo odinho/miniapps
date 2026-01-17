@@ -194,7 +194,7 @@ main {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.08);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   display: grid;
-  grid-template-columns: 180px 1fr;
+  grid-template-columns: 200px 1fr;
   gap: 0;
 }
 
@@ -204,14 +204,17 @@ main {
 }
 
 .post-card-thumbnail {
-  width: 180px;
-  height: 140px;
+  width: 200px;
+  min-height: 100%;
   overflow: hidden;
   background: linear-gradient(135deg, var(--color-primary-light), var(--color-accent));
   position: relative;
 }
 
 .post-card-thumbnail img {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -506,7 +509,8 @@ main {
 
   .post-card-thumbnail {
     width: 100%;
-    height: 180px;
+    height: 200px;
+    min-height: 200px;
   }
 
   .post-header h1 {
