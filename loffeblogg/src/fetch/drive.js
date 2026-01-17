@@ -87,8 +87,12 @@ async function loadConfig() {
 
 /**
  * Get list of documents - tries gdrive first, falls back to config
+ * When using gdrive, also fetches modifiedTime for each document
+ * @param {Object} options
+ * @param {boolean} options.withMeta - fetch modifiedTime for each doc (default: true with gdrive)
+ * @returns {Promise<Array<{id: string, name: string, modifiedTime?: string}>>}
  */
-export async function listDocuments() {
+export async function listDocuments({ withMeta = true } = {}) {
   const config = await loadConfig();
   const gdrivePath = findGdrive();
 
@@ -99,8 +103,15 @@ export async function listDocuments() {
       console.warn('  Brukar config.json i staden.\n');
     } else {
       try {
-        const docs = listViaGdrive(gdrivePath, config.folderId);
+        let docs = listViaGdrive(gdrivePath, config.folderId);
         if (docs.length > 0) {
+          // Fetch modifiedTime for each document
+          if (withMeta) {
+            docs = await Promise.all(docs.map(async (doc) => {
+              const meta = await getDocumentMeta(doc.id);
+              return { ...doc, modifiedTime: meta?.modifiedTime };
+            }));
+          }
           return docs;
         }
         console.warn('⚠ Ingen dokument funne i Drive-mappa. Brukar config.json.\n');
@@ -131,6 +142,19 @@ export async function listDocuments() {
   }
 
   return [];
+}
+
+/**
+ * Save document list to cache (for check-updates.sh)
+ */
+export async function cacheDocuments(documents) {
+  const meta = {};
+  for (const doc of documents) {
+    if (doc.modifiedTime) {
+      meta[doc.id] = { modifiedTime: doc.modifiedTime };
+    }
+  }
+  await saveCachedMeta(meta);
 }
 
 /**
