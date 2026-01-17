@@ -176,8 +176,9 @@ export function splitIntoDays(html, defaultYear = 2026) {
     const startIndex = heading.index;
     const endIndex = i < headings.length - 1 ? headings[i + 1].index : elements.length;
 
+    // Skip the heading element itself (startIndex + 1) to avoid duplicate date display
     const sectionContent = elements
-      .slice(startIndex, endIndex)
+      .slice(startIndex + 1, endIndex)
       .map(el => $.html(el))
       .join('\n');
 
@@ -287,6 +288,28 @@ export function cleanHtml(html) {
 }
 
 /**
+ * Remove title text from intro content if it matches the document title
+ * This prevents showing the title twice (once in h1, once in content)
+ */
+function removeIntroTitle(html, title) {
+  const $ = load(html);
+  const titleLower = title.toLowerCase();
+
+  // Check first few paragraphs for title-only content
+  $('p').each((i, el) => {
+    if (i > 2) return false; // Only check first 3 paragraphs
+    const $el = $(el);
+    const text = $el.text().trim();
+    // Remove if text matches title (case-insensitive)
+    if (text.toLowerCase() === titleLower) {
+      $el.remove();
+    }
+  });
+
+  return $('body').html() || $.html();
+}
+
+/**
  * Parse a complete document into structured format
  */
 export function parseDocument(docId, html, name, imageMap = new Map()) {
@@ -296,12 +319,18 @@ export function parseDocument(docId, html, name, imageMap = new Map()) {
   const days = sections.map(section => {
     const images = extractImagesFromSection(section.content, imageMap);
 
+    // For intro sections, remove title if it appears in content
+    let cleanedContent = cleanHtml(section.content);
+    if (section.heading === 'Intro') {
+      cleanedContent = removeIntroTitle(cleanedContent, title);
+    }
+
     return {
       date: section.dateInfo?.date ? formatDateISO(section.dateInfo.date) : null,
       dateFormatted: section.dateInfo?.date ? formatDateNynorsk(section.dateInfo.date) : null,
       location: section.dateInfo?.location || null,
       heading: section.heading,
-      content: cleanHtml(section.content),
+      content: cleanedContent,
       images
     };
   });
