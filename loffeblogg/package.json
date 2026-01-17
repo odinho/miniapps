@@ -1,0 +1,22 @@
+{
+  "name": "loffeblogg",
+  "version": "1.0.0",
+  "description": "Reiseblogg-generator frå Google Drive",
+  "type": "module",
+  "scripts": {
+    "fetch": "node src/build.js --fetch-only",
+    "parse": "node src/build.js --parse-only",
+    "build": "node src/build.js && npx @11ty/eleventy",
+    "serve": "npx @11ty/eleventy --serve",
+    "dev": "node src/build.js && npx @11ty/eleventy --serve",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@11ty/eleventy": "^3.0.0",
+    "cheerio": "^1.0.0",
+    "sharp": "^0.33.0"
+  },
+  "devDependencies": {
+    "vitest": "^2.0.0"
+  }
+}

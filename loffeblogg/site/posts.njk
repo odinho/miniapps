@@ -1,0 +1,68 @@
+---
+pagination:
+  data: posts
+  size: 1
+  alias: post
+permalink: "/{{ post.slug }}/"
+---
+<!DOCTYPE html>
+<html lang="nn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ post.title }} - Reiseblogg</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <nav>
+      <a href="/" class="site-title">← Tilbake</a>
+    </nav>
+  </header>
+
+  <main>
+    <article class="post">
+      <header class="post-header">
+        <h1>{{ post.title }}</h1>
+        {% set daysWithDates = post.days | selectattr("date") | list %}
+        {% if daysWithDates | length > 0 %}
+        <nav class="day-nav">
+          <p>Gå til dag:</p>
+          <ul>
+            {% for day in daysWithDates %}
+            <li>
+              <a href="#dag-{{ loop.index }}">
+                {{ day.date | kortdato }}
+                {% if day.location %}<span class="location">{{ day.location }}</span>{% endif %}
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+        </nav>
+        {% endif %}
+      </header>
+
+      <div class="post-content">
+        {% for day in post.days %}
+        <section class="day-section" {% if day.date %}id="dag-{{ loop.index }}"{% endif %}>
+          {% if day.heading and day.heading != 'Intro' %}
+          <h2 class="day-heading">
+            {% if day.location %}{{ day.location }} · {% endif %}
+            {% if day.dateFormatted %}{{ day.dateFormatted }}{% else %}{{ day.heading }}{% endif %}
+          </h2>
+          {% endif %}
+
+          <div class="day-content">
+            {{ day.content | safe }}
+          </div>
+        </section>
+        {% endfor %}
+      </div>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <p>Reisebrev frå verdas krå</p>
+  </footer>
+</body>
+</html>

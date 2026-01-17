@@ -1,0 +1,29 @@
+---
+layout: base.njk
+title: Heim
+---
+
+<section class="intro">
+  <h1>Reisebrev</h1>
+  <p class="lead">Opplevingar og eventyr frå reisa.</p>
+</section>
+
+<section class="posts-list">
+  {% for post in posts %}
+  <article class="post-card">
+    <h2><a href="/{{ post.slug }}/">{{ post.title }}</a></h2>
+    {% set firstDay = post.days | selectattr("date") | first %}
+    {% set lastDay = post.days | selectattr("date") | last %}
+    {% if firstDay and lastDay %}
+    <p class="post-dates">
+      {{ firstDay.date | kortdato }} – {{ lastDay.date | kortdato }}
+      {% if firstDay.location %}· {{ firstDay.location }}{% endif %}
+    </p>
+    {% endif %}
+    <p class="post-summary">{{ post.days | length }} dagar</p>
+    <a href="/{{ post.slug }}/" class="read-more">Les meir →</a>
+  </article>
+  {% else %}
+  <p class="no-posts">Ingen innlegg enno. Køyr <code>npm run build</code> for å henta innhald.</p>
+  {% endfor %}
+</section>

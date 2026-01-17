@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Cache directories (regenerated from Google Drive)
+cache/
+
+# Built site
+_site/
+
+# Environment variables
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
