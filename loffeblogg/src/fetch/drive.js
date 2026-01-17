@@ -168,23 +168,24 @@ export async function getDocumentMeta(docId) {
 }
 
 /**
- * Get cached folder metadata
+ * Get cached document metadata
+ * Format: { "docId": { modifiedTime: "..." }, ... }
  */
 export async function getCachedMeta() {
-  const metaPath = path.join(CACHE_DIR, 'folder.json');
+  const metaPath = path.join(CACHE_DIR, 'documents.json');
   try {
     return JSON.parse(await fs.readFile(metaPath, 'utf-8'));
   } catch {
-    return { documents: {}, lastChecked: null };
+    return {};
   }
 }
 
 /**
- * Save folder metadata to cache
+ * Save document metadata to cache
  */
 export async function saveCachedMeta(meta) {
   await fs.mkdir(CACHE_DIR, { recursive: true });
-  const metaPath = path.join(CACHE_DIR, 'folder.json');
+  const metaPath = path.join(CACHE_DIR, 'documents.json');
   await fs.writeFile(metaPath, JSON.stringify(meta, null, 2));
 }
 

@@ -4,7 +4,7 @@
  * Fetches documents from Google Drive, processes images, and parses content
  */
 
-import { listDocuments } from './fetch/drive.js';
+import { listDocuments, getDocumentMeta, saveCachedMeta, getCachedMeta } from './fetch/drive.js';
 import { fetchAndCacheDocument } from './fetch/docs.js';
 import { processImages, replaceImageUrls } from './fetch/images.js';
 import { parseDocument, saveParsedDocument } from './parse/parser.js';
@@ -65,6 +65,17 @@ async function main() {
       }
     }
   }
+
+  // Update meta cache with document info (for check-updates.sh)
+  // Format: { "docId": { modifiedTime: "..." }, ... }
+  const meta = {};
+  for (const doc of documents) {
+    const docMeta = await getDocumentMeta(doc.id);
+    if (docMeta?.modifiedTime) {
+      meta[doc.id] = { modifiedTime: docMeta.modifiedTime };
+    }
+  }
+  await saveCachedMeta(meta);
 
   console.log('\n🎉 Bygging fullført!\n');
 
