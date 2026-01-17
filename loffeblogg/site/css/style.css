@@ -504,6 +504,11 @@ a.post-card:hover h2 {
   font-size: 1.1rem;
 }
 
+.day-heading .dot {
+  color: var(--color-primary);
+  margin-right: 0.3rem;
+}
+
 /* ===== Day Content ===== */
 .day-content {
   font-size: 1.05rem;

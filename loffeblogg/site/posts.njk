@@ -44,8 +44,8 @@ isPost: true
         <section class="day-section" {% if day.date %}id="dag-{{ loop.index }}" data-day="{{ loop.index }}"{% endif %}>
           {% if day.heading and day.heading != 'Intro' %}
           <h2 class="day-heading">
-            {% if day.location %}<span class="location-name">{{ day.location }}</span> · {% endif %}
-            <span class="date-text">{{ day.dateFormatted }}</span>
+            {% if day.location %}<span class="location-name">{{ day.location }}</span>{% endif %}
+            <span class="date-text">{% if day.location %}<span class="dot">·</span> {% endif %}{{ day.dateFormatted }}</span>
           </h2>
           {% endif %}
 
