@@ -22,6 +22,16 @@ CONFIG_FILE="config.json"
 META_FILE="cache/meta/documents.json"
 CHECK_NEW=false
 
+# Find gdrive binary - local cache first, then global
+if [[ -x "cache/gdrive/gdrive" ]]; then
+  GDRIVE="./cache/gdrive/gdrive"
+elif command -v gdrive &>/dev/null; then
+  GDRIVE="gdrive"
+else
+  echo "❌ gdrive not found. Install with: npm run setup:gdrive"
+  exit 1
+fi
+
 [[ "$1" == "--check-new" ]] && CHECK_NEW=true
 
 # Ensure meta directory exists
@@ -45,7 +55,7 @@ while IFS= read -r doc; do
   DOC_NAME=$(echo "$doc" | jq -r '.name')
 
   # Get current modified time from Google Drive
-  INFO=$(gdrive files info "$DOC_ID" 2>/dev/null) || {
+  INFO=$($GDRIVE files info "$DOC_ID" 2>/dev/null) || {
     echo "  ⚠ $DOC_NAME: Failed to get info (auth issue?)"
     continue
   }
@@ -73,7 +83,7 @@ if $CHECK_NEW; then
   echo "Checking for new documents in folder..."
 
   # List all Google Docs in folder
-  FOLDER_DOCS=$(gdrive files list --query "'$FOLDER_ID' in parents and mimeType='application/vnd.google-apps.document'" 2>/dev/null) || {
+  FOLDER_DOCS=$($GDRIVE files list --query "'$FOLDER_ID' in parents and mimeType='application/vnd.google-apps.document'" 2>/dev/null) || {
     echo "  ⚠ Failed to list folder"
   }
 
