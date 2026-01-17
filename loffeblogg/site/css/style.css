@@ -318,64 +318,93 @@ a.post-card:hover h2 {
   color: var(--color-primary-dark);
 }
 
-/* ===== Day Navigation ===== */
+/* ===== Day Navigation - Vertical Timeline ===== */
 .day-nav {
-  background: var(--color-warm-cream);
-  padding: 1.2rem 1.5rem;
-  border-radius: 10px;
-  border: 1px solid var(--color-border);
+  padding: 0.5rem 0;
+  margin: 0.5rem 0;
 }
 
 .day-nav p {
-  margin: 0 0 0.8rem;
-  font-weight: 600;
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  display: none;
 }
 
 .day-nav ul {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  position: relative;
+  padding-left: 1.5rem;
+}
+
+/* Vertical timeline line */
+.day-nav ul::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 5px;
+  width: 2px;
+  background: var(--color-border);
+}
+
+.day-nav li {
+  position: relative;
 }
 
 .day-nav li a {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 0.5rem 1rem;
-  background: var(--color-card-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  text-align: center;
-  min-width: 80px;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  text-decoration: none;
+  transition: all 0.15s ease;
 }
 
-.day-nav li a:hover {
+/* Timeline dot */
+.day-nav li a::before {
+  content: '';
+  position: absolute;
+  left: -1.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 10px;
+  background: var(--color-warm-bg);
+  border: 2px solid var(--color-primary-light);
+  border-radius: 50%;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.day-nav li:first-child a::before {
   background: var(--color-primary);
   border-color: var(--color-primary);
-  color: #fff;
-  text-decoration: none;
-  transform: translateY(-1px);
 }
 
-.day-nav li a:hover .location {
-  color: rgba(255, 255, 255, 0.85);
+.day-nav li a:hover::before {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  transform: translateY(-50%) scale(1.2);
+}
+
+.day-nav li a .date {
+  font-weight: 600;
+  color: var(--color-primary);
+  white-space: nowrap;
+  min-width: 3.5rem;
+}
+
+.day-nav li a:hover .date {
+  color: var(--color-primary-dark);
 }
 
 .day-nav .location {
-  color: var(--color-text-light);
-  font-size: 0.75rem;
-  font-weight: 400;
-  margin-top: 0.15rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.day-nav li a:hover .location {
+  color: var(--color-text);
 }
 
 /* ===== Day Sections ===== */
@@ -506,16 +535,6 @@ a.post-card:hover h2 {
 
   .post-header h1 {
     font-size: 2rem;
-  }
-
-  .day-nav ul {
-    flex-direction: column;
-  }
-
-  .day-nav li a {
-    display: block;
-    text-align: center;
-    min-width: auto;
   }
 
   .day-heading {

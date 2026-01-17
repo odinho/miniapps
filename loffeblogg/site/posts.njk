@@ -32,7 +32,7 @@ permalink: "/{{ post.slug }}/"
             {% for day in daysWithDates %}
             <li>
               <a href="#dag-{{ loop.index }}">
-                {{ day.date | kortdato }}
+                <span class="date">{{ day.date | kortdato }}</span>
                 {% if day.location %}<span class="location">{{ day.location }}</span>{% endif %}
               </a>
             </li>
