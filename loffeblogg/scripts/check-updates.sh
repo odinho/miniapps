@@ -8,9 +8,13 @@
 #   ./scripts/check-updates.sh              # Check existing docs
 #   ./scripts/check-updates.sh --check-new  # Also check for new docs in folder
 #
-# Cron examples:
-#   */30 * * * * cd /path/to/loffeblogg && ./scripts/check-updates.sh
-#   0 6 * * *    cd /path/to/loffeblogg && ./scripts/check-updates.sh --check-new
+# Exit codes:
+#   0 = Changes detected and rebuilt successfully
+#   1 = Error (build failed, auth issue, etc.)
+#   2 = No changes detected
+#
+# Example with deploy:
+#   ./scripts/check-updates.sh && npm run deploy
 #
 # New documents are reported but must be added to config.json manually.
 # Documents prefixed "Kopi av " (Google's copy prefix) are ignored.
@@ -119,6 +123,8 @@ echo
 if $NEEDS_REBUILD; then
   echo "🔨 Changes detected, rebuilding..."
   node src/build.js --force && npx @11ty/eleventy
+  # Exit 0 = rebuilt successfully
 else
   echo "✓ No changes detected"
+  exit 2  # Exit 2 = no changes (not an error, just nothing to do)
 fi

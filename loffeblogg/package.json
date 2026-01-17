@@ -10,7 +10,8 @@
     "serve": "npx @11ty/eleventy --serve",
     "dev": "node src/build.js && npx @11ty/eleventy --serve",
     "test": "vitest",
-    "setup:gdrive": "./scripts/setup-gdrive.sh"
+    "setup:gdrive": "./scripts/setup-gdrive.sh",
+    "deploy": "rsync -avz --delete _site/ odin@hetzner.s0.no:loffetur.s0.no/"
   },
   "dependencies": {
     "@11ty/eleventy": "^3.0.0",
