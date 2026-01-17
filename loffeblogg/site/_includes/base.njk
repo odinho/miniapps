@@ -29,5 +29,28 @@
   <footer class="site-footer">
     <p>Reisebrev frå verdas krå</p>
   </footer>
+
+  <script>
+    // Hide header on scroll down, show on scroll up
+    let lastScroll = 0;
+    const header = document.querySelector('.site-header');
+
+    window.addEventListener('scroll', () => {
+      const currentScroll = window.scrollY;
+
+      if (currentScroll <= 0) {
+        header.classList.remove('hidden');
+        return;
+      }
+
+      if (currentScroll > lastScroll && currentScroll > 60) {
+        header.classList.add('hidden');
+      } else if (currentScroll < lastScroll) {
+        header.classList.remove('hidden');
+      }
+
+      lastScroll = currentScroll;
+    }, { passive: true });
+  </script>
 </body>
 </html>
