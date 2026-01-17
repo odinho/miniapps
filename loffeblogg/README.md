@@ -6,7 +6,12 @@ Genererer ein statisk reiseblogg frå Google Docs.
 
 ```bash
 npm install
+npm run setup:gdrive   # Last ned gdrive CLI (valfritt)
+gdrive account add     # Autentiser mot Google (valfritt)
 ```
+
+Med gdrive vert dokument automatisk oppdaga frå Drive-mappa.
+Utan gdrive må du liste dokument manuelt i `config.json`.
 
 ## Bruk
 
@@ -26,23 +31,20 @@ npm test
 
 ## Konfigurasjon
 
-Rediger `config.json` for å leggje til nye dokument:
+`config.json` inneheld mappe-ID og (valfritt) manuelle dokument:
 
 ```json
 {
-  "documents": [
-    {
-      "id": "GOOGLE_DOC_ID",
-      "name": "Dokumentnamn"
-    }
-  ]
+  "folderId": "GOOGLE_DRIVE_FOLDER_ID",
+  "documents": []
 }
 ```
 
-Dokument-ID finn du i URL-en til dokumentet:
-`https://docs.google.com/document/d/DENNE_ID_EN/edit`
+- `folderId`: Henta frå Drive-URL (`drive.google.com/drive/folders/DENNE_ID`)
+- `documents`: Valfri liste dersom du ikkje brukar gdrive
 
 Dokumenta må vera delt offentleg ("Alle med lenkja").
+Dokument med namn som startar med "Kopi av " vert ignorert.
 
 ## Datoformat
 
