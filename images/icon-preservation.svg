@@ -1,22 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <defs>
-    <linearGradient id="preserveGreen" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#4a7c23;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#2d5016;stop-opacity:1" />
-    </linearGradient>
-  </defs>
+  <!-- Sharp shield -->
+  <path d="M32 2 L58 10 L58 30 C58 46 46 56 32 62 C18 56 6 46 6 30 L6 10 Z" fill="currentColor"/>
 
-  <!-- Protective shield outline -->
-  <path d="M32 6 L52 14 L52 32 Q52 50 32 58 Q12 50 12 32 L12 14 Z" fill="none" stroke="url(#preserveGreen)" stroke-width="3"/>
-
-  <!-- Shield fill -->
-  <path d="M32 10 L48 16 L48 32 Q48 46 32 53 Q16 46 16 32 L16 16 Z" fill="#e8f4e8"/>
-
-  <!-- Tree inside shield -->
-  <rect x="29" y="35" width="6" height="14" fill="#8b7355"/>
-  <ellipse cx="32" cy="30" rx="12" ry="10" fill="url(#preserveGreen)"/>
-  <ellipse cx="32" cy="22" rx="8" ry="7" fill="#4a7c23"/>
-
-  <!-- Heart symbol (representing care) -->
-  <path d="M32 48 L28 44 Q24 40 28 36 Q32 34 32 38 Q32 34 36 36 Q40 40 36 44 Z" fill="#c95a5a" opacity="0.8"/>
+  <!-- Tree cutout - crisp -->
+  <rect x="29" y="38" width="6" height="14" fill="white"/>
+  <path d="M32 14 L44 34 L20 34 Z" fill="white"/>
+  <path d="M32 8 L40 22 L24 22 Z" fill="white"/>
 </svg>

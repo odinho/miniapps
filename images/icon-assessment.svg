@@ -1,24 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <defs>
-    <linearGradient id="iconGreen" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#4a7c23;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#2d5016;stop-opacity:1" />
-    </linearGradient>
-  </defs>
+  <!-- Magnifying glass -->
+  <circle cx="26" cy="26" r="18" stroke="currentColor" stroke-width="6" fill="none"/>
+  <path d="M40 40 L58 58" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
 
-  <!-- Clipboard background -->
-  <rect x="12" y="8" width="40" height="50" rx="3" fill="#f5f4f0" stroke="url(#iconGreen)" stroke-width="2"/>
-
-  <!-- Clipboard top -->
-  <rect x="22" y="4" width="20" height="10" rx="2" fill="url(#iconGreen)"/>
-  <circle cx="32" cy="9" r="3" fill="#f5f4f0"/>
-
-  <!-- Tree silhouette on clipboard -->
-  <rect x="29" y="35" width="6" height="18" fill="#8b7355"/>
-  <ellipse cx="32" cy="30" rx="14" ry="12" fill="url(#iconGreen)"/>
-  <ellipse cx="32" cy="22" rx="10" ry="8" fill="#4a7c23"/>
-
-  <!-- Checkmark -->
-  <circle cx="48" cy="48" r="10" fill="url(#iconGreen)"/>
-  <path d="M43 48 L46 51 L53 44" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Tree inside magnifying glass -->
+  <rect x="24" y="28" width="4" height="8" fill="currentColor"/>
+  <ellipse cx="26" cy="24" rx="8" ry="6" fill="currentColor"/>
+  <ellipse cx="26" cy="19" rx="5" ry="4" fill="currentColor"/>
 </svg>

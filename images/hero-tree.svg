@@ -48,11 +48,8 @@
     }
   </style>
 
-  <!-- Background -->
-  <rect width="400" height="300" fill="url(#skyGrad)"/>
-
-  <!-- Ground -->
-  <ellipse cx="200" cy="290" rx="180" ry="20" fill="#3d6b1d" opacity="0.2"/>
+  <!-- Ground shadow - fades at edges -->
+  <ellipse cx="200" cy="280" rx="120" ry="15" fill="#3d6b1d" opacity="0.15"/>
 
   <!-- Tree trunk -->
   <path d="M185 290 L190 200 L175 200 L180 160 L195 160 L195 290 Z" fill="url(#trunkGrad)"/>

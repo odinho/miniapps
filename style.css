@@ -106,6 +106,7 @@ html {
     scroll-behavior: smooth;
     scroll-padding-top: 60px; /* Offset for sticky header */
     -webkit-text-size-adjust: 100%;
+    background-color: var(--color-primary-dark);
 }
 
 body {
@@ -354,7 +355,9 @@ p:last-child {
 
 .main-nav ul {
     display: flex;
-    gap: var(--space-xl);
+    gap: var(--space-lg);
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
 .main-nav a {
@@ -366,6 +369,7 @@ p:last-child {
     text-transform: uppercase;
     font-size: var(--font-size-xs);
     transition: color var(--transition-base);
+    white-space: nowrap;
 }
 
 .main-nav a::after {
@@ -471,7 +475,6 @@ p:last-child {
 
 .hero-image {
     max-width: 300px;
-    opacity: 0.35;
     filter: drop-shadow(0 20px 40px rgba(26, 77, 46, 0.08));
 }
 
@@ -729,16 +732,11 @@ p:last-child {
 .about-image {
     max-width: 400px;
     margin: 0 auto;
-    opacity: 0.4;
 }
 
 .about-image img {
     border-radius: var(--radius-lg);
-    transition: transform var(--transition-base), box-shadow var(--transition-base), opacity var(--transition-base);
-}
-
-.about-image:hover {
-    opacity: 0.5;
+    transition: transform var(--transition-base), box-shadow var(--transition-base);
 }
 
 .about-image:hover img {

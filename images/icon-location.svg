@@ -1,19 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
   <defs>
-    <linearGradient id="locGreen" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#4a7c23;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#2d5016;stop-opacity:1" />
-    </linearGradient>
+    <mask id="treeCutout">
+      <!-- White = visible, Black = hidden -->
+      <rect width="48" height="48" fill="white"/>
+      <!-- Tree cutout -->
+      <rect x="22.5" y="24" width="3" height="6" fill="black"/>
+      <ellipse cx="24" cy="20" rx="6" ry="5" fill="black"/>
+      <ellipse cx="24" cy="16" rx="4" ry="3.5" fill="black"/>
+    </mask>
   </defs>
 
-  <!-- Location pin -->
-  <path d="M24 4 C14 4 6 12 6 22 C6 34 24 44 24 44 C24 44 42 34 42 22 C42 12 34 4 24 4 Z" fill="url(#locGreen)"/>
-
-  <!-- Inner circle -->
-  <circle cx="24" cy="20" r="8" fill="#f5f4f0"/>
-
-  <!-- Tree inside pin -->
-  <rect x="22.5" y="21" width="3" height="5" fill="#8b7355"/>
-  <ellipse cx="24" cy="18" rx="5" ry="4" fill="#4a7c23"/>
-  <ellipse cx="24" cy="15" rx="3.5" ry="3" fill="#5d9a2b"/>
+  <!-- Location pin with tree cutout -->
+  <path d="M24 4 C14 4 6 12 6 22 C6 34 24 44 24 44 C24 44 42 34 42 22 C42 12 34 4 24 4 Z"
+        fill="currentColor"
+        mask="url(#treeCutout)"/>
 </svg>
