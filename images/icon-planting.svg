@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Small tree/sapling -->
+  <rect x="30" y="32" width="4" height="12" fill="currentColor"/>
+  <ellipse cx="32" cy="26" rx="10" ry="10" fill="currentColor"/>
+  <!-- Ground/soil -->
+  <path d="M8 52 Q32 44 56 52 L56 58 L8 58 Z" fill="currentColor"/>
+  <!-- Roots hint -->
+  <path d="M30 44 Q26 50 22 52" stroke="currentColor" stroke-width="2" fill="none"/>
+  <path d="M34 44 Q38 50 42 52" stroke="currentColor" stroke-width="2" fill="none"/>
+</svg>

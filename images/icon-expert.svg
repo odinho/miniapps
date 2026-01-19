@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Scale/balance -->
+  <circle cx="32" cy="12" r="4" stroke="currentColor" stroke-width="3" fill="none"/>
+  <line x1="32" y1="16" x2="32" y2="28" stroke="currentColor" stroke-width="4"/>
+  <line x1="14" y1="28" x2="50" y2="28" stroke="currentColor" stroke-width="4"/>
+  <!-- Left pan -->
+  <line x1="14" y1="28" x2="14" y2="40" stroke="currentColor" stroke-width="3"/>
+  <path d="M6 40 Q14 48 22 40" stroke="currentColor" stroke-width="3" fill="none"/>
+  <!-- Right pan -->
+  <line x1="50" y1="28" x2="50" y2="40" stroke="currentColor" stroke-width="3"/>
+  <path d="M42 40 Q50 48 58 40" stroke="currentColor" stroke-width="3" fill="none"/>
+  <!-- Base -->
+  <rect x="26" y="48" width="12" height="4" rx="1" fill="currentColor"/>
+  <rect x="22" y="52" width="20" height="4" rx="1" fill="currentColor"/>
+</svg>

@@ -331,6 +331,21 @@ p:last-child {
     gap: var(--space-md);
 }
 
+.logo-link {
+    display: block;
+    transition: transform var(--transition-base), opacity var(--transition-base);
+}
+
+.logo-link:hover {
+    transform: translateY(-2px);
+    opacity: 0.9;
+}
+
+.logo-image {
+    height: 48px;
+    width: auto;
+}
+
 .logo h1 {
     font-size: var(--font-size-xl);
     font-weight: var(--font-weight-black);
@@ -639,6 +654,99 @@ p:last-child {
     line-height: var(--line-height-relaxed);
 }
 
+/* Services Category Heading */
+.services-category {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: var(--space-2xl);
+    margin-bottom: var(--space-lg);
+    text-align: center;
+    position: relative;
+}
+
+.services-category:first-of-type {
+    margin-top: 0;
+}
+
+/* Service Card as Details/Summary */
+details.service-card {
+    cursor: pointer;
+}
+
+details.service-card summary {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    list-style: none;
+    cursor: pointer;
+}
+
+details.service-card summary::-webkit-details-marker {
+    display: none;
+}
+
+details.service-card summary::marker {
+    display: none;
+}
+
+details.service-card summary h4 {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text);
+    margin-bottom: 0;
+    letter-spacing: -0.015em;
+    word-wrap: break-word;
+    hyphens: auto;
+}
+
+details.service-card .service-details {
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--color-border-light);
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+details.service-card[open] {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f8f5 100%);
+}
+
+details.service-card[open] .service-icon {
+    transform: scale(1.05);
+}
+
+/* Click hint on service cards */
+details.service-card summary::after {
+    content: 'Klikk for mer info';
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-top: var(--space-sm);
+    opacity: 0.7;
+    transition: opacity var(--transition-fast);
+}
+
+details.service-card[open] summary::after {
+    content: '';
+}
+
+details.service-card:hover summary::after {
+    opacity: 1;
+}
+
 /* ============================================
    About Section
    ============================================ */
@@ -815,6 +923,90 @@ p:last-child {
 }
 
 /* ============================================
+   Entreprenør Section
+   ============================================ */
+
+.entreprenor {
+    padding: var(--space-3xl) 0;
+    background-color: var(--color-surface-alt);
+}
+
+.entreprenor h2 {
+    text-align: center;
+    font-size: var(--font-size-3xl);
+    font-weight: var(--font-weight-black);
+    color: var(--color-primary-dark);
+    margin-bottom: var(--space-md);
+    letter-spacing: -0.025em;
+}
+
+.deliverables {
+    margin-bottom: var(--space-xl);
+}
+
+.deliverables h3 {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-primary);
+    text-align: center;
+    margin-bottom: var(--space-lg);
+}
+
+.deliverables-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-md);
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.deliverable-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    background: var(--color-surface);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-full);
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition-base);
+}
+
+.deliverable-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.deliverable-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+    color: #ffffff;
+    font-weight: var(--font-weight-bold);
+    font-size: var(--font-size-sm);
+    border-radius: var(--radius-full);
+}
+
+.deliverable-text {
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text);
+}
+
+.entreprenor-content {
+    max-width: 720px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.entreprenor-content p {
+    color: var(--color-text-light);
+    line-height: var(--line-height-relaxed);
+}
+
+/* ============================================
    Contact Section
    ============================================ */
 
@@ -974,6 +1166,84 @@ p:last-child {
 }
 
 /* ============================================
+   FAQ Section
+   ============================================ */
+
+.faq {
+    padding: var(--space-3xl) 0;
+    background-color: var(--color-surface-alt);
+}
+
+.faq h2 {
+    text-align: center;
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-primary-dark);
+    margin-bottom: var(--space-xl);
+}
+
+.faq-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.faq-item {
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    overflow: hidden;
+    transition: all var(--transition-base);
+}
+
+.faq-item:hover {
+    border-color: var(--color-primary);
+    box-shadow: var(--shadow-sm);
+}
+
+.faq-item summary {
+    padding: var(--space-md) var(--space-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+.faq-item summary::-webkit-details-marker {
+    display: none;
+}
+
+.faq-item summary::after {
+    content: '+';
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-primary);
+    flex-shrink: 0;
+    transition: transform var(--transition-fast);
+}
+
+.faq-item[open] summary::after {
+    content: '−';
+}
+
+.faq-item[open] summary {
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.faq-item p {
+    padding: var(--space-md) var(--space-lg);
+    color: var(--color-text-light);
+    line-height: var(--line-height-relaxed);
+    animation: slideDown 0.3s ease-out;
+}
+
+/* ============================================
    Footer - Sophisticated & Refined
    ============================================ */
 
@@ -1078,6 +1348,38 @@ p:last-child {
     letter-spacing: 0.01em;
 }
 
+.footer-info .insurance {
+    font-size: var(--font-size-xs);
+    color: rgba(255, 255, 255, 0.7);
+    margin-top: var(--space-md);
+    font-style: italic;
+}
+
+.footer-seo {
+    padding: var(--space-lg) 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: var(--space-lg);
+    position: relative;
+    z-index: 1;
+}
+
+.footer-seo p {
+    font-size: var(--font-size-xs);
+    color: rgba(255, 255, 255, 0.6);
+    line-height: var(--line-height-relaxed);
+    text-align: center;
+    max-width: 800px;
+    margin: 0 auto var(--space-sm);
+}
+
+.footer-seo .alt-spellings {
+    font-size: var(--font-size-xs);
+    color: rgba(255, 255, 255, 0.4);
+    font-style: italic;
+    margin-bottom: 0;
+}
+
 /* ============================================
    Responsive Design - Tablet (768px+)
    ============================================ */
@@ -1102,12 +1404,21 @@ p:last-child {
         justify-content: space-between;
     }
 
+    .logo-image {
+        height: 56px;
+    }
+
     .logo h1 {
         font-size: var(--font-size-2xl);
     }
 
     .tagline {
         text-align: left;
+    }
+
+    /* FAQ */
+    .faq-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 
     /* Hero */
@@ -1149,7 +1460,12 @@ p:last-child {
     }
 
     .services-grid {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    /* Entreprenør */
+    .entreprenor h2 {
+        font-size: var(--font-size-3xl);
     }
 
     /* About */
@@ -1245,10 +1561,15 @@ p:last-child {
         max-width: 420px;
     }
 
-    /* Services */
+    /* Services - 4 columns on large screens */
     .services-grid {
         grid-template-columns: repeat(4, 1fr);
         gap: var(--space-lg);
+    }
+
+    /* Logo */
+    .logo-image {
+        height: 64px;
     }
 
     .service-card {

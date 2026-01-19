@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Tree -->
+  <rect x="30" y="42" width="4" height="16" fill="currentColor"/>
+  <ellipse cx="32" cy="36" rx="12" ry="10" fill="currentColor"/>
+  <ellipse cx="32" cy="26" rx="8" ry="7" fill="currentColor"/>
+  <!-- Support cables -->
+  <line x1="20" y1="30" x2="8" y2="50" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+  <line x1="44" y1="30" x2="56" y2="50" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+  <!-- Anchors -->
+  <circle cx="8" cy="52" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
+  <circle cx="56" cy="52" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
+</svg>
