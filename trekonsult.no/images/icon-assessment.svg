@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Magnifying glass -->
+  <circle cx="26" cy="26" r="18" stroke="currentColor" stroke-width="6" fill="none"/>
+  <path d="M40 40 L58 58" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Tree inside magnifying glass -->
+  <rect x="24" y="28" width="4" height="8" fill="currentColor"/>
+  <ellipse cx="26" cy="24" rx="8" ry="6" fill="currentColor"/>
+  <ellipse cx="26" cy="19" rx="5" ry="4" fill="currentColor"/>
+</svg>

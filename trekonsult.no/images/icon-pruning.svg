@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Secateurs/pruning shears - side view -->
+  <!-- Top blade -->
+  <path d="M6 24 Q16 20 32 24 L32 28 Q16 32 6 28 Z" fill="currentColor"/>
+
+  <!-- Bottom blade -->
+  <path d="M6 36 Q16 40 32 36 L32 32 Q16 28 6 32 Z" fill="currentColor"/>
+
+  <!-- Pivot bolt -->
+  <circle cx="32" cy="30" r="4" fill="currentColor"/>
+
+  <!-- Handle top -->
+  <path d="M32 24 L54 12 Q58 10 60 14 L60 22 Q58 26 54 24 L36 28 Z" fill="currentColor"/>
+
+  <!-- Handle bottom -->
+  <path d="M32 36 L54 48 Q58 50 60 46 L60 38 Q58 34 54 36 L36 32 Z" fill="currentColor"/>
+</svg>

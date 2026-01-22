@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Calendar/document -->
+  <rect x="10" y="12" width="44" height="44" rx="4" stroke="currentColor" stroke-width="4" fill="none"/>
+  <line x1="10" y1="24" x2="54" y2="24" stroke="currentColor" stroke-width="4"/>
+  <!-- Calendar dots/grid -->
+  <circle cx="22" cy="34" r="3" fill="currentColor"/>
+  <circle cx="32" cy="34" r="3" fill="currentColor"/>
+  <circle cx="42" cy="34" r="3" fill="currentColor"/>
+  <circle cx="22" cy="46" r="3" fill="currentColor"/>
+  <circle cx="32" cy="46" r="3" fill="currentColor"/>
+</svg>

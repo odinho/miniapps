@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Warning triangle -->
+  <path d="M32 8 L58 54 H6 Z" stroke="currentColor" stroke-width="4" stroke-linejoin="round" fill="none"/>
+  <!-- Exclamation mark -->
+  <line x1="32" y1="24" x2="32" y2="38" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="32" cy="46" r="2.5" fill="currentColor"/>
+</svg>

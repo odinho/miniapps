@@ -1,0 +1,166 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-20 -5 520 405" width="520" height="405">
+  <defs>
+    <linearGradient id="sky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#d4e8d4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f0f4ec;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="trunk" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#5c4033;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#7a5230;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#5c4033;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="canopy1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4a7c23;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2d5016;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="canopy2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#5d9a2b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3d6b1d;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="person" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#2d5016;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4a7c23;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <style>
+    @media (prefers-reduced-motion: no-preference) {
+      .tree-sway { animation: treeSway 5s ease-in-out infinite; transform-origin: 85px 380px; }
+      .canopy-float { animation: canopyFloat 4s ease-in-out infinite; }
+      .canopy-float-delay { animation: canopyFloat 4s ease-in-out infinite 1.5s; }
+      .highlight-pulse { animation: highlightPulse 3s ease-in-out infinite; }
+      .highlight-pulse-delay { animation: highlightPulse 3s ease-in-out infinite 1s; }
+      .arm-work { animation: armWork 2s ease-in-out infinite; transform-origin: 178px 200px; }
+      .tool-work { animation: toolWork 2s ease-in-out infinite; transform-origin: 125px 210px; }
+      .bg-tree-sway { animation: bgTreeSway 7s ease-in-out infinite; transform-origin: 387px 380px; }
+
+      @keyframes treeSway {
+        0%, 100% { transform: rotate(0deg); }
+        50% { transform: rotate(0.5deg); }
+      }
+
+      @keyframes canopyFloat {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-2px); }
+      }
+
+      @keyframes highlightPulse {
+        0%, 100% { opacity: 0.4; transform: scale(1); }
+        50% { opacity: 0.6; transform: scale(1.05); }
+      }
+
+      @keyframes armWork {
+        0%, 100% { transform: rotate(0deg); }
+        25% { transform: rotate(-5deg); }
+        75% { transform: rotate(5deg); }
+      }
+
+      @keyframes toolWork {
+        0%, 100% { transform: rotate(0deg); }
+        25% { transform: rotate(8deg); }
+        75% { transform: rotate(-8deg); }
+      }
+
+      @keyframes bgTreeSway {
+        0%, 100% { transform: rotate(0deg); }
+        50% { transform: rotate(-0.3deg); }
+      }
+    }
+  </style>
+
+  <!-- Ground shadow - fades at edges -->
+  <ellipse cx="200" cy="370" rx="140" ry="20" fill="#3d6b1d" opacity="0.12"/>
+
+  <!-- Main tree group with sway -->
+  <g class="tree-sway">
+    <!-- Large tree trunk -->
+    <rect x="60" y="160" width="50" height="220" fill="url(#trunk)"/>
+    <path d="M55 380 Q40 385 30 380" stroke="#5c4033" stroke-width="4" fill="none"/>
+    <path d="M115 380 Q130 385 145 380" stroke="#5c4033" stroke-width="4" fill="none"/>
+
+    <!-- Tree bark texture -->
+    <path d="M70 180 L70 350" stroke="#4a3525" stroke-width="1" opacity="0.3"/>
+    <path d="M85 200 L85 320" stroke="#4a3525" stroke-width="1" opacity="0.3"/>
+    <path d="M100 190 L100 340" stroke="#4a3525" stroke-width="1" opacity="0.3"/>
+
+    <!-- Branch extending right -->
+    <path d="M85 200 Q150 180 220 200" stroke="url(#trunk)" stroke-width="20" fill="none" stroke-linecap="round"/>
+
+    <!-- Tree canopy with floating animation -->
+    <g class="canopy-float">
+      <ellipse cx="85" cy="100" rx="100" ry="90" fill="url(#canopy1)"/>
+      <ellipse cx="50" cy="80" rx="60" ry="55" fill="url(#canopy2)"/>
+    </g>
+    <g class="canopy-float-delay">
+      <ellipse cx="120" cy="70" rx="55" ry="50" fill="url(#canopy2)"/>
+      <ellipse cx="85" cy="40" rx="50" ry="40" fill="url(#canopy1)"/>
+    </g>
+
+    <!-- Canopy highlights with pulse -->
+    <circle cx="40" cy="70" r="20" fill="#6ba832" class="highlight-pulse"/>
+    <circle cx="100" cy="50" r="15" fill="#6ba832" class="highlight-pulse-delay"/>
+    <circle cx="140" cy="90" r="12" fill="#6ba832" class="highlight-pulse"/>
+  </g>
+
+  <!-- Ladder (static) -->
+  <rect x="145" y="160" width="5" height="200" fill="#8b7355"/>
+  <rect x="175" y="160" width="5" height="200" fill="#8b7355"/>
+  <rect x="145" y="180" width="35" height="4" fill="#a89078"/>
+  <rect x="145" y="210" width="35" height="4" fill="#a89078"/>
+  <rect x="145" y="240" width="35" height="4" fill="#a89078"/>
+  <rect x="145" y="270" width="35" height="4" fill="#a89078"/>
+  <rect x="145" y="300" width="35" height="4" fill="#a89078"/>
+  <rect x="145" y="330" width="35" height="4" fill="#a89078"/>
+
+  <!-- Arborist figure -->
+  <!-- Hard hat -->
+  <ellipse cx="165" cy="168" rx="18" ry="8" fill="#d4a84b"/>
+  <ellipse cx="165" cy="163" rx="14" ry="6" fill="#e4c88b"/>
+
+  <!-- Head -->
+  <circle cx="165" cy="180" r="12" fill="#d4a07a"/>
+
+  <!-- Body -->
+  <rect x="152" y="192" width="26" height="45" rx="5" fill="url(#person)"/>
+
+  <!-- Arms with work animation -->
+  <path d="M152 200 Q130 190 125 205" stroke="url(#person)" stroke-width="10" fill="none" stroke-linecap="round"/>
+  <g class="arm-work">
+    <path d="M178 200 Q200 190 210 180" stroke="url(#person)" stroke-width="10" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- Hand and pruning tool with work animation -->
+  <g class="tool-work">
+    <circle cx="125" cy="210" r="6" fill="#d4a07a"/>
+    <rect x="115" y="205" width="25" height="4" fill="#666"/>
+    <path d="M105 200 L115 210 L105 220" stroke="#888" stroke-width="3" fill="none"/>
+  </g>
+
+  <!-- Legs on ladder -->
+  <rect x="153" y="237" width="10" height="35" fill="#2d4a16"/>
+  <rect x="165" y="237" width="10" height="35" fill="#2d4a16"/>
+
+  <!-- Boots -->
+  <ellipse cx="158" cy="275" rx="8" ry="5" fill="#3d3d3d"/>
+  <ellipse cx="170" cy="275" rx="8" ry="5" fill="#3d3d3d"/>
+
+  <!-- Fallen branches/debris -->
+  <ellipse cx="350" cy="355" rx="60" ry="12" fill="#5c4033" opacity="0.2"/>
+  <path d="M300 360 Q330 355 360 365 Q380 360 400 365" stroke="#6b4423" stroke-width="6" fill="none"/>
+  <path d="M320 355 Q340 340 360 355" stroke="#6b4423" stroke-width="4" fill="none"/>
+
+  <!-- Small foliage on cut branches -->
+  <circle cx="310" cy="355" r="12" fill="#4a7c23" opacity="0.7"/>
+  <circle cx="380" cy="358" r="10" fill="#4a7c23" opacity="0.6"/>
+
+  <!-- Tools on ground -->
+  <rect x="420" y="355" width="40" height="6" fill="#8b7355" transform="rotate(-15 420 355)"/>
+  <rect x="415" y="340" width="8" height="20" fill="#666" transform="rotate(-15 415 340)"/>
+
+  <!-- Small decorative tree in background with sway -->
+  <g class="bg-tree-sway">
+    <rect x="380" y="280" width="15" height="100" fill="#5c4033" opacity="0.4"/>
+    <ellipse cx="387" cy="250" rx="40" ry="45" fill="#3d6b1d" opacity="0.4"/>
+    <ellipse cx="387" cy="220" rx="30" ry="35" fill="#4a7c23" opacity="0.4"/>
+  </g>
+</svg>

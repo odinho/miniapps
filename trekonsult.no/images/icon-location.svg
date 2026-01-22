@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <defs>
+    <mask id="treeCutout">
+      <!-- White = visible, Black = hidden -->
+      <rect width="48" height="48" fill="white"/>
+      <!-- Tree cutout -->
+      <rect x="22.5" y="24" width="3" height="6" fill="black"/>
+      <ellipse cx="24" cy="20" rx="6" ry="5" fill="black"/>
+      <ellipse cx="24" cy="16" rx="4" ry="3.5" fill="black"/>
+    </mask>
+  </defs>
+
+  <!-- Location pin with tree cutout -->
+  <path d="M24 4 C14 4 6 12 6 22 C6 34 24 44 24 44 C24 44 42 34 42 22 C42 12 34 4 24 4 Z"
+        fill="currentColor"
+        mask="url(#treeCutout)"/>
+</svg>
