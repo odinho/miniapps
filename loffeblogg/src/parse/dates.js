@@ -102,6 +102,58 @@ const WEEKDAYS = ['måndag', 'tysdag', 'onsdag', 'torsdag', 'fredag', 'laurdag',
                   'mandag', 'tirsdag', 'lørdag', 'søndag']; // Both nynorsk and bokmål
 
 /**
+ * Extract date range and optional location from a heading line
+ * Examples:
+ *   "21.01.2026 - 26.01.2026 Phuket" -> { date: startDate, endDate, location: "Phuket", isRange: true }
+ *   "21.01 - 26.01.2026 Phuket" -> { date: startDate, endDate, location: "Phuket", isRange: true }
+ * Returns single object with range information
+ */
+export function extractDateRangeFromLine(text, defaultYear = new Date().getFullYear()) {
+  const trimmed = text.trim();
+
+  // Pattern: "21.01.2026 - 26.01.2026 Location" or "21.01 - 26.01.2026 Location"
+  const rangePattern = /^(\d{1,2})\.(\d{1,2})(?:\.(\d{4}|\d{2}))?\s*[-–]\s*(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})(?!\d)\s*(.*)$/;
+  const match = trimmed.match(rangePattern);
+
+  if (match) {
+    const startDay = parseInt(match[1], 10);
+    const startMonth = parseInt(match[2], 10) - 1;
+    let startYear = match[3] ? parseInt(match[3], 10) : null;
+
+    const endDay = parseInt(match[4], 10);
+    const endMonth = parseInt(match[5], 10) - 1;
+    let endYear = parseInt(match[6], 10);
+
+    const location = match[7].trim() || null;
+
+    // Handle 2-digit years
+    if (endYear < 100) {
+      endYear += 2000;
+    }
+
+    // If start year not provided, use end year
+    if (!startYear) {
+      startYear = endYear;
+    } else if (startYear < 100) {
+      startYear += 2000;
+    }
+
+    const startDate = new Date(startYear, startMonth, startDay);
+    const endDate = new Date(endYear, endMonth, endDay);
+
+    return {
+      date: startDate,
+      endDate: endDate,
+      location,
+      rawText: trimmed,
+      isRange: true
+    };
+  }
+
+  return null;
+}
+
+/**
  * Extract date and optional location from a heading line
  * Examples:
  *   "Bangkok 1. januar 2026" -> { date, location: "Bangkok", rawText }
@@ -109,8 +161,14 @@ const WEEKDAYS = ['måndag', 'tysdag', 'onsdag', 'torsdag', 'fredag', 'laurdag',
  *   "09.01.2026 Chang Mai" -> { date, location: "Chang Mai", rawText }
  *   "Laurdag 10.01.26" -> { date, location: null, rawText }
  *   "11.01.26 Houayxay til Pakbeng" -> { date, location: "Houayxay til Pakbeng", rawText }
+ *   "21.01.2026 - 26.01.2026 Phuket" -> { date: startDate, endDate, location: "Phuket", isRange: true }
  */
 export function extractDateFromLine(text, defaultYear = new Date().getFullYear()) {
+  // Try date range first
+  const dateRange = extractDateRangeFromLine(text, defaultYear);
+  if (dateRange) {
+    return dateRange; // Returns single object with range info
+  }
   const trimmed = text.trim();
 
   // Try text date pattern with optional location prefix/suffix

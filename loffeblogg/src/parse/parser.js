@@ -348,7 +348,10 @@ export function parseDocument(docId, html, name, imageMap = new Map()) {
 
     return {
       date: section.dateInfo?.date ? formatDateISO(section.dateInfo.date) : null,
+      endDate: section.dateInfo?.endDate ? formatDateISO(section.dateInfo.endDate) : null,
       dateFormatted: section.dateInfo?.date ? formatDateNynorsk(section.dateInfo.date) : null,
+      endDateFormatted: section.dateInfo?.endDate ? formatDateNynorsk(section.dateInfo.endDate) : null,
+      isRange: section.dateInfo?.isRange || false,
       location: section.dateInfo?.location || null,
       heading: section.heading,
       content: cleanedContent,

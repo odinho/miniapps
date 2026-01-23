@@ -28,11 +28,11 @@ showHero: true
       {% set lastDay = post.days | selectattr("date") | last %}
       {% if firstDay and lastDay %}
       <p class="post-dates">
-        {{ firstDay.date | kortdato }} – {{ lastDay.date | kortdato }}
+        {{ firstDay.date | kortdato }} – {{ (lastDay.endDate or lastDay.date) | kortdato }}
         {% if firstDay.location %} · {{ firstDay.location }}{% endif %}
       </p>
       {% endif %}
-      <p class="post-summary">{{ post.days | length }} dagar</p>
+      <p class="post-summary">{{ post.days | countDays }} dagar</p>
       <span class="read-more">Les meir &rarr;</span>
     </div>
   </a>

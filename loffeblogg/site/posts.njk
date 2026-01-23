@@ -24,7 +24,11 @@ isPost: true
           {% for day in daysWithDates %}
           <li{% if loop.first %} class="active"{% endif %}>
             <a href="#dag-{{ loop.index }}" data-day="{{ loop.index }}">
-              <span class="date">{{ day.date | kortdato }}</span>
+              {% if day.endDate %}
+                <span class="date">{{ day.date | kortdato }} – {{ day.endDate | kortdato }}</span>
+              {% else %}
+                <span class="date">{{ day.date | kortdato }}</span>
+              {% endif %}
               {% if day.location %}<span class="location">{{ day.location }}</span>{% endif %}
             </a>
           </li>
@@ -45,7 +49,14 @@ isPost: true
           {% if day.heading and day.heading != 'Intro' %}
           <h2 class="day-heading">
             {% if day.location %}<span class="location-name">{{ day.location }}</span>{% endif %}
-            <span class="date-text">{% if day.location %}<span class="dot">·</span> {% endif %}{{ day.dateFormatted }}</span>
+            <span class="date-text">
+              {% if day.location %}<span class="dot">·</span> {% endif %}
+              {% if day.endDate %}
+                {{ day.date | datoSpenn(day.endDate) }}
+              {% else %}
+                {{ day.dateFormatted }}
+              {% endif %}
+            </span>
           </h2>
           {% endif %}
 
