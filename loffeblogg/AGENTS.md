@@ -4,6 +4,7 @@
 
 ```
 src/build.js          # Entry point - orchestrates fetch → parse → cache
+src/fetch/drive.js    # Document listing via gdrive CLI + cache cleanup
 src/fetch/docs.js     # Google Docs HTML export
 src/fetch/images.js   # Image download + Sharp thumbnails
 src/parse/dates.js    # Norwegian date parsing (tested)
@@ -44,6 +45,12 @@ Always run tests after modifying `src/parse/`.
 - Image URLs from Google Docs are temporary - always download and cache
 - Nunjucks `safe` filter is built-in, don't override it
 - The `build.js` file is globally gitignored, needs `git add -f`
+
+## Code Style
+
+- **Be concise**: Prefer short, clear functions over long implementations
+- **Be concise**: Don't document what the code already says
+- **Be concise**: Keep commit messages short and clear
 
 ## Language
 
