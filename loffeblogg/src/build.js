@@ -4,7 +4,7 @@
  * Fetches documents from Google Drive, processes images, and parses content
  */
 
-import { listDocuments, cacheDocuments } from './fetch/drive.js';
+import { listDocuments, cacheDocuments, cleanupStaleCache } from './fetch/drive.js';
 import { fetchAndCacheDocument } from './fetch/docs.js';
 import { processImages, replaceImageUrls } from './fetch/images.js';
 import { parseDocument, saveParsedDocument } from './parse/parser.js';
@@ -28,6 +28,9 @@ async function main() {
   console.log(`Fann ${documents.length} dokument:\n`);
   documents.forEach(doc => console.log(`  - ${doc.name} (${doc.id})`));
   console.log('');
+
+  // Clean up cached files for documents that no longer exist
+  await cleanupStaleCache(documents);
 
   for (const doc of documents) {
     try {

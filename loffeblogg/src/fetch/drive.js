@@ -223,3 +223,37 @@ export async function needsUpdate(docId, newModifiedTime) {
   if (!newModifiedTime) return true;
   return cached.modifiedTime !== newModifiedTime;
 }
+
+/**
+ * Clean up cached files for documents that no longer exist in Drive
+ * @param {Array<{id: string}>} currentDocuments - List of current documents from Drive
+ */
+export async function cleanupStaleCache(currentDocuments) {
+  const currentIds = new Set(currentDocuments.map(doc => doc.id));
+  let deletedCount = 0;
+
+  const cleanDir = async (dir, extractId) => {
+    if (!existsSync(dir)) return;
+    const files = await fs.readdir(dir);
+
+    for (const file of files) {
+      const docId = extractId(file);
+      if (docId && !currentIds.has(docId)) {
+        await fs.unlink(path.join(dir, file));
+        console.log(`  🗑️  Sletta frå cache: ${file}`);
+        deletedCount++;
+      }
+    }
+  };
+
+  try {
+    await cleanDir(path.resolve('cache/parsed'), f => f.endsWith('.json') ? f.replace('.json', '') : null);
+    await cleanDir(path.resolve('cache/docs'), f => f.split('.')[0]);
+
+    if (deletedCount > 0) {
+      console.log(`\n✨ Rydda ${deletedCount} filer frå cache\n`);
+    }
+  } catch (error) {
+    console.warn('⚠️  Kunne ikkje rydde cache:', error.message);
+  }
+}
