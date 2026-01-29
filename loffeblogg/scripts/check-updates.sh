@@ -102,7 +102,9 @@ if $CHECK_NEW; then
 
   # Parse gdrive output (skip header line)
   # Format: Id  Name  Type  Size  Created
-  echo "$FOLDER_DOCS" | tail -n +2 | while IFS= read -r line; do
+  NEW_DOCS_FOUND=false
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
     NEW_ID=$(echo "$line" | awk '{print $1}')
     # Name is between ID and "document" type
     NEW_NAME=$(echo "$line" | sed -E 's/^[^ ]+\s+//' | sed -E 's/\s+document\s+.*//')
@@ -114,8 +116,13 @@ if $CHECK_NEW; then
     if ! echo "$KNOWN_IDS" | grep -q "$NEW_ID"; then
       echo "  📄 New document: $NEW_NAME"
       echo "     ID: $NEW_ID"
+      NEW_DOCS_FOUND=true
     fi
-  done
+  done < <(echo "$FOLDER_DOCS" | tail -n +2)
+
+  if $NEW_DOCS_FOUND; then
+    NEEDS_REBUILD=true
+  fi
 fi
 
 echo

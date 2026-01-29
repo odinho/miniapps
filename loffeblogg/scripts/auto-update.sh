@@ -11,9 +11,31 @@ LOG_PREFIX="[loffeblogg]"
 
 echo "$LOG_PREFIX Starting auto-update at $(date)"
 
+# Check for new documents less frequently (every 6 runs = ~3 hours with 30min timer)
+CHECK_NEW_INTERVAL=6
+COUNTER_FILE="cache/meta/check-new-counter"
+
+# Initialize or read counter
+if [[ -f "$COUNTER_FILE" ]]; then
+  COUNTER=$(cat "$COUNTER_FILE")
+else
+  COUNTER=0
+fi
+
+# Determine if we should check for new documents
+CHECK_NEW_FLAG=""
+if (( COUNTER >= CHECK_NEW_INTERVAL )); then
+  CHECK_NEW_FLAG="--check-new"
+  COUNTER=0
+  echo "$LOG_PREFIX Checking for new documents (every ${CHECK_NEW_INTERVAL} runs)"
+else
+  ((COUNTER++))
+fi
+echo "$COUNTER" > "$COUNTER_FILE"
+
 # Run check-updates, capture exit code
 set +e
-./scripts/check-updates.sh
+./scripts/check-updates.sh $CHECK_NEW_FLAG
 EXIT_CODE=$?
 set -e
 
