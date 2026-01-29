@@ -69,6 +69,17 @@ Krev [gdrive v3](https://github.com/glotlabs/gdrive/releases) med `gdrive accoun
 ./scripts/check-updates.sh --check-new
 ```
 
+### Systemd-timer
+
+For automatisk oppdatering kvart 30. minutt:
+
+```bash
+./systemd/install.sh
+```
+
+Dette installerer ein brukar-timer som køyrer `scripts/auto-update.sh`.
+Sjå status med `systemctl --user status loffeblogg.timer`.
+
 ## Mappestruktur
 
 ```
