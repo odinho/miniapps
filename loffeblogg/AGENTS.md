@@ -50,7 +50,7 @@ Always run tests after modifying `src/parse/`.
 
 - **Be concise**: Prefer short, clear functions over long implementations
 - **Be concise**: Don't document what the code already says
-- **Be concise**: Keep commit messages short and clear
+- **Be concise**: Keep commit messages short and clear, skip any ads
 
 ## Language
 
