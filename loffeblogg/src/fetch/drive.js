@@ -1,6 +1,9 @@
 /**
  * Google Drive folder listing
- * Uses gdrive CLI if available, falls back to config.json
+ * Uses rclone by default, falls back to gdrive CLI, then config.json
+ *
+ * Backend priority: rclone > gdrive > config.json
+ * Override with config.json: "driveBackend": "gdrive" or "rclone"
  */
 
 import fs from 'fs/promises';
@@ -11,6 +14,53 @@ import { execSync } from 'child_process';
 const CACHE_DIR = path.resolve('cache/meta');
 const CONFIG_PATH = path.resolve('config.json');
 const LOCAL_GDRIVE = path.resolve('cache/gdrive/gdrive');
+
+// ============ RCLONE BACKEND ============
+
+/**
+ * Check if rclone is available and configured with a 'drive' remote
+ */
+function isRcloneAvailable() {
+  try {
+    const remotes = execSync('rclone listremotes', { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
+    return remotes.includes('drive:');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * List documents using rclone
+ */
+function listViaRclone(folderId) {
+  const output = execSync(
+    `rclone lsjson --drive-root-folder-id "${folderId}" drive:`,
+    { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+  );
+
+  const files = JSON.parse(output);
+  const documents = [];
+
+  for (const file of files) {
+    if (file.IsDir) continue;
+
+    // rclone shows Google Docs as .docx - strip extension
+    const name = file.Name.replace(/\.(docx|gdoc)$/, '');
+
+    // Skip copies (Norwegian: "Kopi av")
+    if (name.startsWith('Kopi av ')) continue;
+
+    documents.push({
+      id: file.ID,
+      name,
+      modifiedTime: file.ModTime,
+    });
+  }
+
+  return documents;
+}
+
+// ============ GDRIVE BACKEND ============
 
 /**
  * Find gdrive binary - check local cache first, then global
@@ -86,22 +136,75 @@ async function loadConfig() {
 }
 
 /**
- * Get list of documents - tries gdrive first, falls back to config
- * When using gdrive, also fetches modifiedTime for each document
+ * Detect which backend to use
+ * Priority: config override > rclone > gdrive > config.json
+ */
+function detectBackend(config) {
+  // Allow explicit override in config
+  if (config.driveBackend === 'gdrive') {
+    const gdrivePath = findGdrive();
+    if (gdrivePath && isGdriveAuthenticated(gdrivePath)) {
+      return { type: 'gdrive', path: gdrivePath };
+    }
+    console.warn('⚠ driveBackend sett til gdrive, men gdrive er ikkje tilgjengeleg');
+  }
+
+  if (config.driveBackend === 'rclone') {
+    if (isRcloneAvailable()) {
+      return { type: 'rclone' };
+    }
+    console.warn('⚠ driveBackend sett til rclone, men rclone er ikkje tilgjengeleg');
+  }
+
+  // Auto-detect: prefer rclone
+  if (isRcloneAvailable()) {
+    return { type: 'rclone' };
+  }
+
+  const gdrivePath = findGdrive();
+  if (gdrivePath && isGdriveAuthenticated(gdrivePath)) {
+    return { type: 'gdrive', path: gdrivePath };
+  }
+
+  return { type: 'none' };
+}
+
+/**
+ * Get list of documents - tries rclone first, then gdrive, then config.json
  * @param {Object} options
- * @param {boolean} options.withMeta - fetch modifiedTime for each doc (default: true with gdrive)
+ * @param {boolean} options.withMeta - fetch modifiedTime for each doc (default: true)
  * @returns {Promise<Array<{id: string, name: string, modifiedTime?: string}>>}
  */
 export async function listDocuments({ withMeta = true } = {}) {
   const config = await loadConfig();
-  const gdrivePath = findGdrive();
 
-  // Try gdrive if available and authenticated
-  if (gdrivePath && config.folderId) {
-    if (!isGdriveAuthenticated(gdrivePath)) {
-      console.warn('⚠ gdrive funnen men ikkje autentisert. Køyr: gdrive account add');
-      console.warn('  Brukar config.json i staden.\n');
-    } else {
+  if (!config.folderId) {
+    console.error('❌ Ingen folderId i config.json.');
+    console.error('   Legg til folderId for å bruke automatisk dokumentoppdaging.');
+    return config.documents || [];
+  }
+
+  const backend = detectBackend(config);
+
+  // Try rclone
+  if (backend.type === 'rclone') {
+    try {
+      const docs = listViaRclone(config.folderId);
+      if (docs.length > 0) {
+        console.log(`ℹ Brukar rclone (${docs.length} dokument)\n`);
+        return docs;
+      }
+      console.warn('⚠ Ingen dokument funne via rclone. Prøvar gdrive...\n');
+    } catch (error) {
+      console.warn(`⚠ rclone feil: ${error.message}`);
+      console.warn('  Prøvar gdrive...\n');
+    }
+  }
+
+  // Try gdrive
+  if (backend.type === 'gdrive' || (backend.type !== 'rclone' && findGdrive())) {
+    const gdrivePath = backend.path || findGdrive();
+    if (gdrivePath && isGdriveAuthenticated(gdrivePath)) {
       try {
         let docs = listViaGdrive(gdrivePath, config.folderId);
         if (docs.length > 0) {
@@ -112,35 +215,26 @@ export async function listDocuments({ withMeta = true } = {}) {
               return { ...doc, modifiedTime: meta?.modifiedTime };
             }));
           }
+          console.log(`ℹ Brukar gdrive (${docs.length} dokument)\n`);
           return docs;
         }
-        console.warn('⚠ Ingen dokument funne i Drive-mappa. Brukar config.json.\n');
+        console.warn('⚠ Ingen dokument funne via gdrive.\n');
       } catch (error) {
-        console.warn(`⚠ gdrive feil: ${error.message}`);
-        console.warn('  Brukar config.json i staden.\n');
+        console.warn(`⚠ gdrive feil: ${error.message}\n`);
       }
     }
   }
 
   // Fall back to config.json
   if (config.documents?.length > 0) {
-    if (!gdrivePath) {
-      console.log('ℹ Brukar config.json (gdrive ikkje installert)');
-      console.log('  For automatisk oppdaging, køyr: npm run setup:gdrive\n');
-    }
+    console.log('ℹ Brukar config.json (ingen CLI-verktøy tilgjengeleg)');
+    console.log('  For automatisk oppdaging, installer rclone eller gdrive\n');
     return config.documents;
   }
 
-  // No documents found anywhere
-  if (!gdrivePath) {
-    console.error('❌ Ingen dokument funne.');
-    console.error('   Installer gdrive: npm run setup:gdrive');
-    console.error('   Eller legg til dokument i config.json manuelt.');
-  } else if (!config.folderId) {
-    console.error('❌ Ingen folderId i config.json.');
-    console.error('   Legg til folderId for å bruke automatisk dokumentoppdaging.');
-  }
-
+  console.error('❌ Ingen dokument funne.');
+  console.error('   Installer rclone: sudo apt install rclone && rclone config');
+  console.error('   Eller legg til dokument i config.json manuelt.');
   return [];
 }
 
@@ -158,14 +252,33 @@ export async function cacheDocuments(documents) {
 }
 
 /**
- * Get document metadata via gdrive (for caching)
+ * Get document metadata via rclone
  */
-export async function getDocumentMeta(docId) {
-  const gdrivePath = findGdrive();
-  if (!gdrivePath || !isGdriveAuthenticated(gdrivePath)) {
+function getDocumentMetaViaRclone(docId, folderId) {
+  try {
+    const output = execSync(
+      `rclone lsjson --drive-root-folder-id "${folderId}" drive:`,
+      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+    );
+
+    const files = JSON.parse(output);
+    const file = files.find(f => f.ID === docId);
+    if (!file) return null;
+
+    return {
+      id: file.ID,
+      name: file.Name.replace(/\.(docx|gdoc)$/, ''),
+      modifiedTime: file.ModTime,
+    };
+  } catch {
     return null;
   }
+}
 
+/**
+ * Get document metadata via gdrive
+ */
+function getDocumentMetaViaGdrive(gdrivePath, docId) {
   try {
     const output = execSync(
       `${gdrivePath} files info ${docId}`,
@@ -189,6 +302,25 @@ export async function getDocumentMeta(docId) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Get document metadata (for caching)
+ */
+export async function getDocumentMeta(docId) {
+  const config = await loadConfig();
+  const backend = detectBackend(config);
+
+  if (backend.type === 'rclone' && config.folderId) {
+    return getDocumentMetaViaRclone(docId, config.folderId);
+  }
+
+  const gdrivePath = backend.path || findGdrive();
+  if (gdrivePath && isGdriveAuthenticated(gdrivePath)) {
+    return getDocumentMetaViaGdrive(gdrivePath, docId);
+  }
+
+  return null;
 }
 
 /**
