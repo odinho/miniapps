@@ -11,11 +11,12 @@ import path from 'path';
 
 import * as rclone from './backends/rclone.js';
 import * as gdrive from './backends/gdrive.js';
+import * as gog from './backends/gog.js';
 
 const CACHE_DIR = path.resolve('cache/meta');
 const CONFIG_PATH = path.resolve('config.json');
 
-const backends = [rclone, gdrive];
+const backends = [gog, rclone, gdrive];
 
 /**
  * Load config file
