@@ -37,8 +37,8 @@ async function main() {
       console.log(`\n📄 Prosesserer: ${doc.name}`);
       console.log('─'.repeat(40));
 
-      // Fetch document HTML
-      const html = await fetchAndCacheDocument(doc.id, doc.name, forceRefresh);
+      // Fetch document HTML (pass modifiedTime for cache invalidation)
+      const html = await fetchAndCacheDocument(doc.id, doc.name, forceRefresh, doc.modifiedTime);
 
       if (fetchOnly) {
         console.log('Ferdig med henting (--fetch-only)');

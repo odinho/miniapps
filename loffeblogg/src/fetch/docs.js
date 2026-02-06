@@ -73,18 +73,38 @@ export async function cacheDocument(docId, html, meta = {}) {
 }
 
 /**
+ * Check if cached document is stale (older than source)
+ */
+async function isCacheStale(docId, modifiedTime) {
+  if (!modifiedTime) return false; // Can't check without modifiedTime
+
+  const meta = await getCachedDocMeta(docId);
+  if (!meta?.cachedAt) return true; // No cache metadata = stale
+
+  const cachedDate = new Date(meta.cachedAt);
+  const modifiedDate = new Date(modifiedTime);
+
+  return modifiedDate > cachedDate;
+}
+
+/**
  * Fetch and cache a document if needed
  */
-export async function fetchAndCacheDocument(docId, name, forceRefresh = false) {
+export async function fetchAndCacheDocument(docId, name, forceRefresh = false, modifiedTime = null) {
   if (!forceRefresh) {
     const cached = await getCachedDocument(docId);
     if (cached) {
-      console.log(`Brukar cache for: ${name || docId}`);
-      return cached;
+      // Check if source is newer than cache
+      const stale = await isCacheStale(docId, modifiedTime);
+      if (!stale) {
+        console.log(`Brukar cache for: ${name || docId}`);
+        return cached;
+      }
+      console.log(`Cache utdatert for: ${name || docId}`);
     }
   }
 
   const html = await fetchDocument(docId);
-  await cacheDocument(docId, html, { name });
+  await cacheDocument(docId, html, { name, sourceModifiedTime: modifiedTime });
   return html;
 }
