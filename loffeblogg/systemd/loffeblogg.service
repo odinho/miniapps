@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=oneshot
 WorkingDirectory=%WORKDIR%
 ExecStart=%WORKDIR%/scripts/auto-update.sh
-Environment="PATH=%HOME%/bin:%HOME%/.local/bin:%HOME%/.nvm/versions/node/v22.17.1/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PATH=/home/linuxbrew/.linuxbrew/bin:%HOME%/.local/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="SSH_AUTH_SOCK=/run/user/1000/keyring/ssh"
 
 [Install]
