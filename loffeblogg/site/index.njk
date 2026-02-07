@@ -44,23 +44,20 @@ showHero: true
   {% endfor %}
 </section>
 
-{# Artiklar - refleksjonar og tekstar utan datoar #}
+{# Undervegs - refleksjonar og tekstar utan datoar #}
 {% set hasArticles = false %}
 {% for post in posts %}
   {% if not post.isDestination %}{% set hasArticles = true %}{% endif %}
 {% endfor %}
 {% if hasArticles %}
 <section class="articles-section">
-  <h2 class="articles-heading">Tankar frå reisa</h2>
+  <h2 class="articles-heading">Undervegs</h2>
   <div class="articles-list">
     {% for article in posts %}
     {% if not article.isDestination %}
     <a href="/{{ article.slug }}/" class="article-card">
-      <span class="article-icon">✍️</span>
-      <div class="article-content">
-        <h3>{{ article.title }}</h3>
-        <span class="read-more">Les meir &rarr;</span>
-      </div>
+      <h3>{{ article.title }}</h3>
+      <span class="read-more">&rarr;</span>
     </a>
     {% endif %}
     {% endfor %}
