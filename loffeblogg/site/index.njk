@@ -56,8 +56,11 @@ showHero: true
     {% for article in posts %}
     {% if not article.isDestination %}
     <a href="/{{ article.slug }}/" class="article-card">
-      <h3>{{ article.title }}</h3>
-      <span class="read-more">&rarr;</span>
+      <div class="article-text">
+        <h3>{{ article.title }}</h3>
+        <p>Refleksjonar og observasjonar frå turen</p>
+      </div>
+      <span class="article-arrow">&rarr;</span>
     </a>
     {% endif %}
     {% endfor %}
