@@ -14,6 +14,7 @@ echo "$LOG_PREFIX Starting auto-update at $(date)"
 # Check for new documents less frequently (every 6 runs = ~3 hours with 30min timer)
 CHECK_NEW_INTERVAL=6
 COUNTER_FILE="cache/meta/check-new-counter"
+mkdir -p "$(dirname "$COUNTER_FILE")"
 
 # Initialize or read counter
 if [[ -f "$COUNTER_FILE" ]]; then
@@ -29,7 +30,7 @@ if (( COUNTER >= CHECK_NEW_INTERVAL )); then
   COUNTER=0
   echo "$LOG_PREFIX Checking for new documents (every ${CHECK_NEW_INTERVAL} runs)"
 else
-  ((COUNTER++))
+  COUNTER=$((COUNTER + 1))
 fi
 echo "$COUNTER" > "$COUNTER_FILE"
 
