@@ -4,8 +4,10 @@ title: Heim
 showHero: true
 ---
 
+{# Destinasjonar - reisemål med datoar #}
 <section class="posts-list">
   {% for post in posts %}
+  {% if post.isDestination %}
   <a href="/{{ post.slug }}/" class="post-card">
     <div class="post-card-thumbnail">
       {% set firstImage = null %}
@@ -36,7 +38,32 @@ showHero: true
       <span class="read-more">Les meir &rarr;</span>
     </div>
   </a>
+  {% endif %}
   {% else %}
   <p class="no-posts">Ingen innlegg enno. Køyr <code>npm run build</code> for å henta innhald.</p>
   {% endfor %}
 </section>
+
+{# Artiklar - refleksjonar og tekstar utan datoar #}
+{% set hasArticles = false %}
+{% for post in posts %}
+  {% if not post.isDestination %}{% set hasArticles = true %}{% endif %}
+{% endfor %}
+{% if hasArticles %}
+<section class="articles-section">
+  <h2 class="articles-heading">Tankar frå reisa</h2>
+  <div class="articles-list">
+    {% for article in posts %}
+    {% if not article.isDestination %}
+    <a href="/{{ article.slug }}/" class="article-card">
+      <span class="article-icon">✍️</span>
+      <div class="article-content">
+        <h3>{{ article.title }}</h3>
+        <span class="read-more">Les meir &rarr;</span>
+      </div>
+    </a>
+    {% endif %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}

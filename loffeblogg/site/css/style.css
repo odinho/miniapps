@@ -319,6 +319,80 @@ a.post-card:hover h2 {
   font-size: 0.9em;
 }
 
+/* ===== Articles Section (Essays without dates) ===== */
+.articles-section {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 2px solid var(--color-border);
+}
+
+.articles-heading {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  color: var(--color-text-muted);
+  margin: 0 0 1rem;
+  font-weight: 500;
+}
+
+.articles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+a.article-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: var(--color-card-bg);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  text-decoration: none;
+  color: inherit;
+}
+
+a.article-card:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  text-decoration: none;
+}
+
+.article-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.article-content h3 {
+  margin: 0 0 0.2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+a.article-card:hover h3 {
+  color: var(--color-primary);
+}
+
+.article-content .read-more {
+  font-size: 0.85rem;
+}
+
+/* Footer articles link */
+.footer-articles {
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+}
+
+.footer-articles a {
+  color: var(--color-text-muted);
+}
+
+.footer-articles a:hover {
+  color: var(--color-primary);
+}
+
 /* ===== Individual Post ===== */
 .post-header {
   margin-bottom: 1.5rem;

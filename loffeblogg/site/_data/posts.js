@@ -15,11 +15,15 @@ export default async function() {
         .filter(f => f.endsWith('.json'))
         .map(async f => {
           const content = await fs.readFile(path.join(PARSED_DIR, f), 'utf-8');
-          return JSON.parse(content);
+          const post = JSON.parse(content);
+          // Mark if this is a destination (has dates) or an article (no dates)
+          post.isDestination = post.days.some(d => d.date);
+          return post;
         })
     );
 
     // Sort by first date in each post (latest first)
+    // Articles without dates go to the end
     posts.sort((a, b) => {
       const dateA = a.days.find(d => d.date)?.date || '0000';
       const dateB = b.days.find(d => d.date)?.date || '0000';
