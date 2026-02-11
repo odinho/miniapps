@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Environment variables and credentials
+.env
+*.json.gpg
+google-*.json
+service-account*.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Agent/AI directories
+.agent/
+.claude/
