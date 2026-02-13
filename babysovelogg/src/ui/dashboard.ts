@@ -4,6 +4,7 @@ import { queueEvent, getClientId } from '../sync.js';
 import { calculateAgeMonths, predictNextNap } from '../engine/schedule.js';
 import { el, formatAge, formatDuration, formatDurationLong, renderTimer, renderCountdown, formatTime } from './components.js';
 import { showToast } from './toast.js';
+import { renderArc } from './arc.js';
 
 let cleanups: (() => void)[] = [];
 
@@ -66,6 +67,35 @@ export function renderDashboard(container: HTMLElement): void {
   });
 
   dash.appendChild(btn);
+
+  // 12-hour arc visualization
+  const isNightMode = document.documentElement.getAttribute('data-theme') === 'night';
+  const arcSvg = renderArc({
+    todaySleeps: todaySleeps.map((s: any) => ({ start_time: s.start_time, end_time: s.end_time, type: s.type })),
+    activeSleep: activeSleep ? { start_time: activeSleep.start_time, type: activeSleep.type } : null,
+    prediction,
+    isNightMode,
+  });
+  const arcContainer = el('div', { className: 'arc-container' });
+  arcContainer.appendChild(arcSvg);
+
+  // Center text inside arc (countdown or timer)
+  const arcCenter = el('div', { className: 'arc-center-text' });
+
+  if (isSleeping && activeSleep) {
+    const timer = renderTimer(activeSleep.start_time);
+    cleanups.push(timer.stop);
+    arcCenter.appendChild(el('div', { className: 'arc-center-label' }, [activeSleep.type === 'night' ? '💤 Sleeping' : '😴 Napping']));
+    arcCenter.appendChild(timer.element);
+  } else if (prediction?.nextNap) {
+    const cd = renderCountdown(prediction.nextNap);
+    cleanups.push(cd.stop);
+    arcCenter.appendChild(el('div', { className: 'arc-center-label' }, ['Next nap']));
+    arcCenter.appendChild(cd.element);
+  }
+
+  arcContainer.appendChild(arcCenter);
+  dash.appendChild(arcContainer);
 
   // Timer or countdown
   if (isSleeping && activeSleep) {

@@ -601,4 +601,68 @@ html, body {
   text-decoration: underline;
   margin-top: 2px;
 }
+
+/* Arc visualization */
+.arc-container {
+  position: relative;
+  width: 100%;
+  max-width: 340px;
+}
+
+.sleep-arc {
+  display: block;
+}
+
+.arc-hour-label {
+  font-size: 10px;
+  fill: var(--text-light);
+  font-family: var(--font);
+}
+
+.arc-bubble-label {
+  font-size: 8px;
+  fill: var(--white);
+  font-family: var(--font);
+  font-weight: 600;
+}
+
+.arc-bubble-predicted .arc-bubble-label {
+  fill: var(--text-light);
+}
+
+.arc-short-nap {
+  font-size: 11px;
+  fill: var(--text-light);
+  font-family: var(--font);
+}
+
+.arc-active-pulse {
+  animation: arcPulse 2s ease-in-out infinite;
+}
+
+@keyframes arcPulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+.arc-center-text {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.arc-center-label {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.arc-center-text .countdown-value {
+  font-size: 1.4rem;
+}
 `;
