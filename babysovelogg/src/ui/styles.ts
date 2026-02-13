@@ -2,6 +2,15 @@ export function injectStyles(): void {
   const style = document.createElement("style");
   style.textContent = CSS;
   document.head.appendChild(style);
+  applyTheme();
+  // Re-check every minute
+  setInterval(applyTheme, 60000);
+}
+
+export function applyTheme(forceMode?: 'day' | 'night'): void {
+  const hour = new Date().getHours();
+  const mode = forceMode ?? (hour >= 6 && hour < 18 ? 'day' : 'night');
+  document.documentElement.setAttribute('data-theme', mode);
 }
 
 const CSS = `
@@ -29,6 +38,104 @@ const CSS = `
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Night theme */
+[data-theme="night"] {
+  --cream: #1a1a2e;
+  --cream-dark: #16213e;
+  --white: #1e2746;
+  --text: #e0d8f0;
+  --text-light: #9a8fc0;
+  --lavender: #2a2550;
+  --lavender-dark: #9a8fc0;
+  --shadow: 0 2px 16px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* Stars background for night mode */
+[data-theme="night"] body {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%);
+}
+
+[data-theme="night"] body::before,
+[data-theme="night"] body::after {
+  content: '';
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+[data-theme="night"] body::before {
+  background-image:
+    radial-gradient(1px 1px at 10% 15%, rgba(255,255,255,0.7) 50%, transparent 50%),
+    radial-gradient(1px 1px at 25% 35%, rgba(255,255,255,0.5) 50%, transparent 50%),
+    radial-gradient(1.5px 1.5px at 40% 10%, rgba(255,255,255,0.8) 50%, transparent 50%),
+    radial-gradient(1px 1px at 55% 45%, rgba(255,255,255,0.4) 50%, transparent 50%),
+    radial-gradient(1px 1px at 70% 20%, rgba(255,255,255,0.6) 50%, transparent 50%),
+    radial-gradient(1.5px 1.5px at 85% 55%, rgba(255,255,255,0.7) 50%, transparent 50%),
+    radial-gradient(1px 1px at 15% 65%, rgba(255,255,255,0.5) 50%, transparent 50%),
+    radial-gradient(1px 1px at 50% 75%, rgba(255,255,255,0.6) 50%, transparent 50%),
+    radial-gradient(1px 1px at 90% 80%, rgba(255,255,255,0.4) 50%, transparent 50%),
+    radial-gradient(1.5px 1.5px at 30% 85%, rgba(255,255,255,0.7) 50%, transparent 50%),
+    radial-gradient(1px 1px at 65% 90%, rgba(255,255,255,0.5) 50%, transparent 50%),
+    radial-gradient(1px 1px at 5% 40%, rgba(255,255,255,0.3) 50%, transparent 50%);
+  animation: starsTwinkle 4s ease-in-out infinite alternate;
+}
+
+[data-theme="night"] body::after {
+  background-image:
+    radial-gradient(1px 1px at 20% 25%, rgba(255,255,255,0.5) 50%, transparent 50%),
+    radial-gradient(1.5px 1.5px at 45% 55%, rgba(255,255,255,0.6) 50%, transparent 50%),
+    radial-gradient(1px 1px at 75% 35%, rgba(255,255,255,0.4) 50%, transparent 50%),
+    radial-gradient(1px 1px at 60% 70%, rgba(255,255,255,0.7) 50%, transparent 50%),
+    radial-gradient(1px 1px at 35% 50%, rgba(255,255,255,0.3) 50%, transparent 50%),
+    radial-gradient(1.5px 1.5px at 80% 15%, rgba(255,255,255,0.6) 50%, transparent 50%);
+  animation: starsTwinkle 5s ease-in-out 1s infinite alternate;
+}
+
+@keyframes starsTwinkle {
+  0% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+/* Glow effects on interactive elements in night mode */
+[data-theme="night"] .btn-primary {
+  box-shadow: 0 0 15px rgba(184, 169, 212, 0.4);
+}
+
+[data-theme="night"] .btn-primary:active {
+  box-shadow: 0 0 25px rgba(184, 169, 212, 0.6);
+}
+
+[data-theme="night"] .fab {
+  box-shadow: 0 0 20px rgba(184, 169, 212, 0.5), var(--shadow-lg);
+}
+
+[data-theme="night"] .sleep-button.awake {
+  box-shadow: 0 0 40px rgba(245, 199, 110, 0.5), 0 0 80px rgba(245, 199, 110, 0.2);
+}
+
+[data-theme="night"] .sleep-button.sleeping {
+  box-shadow: 0 0 40px rgba(184, 169, 212, 0.6), 0 0 80px rgba(184, 169, 212, 0.3);
+}
+
+[data-theme="night"] .nav-tab.active {
+  text-shadow: 0 0 8px rgba(184, 169, 212, 0.6);
+}
+
+[data-theme="night"] .countdown,
+[data-theme="night"] .stats-card,
+[data-theme="night"] .sleep-log-item {
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Ensure app content is above stars */
+[data-theme="night"] #app {
+  position: relative;
+  z-index: 1;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
