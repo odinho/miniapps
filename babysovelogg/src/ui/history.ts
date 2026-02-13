@@ -16,9 +16,16 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
     return;
   }
 
+  // Group by local date (not UTC) so night sleeps group correctly
+  const toLocalDate = (iso: string) => {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const todayLocal = toLocalDate(new Date().toISOString());
+
   const grouped = new Map<string, any[]>();
   for (const s of sleeps) {
-    const date = s.start_time.slice(0, 10);
+    const date = toLocalDate(s.start_time);
     if (!grouped.has(date)) grouped.set(date, []);
     grouped.get(date)!.push(s);
   }
@@ -27,7 +34,7 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
   
   for (const [date, entries] of grouped) {
     const d = new Date(date + 'T12:00:00');
-    const isToday = date === new Date().toISOString().slice(0, 10);
+    const isToday = date === todayLocal;
     const label = isToday ? 'Today' : d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
     
     log.appendChild(el('div', { style: { fontSize: '0.8rem', color: 'var(--text-light)', padding: '8px 4px 4px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.03em' } }, [label]));

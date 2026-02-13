@@ -7,7 +7,7 @@ export function applyEvent(event: NapperEvent): void {
   switch (type) {
     case 'baby.created':
       db.prepare(
-        'INSERT INTO baby (name, birthdate, created_at) VALUES (?, ?, datetime("now"))'
+        `INSERT INTO baby (name, birthdate, created_at) VALUES (?, ?, datetime('now'))`
       ).run(payload.name, payload.birthdate);
       break;
       
@@ -48,6 +48,12 @@ export function applyEvent(event: NapperEvent): void {
       break;
     }
     
+    case 'sleep.manual':
+      db.prepare(
+        'INSERT INTO sleep_log (baby_id, start_time, end_time, type) VALUES (?, ?, ?, ?)'
+      ).run(payload.babyId, payload.startTime, payload.endTime, payload.type || 'nap');
+      break;
+      
     case 'sleep.deleted':
       db.prepare('UPDATE sleep_log SET deleted = 1 WHERE id = ?').run(payload.sleepId);
       break;

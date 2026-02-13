@@ -3,6 +3,7 @@ import { postEvents } from '../api.js';
 import { queueEvent, getClientId } from '../sync.js';
 import { calculateAgeMonths, predictNextNap } from '../engine/schedule.js';
 import { el, formatAge, formatDuration, formatDurationLong, renderTimer, renderCountdown, formatTime } from './components.js';
+import { showToast } from './toast.js';
 
 let cleanups: (() => void)[] = [];
 
@@ -70,10 +71,12 @@ export function renderDashboard(container: HTMLElement): void {
   if (isSleeping && activeSleep) {
     const timer = renderTimer(activeSleep.start_time);
     cleanups.push(timer.stop);
+    const editLink = el('span', { className: 'edit-start-link' }, ['edit start time']);
+    editLink.addEventListener('click', () => showEditStartModal(activeSleep, container));
     dash.appendChild(el('div', { className: 'countdown' }, [
       el('div', { className: 'countdown-label' }, [`${activeSleep.type === 'night' ? 'Night' : 'Nap'} in progress`]),
       timer.element,
-      el('div', { className: 'countdown-sub' }, [`Started ${formatTime(activeSleep.start_time)}`]),
+      el('div', { className: 'countdown-sub' }, [`Started ${formatTime(activeSleep.start_time)} · `, editLink]),
     ]));
   } else if (prediction?.nextNap) {
     const cd = renderCountdown(prediction.nextNap);
@@ -106,4 +109,113 @@ export function renderDashboard(container: HTMLElement): void {
 
   view.appendChild(dash);
   container.appendChild(view);
+
+  // FAB for manual sleep entry
+  const fab = el('button', { className: 'fab' }, ['+']);
+  fab.addEventListener('click', () => showManualSleepModal(baby, container));
+  container.appendChild(fab);
+}
+
+function toLocal(iso: string): string {
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
+function showManualSleepModal(baby: any, container: HTMLElement): void {
+  const overlay = el('div', { className: 'modal-overlay' });
+  const modal = el('div', { className: 'modal' });
+
+  const now = new Date();
+  const oneHourAgo = new Date(now.getTime() - 3600000);
+
+  const startInput = el('input', { type: 'datetime-local', value: toLocal(oneHourAgo.toISOString()) }) as HTMLInputElement;
+  const endInput = el('input', { type: 'datetime-local', value: toLocal(now.toISOString()) }) as HTMLInputElement;
+
+  let selectedType = now.getHours() >= 18 || now.getHours() < 6 ? 'night' : 'nap';
+  const napPill = el('button', { className: `type-pill ${selectedType === 'nap' ? 'active' : ''}` }, ['😴 Nap']);
+  const nightPill = el('button', { className: `type-pill ${selectedType === 'night' ? 'active' : ''}` }, ['🌙 Night']);
+  const updatePills = () => {
+    napPill.className = `type-pill ${selectedType === 'nap' ? 'active' : ''}`;
+    nightPill.className = `type-pill ${selectedType === 'night' ? 'active' : ''}`;
+  };
+  napPill.addEventListener('click', () => { selectedType = 'nap'; updatePills(); });
+  nightPill.addEventListener('click', () => { selectedType = 'night'; updatePills(); });
+
+  modal.appendChild(el('h2', null, ['Add Sleep']));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Type']), el('div', { className: 'type-pills' }, [napPill, nightPill])]));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Start']), startInput]));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['End']), endInput]));
+
+  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Save']);
+  const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Cancel']);
+
+  saveBtn.addEventListener('click', async () => {
+    const start = new Date(startInput.value);
+    const end = new Date(endInput.value);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) { showToast('Please fill in both times', 'warning'); return; }
+    if (end <= start) { showToast('End must be after start', 'warning'); return; }
+
+    try {
+      const result = await postEvents([{
+        type: 'sleep.manual',
+        payload: { babyId: baby.id, startTime: start.toISOString(), endTime: end.toISOString(), type: selectedType },
+        clientId: getClientId(),
+      }]);
+      setAppState(result.state);
+      showToast('Sleep entry added', 'success');
+      close();
+      renderDashboard(container);
+    } catch {
+      showToast('Failed to save', 'error');
+    }
+  });
+
+  cancelBtn.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  modal.appendChild(el('div', { className: 'btn-row' }, [cancelBtn, saveBtn]));
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  function close() { overlay.remove(); }
+}
+
+function showEditStartModal(activeSleep: any, container: HTMLElement): void {
+  const overlay = el('div', { className: 'modal-overlay' });
+  const modal = el('div', { className: 'modal' });
+
+  const startInput = el('input', { type: 'datetime-local', value: toLocal(activeSleep.start_time) }) as HTMLInputElement;
+
+  modal.appendChild(el('h2', null, ['Edit Start Time']));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Started at']), startInput]));
+
+  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Save']);
+  const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Cancel']);
+
+  saveBtn.addEventListener('click', async () => {
+    const start = new Date(startInput.value);
+    if (isNaN(start.getTime())) { showToast('Invalid time', 'warning'); return; }
+    try {
+      const result = await postEvents([{
+        type: 'sleep.updated',
+        payload: { sleepId: activeSleep.id, startTime: start.toISOString() },
+        clientId: getClientId(),
+      }]);
+      setAppState(result.state);
+      showToast('Start time updated', 'success');
+      close();
+      renderDashboard(container);
+    } catch {
+      showToast('Failed to update', 'error');
+    }
+  });
+
+  cancelBtn.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  modal.appendChild(el('div', { className: 'btn-row' }, [cancelBtn, saveBtn]));
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  function close() { overlay.remove(); }
 }

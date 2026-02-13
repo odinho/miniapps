@@ -462,4 +462,36 @@ html, body {
   color: var(--text);
   font-weight: 600;
 }
+
+/* FAB button */
+.fab {
+  position: fixed;
+  bottom: calc(68px + var(--safe-bottom));
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--moon);
+  color: var(--white);
+  font-size: 1.8rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--shadow-lg);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s, background 0.2s;
+}
+.fab:active { transform: scale(0.92); }
+
+/* Edit start link */
+.edit-start-link {
+  color: var(--lavender-dark);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-decoration: underline;
+  margin-top: 2px;
+}
 `;

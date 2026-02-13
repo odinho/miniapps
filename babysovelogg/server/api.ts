@@ -87,6 +87,10 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
   const method = req.method || 'GET';
   
+  if (url.pathname.startsWith('/api/')) {
+    console.log(`[${new Date().toISOString()}] ${method} ${url.pathname}`);
+  }
+  
   // CORS preflight
   if (method === 'OPTIONS') {
     res.writeHead(204, {
@@ -109,14 +113,19 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   }
   
   if (url.pathname === '/api/events' && method === 'POST') {
-    const body = JSON.parse(await readBody(req));
-    const results = [];
-    for (const evt of body.events || [body]) {
-      const event = appendEvent(evt.type, evt.payload, evt.clientId);
-      applyEvent(event);
-      results.push(event);
+    try {
+      const body = JSON.parse(await readBody(req));
+      const results = [];
+      for (const evt of body.events || [body]) {
+        const event = appendEvent(evt.type, evt.payload, evt.clientId);
+        applyEvent(event);
+        results.push(event);
+      }
+      return json(res, { events: results, state: getState() });
+    } catch (err: any) {
+      console.error(`[ERROR] POST /api/events:`, err.message);
+      return json(res, { error: err.message }, 500);
     }
-    return json(res, { events: results, state: getState() });
   }
   
   if (url.pathname === '/api/sleeps' && method === 'GET') {

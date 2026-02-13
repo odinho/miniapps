@@ -154,6 +154,76 @@ export function extractDateRangeFromLine(text, defaultYear = new Date().getFullY
 }
 
 /**
+ * Extract text date range from a heading line
+ * Examples:
+ *   "8. februar – 14. februar 2026" -> { date: start, endDate: end, isRange: true }
+ *   "8. – 14. februar 2026 Phnom Penh" -> { date: start, endDate: end, location: "Phnom Penh", isRange: true }
+ *   "28. januar – 3. februar 2026" -> cross-month range
+ */
+export function extractTextDateRangeFromLine(text, defaultYear = new Date().getFullYear()) {
+  const trimmed = text.trim();
+  const monthNames = 'januar|februar|mars|april|mai|juni|juli|august|september|oktober|november|desember';
+
+  // Pattern 1: "8. februar – 14. februar 2026 [Location]"
+  // Both dates have month names
+  const fullPattern = new RegExp(
+    `^(.*?)\\s*(\\d{1,2})\\.\\s*(${monthNames})\\s*(?:(\\d{4})\\s*)?[-–]\\s*(\\d{1,2})\\.\\s*(${monthNames})\\s*(\\d{4})?\\s*(.*)$`, 'i'
+  );
+  const fullMatch = trimmed.match(fullPattern);
+
+  if (fullMatch) {
+    const startDay = parseInt(fullMatch[2], 10);
+    const startMonth = MONTHS[fullMatch[3].toLowerCase()];
+    const endDay = parseInt(fullMatch[5], 10);
+    const endMonth = MONTHS[fullMatch[6].toLowerCase()];
+    const year = fullMatch[7] ? parseInt(fullMatch[7], 10) : (fullMatch[4] ? parseInt(fullMatch[4], 10) : defaultYear);
+    const startYear = fullMatch[4] ? parseInt(fullMatch[4], 10) : year;
+
+    let locationBefore = fullMatch[1].trim();
+    let locationAfter = fullMatch[8].trim();
+    if (WEEKDAYS.includes(locationBefore.toLowerCase())) locationBefore = '';
+    const location = locationBefore || locationAfter || null;
+
+    return {
+      date: new Date(startYear, startMonth, startDay),
+      endDate: new Date(year, endMonth, endDay),
+      location,
+      rawText: trimmed,
+      isRange: true
+    };
+  }
+
+  // Pattern 2: "8. – 14. februar 2026 [Location]"
+  // Only end date has month name
+  const shortPattern = new RegExp(
+    `^(.*?)\\s*(\\d{1,2})\\.\\s*[-–]\\s*(\\d{1,2})\\.\\s*(${monthNames})\\s*(\\d{4})?\\s*(.*)$`, 'i'
+  );
+  const shortMatch = trimmed.match(shortPattern);
+
+  if (shortMatch) {
+    const startDay = parseInt(shortMatch[2], 10);
+    const endDay = parseInt(shortMatch[3], 10);
+    const month = MONTHS[shortMatch[4].toLowerCase()];
+    const year = shortMatch[5] ? parseInt(shortMatch[5], 10) : defaultYear;
+
+    let locationBefore = shortMatch[1].trim();
+    let locationAfter = shortMatch[6].trim();
+    if (WEEKDAYS.includes(locationBefore.toLowerCase())) locationBefore = '';
+    const location = locationBefore || locationAfter || null;
+
+    return {
+      date: new Date(year, month, startDay),
+      endDate: new Date(year, month, endDay),
+      location,
+      rawText: trimmed,
+      isRange: true
+    };
+  }
+
+  return null;
+}
+
+/**
  * Extract date and optional location from a heading line
  * Examples:
  *   "Bangkok 1. januar 2026" -> { date, location: "Bangkok", rawText }
@@ -164,11 +234,18 @@ export function extractDateRangeFromLine(text, defaultYear = new Date().getFullY
  *   "21.01.2026 - 26.01.2026 Phuket" -> { date: startDate, endDate, location: "Phuket", isRange: true }
  */
 export function extractDateFromLine(text, defaultYear = new Date().getFullYear()) {
-  // Try date range first
+  // Try date range first (numeric format)
   const dateRange = extractDateRangeFromLine(text, defaultYear);
   if (dateRange) {
     return dateRange; // Returns single object with range info
   }
+
+  // Try text date range: "8. februar – 14. februar 2026" or "8. – 14. februar 2026"
+  const textDateRange = extractTextDateRangeFromLine(text, defaultYear);
+  if (textDateRange) {
+    return textDateRange;
+  }
+
   const trimmed = text.trim();
 
   // Try text date pattern with optional location prefix/suffix

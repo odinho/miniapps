@@ -20,6 +20,10 @@ export async function postEvents(events: Array<{type: string; payload: any; clie
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ events }),
   });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`API error ${res.status}: ${text}`);
+  }
   return res.json();
 }
 

@@ -4,10 +4,21 @@ const QUEUE_KEY = 'napper_event_queue';
 const CLIENT_ID_KEY = 'napper_client_id';
 const STATE_CACHE_KEY = 'napper_cached_state';
 
+function generateId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  // Fallback for non-secure contexts (HTTP)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 export function getClientId(): string {
   let id = localStorage.getItem(CLIENT_ID_KEY);
   if (!id) {
-    id = crypto.randomUUID();
+    id = generateId();
     localStorage.setItem(CLIENT_ID_KEY, id);
   }
   return id;

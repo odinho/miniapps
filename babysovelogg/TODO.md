@@ -1,10 +1,280 @@
-# Napper TODO — Roadmap to Feature Parity & Beyond
+# Napper — Implementation Roadmap
 
-Inspirert av den originale Napper-appen. Prioritert i fasar.
+Baby sleep & activity tracker. Event-sourced architecture with SQLite backend, vanilla TS frontend.
+
+**App runs at:** `http://localhost:3200` (PORT=3200)
+**Working dir:** `/home/openclaw/.openclaw/workspace/miniapps/napper/`
+**Build:** `npm run build` (esbuild → dist/)
+**Server:** `PORT=3200 node dist/server.js`
+**Architecture:** One deploy per family. All clients share the same SQLite database. No auth needed.
 
 ---
 
-## Fase 0: MVP ✅ (current)
+## Rules for implementation
+
+1. **Complete each step fully before moving to the next.**
+2. **Each step must include Playwright e2e tests** covering the new functionality.
+3. **Run ALL existing tests after each step** (`npx playwright test`) — they must all pass.
+4. **Commit after each step** with a descriptive message.
+5. **Build and verify** (`npm run build`) before committing.
+6. Keep the app generic — no personal names, no hardcoded baby info.
+
+---
+
+## Step 0: Test Infrastructure (do this first!)
+
+Set up Playwright for the project:
+- Install: `npm i -D @playwright/test` + `npx playwright install chromium`
+- Create `playwright.config.ts` — start server on a random port, use chromium only
+- Create `tests/` directory
+- Write baseline tests for existing functionality:
+  - Onboarding: app redirects to settings when no baby exists, can create a baby
+  - Dashboard: shows baby name, sleep button, can start/stop a nap
+  - History: shows logged sleeps, can edit a sleep entry
+  - Manual sleep: can add a past sleep via the "+" FAB button
+  - Multi-client: second browser context sees the same baby data
+- All tests must pass. Commit: `"Add Playwright test infrastructure + baseline tests"`
+
+---
+
+## Step 1: Dark Theme with Day/Night Mode
+
+The app should have a beautiful dark theme inspired by the original Napper app.
+
+### Design:
+- **Night mode (default for now):** Deep dark blue/purple background (#1a1a2e → #16213e gradient), stars twinkling (CSS), subtle glow effects
+- **Day mode:** Keep current light pastel theme
+- **Auto-switch:** Based on time of day (06:00–18:00 = day, else night), or based on baby's current state (sleeping = night theme)
+- CSS custom properties for theming (swap `--bg`, `--card`, `--text` etc.)
+- Stars: Small dots with twinkle animation scattered on background
+- Neon glow on interactive elements (buttons, cards) in dark mode
+
+### Tests:
+- Theme switches based on time/state
+- Both themes render correctly (no invisible text, contrast OK)
+
+Commit: `"Add dark/night theme with auto-switching"`
+
+---
+
+## Step 2: 12-Hour Arc Visualization (Dashboard)
+
+Replace the current simple dashboard with a 12-hour semicircular arc showing the day/night cycle.
+
+### Design (based on original Napper app):
+- **SVG-based semicircular arc** spanning 12 hours
+- **Day arc:** From wake-up time to expected bedtime (e.g. 06:00→18:00)
+- **Night arc:** From bedtime to expected wake-up (e.g. 18:00→06:00)
+- **Flip between day/night:** Day mode shows day arc, night mode shows night arc
+- **Anchor icons:** Sunrise (☀️) at start of day arc, sunset (🌅) at end
+- **Sleep periods as pill-shaped bubbles** positioned along the arc:
+  - Filled/solid = completed sleep
+  - Dotted outline = predicted next sleep
+  - Glowing/pulsing = currently sleeping
+- **Start/end times** shown as labels on the arc bubbles
+- **Center content:** Countdown to next nap ("Second nap in 3h 13m"), or elapsed time if sleeping
+- **Short naps** shown as small cloud icons below the arc with duration
+
+### Implementation:
+- SVG component in `src/ui/arc.ts`
+- Calculate positions on arc based on time-of-day
+- Use existing prediction engine for predicted naps
+- Keep the sleep toggle button (tap to sleep/wake) — integrate it with the arc or below it
+
+### Tests:
+- Arc renders with correct time range
+- Completed sleeps appear on arc
+- Predicted nap shown with dotted style
+- Active sleep shown with animation
+- Day/night flip works
+
+Commit: `"Add 12-hour arc visualization on dashboard"`
+
+---
+
+## Step 3: Diaper/Activity Logging
+
+Add the ability to log diaper changes (the main non-sleep activity to track).
+
+### Design:
+- **Quick-log button** on dashboard (💩 icon or similar) — one tap opens a bottom-sheet
+- **Bottom-sheet modal** with:
+  - Type: wet 💧, dirty 💩, both 💧💩, dry (pills like nap/night)
+  - Amount: lite / middels / mykje (optional, pills)
+  - Note: free text (optional)
+  - Time: defaults to now, editable (datetime-local)
+- **New event type:** `diaper.logged` — {babyId, time, type, amount?, note?}
+- **Server projection:** New `diaper_log` table (id, baby_id, time, type, amount, note, deleted)
+- **History view:** Show diaper entries interspersed with sleep entries, with appropriate icons
+- **Dashboard stat:** "Diapers today: X" card
+
+### Implementation:
+- Add `diaper.logged` + `diaper.deleted` event handling in `server/projections.ts`
+- Add `diaper_log` table in `server/db.ts`
+- New API endpoint: `GET /api/diapers?from=&to=&limit=`
+- Include diaper count in `/api/state` response
+- Dashboard: quick-log button + today count
+- History: merged timeline of sleeps + diapers
+
+### Tests:
+- Can log a diaper change
+- Diaper appears in history
+- Dashboard shows diaper count
+- Can delete a diaper entry
+- Different types (wet/dirty/both) render correctly
+
+Commit: `"Add diaper/activity logging"`
+
+---
+
+## Step 4: Sleep Metadata (Tags)
+
+Add optional tags when starting or stopping sleep.
+
+### Design:
+- **After stopping sleep (or after starting):** Brief bottom-sheet to tag:
+  - Mood at start: 😊 happy, 😐 normal, 😢 upset, 😤 fighting sleep
+  - How they fell asleep: in bed, nursing, held/worn, stroller, car, bottle
+- **Tags are optional** — can dismiss the sheet
+- **Show tags in history** as small badges on sleep entries
+- **Editable later** via the edit modal
+
+### Implementation:
+- New event: `sleep.tagged` — {sleepId, mood?, method?}
+- Add `mood` and `method` columns to `sleep_log` table + projection
+- Bottom-sheet auto-shows after sleep.ended (with skip option)
+- Tags shown as emoji badges in history items
+
+### Tests:
+- Tag sheet appears after stopping sleep
+- Can select mood and method
+- Tags shown in history
+- Can edit tags later
+- Can skip tagging
+
+Commit: `"Add sleep metadata tagging (mood + method)"`
+
+---
+
+## Step 5: Pause/Resume
+
+Allow pausing and resuming sleep (for brief wake-ups during a nap).
+
+### Design:
+- **Pause button** appears on dashboard during active sleep (next to or below timer)
+- **Resume button** replaces pause when paused
+- **Timer** shows total sleep minus pause duration
+- **History** shows pauses within a sleep entry (e.g. "1h 20m (10m pause)")
+- **Retroactive:** Can add a pause to a past sleep in edit modal
+
+### Implementation:
+- New events: `sleep.paused` {sleepId, pauseTime}, `sleep.resumed` {sleepId, resumeTime}
+- New table: `sleep_pauses` (id, sleep_id, pause_time, resume_time)
+- Server projection: handle pause/resume events
+- Dashboard: pause/resume buttons during active sleep
+- Timer: subtract pause duration from elapsed time
+- History: show pause info
+- `/api/state`: include pause info in activeSleep
+
+### Tests:
+- Can pause and resume active sleep
+- Timer adjusts for pause duration
+- History shows pause duration
+- Can add retroactive pause in edit modal
+- Multiple pauses work correctly
+
+Commit: `"Add pause/resume for sleep sessions"`
+
+---
+
+## Step 6: Statistics Page
+
+Add a dedicated stats page with charts and insights.
+
+### Design:
+- **New nav tab:** 📊 Stats (between History and Settings)
+- **Daily summary:** Total sleep, nap count, longest nap, total awake time
+- **Week view:** Simple bar chart (CSS-based, no chart library) showing sleep per day
+- **Average wake window** from last 7 days
+- **Trends:** Sleep per day trend over 2-4 weeks
+- **Age comparison:** Compare with age-appropriate recommendations (data already in constants.ts)
+- **Diaper stats:** Daily count, trend
+
+### Implementation:
+- New file: `src/ui/stats.ts`
+- Use existing stats engine (`src/engine/stats.ts`)
+- CSS bar charts (div widths proportional to values)
+- New API endpoint: `GET /api/stats?days=14` returning pre-calculated stats
+- Add nav tab in `main.ts`
+
+### Tests:
+- Stats page renders with data
+- Bar chart shows correct proportions
+- Week summary is accurate
+- Diaper stats included
+
+Commit: `"Add statistics page with charts and insights"`
+
+---
+
+## Step 7: Real-time Sync (SSE)
+
+Enable live updates so both parents see changes instantly.
+
+### Design:
+- **Server-Sent Events** stream from server
+- When any client posts an event, all connected clients receive the update
+- **Sync indicator** in UI: green dot = connected, yellow = reconnecting
+- Auto-reconnect on disconnect
+
+### Implementation:
+- New endpoint: `GET /api/stream` — SSE stream
+- Server: maintain list of connected clients, broadcast on new events
+- Client: EventSource in `src/sync.ts`, auto-refresh state on message
+- Visual indicator: small dot in nav bar or header
+- Debounce rapid updates
+
+### Tests:
+- Two browser contexts: one logs sleep, other sees it appear
+- Sync indicator shows correct state
+- Reconnects after disconnect
+- Works alongside offline queue
+
+Commit: `"Add real-time sync via Server-Sent Events"`
+
+---
+
+## Step 8: Polish & PWA
+
+Final polish pass.
+
+### 8.1 Animations
+- Smooth transitions between views
+- Sleep button: satisfying press animation
+- Arc: animated nap bubbles appearing
+- Haptic feedback (Vibration API) on start/stop
+
+### 8.2 PWA improvements
+- App icon (generate a simple moon/baby icon)
+- Proper manifest.json with theme colors
+- Splash screen
+- Fix service worker caching for new assets
+
+### 8.3 Technical cleanup
+- Healthcheck endpoint (`/api/health`)
+- Error handling improvements
+- TypeScript strict where easy
+
+### Tests:
+- PWA installable (manifest valid)
+- Service worker caches assets
+- Health endpoint returns 200
+
+Commit: `"Polish: animations, PWA improvements, cleanup"`
+
+---
+
+## Done ✅
 - [x] Event-sourced backend med SQLite
 - [x] Start/stopp søvn (nap/night auto-detect)
 - [x] Sanntids-timer under pågåande søvn
@@ -13,176 +283,5 @@ Inspirert av den originale Napper-appen. Prioritert i fasar.
 - [x] Offline-køing (localStorage)
 - [x] PWA med service worker
 - [x] Onboarding (legg til baby)
-- [ ] **Deploy til napper.s0.no** ← pågår no
-
----
-
-## Fase 1: Kjernefunksjonar som manglar
-_Ting som gjer appen faktisk brukbar dag-til-dag._
-
-### 1.1 Søvn-metadata (ved start)
-- [ ] **Start-humør:** Upset, lang tid å sovna, normal
-- [ ] **Korleis ho sovna (method):** In bed, nursing, worn/held, next to me, bottle feeding, stroller, car, swing
-- [ ] Bottom-sheet UI for tagging ved start (eller retroaktivt)
-
-### 1.2 Søvn-metadata (ved stopp)
-- [ ] **End-type:** Woke up child (vekt) vs. Woke up naturally (vakna sjølv)
-- [ ] **Wake up mood:** Bad mood / Neutral / Good mood
-- [ ] **Comment:** Fritekst-notat på kvar søvnperiode
-- [ ] **Resume-knapp:** Fortset søvnen i staden for å lagra (ho vakna litt men sovna att)
-- [ ] Bottom-sheet som kjem opp automatisk ved stopp
-
-### Event-design for metadata
-- [ ] Nye event-typar: `sleep.tagged` — {sleepId, startMood?, method?, endType?, wakeMood?, comment?}
-- [ ] Eller: utvid `sleep.ended` payload med metadata
-- [ ] Lagra i sleep_log-tabellen som ekstra kolonnar
-
-### 1.3 Pause/resume
-- [ ] `sleep.paused` event — {sleepId, pauseTime}
-- [ ] `sleep.resumed` event — {sleepId, resumeTime}
-- [ ] Pause-knapp i dashboard under aktiv søvn
-- [ ] Vis pausar i historikk (total søvntid minus pausar)
-- [ ] "Add pause" retroaktivt i redigeringsmodal
-
-### 1.4 Manuell registrering
-- [ ] Legg til tidlegare søvn manuelt (start + slutt)
-- [ ] "+" knapp for rask manuell registrering
-- [ ] Endra starttid på pågåande søvn ("ho sovna eigentleg 10 min sidan")
-
-### 1.5 Betre tidshandtering
-- [ ] Vis alle tider i brukarens lokale tidssone (ikkje UTC)
-- [ ] Timezone-felt i brukarinnstillingar (auto-detect)
-- [ ] Rett dato-gruppering i historikk (natt-søvn som startar 20:00 høyrer til "i dag")
-
----
-
-## Fase 2: Visualisering
-_Det som gjer appen visuelt nyttig og kjekk å bruka._
-
-### 2.1 Dagsboge (12h-klokke med dag/natt-flip)
-- [ ] Sirkulær 12-timars visualisering (IKKJE 24h)
-- [ ] To moduser: **dag** (06–18) og **natt** (18–06)
-- [ ] Flippar frå natt→dag ved "stå opp"-registrering, dag→natt ved "legg seg"
-- [ ] Animert overgang mellom dag/natt-modus
-- [ ] Boge rundt klokka der søvnperiodar er markerte
-- [ ] Sol-ikon (sunrise) og måne-ikon (sunset) som ankerpunkt
-- [ ] Ferdig lur = avrunda pille/kapsel-form på bogen med varigheit
-- [ ] Neste predikerte lur = stipla omriss på bogen
-- [ ] "Second nap in Xh Ym / Near HH:MM" — vis lur-nummer + estimat
-- [ ] Pågåande søvn animert (pulsering/glød)
-- [ ] Canvas eller SVG-basert
-
-### 2.2 Statistikk-side
-- [ ] Dagleg oppsummering (total søvn, antal lurar, lengste lur)
-- [ ] Vekeoversikt med søylediagram
-- [ ] Gjennomsnittleg wake window
-- [ ] Trend: søvn per dag siste 2-4 veker
-- [ ] Samanlikning med aldersanbefalingar
-
-### 2.3 Betre dashboard
-- [ ] Anbefalt leggetid (kveld)
-- [ ] "Schedule is optimized" / tips basert på alder
-- [ ] Gårdagens natt-søvn synleg (total nattetimar)
-
----
-
-## Fase 3: Mørk tema & design
-_Frå "funksjonell" til "vakker"._
-
-### 3.1 Mørkt tema (natt-modus)
-- [ ] Mørk bakgrunn med stjerner (som originalen)
-- [ ] Automatisk bytte basert på tid på døgnet
-- [ ] Beholde det lyse pastelltemaet som standard dagtema
-
-### 3.2 Animasjonar & polish
-- [ ] Soft glow rundt måne-knappen under søvn
-- [ ] Stjerne-twinkle animasjon (CSS)
-- [ ] Smooth transitions mellom views
-- [ ] Bottom-sheet modal (slide-up) for redigering ← allereie delvis
-- [ ] Haptic feedback (vibration API) ved start/stopp
-
-### 3.3 Ikon & branding
-- [ ] App-ikon (for PWA homescreen)
-- [ ] Splash screen
-- [ ] Profilbilete av baby (valfritt)
-
----
-
-## Fase 4: Smart funksjonalitet
-_Det som gjer appen smartare enn ein enkel logg._
-
-### 4.1 Notifikasjonar
-- [ ] Push-varsling X minutt før predikert neste lur
-- [ ] "Har ho vore vaken i Y min — tid for lur snart?"
-- [ ] Service worker push eller Telegram-integrasjon
-- [ ] Konfigurerbare varseltider
-
-### 4.2 Lyd/kvitestøy
-- [ ] Kvitestøy-spelar (brown noise, rain, shh)
-- [ ] Timer for kvitestøy (auto-stopp etter X min)
-- [ ] Volum-kontroll
-- [ ] (Originalen har dette — "Music" tab)
-
-### 4.3 Søvntransisjonar
-- [ ] Automatisk deteksjon av lur-dropping (3→2, 2→1)
-- [ ] Varsel: "Halldis ser ut til å droppa ein lur"
-- [ ] Tilpassa wake windows basert på faktisk data (allereie delvis)
-
-### 4.4 Fôring-sporing (stretch goal)
-- [ ] Registrer amming/flaske/mat
-- [ ] Sjå samanheng mellom fôring og søvn
-- [ ] Eventtypes: `feeding.started`, `feeding.ended`
-
----
-
-## Fase 5: Multi-brukar & sync
-_For at både Odin og Helene kan bruka appen._
-
-### 5.1 Enkel autentisering
-- [ ] Pin-kode eller enkel passord-beskyttelse
-- [ ] Eller: ingen auth, berre delt URL (trusted network)
-- [ ] Client-ID allereie på plass for event-dedup
-
-### 5.2 Sanntids-oppdatering
-- [ ] SSE (Server-Sent Events) eller WebSocket for live sync
-- [ ] Når Helene startar lur → Odin ser det med ein gong
-- [ ] Vis kven som registrerte kva (clientId → namn)
-
-### 5.3 Offline sync forbetring
-- [ ] Conflict resolution UI ("Dobbel registrering oppdaga")
-- [ ] Synkindikator i UI (grøn = synka, gul = køa)
-- [ ] Last-write-wins med manuell dedup-knapp
-
----
-
-## Fase 6: Data & eksport
-- [ ] Eksporter til CSV
-- [ ] Importer frå original Napper-app (viss mogleg)
-- [ ] API for Klådi-integrasjon (eg kan henta data for morgonrapportar!)
-- [ ] Backup/restore av eventlog
-
----
-
-## Teknisk gjeld & infrastruktur
-- [ ] TypeScript strict mode
-- [ ] Testar (minst for engine/schedule.ts og events.ts)
-- [ ] Rate limiting på API
-- [ ] Gzip/brotli komprimering (nginx)
-- [ ] Cache headers for statiske filer
-- [ ] Healthcheck endpoint (/api/health)
-- [ ] Automatisk deploy-script (rsync + restart)
-- [ ] Logrotate for systemd-journal
-
----
-
-## Prioritert rekkefølge for neste sprint
-
-1. ✅ Deploy MVP til napper.s0.no
-2. 🔜 Søvn-metadata (mood + method) — mest nyttig dagleg
-3. 🔜 Manuell registrering (retroaktiv søvn)
-4. 🔜 Pause/resume
-5. Dagsboge-visualisering (24h-klokke)
-6. Mørkt tema
-7. Statistikk-side
-8. SSE live sync (for Helene)
-9. Notifikasjonar
+- [x] Manuell registrering (+FAB, sleep.manual event, edit start time)
+- [x] Tidssonefiks (lokal datogruppering i historikk)
