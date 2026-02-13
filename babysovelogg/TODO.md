@@ -20,26 +20,36 @@ Inspirert av den originale Napper-appen. Prioritert i fasar.
 ## Fase 1: Kjernefunksjonar som manglar
 _Ting som gjer appen faktisk brukbar dag-til-dag._
 
-### 1.1 Søvn-metadata
-- [ ] **Start-tilstand:** Upset, lang tid å sovna, normal (valfri tag ved start/stopp)
-- [ ] **Korleis ho sovna:** In bed, nursing, worn/held, next to me, bottle feeding, stroller, car
-- [ ] Nye event-typar: `sleep.tagged` — {sleepId, mood?, method?}
-- [ ] Bottom-sheet UI for tagging (etter stopp, eller rediger seinare)
-- [ ] Lagra som del av sleep-payload eller eige event
+### 1.1 Søvn-metadata (ved start)
+- [ ] **Start-humør:** Upset, lang tid å sovna, normal
+- [ ] **Korleis ho sovna (method):** In bed, nursing, worn/held, next to me, bottle feeding, stroller, car, swing
+- [ ] Bottom-sheet UI for tagging ved start (eller retroaktivt)
 
-### 1.2 Pause/resume
+### 1.2 Søvn-metadata (ved stopp)
+- [ ] **End-type:** Woke up child (vekt) vs. Woke up naturally (vakna sjølv)
+- [ ] **Wake up mood:** Bad mood / Neutral / Good mood
+- [ ] **Comment:** Fritekst-notat på kvar søvnperiode
+- [ ] **Resume-knapp:** Fortset søvnen i staden for å lagra (ho vakna litt men sovna att)
+- [ ] Bottom-sheet som kjem opp automatisk ved stopp
+
+### Event-design for metadata
+- [ ] Nye event-typar: `sleep.tagged` — {sleepId, startMood?, method?, endType?, wakeMood?, comment?}
+- [ ] Eller: utvid `sleep.ended` payload med metadata
+- [ ] Lagra i sleep_log-tabellen som ekstra kolonnar
+
+### 1.3 Pause/resume
 - [ ] `sleep.paused` event — {sleepId, pauseTime}
 - [ ] `sleep.resumed` event — {sleepId, resumeTime}
 - [ ] Pause-knapp i dashboard under aktiv søvn
 - [ ] Vis pausar i historikk (total søvntid minus pausar)
 - [ ] "Add pause" retroaktivt i redigeringsmodal
 
-### 1.3 Manuell registrering
+### 1.4 Manuell registrering
 - [ ] Legg til tidlegare søvn manuelt (start + slutt)
 - [ ] "+" knapp for rask manuell registrering
 - [ ] Endra starttid på pågåande søvn ("ho sovna eigentleg 10 min sidan")
 
-### 1.4 Betre tidshandtering
+### 1.5 Betre tidshandtering
 - [ ] Vis alle tider i brukarens lokale tidssone (ikkje UTC)
 - [ ] Timezone-felt i brukarinnstillingar (auto-detect)
 - [ ] Rett dato-gruppering i historikk (natt-søvn som startar 20:00 høyrer til "i dag")
@@ -55,8 +65,10 @@ _Det som gjer appen visuelt nyttig og kjekk å bruka._
 - [ ] Flippar frå natt→dag ved "stå opp"-registrering, dag→natt ved "legg seg"
 - [ ] Animert overgang mellom dag/natt-modus
 - [ ] Boge rundt klokka der søvnperiodar er markerte
-- [ ] Sol-ikon (sunrise) og måne-ikon (sunset) som ankerunkt
-- [ ] Lurar som "bobler" langs bogen med start/slutt-tid
+- [ ] Sol-ikon (sunrise) og måne-ikon (sunset) som ankerpunkt
+- [ ] Ferdig lur = avrunda pille/kapsel-form på bogen med varigheit
+- [ ] Neste predikerte lur = stipla omriss på bogen
+- [ ] "Second nap in Xh Ym / Near HH:MM" — vis lur-nummer + estimat
 - [ ] Pågåande søvn animert (pulsering/glød)
 - [ ] Canvas eller SVG-basert
 
