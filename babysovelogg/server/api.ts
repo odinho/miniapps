@@ -1,4 +1,4 @@
-import { IncomingMessage, ServerResponse } from 'http';
+import { IncomingMessage, ServerResponse } from 'node:http';
 import { readFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -9,6 +9,16 @@ import { calculateAgeMonths, predictNextNap, recommendBedtime } from '../src/eng
 import { getTodayStats } from '../src/engine/stats.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// SSE connected clients
+const sseClients = new Set<ServerResponse>();
+
+function broadcast(eventType: string, data: any) {
+  const msg = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of sseClients) {
+    try { client.write(msg); } catch { sseClients.delete(client); }
+  }
+}
 const distDir = process.env.NODE_ENV === 'production' ? __dirname : path.join(__dirname, '..', 'dist');
 
 const MIME: Record<string, string> = {
@@ -114,6 +124,21 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
   
+  // SSE stream
+  if (url.pathname === '/api/stream' && method === 'GET') {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.flushHeaders();
+    sseClients.add(res);
+    const heartbeat = setInterval(() => { try { res.write(':\n\n'); } catch {} }, 30000);
+    req.on('close', () => { sseClients.delete(res); clearInterval(heartbeat); });
+    return;
+  }
+
   // API routes
   if (url.pathname === '/api/state' && method === 'GET') {
     return json(res, getState());
@@ -133,7 +158,9 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
         applyEvent(event);
         results.push(event);
       }
-      return json(res, { events: results, state: getState() });
+      const state = getState();
+      broadcast('update', { state });
+      return json(res, { events: results, state });
     } catch (err: any) {
       console.error(`[ERROR] POST /api/events:`, err.message);
       return json(res, { error: err.message }, 500);

@@ -1,4 +1,4 @@
-import { postEvents } from './api.js';
+import { postEvents, type AppState } from './api.js';
 
 const QUEUE_KEY = 'napper_event_queue';
 const CLIENT_ID_KEY = 'napper_client_id';
@@ -61,4 +61,36 @@ export function getCachedState(): any | null {
 
 export function hasPendingEvents(): boolean {
   return getQueue().length > 0;
+}
+
+export type SSEStatus = 'connected' | 'reconnecting' | 'disconnected';
+
+let sseStatus: SSEStatus = 'disconnected';
+export function getSSEStatus(): SSEStatus { return sseStatus; }
+
+// Suppress SSE re-renders briefly after local mutations
+let lastMutationTime = 0;
+const SSE_SUPPRESS_MS = 1000;
+export function markLocalMutation() { lastMutationTime = Date.now(); }
+
+export function connectSSE(onUpdate: (state: AppState) => void): () => void {
+  const es = new EventSource('/api/stream');
+  es.addEventListener('open', () => { sseStatus = 'connected'; updateSyncDot(); });
+  es.addEventListener('error', () => { sseStatus = 'reconnecting'; updateSyncDot(); });
+  es.addEventListener('update', (e: MessageEvent) => {
+    try {
+      const { state } = JSON.parse(e.data);
+      if (!state) return;
+      cacheState(state);
+      if (Date.now() - lastMutationTime < SSE_SUPPRESS_MS) return; // skip re-render for own mutation
+      onUpdate(state);
+    } catch {}
+  });
+  return () => { es.close(); sseStatus = 'disconnected'; };
+}
+
+function updateSyncDot() {
+  const dot = document.getElementById('sync-dot');
+  if (!dot) return;
+  dot.style.background = sseStatus === 'connected' ? '#4caf50' : sseStatus === 'reconnecting' ? '#ff9800' : '#999';
 }

@@ -1,5 +1,8 @@
 const BASE = '';  // Same origin
 
+let _onMutation: (() => void) | null = null;
+export function setMutationHook(fn: () => void) { _onMutation = fn; }
+
 export interface AppState {
   baby: any;
   activeSleep: any;
@@ -23,6 +26,7 @@ export async function getState(): Promise<AppState> {
 }
 
 export async function postEvents(events: Array<{type: string; payload: any; clientId?: string}>): Promise<{events: any[]; state: AppState}> {
+  if (_onMutation) _onMutation();
   const res = await fetch(`${BASE}/api/events`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

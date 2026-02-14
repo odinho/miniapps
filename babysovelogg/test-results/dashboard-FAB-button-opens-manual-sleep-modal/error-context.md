@@ -1,0 +1,71 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - generic [ref=e7]:
+            - generic [ref=e8]: Testa
+            - generic [ref=e9]: 8 months old
+          - button "☀️ Sleep" [ref=e10] [cursor=pointer]:
+            - generic [ref=e11]: ☀️
+            - generic [ref=e12]: Sleep
+        - img [ref=e14]:
+          - generic [ref=e16]: "06"
+          - generic [ref=e18]: "09"
+          - generic [ref=e19]: "12"
+          - generic [ref=e21]: "15"
+          - generic [ref=e22]: "18"
+          - generic [ref=e23]: ☀️
+          - generic [ref=e24]: 🌅
+        - generic [ref=e25]:
+          - generic [ref=e26]:
+            - generic [ref=e27]: "0"
+            - generic [ref=e28]: Naps today
+          - generic [ref=e29]:
+            - generic [ref=e30]: 0m
+            - generic [ref=e31]: Nap time
+          - generic [ref=e32]:
+            - generic [ref=e33]: 0m
+            - generic [ref=e34]: Total sleep
+        - generic [ref=e36]:
+          - generic [ref=e37]: "0"
+          - generic [ref=e38]: Diapers today
+        - button "💩 Log Diaper" [ref=e39] [cursor=pointer]
+      - button "+" [active] [ref=e40] [cursor=pointer]
+    - navigation [ref=e41]:
+      - button "☀️ Home" [ref=e42] [cursor=pointer]:
+        - generic [ref=e43]: ☀️
+        - generic [ref=e44]: Home
+      - button "📋 History" [ref=e45] [cursor=pointer]:
+        - generic [ref=e46]: 📋
+        - generic [ref=e47]: History
+      - button "📊 Stats" [ref=e48] [cursor=pointer]:
+        - generic [ref=e49]: 📊
+        - generic [ref=e50]: Stats
+      - button "⚙️ Settings" [ref=e51] [cursor=pointer]:
+        - generic [ref=e52]: ⚙️
+        - generic [ref=e53]: Settings
+  - generic [ref=e56]:
+    - heading "Add Sleep" [level=2] [ref=e57]
+    - generic [ref=e58]:
+      - generic [ref=e59]: Type
+      - generic [ref=e60]:
+        - button "😴 Nap" [ref=e61] [cursor=pointer]
+        - button "🌙 Night" [ref=e62] [cursor=pointer]
+    - generic [ref=e63]:
+      - generic [ref=e64]: Start
+      - generic [ref=e65]:
+        - textbox [ref=e66]: 2026-02-14
+        - textbox [ref=e67]: 10:32
+    - generic [ref=e68]:
+      - generic [ref=e69]: End
+      - generic [ref=e70]:
+        - textbox [ref=e71]: 2026-02-14
+        - textbox [ref=e72]: 11:32
+    - generic [ref=e73]:
+      - button "Cancel" [ref=e74] [cursor=pointer]
+      - button "Save" [ref=e75] [cursor=pointer]
+```

@@ -1,0 +1,59 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - generic [ref=e8]: Testa
+          - generic [ref=e9]: 8 months old
+        - button "✦ 🌙 Wake ✦" [ref=e10] [cursor=pointer]:
+          - text: ✦
+          - generic [ref=e11]: 🌙
+          - generic [ref=e12]: Wake
+          - text: ✦
+      - button "⏸️ Pause" [ref=e13] [cursor=pointer]
+      - generic [ref=e14]:
+        - img [ref=e15]:
+          - generic [ref=e17]: "06"
+          - generic [ref=e19]: "09"
+          - generic [ref=e20]: "12"
+          - generic [ref=e22]: "15"
+          - generic [ref=e23]: "18"
+          - generic [ref=e24]: ☀️
+          - generic [ref=e25]: 🌅
+          - generic [ref=e28]: 11:22 AM
+        - generic:
+          - generic: 😴 Napping
+          - text: 05:29
+          - generic [ref=e29] [cursor=pointer]: Started 11:22 AM
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - generic [ref=e32]: "0"
+          - generic [ref=e33]: Naps today
+        - generic [ref=e34]:
+          - generic [ref=e35]: 0m
+          - generic [ref=e36]: Nap time
+        - generic [ref=e37]:
+          - generic [ref=e38]: 0m
+          - generic [ref=e39]: Total sleep
+      - generic [ref=e41]:
+        - generic [ref=e42]: "0"
+        - generic [ref=e43]: Diapers today
+      - button "💩 Log Diaper" [ref=e44] [cursor=pointer]
+    - button "+" [ref=e45] [cursor=pointer]
+  - navigation [ref=e46]:
+    - button "☀️ Home" [ref=e47] [cursor=pointer]:
+      - generic [ref=e48]: ☀️
+      - generic [ref=e49]: Home
+    - button "📋 History" [ref=e50] [cursor=pointer]:
+      - generic [ref=e51]: 📋
+      - generic [ref=e52]: History
+    - button "📊 Stats" [ref=e53] [cursor=pointer]:
+      - generic [ref=e54]: 📊
+      - generic [ref=e55]: Stats
+    - button "⚙️ Settings" [ref=e56] [cursor=pointer]:
+      - generic [ref=e57]: ⚙️
+      - generic [ref=e58]: Settings
+```

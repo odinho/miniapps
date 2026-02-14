@@ -1,5 +1,5 @@
-import { getState, type AppState } from './api.js';
-import { flushQueue, cacheState, getCachedState } from './sync.js';
+import { getState, setMutationHook, type AppState } from './api.js';
+import { flushQueue, cacheState, getCachedState, connectSSE, markLocalMutation } from './sync.js';
 import { injectStyles } from './ui/styles.js';
 import { renderDashboard } from './ui/dashboard.js';
 import { renderHistory } from './ui/history.js';
@@ -35,6 +35,7 @@ export function navigateTo(hash: string): void {
 }
 
 async function main() {
+  setMutationHook(markLocalMutation);
   injectStyles();
   
   const app = document.getElementById('app')!;
@@ -59,6 +60,11 @@ async function main() {
     tabButtons.push(btn);
     nav.appendChild(btn);
   }
+  // Sync indicator dot
+  const syncDot = el('span', { id: 'sync-dot' });
+  Object.assign(syncDot.style, { width: '8px', height: '8px', borderRadius: '50%', background: '#999', position: 'absolute', top: '6px', right: '6px' });
+  nav.style.position = 'relative';
+  nav.appendChild(syncDot);
   app.appendChild(nav);
 
   // Initial load
@@ -94,13 +100,12 @@ async function main() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
-  
-  // Periodic sync
-  setInterval(async () => {
-    await refreshState();
-    const hash = window.location.hash || '#/';
-    if (hash === '#/') renderDashboard(content);
-  }, 30000);
+
+  // Real-time sync via SSE
+  connectSSE((state) => {
+    setAppState(state);
+    route();
+  });
 }
 
 main().catch(console.error);
