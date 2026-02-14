@@ -35,6 +35,12 @@ export async function postEvents(events: Array<{type: string; payload: any; clie
   return res.json();
 }
 
+export async function getStatsData(): Promise<any[]> {
+  const from = new Date(Date.now() - 30 * 86400000).toISOString();
+  const res = await fetch(`${BASE}/api/sleeps?from=${encodeURIComponent(from)}&limit=500`);
+  return res.json();
+}
+
 export async function getSleeps(opts?: {from?: string; to?: string; limit?: number}): Promise<any[]> {
   const params = new URLSearchParams();
   if (opts?.from) params.set('from', opts.from);

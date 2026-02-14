@@ -4,6 +4,7 @@ import { injectStyles } from './ui/styles.js';
 import { renderDashboard } from './ui/dashboard.js';
 import { renderHistory } from './ui/history.js';
 import { renderSettings } from './ui/settings.js';
+import { renderStats } from './ui/stats.js';
 import { el } from './ui/components.js';
 
 let currentState: AppState | null = null;
@@ -45,6 +46,7 @@ async function main() {
   const tabs = [
     { icon: '☀️', label: 'Home', hash: '#/' },
     { icon: '📋', label: 'History', hash: '#/history' },
+    { icon: '📊', label: 'Stats', hash: '#/stats' },
     { icon: '⚙️', label: 'Settings', hash: '#/settings' },
   ];
   const tabButtons: HTMLButtonElement[] = [];
@@ -74,6 +76,9 @@ async function main() {
     switch (hash) {
       case '#/history':
         await renderHistory(content);
+        break;
+      case '#/stats':
+        await renderStats(content);
         break;
       case '#/settings':
         renderSettings(content, { onboarding: !currentState?.baby });
