@@ -3,6 +3,8 @@ import { getClientId } from '../sync.js';
 import { refreshState } from '../main.js';
 import { el, formatDuration, formatTime } from './components.js';
 
+const MOOD_EMOJI: Record<string, string> = { happy: '😊', normal: '😐', upset: '😢', fighting: '😤' };
+const METHOD_EMOJI: Record<string, string> = { bed: '🛏️', nursing: '🤱', held: '🤗', stroller: '🚼', car: '🚗', bottle: '🍼' };
 const DIAPER_ICONS: Record<string, string> = { wet: '💧', dirty: '💩', both: '💧💩', dry: '✨' };
 const DIAPER_LABELS: Record<string, string> = { wet: 'Wet', dirty: 'Dirty', both: 'Wet + Dirty', dry: 'Dry' };
 
@@ -56,11 +58,19 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
         const icon = entry.type === 'night' ? '🌙' : '😴';
         const times = `${formatTime(entry.start_time)} — ${entry.end_time ? formatTime(entry.end_time) : 'now'}`;
 
+        const metaChildren: (Node | string)[] = [entry.type === 'night' ? 'Night sleep' : 'Nap'];
+        if (entry.mood || entry.method) {
+          const badges: (Node | string)[] = [];
+          if (entry.mood && MOOD_EMOJI[entry.mood]) badges.push(el('span', { className: 'tag-badge' }, [MOOD_EMOJI[entry.mood]]));
+          if (entry.method && METHOD_EMOJI[entry.method]) badges.push(el('span', { className: 'tag-badge' }, [METHOD_EMOJI[entry.method]]));
+          metaChildren.push(el('span', { className: 'tag-badges' }, badges));
+        }
+
         const item = el('div', { className: 'sleep-log-item' }, [
           el('span', { className: 'log-icon' }, [icon]),
           el('div', { className: 'log-info' }, [
             el('div', { className: 'log-times' }, [times]),
-            el('div', { className: 'log-meta' }, [entry.type === 'night' ? 'Night sleep' : 'Nap']),
+            el('div', { className: 'log-meta' }, metaChildren),
           ]),
           el('span', { className: 'log-duration' }, [duration]),
         ]);
@@ -112,10 +122,52 @@ function showEditModal(entry: any, container: HTMLElement): void {
   napPill.addEventListener('click', () => { selectedType = 'nap'; updatePills(); });
   nightPill.addEventListener('click', () => { selectedType = 'night'; updatePills(); });
 
+  // Mood pills
+  let selectedMood: string | null = entry.mood || null;
+  const MOODS = [
+    { value: 'happy', label: '😊', title: 'Happy' },
+    { value: 'normal', label: '😐', title: 'Normal' },
+    { value: 'upset', label: '😢', title: 'Upset' },
+    { value: 'fighting', label: '😤', title: 'Fighting sleep' },
+  ];
+  const moodPills = MOODS.map(m => {
+    const pill = el('button', { className: `tag-pill ${selectedMood === m.value ? 'active' : ''}`, 'data-mood': m.value }, [
+      el('span', { className: 'tag-emoji' }, [m.label]), el('span', { className: 'tag-label' }, [m.title]),
+    ]);
+    pill.addEventListener('click', () => {
+      selectedMood = selectedMood === m.value ? null : m.value;
+      moodPills.forEach(p => p.classList.toggle('active', p.getAttribute('data-mood') === selectedMood));
+    });
+    return pill;
+  });
+
+  // Method pills
+  let selectedMethod: string | null = entry.method || null;
+  const METHODS = [
+    { value: 'bed', label: '🛏️', title: 'In bed' },
+    { value: 'nursing', label: '🤱', title: 'Nursing' },
+    { value: 'held', label: '🤗', title: 'Held/worn' },
+    { value: 'stroller', label: '🚼', title: 'Stroller' },
+    { value: 'car', label: '🚗', title: 'Car' },
+    { value: 'bottle', label: '🍼', title: 'Bottle' },
+  ];
+  const methodPills = METHODS.map(m => {
+    const pill = el('button', { className: `tag-pill ${selectedMethod === m.value ? 'active' : ''}`, 'data-method': m.value }, [
+      el('span', { className: 'tag-emoji' }, [m.label]), el('span', { className: 'tag-label' }, [m.title]),
+    ]);
+    pill.addEventListener('click', () => {
+      selectedMethod = selectedMethod === m.value ? null : m.value;
+      methodPills.forEach(p => p.classList.toggle('active', p.getAttribute('data-method') === selectedMethod));
+    });
+    return pill;
+  });
+
   modal.appendChild(el('h2', null, ['Edit Sleep']));
   modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Type']), el('div', { className: 'type-pills' }, [napPill, nightPill])]));
   modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Start']), startInput]));
   modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['End']), endInput]));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Mood']), el('div', { className: 'tag-pills' }, moodPills)]));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Method']), el('div', { className: 'tag-pills' }, methodPills)]));
 
   const saveBtn = el('button', { className: 'btn btn-primary' }, ['Save']);
   const deleteBtn = el('button', { className: 'btn btn-danger' }, ['Delete']);
@@ -129,6 +181,8 @@ function showEditModal(entry: any, container: HTMLElement): void {
         startTime: new Date(startInput.value).toISOString(),
         endTime: endInput.value ? new Date(endInput.value).toISOString() : undefined,
         type: selectedType,
+        mood: selectedMood,
+        method: selectedMethod,
       },
       clientId: getClientId(),
     }]);

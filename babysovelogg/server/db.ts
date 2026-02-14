@@ -29,6 +29,8 @@ db.exec(`
     end_time TEXT,
     type TEXT NOT NULL DEFAULT 'nap',
     notes TEXT,
+    mood TEXT,
+    method TEXT,
     deleted INTEGER NOT NULL DEFAULT 0
   );
   CREATE TABLE IF NOT EXISTS diaper_log (
@@ -41,5 +43,9 @@ db.exec(`
     deleted INTEGER NOT NULL DEFAULT 0
   );
 `);
+
+// Migrate: add mood/method columns if missing
+try { db.exec('ALTER TABLE sleep_log ADD COLUMN mood TEXT'); } catch {}
+try { db.exec('ALTER TABLE sleep_log ADD COLUMN method TEXT'); } catch {}
 
 export default db;

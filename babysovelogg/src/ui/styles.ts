@@ -611,6 +611,50 @@ html, body {
 }
 .diaper-quick-btn:active { transform: scale(0.97); }
 
+/* Tag pills for mood/method */
+.tag-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 2px solid var(--cream-dark);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 70px;
+  min-height: 48px;
+}
+
+.tag-pill .tag-emoji { font-size: 1.4rem; }
+.tag-pill .tag-label { font-size: 0.65rem; color: var(--text-light); }
+
+.tag-pill.active {
+  border-color: var(--moon);
+  background: var(--lavender);
+}
+
+.tag-pill.active .tag-label { color: var(--text); font-weight: 600; }
+
+.tag-badges {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 4px;
+}
+
+.tag-badge {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
 .diaper-type-pills { flex-wrap: wrap; }
 .diaper-type-pills .type-pill { min-width: calc(50% - 4px); }
 

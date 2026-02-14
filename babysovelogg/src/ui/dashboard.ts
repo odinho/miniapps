@@ -49,6 +49,9 @@ export function renderDashboard(container: HTMLElement): void {
       try {
         const result = await postEvents(events);
         setAppState(result.state);
+        renderDashboard(container);
+        showTagSheet(activeSleep.id, container);
+        return;
       } catch {
         queueEvent('sleep.ended', { sleepId: activeSleep.id, endTime: new Date().toISOString() });
       }
@@ -257,6 +260,92 @@ function showEditStartModal(activeSleep: any, container: HTMLElement): void {
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 
   modal.appendChild(el('div', { className: 'btn-row' }, [cancelBtn, saveBtn]));
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  function close() { overlay.remove(); }
+}
+
+const MOODS = [
+  { value: 'happy', label: '😊', title: 'Happy' },
+  { value: 'normal', label: '😐', title: 'Normal' },
+  { value: 'upset', label: '😢', title: 'Upset' },
+  { value: 'fighting', label: '😤', title: 'Fighting sleep' },
+];
+
+const METHODS = [
+  { value: 'bed', label: '🛏️', title: 'In bed' },
+  { value: 'nursing', label: '🤱', title: 'Nursing' },
+  { value: 'held', label: '🤗', title: 'Held/worn' },
+  { value: 'stroller', label: '🚼', title: 'Stroller' },
+  { value: 'car', label: '🚗', title: 'Car' },
+  { value: 'bottle', label: '🍼', title: 'Bottle' },
+];
+
+function showTagSheet(sleepId: number, container: HTMLElement): void {
+  const overlay = el('div', { className: 'modal-overlay' });
+  const modal = el('div', { className: 'modal tag-sheet' });
+
+  let selectedMood: string | null = null;
+  let selectedMethod: string | null = null;
+
+  modal.appendChild(el('h2', null, ['How did it go?']));
+
+  // Mood selection
+  modal.appendChild(el('div', { className: 'form-group' }, [
+    el('label', null, ['Mood']),
+    el('div', { className: 'tag-pills' }, MOODS.map(m => {
+      const pill = el('button', {
+        className: 'tag-pill',
+        'data-mood': m.value,
+        title: m.title,
+      }, [el('span', { className: 'tag-emoji' }, [m.label]), el('span', { className: 'tag-label' }, [m.title])]);
+      pill.addEventListener('click', () => {
+        selectedMood = selectedMood === m.value ? null : m.value;
+        modal.querySelectorAll('[data-mood]').forEach(p => p.classList.toggle('active', p.getAttribute('data-mood') === selectedMood));
+      });
+      return pill;
+    })),
+  ]));
+
+  // Method selection
+  modal.appendChild(el('div', { className: 'form-group' }, [
+    el('label', null, ['Method']),
+    el('div', { className: 'tag-pills' }, METHODS.map(m => {
+      const pill = el('button', {
+        className: 'tag-pill',
+        'data-method': m.value,
+        title: m.title,
+      }, [el('span', { className: 'tag-emoji' }, [m.label]), el('span', { className: 'tag-label' }, [m.title])]);
+      pill.addEventListener('click', () => {
+        selectedMethod = selectedMethod === m.value ? null : m.value;
+        modal.querySelectorAll('[data-method]').forEach(p => p.classList.toggle('active', p.getAttribute('data-method') === selectedMethod));
+      });
+      return pill;
+    })),
+  ]));
+
+  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Save']);
+  const skipBtn = el('button', { className: 'btn btn-ghost' }, ['Skip']);
+
+  saveBtn.addEventListener('click', async () => {
+    if (selectedMood || selectedMethod) {
+      try {
+        const result = await postEvents([{
+          type: 'sleep.tagged',
+          payload: { sleepId, mood: selectedMood, method: selectedMethod },
+          clientId: getClientId(),
+        }]);
+        setAppState(result.state);
+      } catch {}
+    }
+    close();
+  });
+
+  skipBtn.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  modal.appendChild(el('div', { className: 'btn-row' }, [skipBtn, saveBtn]));
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 

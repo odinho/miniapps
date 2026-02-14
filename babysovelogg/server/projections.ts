@@ -41,6 +41,8 @@ export function applyEvent(event: NapperEvent): void {
       if (payload.endTime !== undefined) { sets.push('end_time = ?'); vals.push(payload.endTime); }
       if (payload.type !== undefined) { sets.push('type = ?'); vals.push(payload.type); }
       if (payload.notes !== undefined) { sets.push('notes = ?'); vals.push(payload.notes); }
+      if (payload.mood !== undefined) { sets.push('mood = ?'); vals.push(payload.mood); }
+      if (payload.method !== undefined) { sets.push('method = ?'); vals.push(payload.method); }
       if (sets.length > 0) {
         vals.push(payload.sleepId);
         db.prepare(`UPDATE sleep_log SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
@@ -57,6 +59,18 @@ export function applyEvent(event: NapperEvent): void {
     case 'sleep.deleted':
       db.prepare('UPDATE sleep_log SET deleted = 1 WHERE id = ?').run(payload.sleepId);
       break;
+
+    case 'sleep.tagged': {
+      const sets: string[] = [];
+      const vals: any[] = [];
+      if (payload.mood !== undefined) { sets.push('mood = ?'); vals.push(payload.mood); }
+      if (payload.method !== undefined) { sets.push('method = ?'); vals.push(payload.method); }
+      if (sets.length > 0) {
+        vals.push(payload.sleepId);
+        db.prepare(`UPDATE sleep_log SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+      }
+      break;
+    }
 
     case 'diaper.logged':
       db.prepare(
