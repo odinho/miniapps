@@ -41,19 +41,21 @@ export function renderDashboard(container: HTMLElement): void {
   const view = el('div', { className: 'view' });
   const dash = el('div', { className: 'dashboard' });
 
-  // Baby info
-  dash.appendChild(
-    el('div', { className: 'baby-info' }, [
-      el('div', { className: 'baby-name' }, [baby.name]),
-      el('div', { className: 'baby-age' }, [formatAge(baby.birthdate)]),
-    ])
-  );
-
-  // Big sleep button
+  // Header row: baby info + sleep button
   const btn = el('button', { className: `sleep-button ${isSleeping ? 'sleeping' : 'awake'}` }, [
     el('span', { className: 'icon' }, [isSleeping ? '🌙' : '☀️']),
-    el('span', { className: 'label' }, [isSleeping ? 'Tap to wake' : 'Tap to sleep']),
+    el('span', { className: 'label' }, [isSleeping ? 'Wake' : 'Sleep']),
   ]);
+
+  dash.appendChild(
+    el('div', { className: 'header-row' }, [
+      el('div', { className: 'baby-info' }, [
+        el('span', { className: 'baby-name' }, [baby.name]),
+        el('span', { className: 'baby-age' }, [formatAge(baby.birthdate)]),
+      ]),
+      btn,
+    ])
+  );
 
   btn.addEventListener('click', async () => {
     if (isSleeping && activeSleep) {
@@ -80,8 +82,6 @@ export function renderDashboard(container: HTMLElement): void {
     }
     renderDashboard(container);
   });
-
-  dash.appendChild(btn);
 
   // Pause/resume button when sleeping
   if (isSleeping && activeSleep) {
@@ -123,6 +123,9 @@ export function renderDashboard(container: HTMLElement): void {
     cleanups.push(arcTimer.stop);
     arcCenter.appendChild(el('div', { className: 'arc-center-label' }, [isPaused ? '⏸️ Paused' : activeSleep.type === 'night' ? '💤 Sleeping' : '😴 Napping']));
     arcCenter.appendChild(arcTimer.element);
+    const editLink = el('span', { className: 'edit-start-link' }, ['Started ' + formatTime(activeSleep.start_time)]);
+    editLink.addEventListener('click', () => showEditStartModal(activeSleep, container));
+    arcCenter.appendChild(editLink);
   } else if (prediction?.nextNap) {
     const cd = renderCountdown(prediction.nextNap);
     cleanups.push(cd.stop);
@@ -133,27 +136,7 @@ export function renderDashboard(container: HTMLElement): void {
   arcContainer.appendChild(arcCenter);
   dash.appendChild(arcContainer);
 
-  // Timer or countdown
-  if (isSleeping && activeSleep) {
-    const timer = renderTimerWithPauses(activeSleep.start_time, () => calcPauseMs(pauses), isPaused);
-    cleanups.push(timer.stop);
-    const editLink = el('span', { className: 'edit-start-link' }, ['edit start time']);
-    editLink.addEventListener('click', () => showEditStartModal(activeSleep, container));
-    const label = isPaused ? 'Paused' : `${activeSleep.type === 'night' ? 'Night' : 'Nap'} in progress`;
-    dash.appendChild(el('div', { className: 'countdown' }, [
-      el('div', { className: 'countdown-label' }, [label]),
-      timer.element,
-      el('div', { className: 'countdown-sub' }, [`Started ${formatTime(activeSleep.start_time)} · `, editLink]),
-    ]));
-  } else if (prediction?.nextNap) {
-    const cd = renderCountdown(prediction.nextNap);
-    cleanups.push(cd.stop);
-    dash.appendChild(el('div', { className: 'countdown' }, [
-      el('div', { className: 'countdown-label' }, ['Next nap in']),
-      cd.element,
-      el('div', { className: 'countdown-sub' }, [`Around ${formatTime(prediction.nextNap)}`]),
-    ]));
-  }
+  // (Timer/countdown now shown in arc center — no duplicate card)
 
   // Today's stats
   if (stats) {
@@ -201,6 +184,26 @@ function toLocal(iso: string): string {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 
+function toLocalDate(iso: string): string { return toLocal(iso).slice(0, 10); }
+function toLocalTime(iso: string): string { return toLocal(iso).slice(11, 16); }
+
+function makeDateTimeInputs(iso: string): { dateInput: HTMLInputElement; timeInput: HTMLInputElement; getValue: () => string } {
+  const dateInput = el('input', { type: 'date', value: toLocalDate(iso) }) as HTMLInputElement;
+  const timeInput = el('input', { type: 'time', value: toLocalTime(iso) }) as HTMLInputElement;
+  return {
+    dateInput,
+    timeInput,
+    getValue: () => `${dateInput.value}T${timeInput.value}`,
+  };
+}
+
+function dateTimeGroup(label: string, dt: { dateInput: HTMLInputElement; timeInput: HTMLInputElement }): HTMLElement {
+  return el('div', { className: 'form-group' }, [
+    el('label', null, [label]),
+    el('div', { className: 'datetime-row' }, [dt.dateInput, dt.timeInput]),
+  ]);
+}
+
 function showManualSleepModal(baby: any, container: HTMLElement): void {
   const overlay = el('div', { className: 'modal-overlay' });
   const modal = el('div', { className: 'modal' });
@@ -208,8 +211,8 @@ function showManualSleepModal(baby: any, container: HTMLElement): void {
   const now = new Date();
   const oneHourAgo = new Date(now.getTime() - 3600000);
 
-  const startInput = el('input', { type: 'datetime-local', value: toLocal(oneHourAgo.toISOString()) }) as HTMLInputElement;
-  const endInput = el('input', { type: 'datetime-local', value: toLocal(now.toISOString()) }) as HTMLInputElement;
+  const startDt = makeDateTimeInputs(oneHourAgo.toISOString());
+  const endDt = makeDateTimeInputs(now.toISOString());
 
   let selectedType = now.getHours() >= 18 || now.getHours() < 6 ? 'night' : 'nap';
   const napPill = el('button', { className: `type-pill ${selectedType === 'nap' ? 'active' : ''}` }, ['😴 Nap']);
@@ -223,15 +226,15 @@ function showManualSleepModal(baby: any, container: HTMLElement): void {
 
   modal.appendChild(el('h2', null, ['Add Sleep']));
   modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Type']), el('div', { className: 'type-pills' }, [napPill, nightPill])]));
-  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Start']), startInput]));
-  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['End']), endInput]));
+  modal.appendChild(dateTimeGroup('Start', startDt));
+  modal.appendChild(dateTimeGroup('End', endDt));
 
   const saveBtn = el('button', { className: 'btn btn-primary' }, ['Save']);
   const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Cancel']);
 
   saveBtn.addEventListener('click', async () => {
-    const start = new Date(startInput.value);
-    const end = new Date(endInput.value);
+    const start = new Date(startDt.getValue());
+    const end = new Date(endDt.getValue());
     if (isNaN(start.getTime()) || isNaN(end.getTime())) { showToast('Please fill in both times', 'warning'); return; }
     if (end <= start) { showToast('End must be after start', 'warning'); return; }
 
@@ -264,16 +267,16 @@ function showEditStartModal(activeSleep: any, container: HTMLElement): void {
   const overlay = el('div', { className: 'modal-overlay' });
   const modal = el('div', { className: 'modal' });
 
-  const startInput = el('input', { type: 'datetime-local', value: toLocal(activeSleep.start_time) }) as HTMLInputElement;
+  const startDt = makeDateTimeInputs(activeSleep.start_time);
 
   modal.appendChild(el('h2', null, ['Edit Start Time']));
-  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Started at']), startInput]));
+  modal.appendChild(dateTimeGroup('Started at', startDt));
 
   const saveBtn = el('button', { className: 'btn btn-primary' }, ['Save']);
   const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Cancel']);
 
   saveBtn.addEventListener('click', async () => {
-    const start = new Date(startInput.value);
+    const start = new Date(startDt.getValue());
     if (isNaN(start.getTime())) { showToast('Invalid time', 'warning'); return; }
     try {
       const result = await postEvents([{
@@ -431,20 +434,20 @@ function showDiaperModal(baby: any, container: HTMLElement): void {
     return pill;
   });
 
-  const timeInput = el('input', { type: 'datetime-local', value: toLocal(new Date().toISOString()) }) as HTMLInputElement;
+  const timeDt = makeDateTimeInputs(new Date().toISOString());
   const noteInput = el('input', { type: 'text', placeholder: 'Optional note...' }) as HTMLInputElement;
 
   modal.appendChild(el('h2', null, ['Log Diaper']));
   modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Type']), el('div', { className: 'type-pills diaper-type-pills' }, typePills)]));
   modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Amount']), el('div', { className: 'type-pills' }, amountPills)]));
-  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Time']), timeInput]));
+  modal.appendChild(dateTimeGroup('Time', timeDt));
   modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Note']), noteInput]));
 
   const saveBtn = el('button', { className: 'btn btn-primary' }, ['Save']);
   const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Cancel']);
 
   saveBtn.addEventListener('click', async () => {
-    const time = new Date(timeInput.value);
+    const time = new Date(timeDt.getValue());
     if (isNaN(time.getTime())) { showToast('Invalid time', 'warning'); return; }
     try {
       const result = await postEvents([{

@@ -126,9 +126,13 @@ function showEditModal(entry: any, container: HTMLElement): void {
     const off = d.getTimezoneOffset();
     return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16);
   };
+  const toLocalDate = (iso: string) => toLocal(iso).slice(0, 10);
+  const toLocalTime = (iso: string) => toLocal(iso).slice(11, 16);
 
-  const startInput = el('input', { type: 'datetime-local', value: toLocal(entry.start_time) }) as HTMLInputElement;
-  const endInput = el('input', { type: 'datetime-local', value: entry.end_time ? toLocal(entry.end_time) : '' }) as HTMLInputElement;
+  const startDateInput = el('input', { type: 'date', value: toLocalDate(entry.start_time) }) as HTMLInputElement;
+  const startTimeInput = el('input', { type: 'time', value: toLocalTime(entry.start_time) }) as HTMLInputElement;
+  const endDateInput = el('input', { type: 'date', value: entry.end_time ? toLocalDate(entry.end_time) : '' }) as HTMLInputElement;
+  const endTimeInput = el('input', { type: 'time', value: entry.end_time ? toLocalTime(entry.end_time) : '' }) as HTMLInputElement;
 
   let selectedType = entry.type;
   const napPill = el('button', { className: `type-pill ${selectedType === 'nap' ? 'active' : ''}` }, ['😴 Nap']);
@@ -183,8 +187,8 @@ function showEditModal(entry: any, container: HTMLElement): void {
 
   modal.appendChild(el('h2', null, ['Edit Sleep']));
   modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Type']), el('div', { className: 'type-pills' }, [napPill, nightPill])]));
-  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Start']), startInput]));
-  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['End']), endInput]));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Start']), el('div', { className: 'datetime-row' }, [startDateInput, startTimeInput])]));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['End']), el('div', { className: 'datetime-row' }, [endDateInput, endTimeInput])]));
   modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Mood']), el('div', { className: 'tag-pills' }, moodPills)]));
   modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Method']), el('div', { className: 'tag-pills' }, methodPills)]));
 
@@ -197,8 +201,8 @@ function showEditModal(entry: any, container: HTMLElement): void {
       type: 'sleep.updated',
       payload: {
         sleepId: entry.id,
-        startTime: new Date(startInput.value).toISOString(),
-        endTime: endInput.value ? new Date(endInput.value).toISOString() : undefined,
+        startTime: new Date(`${startDateInput.value}T${startTimeInput.value}`).toISOString(),
+        endTime: endDateInput.value && endTimeInput.value ? new Date(`${endDateInput.value}T${endTimeInput.value}`).toISOString() : undefined,
         type: selectedType,
         mood: selectedMood,
         method: selectedMethod,

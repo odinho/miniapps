@@ -175,26 +175,37 @@ html, body {
   text-align: center;
 }
 
-.dashboard .baby-info {
+/* Header row: baby info + sleep button */
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
   margin-top: 8px;
+  padding: 0 4px;
+}
+
+.dashboard .baby-info {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .dashboard .baby-name {
-  font-size: 1.5rem;
+  font-size: 1.3rem;
   font-weight: 700;
   color: var(--text);
 }
 
 .dashboard .baby-age {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--text-light);
-  margin-top: 2px;
 }
 
-/* Big sleep/wake toggle */
+/* Compact sleep/wake toggle */
 .sleep-button {
-  width: 180px;
-  height: 180px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   border: none;
   cursor: pointer;
@@ -202,14 +213,15 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 2px;
   font-family: var(--font);
-  font-size: 1rem;
+  font-size: 0.65rem;
   font-weight: 600;
   color: var(--white);
   transition: transform 0.2s, box-shadow 0.3s, background 0.5s;
   position: relative;
   outline: none;
+  flex-shrink: 0;
 }
 
 .sleep-button:active {
@@ -218,22 +230,22 @@ html, body {
 
 .sleep-button.awake {
   background: linear-gradient(135deg, var(--sun), var(--sun-glow));
-  box-shadow: 0 0 40px rgba(245, 199, 110, 0.4), var(--shadow-lg);
+  box-shadow: 0 0 20px rgba(245, 199, 110, 0.4), var(--shadow-md);
 }
 
 .sleep-button.sleeping {
   background: linear-gradient(135deg, var(--moon), var(--moon-glow));
-  box-shadow: 0 0 40px rgba(184, 169, 212, 0.5), var(--shadow-lg);
+  box-shadow: 0 0 20px rgba(184, 169, 212, 0.5), var(--shadow-md);
   animation: moonPulse 3s ease-in-out infinite;
 }
 
 .sleep-button .icon {
-  font-size: 3.5rem;
+  font-size: 1.5rem;
   line-height: 1;
 }
 
 .sleep-button .label {
-  font-size: 0.85rem;
+  font-size: 0.55rem;
   opacity: 0.9;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -253,8 +265,8 @@ html, body {
   color: rgba(255,255,255,0.6);
   animation: twinkle 2s ease-in-out infinite;
 }
-.sleep-button.sleeping::before { top: 20px; right: 25px; animation-delay: 0.5s; }
-.sleep-button.sleeping::after { bottom: 30px; left: 20px; animation-delay: 1.2s; }
+.sleep-button.sleeping::before { top: 4px; right: 6px; animation-delay: 0.5s; }
+.sleep-button.sleeping::after { bottom: 6px; left: 4px; animation-delay: 1.2s; }
 
 @keyframes twinkle {
   0%, 100% { opacity: 0.3; }
@@ -478,6 +490,17 @@ html, body {
 
 .modal input:focus, .settings input:focus {
   border-color: var(--lavender-dark);
+}
+
+.datetime-row {
+  display: flex;
+  gap: 8px;
+}
+.datetime-row input[type="date"] {
+  flex: 1.2;
+}
+.datetime-row input[type="time"] {
+  flex: 0.8;
 }
 
 .btn {
@@ -724,6 +747,17 @@ html, body {
   transform: translateX(-50%);
   text-align: center;
   pointer-events: none;
+}
+
+.arc-center-text .edit-start-link {
+  pointer-events: auto;
+  display: block;
+  margin-top: 2px;
+  font-size: 0.7rem;
+  color: var(--text-light);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
 }
 
 .arc-center-label {
