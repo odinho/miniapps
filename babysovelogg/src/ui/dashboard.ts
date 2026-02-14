@@ -137,6 +137,19 @@ export function renderDashboard(container: HTMLElement): void {
     ]));
   }
 
+  // Diaper stats + quick log
+  const diaperCount = state.diaperCount ?? 0;
+  dash.appendChild(el('div', { className: 'stats-row' }, [
+    el('div', { className: 'stats-card' }, [
+      el('div', { className: 'stat-value' }, [String(diaperCount)]),
+      el('div', { className: 'stat-label' }, ['Diapers today']),
+    ]),
+  ]));
+
+  const diaperBtn = el('button', { className: 'diaper-quick-btn' }, ['💩 Log Diaper']);
+  diaperBtn.addEventListener('click', () => showDiaperModal(baby, container));
+  dash.appendChild(diaperBtn);
+
   view.appendChild(dash);
   container.appendChild(view);
 
@@ -237,6 +250,97 @@ function showEditStartModal(activeSleep: any, container: HTMLElement): void {
       renderDashboard(container);
     } catch {
       showToast('Failed to update', 'error');
+    }
+  });
+
+  cancelBtn.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  modal.appendChild(el('div', { className: 'btn-row' }, [cancelBtn, saveBtn]));
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  function close() { overlay.remove(); }
+}
+
+function showDiaperModal(baby: any, container: HTMLElement): void {
+  const overlay = el('div', { className: 'modal-overlay' });
+  const modal = el('div', { className: 'modal' });
+
+  let selectedType = 'wet';
+  const types = [
+    { value: 'wet', label: '💧 Wet' },
+    { value: 'dirty', label: '💩 Dirty' },
+    { value: 'both', label: '💧💩 Both' },
+    { value: 'dry', label: '✨ Dry' },
+  ];
+
+  const typePills = types.map(t => {
+    const pill = el('button', { className: `type-pill ${selectedType === t.value ? 'active' : ''}`, 'data-diaper-type': t.value }, [t.label]);
+    pill.addEventListener('click', () => {
+      selectedType = t.value;
+      updatePills();
+    });
+    return pill;
+  });
+
+  const updatePills = () => {
+    typePills.forEach((pill, i) => {
+      pill.className = `type-pill ${selectedType === types[i].value ? 'active' : ''}`;
+    });
+  };
+
+  let selectedAmount = 'middels';
+  const amounts = [
+    { value: 'lite', label: 'Lite' },
+    { value: 'middels', label: 'Middels' },
+    { value: 'mykje', label: 'Mykje' },
+  ];
+
+  const amountPills = amounts.map(a => {
+    const pill = el('button', { className: `type-pill ${selectedAmount === a.value ? 'active' : ''}` }, [a.label]);
+    pill.addEventListener('click', () => {
+      selectedAmount = a.value;
+      amountPills.forEach((p, i) => {
+        p.className = `type-pill ${selectedAmount === amounts[i].value ? 'active' : ''}`;
+      });
+    });
+    return pill;
+  });
+
+  const timeInput = el('input', { type: 'datetime-local', value: toLocal(new Date().toISOString()) }) as HTMLInputElement;
+  const noteInput = el('input', { type: 'text', placeholder: 'Optional note...' }) as HTMLInputElement;
+
+  modal.appendChild(el('h2', null, ['Log Diaper']));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Type']), el('div', { className: 'type-pills diaper-type-pills' }, typePills)]));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Amount']), el('div', { className: 'type-pills' }, amountPills)]));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Time']), timeInput]));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Note']), noteInput]));
+
+  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Save']);
+  const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Cancel']);
+
+  saveBtn.addEventListener('click', async () => {
+    const time = new Date(timeInput.value);
+    if (isNaN(time.getTime())) { showToast('Invalid time', 'warning'); return; }
+    try {
+      const result = await postEvents([{
+        type: 'diaper.logged',
+        payload: {
+          babyId: baby.id,
+          time: time.toISOString(),
+          type: selectedType,
+          amount: selectedAmount,
+          note: noteInput.value || undefined,
+        },
+        clientId: getClientId(),
+      }]);
+      setAppState(result.state);
+      showToast('Diaper logged', 'success');
+      close();
+      renderDashboard(container);
+    } catch {
+      showToast('Failed to save', 'error');
     }
   });
 

@@ -7,6 +7,14 @@ export interface AppState {
   stats: any;
   prediction: any;
   ageMonths?: number;
+  diaperCount?: number;
+}
+
+export async function getDiapers(opts?: {limit?: number}): Promise<any[]> {
+  const params = new URLSearchParams();
+  if (opts?.limit) params.set('limit', String(opts.limit));
+  const res = await fetch(`${BASE}/api/diapers?${params}`);
+  return res.json();
 }
 
 export async function getState(): Promise<AppState> {

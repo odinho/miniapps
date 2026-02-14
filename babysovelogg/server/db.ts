@@ -31,6 +31,15 @@ db.exec(`
     notes TEXT,
     deleted INTEGER NOT NULL DEFAULT 0
   );
+  CREATE TABLE IF NOT EXISTS diaper_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    baby_id INTEGER NOT NULL REFERENCES baby(id),
+    time TEXT NOT NULL,
+    type TEXT NOT NULL,
+    amount TEXT,
+    note TEXT,
+    deleted INTEGER NOT NULL DEFAULT 0
+  );
 `);
 
 export default db;

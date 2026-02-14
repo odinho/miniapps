@@ -57,10 +57,21 @@ export function applyEvent(event: NapperEvent): void {
     case 'sleep.deleted':
       db.prepare('UPDATE sleep_log SET deleted = 1 WHERE id = ?').run(payload.sleepId);
       break;
+
+    case 'diaper.logged':
+      db.prepare(
+        'INSERT INTO diaper_log (baby_id, time, type, amount, note) VALUES (?, ?, ?, ?, ?)'
+      ).run(payload.babyId, payload.time, payload.type, payload.amount ?? null, payload.note ?? null);
+      break;
+
+    case 'diaper.deleted':
+      db.prepare('UPDATE diaper_log SET deleted = 1 WHERE id = ?').run(payload.diaperId);
+      break;
   }
 }
 
 export function rebuildAll(): void {
+  db.prepare('DELETE FROM diaper_log').run();
   db.prepare('DELETE FROM sleep_log').run();
   db.prepare('DELETE FROM baby').run();
   const events = db.prepare('SELECT * FROM events ORDER BY id ASC').all() as any[];

@@ -80,7 +80,12 @@ function getState() {
     }
   }
   
-  return { baby, activeSleep, todaySleeps, stats, prediction, ageMonths };
+  const todayDiapers = db.prepare(
+    'SELECT COUNT(*) as count FROM diaper_log WHERE baby_id = ? AND time >= ? AND deleted = 0'
+  ).get(baby.id, todayStart.toISOString()) as any;
+  const diaperCount = todayDiapers?.count ?? 0;
+
+  return { baby, activeSleep, todaySleeps, stats, prediction, ageMonths, diaperCount };
 }
 
 export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
@@ -143,6 +148,17 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     return json(res, db.prepare(sql).all(...params));
   }
   
+  if (url.pathname === '/api/diapers' && method === 'GET') {
+    const baby = db.prepare('SELECT * FROM baby ORDER BY id DESC LIMIT 1').get() as any;
+    if (!baby) return json(res, []);
+    const limit = url.searchParams.get('limit') || '50';
+    let sql = 'SELECT * FROM diaper_log WHERE baby_id = ? AND deleted = 0';
+    const params: any[] = [baby.id];
+    sql += ' ORDER BY time DESC LIMIT ?';
+    params.push(parseInt(limit));
+    return json(res, db.prepare(sql).all(...params));
+  }
+
   // Static files
   let filePath: string;
   if (url.pathname === '/' || url.pathname === '/index.html') {

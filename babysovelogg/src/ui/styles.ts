@@ -593,6 +593,27 @@ html, body {
 }
 .fab:active { transform: scale(0.92); }
 
+/* Diaper quick-log button */
+.diaper-quick-btn {
+  width: 100%;
+  max-width: 340px;
+  padding: 14px 24px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--peach);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 48px;
+  transition: transform 0.15s;
+}
+.diaper-quick-btn:active { transform: scale(0.97); }
+
+.diaper-type-pills { flex-wrap: wrap; }
+.diaper-type-pills .type-pill { min-width: calc(50% - 4px); }
+
 /* Edit start link */
 .edit-start-link {
   color: var(--lavender-dark);

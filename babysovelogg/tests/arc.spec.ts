@@ -8,9 +8,10 @@ function getDb() {
 
 function resetDb() {
   const db = getDb();
-  db.prepare('DELETE FROM sleep_log').run();
-  db.prepare('DELETE FROM baby').run();
-  db.prepare('DELETE FROM events').run();
+  try { db.prepare('DELETE FROM diaper_log').run(); } catch {}
+  try { db.prepare('DELETE FROM sleep_log').run(); } catch {}
+  try { db.prepare('DELETE FROM baby').run(); } catch {}
+  try { db.prepare('DELETE FROM events').run(); } catch {}
   db.close();
 }
 

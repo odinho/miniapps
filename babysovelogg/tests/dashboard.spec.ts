@@ -8,9 +8,10 @@ function getDb() {
 
 function resetDb() {
   const db = getDb();
-  db.prepare('DELETE FROM sleep_log').run();
-  db.prepare('DELETE FROM baby').run();
-  db.prepare('DELETE FROM events').run();
+  try { db.prepare('DELETE FROM diaper_log').run(); } catch {}
+  try { db.prepare('DELETE FROM sleep_log').run(); } catch {}
+  try { db.prepare('DELETE FROM baby').run(); } catch {}
+  try { db.prepare('DELETE FROM events').run(); } catch {}
   db.close();
 }
 
@@ -54,11 +55,12 @@ test('Dashboard shows stats section', async ({ page }) => {
   await expect(page.locator('.baby-name')).toHaveText('Testa', { timeout: 5000 });
 
   // Stats row should be visible with cards
-  await expect(page.locator('.stats-row')).toBeVisible();
-  await expect(page.locator('.stats-card')).toHaveCount(3);
+  await expect(page.locator('.stats-row').first()).toBeVisible();
+  await expect(page.locator('.stats-card')).toHaveCount(4);
   await expect(page.locator('.stat-label').nth(0)).toHaveText('Naps today');
   await expect(page.locator('.stat-label').nth(1)).toHaveText('Nap time');
   await expect(page.locator('.stat-label').nth(2)).toHaveText('Total sleep');
+  await expect(page.locator('.stat-label').nth(3)).toHaveText('Diapers today');
 });
 
 test('FAB button opens manual sleep modal', async ({ page }) => {
