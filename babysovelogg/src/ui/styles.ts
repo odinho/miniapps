@@ -419,12 +419,13 @@ html, body {
   font-family: var(--font);
   font-size: 0.7rem;
   color: var(--text-light);
-  transition: color 0.2s;
+  transition: color 0.2s, transform 0.15s;
   min-height: 52px;
   outline: none;
   -webkit-tap-highlight-color: transparent;
 }
 
+.nav-tab:active { transform: scale(0.95); }
 .nav-tab .nav-icon { font-size: 1.4rem; }
 .nav-tab.active { color: var(--moon); font-weight: 600; }
 
@@ -856,5 +857,14 @@ html, body {
   font-size: 0.85rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+/* Page fade-in transition */
+@keyframes viewFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.view-fade-in {
+  animation: viewFadeIn 0.15s ease;
 }
 `;

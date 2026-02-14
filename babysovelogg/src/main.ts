@@ -70,7 +70,10 @@ async function main() {
   // Initial load
   await refreshState();
 
+  let routeSeq = 0;
+
   async function route() {
+    const seq = ++routeSeq;
     cleanupDashboard(); // Stop any running timers/intervals from dashboard
     const hash = window.location.hash || '#/';
     if (!currentState?.baby && hash !== '#/settings') {
@@ -80,6 +83,7 @@ async function main() {
     tabButtons.forEach((btn, i) => {
       btn.classList.toggle('active', hash === tabs[i].hash);
     });
+
     switch (hash) {
       case '#/history':
         await renderHistory(content);
@@ -92,6 +96,14 @@ async function main() {
         break;
       default:
         renderDashboard(content);
+    }
+
+    // Only animate if this is still the latest route
+    if (seq === routeSeq) {
+      content.classList.remove('view-fade-in');
+      // Force reflow to restart animation
+      void content.offsetWidth;
+      content.classList.add('view-fade-in');
     }
   }
 
