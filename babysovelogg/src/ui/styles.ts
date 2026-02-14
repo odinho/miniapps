@@ -596,8 +596,8 @@ html, body {
 /* FAB button */
 .fab {
   position: fixed;
-  bottom: calc(68px + var(--safe-bottom));
-  right: 20px;
+  bottom: calc(130px + var(--safe-bottom));
+  right: 16px;
   width: 56px;
   height: 56px;
   border-radius: 50%;
