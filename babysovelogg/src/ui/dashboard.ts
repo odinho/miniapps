@@ -2,9 +2,19 @@ import { getAppState, refreshState, setAppState } from '../main.js';
 import { postEvents } from '../api.js';
 import { queueEvent, getClientId } from '../sync.js';
 import { calculateAgeMonths, predictNextNap } from '../engine/schedule.js';
-import { el, formatAge, formatDuration, formatDurationLong, renderTimer, renderCountdown, formatTime } from './components.js';
+import { el, formatAge, formatDuration, formatDurationLong, renderTimer, renderTimerWithPauses, renderCountdown, formatTime } from './components.js';
 import { showToast } from './toast.js';
 import { renderArc } from './arc.js';
+
+function calcPauseMs(pauses: any[]): number {
+  let total = 0;
+  for (const p of pauses) {
+    const start = new Date(p.pause_time).getTime();
+    const end = p.resume_time ? new Date(p.resume_time).getTime() : Date.now();
+    total += end - start;
+  }
+  return total;
+}
 
 let cleanups: (() => void)[] = [];
 
@@ -25,6 +35,8 @@ export function renderDashboard(container: HTMLElement): void {
   
   const { baby, activeSleep, todaySleeps, stats, prediction, ageMonths } = state;
   const isSleeping = !!activeSleep;
+  const pauses: any[] = activeSleep?.pauses || [];
+  const isPaused = pauses.length > 0 && !pauses[pauses.length - 1].resume_time;
 
   const view = el('div', { className: 'view' });
   const dash = el('div', { className: 'dashboard' });
@@ -71,6 +83,27 @@ export function renderDashboard(container: HTMLElement): void {
 
   dash.appendChild(btn);
 
+  // Pause/resume button when sleeping
+  if (isSleeping && activeSleep) {
+    const pauseBtn = el('button', { className: `btn ${isPaused ? 'btn-primary' : 'btn-ghost'} pause-btn` }, [
+      isPaused ? '▶️ Resume' : '⏸️ Pause',
+    ]);
+    pauseBtn.addEventListener('click', async () => {
+      const eventType = isPaused ? 'sleep.resumed' : 'sleep.paused';
+      const payload = isPaused
+        ? { sleepId: activeSleep.id, resumeTime: new Date().toISOString() }
+        : { sleepId: activeSleep.id, pauseTime: new Date().toISOString() };
+      try {
+        const result = await postEvents([{ type: eventType, payload, clientId: getClientId() }]);
+        setAppState(result.state);
+      } catch {
+        queueEvent(eventType, payload);
+      }
+      renderDashboard(container);
+    });
+    dash.appendChild(pauseBtn);
+  }
+
   // 12-hour arc visualization
   const isNightMode = document.documentElement.getAttribute('data-theme') === 'night';
   const arcSvg = renderArc({
@@ -86,10 +119,10 @@ export function renderDashboard(container: HTMLElement): void {
   const arcCenter = el('div', { className: 'arc-center-text' });
 
   if (isSleeping && activeSleep) {
-    const timer = renderTimer(activeSleep.start_time);
-    cleanups.push(timer.stop);
-    arcCenter.appendChild(el('div', { className: 'arc-center-label' }, [activeSleep.type === 'night' ? '💤 Sleeping' : '😴 Napping']));
-    arcCenter.appendChild(timer.element);
+    const arcTimer = renderTimerWithPauses(activeSleep.start_time, () => calcPauseMs(pauses), isPaused);
+    cleanups.push(arcTimer.stop);
+    arcCenter.appendChild(el('div', { className: 'arc-center-label' }, [isPaused ? '⏸️ Paused' : activeSleep.type === 'night' ? '💤 Sleeping' : '😴 Napping']));
+    arcCenter.appendChild(arcTimer.element);
   } else if (prediction?.nextNap) {
     const cd = renderCountdown(prediction.nextNap);
     cleanups.push(cd.stop);
@@ -102,12 +135,13 @@ export function renderDashboard(container: HTMLElement): void {
 
   // Timer or countdown
   if (isSleeping && activeSleep) {
-    const timer = renderTimer(activeSleep.start_time);
+    const timer = renderTimerWithPauses(activeSleep.start_time, () => calcPauseMs(pauses), isPaused);
     cleanups.push(timer.stop);
     const editLink = el('span', { className: 'edit-start-link' }, ['edit start time']);
     editLink.addEventListener('click', () => showEditStartModal(activeSleep, container));
+    const label = isPaused ? 'Paused' : `${activeSleep.type === 'night' ? 'Night' : 'Nap'} in progress`;
     dash.appendChild(el('div', { className: 'countdown' }, [
-      el('div', { className: 'countdown-label' }, [`${activeSleep.type === 'night' ? 'Night' : 'Nap'} in progress`]),
+      el('div', { className: 'countdown-label' }, [label]),
       timer.element,
       el('div', { className: 'countdown-sub' }, [`Started ${formatTime(activeSleep.start_time)} · `, editLink]),
     ]));

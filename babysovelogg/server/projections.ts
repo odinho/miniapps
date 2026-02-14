@@ -72,6 +72,20 @@ export function applyEvent(event: NapperEvent): void {
       break;
     }
 
+    case 'sleep.paused': {
+      db.prepare(
+        'INSERT INTO sleep_pauses (sleep_id, pause_time) VALUES (?, ?)'
+      ).run(payload.sleepId, payload.pauseTime);
+      break;
+    }
+
+    case 'sleep.resumed': {
+      db.prepare(
+        'UPDATE sleep_pauses SET resume_time = ? WHERE sleep_id = ? AND resume_time IS NULL'
+      ).run(payload.resumeTime, payload.sleepId);
+      break;
+    }
+
     case 'diaper.logged':
       db.prepare(
         'INSERT INTO diaper_log (baby_id, time, type, amount, note) VALUES (?, ?, ?, ?, ?)'
@@ -85,6 +99,7 @@ export function applyEvent(event: NapperEvent): void {
 }
 
 export function rebuildAll(): void {
+  db.prepare('DELETE FROM sleep_pauses').run();
   db.prepare('DELETE FROM diaper_log').run();
   db.prepare('DELETE FROM sleep_log').run();
   db.prepare('DELETE FROM baby').run();

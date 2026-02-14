@@ -4,6 +4,7 @@ import path from 'path';
 
 function resetDb() {
   const db = new Database(path.join(process.cwd(), 'napper.db'));
+  try { db.prepare('DELETE FROM sleep_pauses').run(); } catch {}
   try { db.prepare('DELETE FROM diaper_log').run(); } catch {}
   try { db.prepare('DELETE FROM sleep_log').run(); } catch {}
   try { db.prepare('DELETE FROM baby').run(); } catch {}

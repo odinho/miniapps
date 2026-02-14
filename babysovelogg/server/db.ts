@@ -44,6 +44,15 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sleep_pauses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sleep_id INTEGER NOT NULL REFERENCES sleep_log(id),
+    pause_time TEXT NOT NULL,
+    resume_time TEXT
+  );
+`);
+
 // Migrate: add mood/method columns if missing
 try { db.exec('ALTER TABLE sleep_log ADD COLUMN mood TEXT'); } catch {}
 try { db.exec('ALTER TABLE sleep_log ADD COLUMN method TEXT'); } catch {}

@@ -52,13 +52,32 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
 
     for (const entry of dayEntries) {
       if (entry._kind === 'sleep') {
-        const duration = entry.end_time
-          ? formatDuration(new Date(entry.end_time).getTime() - new Date(entry.start_time).getTime())
-          : 'ongoing…';
+        let durationMs = entry.end_time
+          ? new Date(entry.end_time).getTime() - new Date(entry.start_time).getTime()
+          : 0;
+        if (entry.pauses?.length) {
+          for (const p of entry.pauses) {
+            const ps = new Date(p.pause_time).getTime();
+            const pe = p.resume_time ? new Date(p.resume_time).getTime() : (entry.end_time ? new Date(entry.end_time).getTime() : Date.now());
+            durationMs -= (pe - ps);
+          }
+        }
+        const duration = entry.end_time ? formatDuration(Math.max(0, durationMs)) : 'ongoing…';
         const icon = entry.type === 'night' ? '🌙' : '😴';
         const times = `${formatTime(entry.start_time)} — ${entry.end_time ? formatTime(entry.end_time) : 'now'}`;
 
+        const entryPauses: any[] = entry.pauses || [];
         const metaChildren: (Node | string)[] = [entry.type === 'night' ? 'Night sleep' : 'Nap'];
+        if (entryPauses.length > 0) {
+          let totalPauseMs = 0;
+          for (const p of entryPauses) {
+            const ps = new Date(p.pause_time).getTime();
+            const pe = p.resume_time ? new Date(p.resume_time).getTime() : (entry.end_time ? new Date(entry.end_time).getTime() : Date.now());
+            totalPauseMs += pe - ps;
+          }
+          const pauseMin = Math.floor(totalPauseMs / 60000);
+          metaChildren.push(` · ${entryPauses.length} pause${entryPauses.length > 1 ? 's' : ''} (${pauseMin}m)`);
+        }
         if (entry.mood || entry.method) {
           const badges: (Node | string)[] = [];
           if (entry.mood && MOOD_EMOJI[entry.mood]) badges.push(el('span', { className: 'tag-badge' }, [MOOD_EMOJI[entry.mood]]));

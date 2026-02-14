@@ -593,6 +593,13 @@ html, body {
 }
 .fab:active { transform: scale(0.92); }
 
+/* Pause/resume button */
+.pause-btn {
+  max-width: 340px;
+  width: 100%;
+}
+
+
 /* Diaper quick-log button */
 .diaper-quick-btn {
   width: 100%;

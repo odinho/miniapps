@@ -74,6 +74,21 @@ export function renderTimer(startTime: string | Date): { element: HTMLSpanElemen
   return { element: span, stop: () => clearInterval(iv) };
 }
 
+/** Returns a timer that subtracts pauseMs from elapsed, and freezes if currently paused. */
+export function renderTimerWithPauses(startTime: string | Date, getPauseMs: () => number, isPaused: boolean): { element: HTMLSpanElement; stop: () => void } {
+  const start = typeof startTime === "string" ? new Date(startTime).getTime() : startTime.getTime();
+  const span = el("span", { className: "countdown-value" });
+
+  const update = () => {
+    const elapsed = Date.now() - start - getPauseMs();
+    span.textContent = formatDurationLong(Math.max(0, elapsed));
+  };
+  update();
+  const iv = setInterval(update, 1000);
+
+  return { element: span, stop: () => clearInterval(iv) };
+}
+
 /** Returns a span counting down to targetTime, updating every second. */
 export function renderCountdown(targetTime: string | Date): { element: HTMLSpanElement; stop: () => void } {
   const target = typeof targetTime === "string" ? new Date(targetTime).getTime() : targetTime.getTime();

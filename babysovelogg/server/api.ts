@@ -51,9 +51,16 @@ function getState() {
   const baby = db.prepare('SELECT * FROM baby ORDER BY id DESC LIMIT 1').get() as any;
   if (!baby) return { baby: null, activeSleep: null, todaySleeps: [], stats: null, prediction: null };
   
-  const activeSleep = db.prepare(
+  let activeSleep = db.prepare(
     'SELECT * FROM sleep_log WHERE baby_id = ? AND end_time IS NULL AND deleted = 0 ORDER BY id DESC LIMIT 1'
   ).get(baby.id) as any;
+  
+  if (activeSleep) {
+    const pauses = db.prepare(
+      'SELECT * FROM sleep_pauses WHERE sleep_id = ? ORDER BY pause_time ASC'
+    ).all(activeSleep.id) as any[];
+    activeSleep = { ...activeSleep, pauses };
+  }
   
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -145,7 +152,11 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     if (to) { sql += ' AND start_time <= ?'; params.push(to); }
     sql += ' ORDER BY start_time DESC LIMIT ?';
     params.push(parseInt(limit));
-    return json(res, db.prepare(sql).all(...params));
+    const sleeps = db.prepare(sql).all(...params) as any[];
+    for (const s of sleeps) {
+      s.pauses = db.prepare('SELECT * FROM sleep_pauses WHERE sleep_id = ? ORDER BY pause_time ASC').all(s.id);
+    }
+    return json(res, sleeps);
   }
   
   if (url.pathname === '/api/diapers' && method === 'GET') {
