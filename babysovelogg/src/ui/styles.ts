@@ -631,7 +631,7 @@ html, body {
   border: none;
   border-radius: var(--radius-sm);
   background: var(--peach);
-  color: var(--text);
+  color: #4a3f5c;
   font-family: var(--font);
   font-size: 1rem;
   font-weight: 600;
