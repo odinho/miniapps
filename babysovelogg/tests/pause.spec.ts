@@ -53,12 +53,12 @@ test('Can pause and resume', async ({ page }) => {
   // Pause
   await page.click('.pause-btn');
   await expect(page.locator('.pause-btn')).toContainText('Resume', { timeout: 5000 });
-  await expect(page.locator('.countdown-label')).toContainText('Paused');
+  await expect(page.locator('.arc-center-label')).toContainText('Paused');
 
   // Resume
   await page.click('.pause-btn');
   await expect(page.locator('.pause-btn')).toContainText('Pause', { timeout: 5000 });
-  await expect(page.locator('.countdown-label')).toContainText('in progress');
+  await expect(page.locator('.arc-center-label')).toContainText(/Napping|Sleeping/);
 });
 
 test('Timer adjusts for pause duration', async ({ page }) => {
@@ -91,7 +91,7 @@ test('Timer adjusts for pause duration', async ({ page }) => {
   await expect(page.locator('.sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
 
   // Timer should show ~5 minutes (10 min elapsed - 5 min paused), not 10 minutes
-  const timerText = await page.locator('.countdown .countdown-value').textContent();
+  const timerText = await page.locator('.arc-center-text .countdown-value').textContent();
   // Should be around 05:xx, not 10:xx
   expect(timerText).toMatch(/^0[45]:/);
 });

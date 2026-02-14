@@ -43,7 +43,7 @@ test('Can start and stop a nap', async ({ page }) => {
   // Start sleep
   await page.click('.sleep-button');
   await expect(page.locator('.sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
-  await expect(page.locator('.countdown-label')).toContainText('in progress');
+  await expect(page.locator('.arc-center-label')).toContainText(/Napping|Sleeping/);
 
   // Stop sleep
   await page.click('.sleep-button');
@@ -70,7 +70,8 @@ test('FAB button opens manual sleep modal', async ({ page }) => {
 
   await page.click('.fab');
   await expect(page.locator('.modal h2')).toHaveText('Add Sleep');
-  await expect(page.locator('.modal input[type="datetime-local"]').first()).toBeVisible();
+  await expect(page.locator('.modal input[type="date"]').first()).toBeVisible();
+  await expect(page.locator('.modal input[type="time"]').first()).toBeVisible();
 });
 
 test('Can add manual sleep entry', async ({ page }) => {
