@@ -11,6 +11,6 @@ export default defineConfig({
   webServer: {
     command: 'PORT=3200 node dist/server.js',
     port: 3200,
-    reuseExistingServer: false,
+    reuseExistingServer: true,
   },
 });
