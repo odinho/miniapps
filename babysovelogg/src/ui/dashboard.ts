@@ -18,13 +18,13 @@ function calcPauseMs(pauses: any[]): number {
 
 let cleanups: (() => void)[] = [];
 
-function cleanup() {
+export function cleanupDashboard() {
   cleanups.forEach(fn => fn());
   cleanups = [];
 }
 
 export function renderDashboard(container: HTMLElement): void {
-  cleanup();
+  cleanupDashboard();
   container.innerHTML = '';
   
   const state = getAppState();
@@ -140,18 +140,44 @@ export function renderDashboard(container: HTMLElement): void {
 
   // Today's stats
   if (stats) {
-    const totalMs = (stats.totalNapMinutes + stats.totalNightMinutes) * 60000;
+    const napCountEl = el('div', { className: 'stat-value' });
+    const napTimeEl = el('div', { className: 'stat-value' });
+    const totalSleepEl = el('div', { className: 'stat-value' });
+
+    const updateStats = () => {
+      let activeMinutes = 0;
+      if (activeSleep) {
+        const elapsedMs = Date.now() - new Date(activeSleep.start_time).getTime() - calcPauseMs(pauses);
+        activeMinutes = Math.max(0, elapsedMs) / 60000;
+      }
+      const isActiveNap = activeSleep?.type === 'nap';
+      const napCount = stats.napCount + (isActiveNap ? 1 : 0);
+      const napMinutes = stats.totalNapMinutes + (isActiveNap ? activeMinutes : 0);
+      const totalMinutes = stats.totalNapMinutes + stats.totalNightMinutes + activeMinutes;
+
+      napCountEl.textContent = String(napCount);
+      napTimeEl.textContent = formatDuration(napMinutes * 60000);
+      totalSleepEl.textContent = formatDuration(totalMinutes * 60000);
+    };
+
+    updateStats();
+
+    if (isSleeping) {
+      const statsInterval = setInterval(updateStats, 1000);
+      cleanups.push(() => clearInterval(statsInterval));
+    }
+
     dash.appendChild(el('div', { className: 'stats-row' }, [
       el('div', { className: 'stats-card' }, [
-        el('div', { className: 'stat-value' }, [String(stats.napCount)]),
+        napCountEl,
         el('div', { className: 'stat-label' }, ['Naps today']),
       ]),
       el('div', { className: 'stats-card' }, [
-        el('div', { className: 'stat-value' }, [formatDuration(stats.totalNapMinutes * 60000)]),
+        napTimeEl,
         el('div', { className: 'stat-label' }, ['Nap time']),
       ]),
       el('div', { className: 'stats-card' }, [
-        el('div', { className: 'stat-value' }, [formatDuration(totalMs)]),
+        totalSleepEl,
         el('div', { className: 'stat-label' }, ['Total sleep']),
       ]),
     ]));

@@ -1,7 +1,7 @@
 import { getState, setMutationHook, type AppState } from './api.js';
 import { flushQueue, cacheState, getCachedState, connectSSE, markLocalMutation } from './sync.js';
 import { injectStyles } from './ui/styles.js';
-import { renderDashboard } from './ui/dashboard.js';
+import { renderDashboard, cleanupDashboard } from './ui/dashboard.js';
 import { renderHistory } from './ui/history.js';
 import { renderSettings } from './ui/settings.js';
 import { renderStats } from './ui/stats.js';
@@ -71,6 +71,7 @@ async function main() {
   await refreshState();
 
   async function route() {
+    cleanupDashboard(); // Stop any running timers/intervals from dashboard
     const hash = window.location.hash || '#/';
     if (!currentState?.baby && hash !== '#/settings') {
       window.location.hash = '#/settings';
