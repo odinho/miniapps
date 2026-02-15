@@ -1,10 +1,10 @@
 import { test, expect } from './fixtures';
 
 async function dismissMorningPrompt(page: any) {
-  const prompt = page.locator('.morning-prompt');
+  const prompt = page.getByTestId('morning-prompt');
   if (await prompt.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await page.locator('.morning-prompt .btn-primary').click();
-    await expect(page.locator('.baby-name')).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: 'Set Wake-up Time' }).click();
+    await expect(page.getByTestId('baby-name')).toBeVisible({ timeout: 5000 });
   }
 }
 
@@ -19,12 +19,12 @@ test('Get Started button creates baby and navigates to dashboard', async ({ page
 
   await page.getByRole('button', { name: 'Get Started ✨' }).click();
 
-  await expect(page.locator('.morning-prompt')).toBeVisible({ timeout: 5000 });
-  await page.locator('.morning-prompt .btn-primary').click();
+  await expect(page.getByTestId('morning-prompt')).toBeVisible({ timeout: 5000 });
+  await page.getByRole('button', { name: 'Set Wake-up Time' }).click();
 
-  await expect(page.locator('.baby-name')).toHaveText('Halldis', { timeout: 5000 });
-  await expect(page.locator('.baby-age')).toContainText('months old');
-  await expect(page.locator('.sleep-button')).toBeVisible();
+  await expect(page.getByTestId('baby-name')).toHaveText('Halldis', { timeout: 5000 });
+  await expect(page.getByTestId('baby-age')).toContainText('months old');
+  await expect(page.getByTestId('sleep-button')).toBeVisible();
 });
 
 test('Get Started validates required fields', async ({ page }) => {
@@ -39,9 +39,9 @@ test('Get Started validates required fields', async ({ page }) => {
 
   await page.locator('input[type="date"]').fill('2025-06-12');
   await page.getByRole('button', { name: 'Get Started ✨' }).click();
-  await expect(page.locator('.morning-prompt')).toBeVisible({ timeout: 5000 });
-  await page.locator('.morning-prompt .btn-primary').click();
-  await expect(page.locator('.baby-name')).toHaveText('Halldis', { timeout: 5000 });
+  await expect(page.getByTestId('morning-prompt')).toBeVisible({ timeout: 5000 });
+  await page.getByRole('button', { name: 'Set Wake-up Time' }).click();
+  await expect(page.getByTestId('baby-name')).toHaveText('Halldis', { timeout: 5000 });
 });
 
 test('Sleep tracking flow after onboarding', async ({ page, request }) => {
@@ -51,10 +51,10 @@ test('Sleep tracking flow after onboarding', async ({ page, request }) => {
   });
 
   await page.goto('/');
-  await expect(page.locator('.morning-prompt')).toBeVisible({ timeout: 5000 });
-  await page.locator('.morning-prompt .btn-primary').click();
-  await expect(page.locator('.baby-name')).toHaveText('Halldis', { timeout: 5000 });
+  await expect(page.getByTestId('morning-prompt')).toBeVisible({ timeout: 5000 });
+  await page.getByRole('button', { name: 'Set Wake-up Time' }).click();
+  await expect(page.getByTestId('baby-name')).toHaveText('Halldis', { timeout: 5000 });
 
-  await page.locator('.sleep-button').click();
-  await expect(page.locator('.sleep-button')).toHaveClass(/sleeping/, { timeout: 3000 });
+  await page.getByTestId('sleep-button').click();
+  await expect(page.getByTestId('sleep-button')).toHaveClass(/sleeping/, { timeout: 3000 });
 });
