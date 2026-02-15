@@ -5,12 +5,11 @@ test('Tag sheet appears after stopping sleep', async ({ page }) => {
   setWakeUpTime(babyId);
   await page.goto('/');
 
-  await page.locator('.sleep-button').click();
-  await expect(page.locator('.sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
+  await page.getByTestId('sleep-button').click();
+  await expect(page.getByTestId('sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
 
-  await page.locator('.sleep-button').click();
-  await expect(page.locator('.tag-sheet')).toBeVisible({ timeout: 5000 });
-  await expect(page.locator('.tag-sheet h2')).toHaveText('How did it go?');
+  await page.getByTestId('sleep-button').click();
+  await expect(page.getByRole('heading', { name: 'How did it go?' })).toBeVisible({ timeout: 5000 });
 });
 
 test('Can select mood and method and save', async ({ page }) => {
@@ -18,21 +17,21 @@ test('Can select mood and method and save', async ({ page }) => {
   setWakeUpTime(babyId);
   await page.goto('/');
 
-  await page.locator('.sleep-button').click();
-  await expect(page.locator('.sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
-  await page.locator('.sleep-button').click();
-  await expect(page.locator('.tag-sheet')).toBeVisible({ timeout: 5000 });
+  await page.getByTestId('sleep-button').click();
+  await expect(page.getByTestId('sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
+  await page.getByTestId('sleep-button').click();
+  await expect(page.getByRole('heading', { name: 'How did it go?' })).toBeVisible({ timeout: 5000 });
 
-  await page.locator('[data-mood="happy"]').click();
-  await expect(page.locator('[data-mood="happy"]')).toHaveClass(/active/);
+  await page.getByRole('button', { name: 'Happy' }).click();
+  await expect(page.getByRole('button', { name: 'Happy' })).toHaveClass(/active/);
 
-  await page.locator('[data-method="nursing"]').click();
-  await expect(page.locator('[data-method="nursing"]')).toHaveClass(/active/);
+  await page.getByRole('button', { name: 'Nursing' }).click();
+  await expect(page.getByRole('button', { name: 'Nursing' })).toHaveClass(/active/);
 
-  await page.locator('.tag-sheet .btn-primary').click();
-  await expect(page.locator('.modal-overlay')).not.toBeVisible({ timeout: 5000 });
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByTestId('modal-overlay')).not.toBeVisible({ timeout: 5000 });
 
-  await page.locator('.nav-tab:nth-child(2)').click();
+  await page.getByRole('button', { name: 'History' }).click();
   await expect(page.locator('.tag-badge').first()).toBeVisible({ timeout: 5000 });
 });
 
@@ -57,12 +56,12 @@ test('Can skip tagging', async ({ page }) => {
   setWakeUpTime(babyId);
   await page.goto('/');
 
-  await page.locator('.sleep-button').click();
-  await expect(page.locator('.sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
-  await page.locator('.sleep-button').click();
-  await expect(page.locator('.tag-sheet')).toBeVisible({ timeout: 5000 });
+  await page.getByTestId('sleep-button').click();
+  await expect(page.getByTestId('sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
+  await page.getByTestId('sleep-button').click();
+  await expect(page.getByRole('heading', { name: 'How did it go?' })).toBeVisible({ timeout: 5000 });
 
-  await page.locator('.tag-sheet .btn-ghost').click();
-  await expect(page.locator('.modal-overlay')).not.toBeVisible({ timeout: 5000 });
-  await expect(page.locator('.sleep-button')).toHaveClass(/awake/);
+  await page.getByRole('button', { name: 'Skip' }).click();
+  await expect(page.getByTestId('modal-overlay')).not.toBeVisible({ timeout: 5000 });
+  await expect(page.getByTestId('sleep-button')).toHaveClass(/awake/);
 });
