@@ -238,3 +238,13 @@ Commit: `"Polish: animations, PWA improvements, cleanup"`
 - [x] Onboarding (legg til baby)
 - [x] Manuell registrering (+FAB, sleep.manual event, edit start time)
 - [x] Tidssonefiks (lokal datogruppering i historikk)
+- [x] Step 0: Playwright baseline testar
+- [x] Step 1: Dark/night theme med auto-switching
+- [x] Step 2: 12-timars boge-visualisering
+- [x] Step 3: Bleielogging
+- [x] Step 4: Søvn-metadata (mood + method tags)
+- [x] Step 5: Pause/resume
+- [x] Step 6: Statistikkside
+- [x] Step 7: SSE sanntidssynk
+- [x] Step 8: Polish & PWA
+- [x] Morgon-prompt med ståopp-tid + boge forankra i vaknetid + predikerte duppar og leggjetid
