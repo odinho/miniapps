@@ -53,8 +53,34 @@ test('Arc renders on dashboard', async ({ page }) => {
 test('Completed sleeps appear as filled bubbles on arc', async ({ page }) => {
   const babyId = createBaby('Testa');
   const now = new Date();
-  const start = new Date(now.getTime() - 2 * 3600000); // 2h ago
-  const end = new Date(now.getTime() - 1 * 3600000);   // 1h ago
+  const hour = now.getHours();
+  
+  // Create sleep times within the current arc range
+  // Day arc: 6-18, Night arc: 18-30 (18-6)
+  let start: Date, end: Date;
+  if (hour >= 6 && hour < 18) {
+    // Day mode: create a sleep during day hours (e.g., 10am-11am today)
+    start = new Date(now);
+    start.setHours(10, 0, 0, 0);
+    end = new Date(now);
+    end.setHours(11, 0, 0, 0);
+  } else {
+    // Night mode: create a sleep during night hours
+    if (hour >= 18) {
+      // Evening: create sleep at 20:00-21:00
+      start = new Date(now);
+      start.setHours(20, 0, 0, 0);
+      end = new Date(now);
+      end.setHours(21, 0, 0, 0);
+    } else {
+      // Early morning (0-6): create sleep at midnight-1am
+      start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+      end = new Date(now);
+      end.setHours(1, 0, 0, 0);
+    }
+  }
+  
   addCompletedSleep(babyId, start.toISOString(), end.toISOString(), 'nap');
 
   await page.goto('/');
