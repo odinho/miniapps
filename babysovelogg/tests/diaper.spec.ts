@@ -10,15 +10,28 @@ function resetDb() {
   const db = getDb();
   db.prepare('DELETE FROM diaper_log').run();
   try { db.prepare('DELETE FROM sleep_log').run(); } catch {}
+  try { db.prepare('DELETE FROM day_start').run(); } catch {}
   try { db.prepare('DELETE FROM baby').run(); } catch {}
   try { db.prepare('DELETE FROM events').run(); } catch {}
   db.close();
 }
 
-function createBaby(name = 'Testa', birthdate = '2025-06-12') {
+function createBaby(name = 'Testa', birthdate = '2025-06-12'): number {
   const db = getDb();
   db.prepare("INSERT INTO events (type, payload) VALUES ('baby.created', ?)").run(JSON.stringify({ name, birthdate }));
-  db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run(name, birthdate);
+  const info = db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run(name, birthdate);
+  db.close();
+  return Number(info.lastInsertRowid);
+}
+
+function setWakeUpTime(babyId: number) {
+  const db = getDb();
+  const today = new Date();
+  today.setHours(7, 0, 0, 0);
+  const dateStr = today.toISOString().split('T')[0];
+  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
+    babyId, dateStr, today.toISOString()
+  );
   db.close();
 }
 
@@ -27,7 +40,8 @@ test.beforeEach(() => {
 });
 
 test('Can log a diaper change', async ({ page }) => {
-  createBaby('Testa');
+  const babyId = createBaby('Testa');
+  setWakeUpTime(babyId);
   await page.goto('/');
   await expect(page.locator('.baby-name')).toHaveText('Testa', { timeout: 5000 });
 
@@ -45,7 +59,8 @@ test('Can log a diaper change', async ({ page }) => {
 });
 
 test('Diaper shows in history', async ({ page }) => {
-  createBaby('Testa');
+  const babyId = createBaby('Testa');
+  setWakeUpTime(babyId);
   await page.goto('/');
   await expect(page.locator('.baby-name')).toHaveText('Testa', { timeout: 5000 });
 
@@ -61,7 +76,8 @@ test('Diaper shows in history', async ({ page }) => {
 });
 
 test('Dashboard diaper count updates', async ({ page }) => {
-  createBaby('Testa');
+  const babyId = createBaby('Testa');
+  setWakeUpTime(babyId);
   await page.goto('/');
   await expect(page.locator('.baby-name')).toHaveText('Testa', { timeout: 5000 });
 
@@ -83,7 +99,8 @@ test('Dashboard diaper count updates', async ({ page }) => {
 });
 
 test('Can delete a diaper entry', async ({ page }) => {
-  createBaby('Testa');
+  const babyId = createBaby('Testa');
+  setWakeUpTime(babyId);
   await page.goto('/');
   await expect(page.locator('.baby-name')).toHaveText('Testa', { timeout: 5000 });
 

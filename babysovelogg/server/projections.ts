@@ -95,6 +95,19 @@ export function applyEvent(event: NapperEvent): void {
     case 'diaper.deleted':
       db.prepare('UPDATE diaper_log SET deleted = 1 WHERE id = ?').run(payload.diaperId);
       break;
+
+    case 'day.started': {
+      // Use local date (not UTC) to determine the day
+      const wakeDate = new Date(payload.wakeTime);
+      const year = wakeDate.getFullYear();
+      const month = String(wakeDate.getMonth() + 1).padStart(2, '0');
+      const day = String(wakeDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+      db.prepare(
+        'INSERT OR REPLACE INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)'
+      ).run(payload.babyId, dateStr, payload.wakeTime);
+      break;
+    }
   }
 }
 
@@ -102,6 +115,7 @@ export function rebuildAll(): void {
   db.prepare('DELETE FROM sleep_pauses').run();
   db.prepare('DELETE FROM diaper_log').run();
   db.prepare('DELETE FROM sleep_log').run();
+  db.prepare('DELETE FROM day_start').run();
   db.prepare('DELETE FROM baby').run();
   const events = db.prepare('SELECT * FROM events ORDER BY id ASC').all() as any[];
   for (const row of events) {

@@ -53,6 +53,17 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS day_start (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    baby_id INTEGER NOT NULL REFERENCES baby(id),
+    date TEXT NOT NULL,
+    wake_time TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(baby_id, date)
+  );
+`);
+
 // Migrate: add mood/method columns if missing
 try { db.exec('ALTER TABLE sleep_log ADD COLUMN mood TEXT'); } catch {}
 try { db.exec('ALTER TABLE sleep_log ADD COLUMN method TEXT'); } catch {}

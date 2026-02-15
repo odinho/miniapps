@@ -11,15 +11,26 @@ function resetDb() {
   try { db.prepare('DELETE FROM sleep_pauses').run(); } catch {}
   try { db.prepare('DELETE FROM diaper_log').run(); } catch {}
   try { db.prepare('DELETE FROM sleep_log').run(); } catch {}
+  try { db.prepare('DELETE FROM day_start').run(); } catch {}
   try { db.prepare('DELETE FROM baby').run(); } catch {}
   try { db.prepare('DELETE FROM events').run(); } catch {}
   db.close();
 }
 
-function createBaby(name = 'Testa', birthdate = '2025-06-12') {
+function createBaby(name = 'Testa', birthdate = '2025-06-12'): number {
   const db = getDb();
   db.prepare("INSERT INTO events (type, payload) VALUES ('baby.created', ?)").run(JSON.stringify({ name, birthdate }));
-  db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run(name, birthdate);
+  const info = db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run(name, birthdate);
+  db.close();
+  return Number(info.lastInsertRowid);
+}
+
+function setWakeUpTime(babyId: number) {
+  const db = getDb();
+  const today = new Date();
+  today.setHours(7, 0, 0, 0);
+  const dateStr = today.toISOString().split('T')[0];
+  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(babyId, dateStr, today.toISOString());
   db.close();
 }
 
@@ -28,7 +39,8 @@ test.beforeEach(() => {
 });
 
 test('Pause button appears when sleeping', async ({ page }) => {
-  createBaby('Testa');
+  const babyId = createBaby('Testa');
+  setWakeUpTime(babyId);
   await page.goto('/');
   await expect(page.locator('.sleep-button')).toHaveClass(/awake/);
   // No pause button when awake
@@ -43,7 +55,8 @@ test('Pause button appears when sleeping', async ({ page }) => {
 });
 
 test('Can pause and resume', async ({ page }) => {
-  createBaby('Testa');
+  const babyId = createBaby('Testa');
+  setWakeUpTime(babyId);
   await page.goto('/');
 
   // Start sleep
@@ -62,9 +75,9 @@ test('Can pause and resume', async ({ page }) => {
 });
 
 test('Timer adjusts for pause duration', async ({ page }) => {
-  createBaby('Testa');
+  const babyId = createBaby('Testa');
+  setWakeUpTime(babyId);
   const db = getDb();
-  const babyId = (db.prepare('SELECT id FROM baby ORDER BY id DESC LIMIT 1').get() as any).id;
   const now = Date.now();
   const startTime = new Date(now - 10 * 60000).toISOString();
   const pauseTime = new Date(now - 8 * 60000).toISOString();
@@ -97,7 +110,8 @@ test('Timer adjusts for pause duration', async ({ page }) => {
 });
 
 test('Multiple pauses work correctly', async ({ page }) => {
-  createBaby('Testa');
+  const babyId = createBaby('Testa');
+  setWakeUpTime(babyId);
   await page.goto('/');
 
   // Start sleep
@@ -126,9 +140,9 @@ test('Multiple pauses work correctly', async ({ page }) => {
 });
 
 test('History shows pause info', async ({ page }) => {
-  createBaby('Testa');
+  const babyId = createBaby('Testa');
+  setWakeUpTime(babyId);
   const db = getDb();
-  const babyId = (db.prepare('SELECT id FROM baby ORDER BY id DESC LIMIT 1').get() as any).id;
   const now = Date.now();
   const startTime = new Date(now - 60 * 60000).toISOString();
   const endTime = new Date(now - 10 * 60000).toISOString();

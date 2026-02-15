@@ -40,6 +40,43 @@ export function predictNextNap(
   return new Date(wake.getTime() + ww * 60 * 1000).toISOString();
 }
 
+export interface PredictedNap {
+  startTime: string;
+  endTime: string;
+}
+
+/** Predict all naps for the day based on wake-up time and recent sleep patterns. */
+export function predictDayNaps(
+  wakeUpTime: string,
+  ageMonths: number,
+  recentSleeps?: SleepEntry[]
+): PredictedNap[] {
+  const napCount = findByAge(NAP_COUNTS, ageMonths);
+  const ww = getWakeWindow(ageMonths, recentSleeps);
+  const expectedNaps = napCount.naps;
+  
+  const predictions: PredictedNap[] = [];
+  let currentWake = new Date(wakeUpTime);
+  
+  // Estimate nap duration based on age (younger babies = longer naps)
+  const napDurationMinutes = ageMonths < 6 ? 60 : ageMonths < 12 ? 45 : 30;
+  
+  for (let i = 0; i < expectedNaps; i++) {
+    const napStart = new Date(currentWake.getTime() + ww * 60 * 1000);
+    const napEnd = new Date(napStart.getTime() + napDurationMinutes * 60 * 1000);
+    
+    predictions.push({
+      startTime: napStart.toISOString(),
+      endTime: napEnd.toISOString(),
+    });
+    
+    // Next wake window starts after this nap ends
+    currentWake = napEnd;
+  }
+  
+  return predictions;
+}
+
 /** Recommend bedtime based on today's sleeps and age. */
 export function recommendBedtime(todaySleeps: SleepEntry[], ageMonths: number): string {
   const napCount = findByAge(NAP_COUNTS, ageMonths);

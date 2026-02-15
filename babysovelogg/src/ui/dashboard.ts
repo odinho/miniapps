@@ -33,7 +33,14 @@ export function renderDashboard(container: HTMLElement): void {
     return;
   }
   
-  const { baby, activeSleep, todaySleeps, stats, prediction, ageMonths } = state;
+  const { baby, activeSleep, todaySleeps, stats, prediction, ageMonths, todayWakeUp } = state;
+  
+  // Show morning prompt if no wake-up time set and no sleeps today
+  if (!todayWakeUp && todaySleeps.length === 0 && !activeSleep) {
+    showMorningPrompt(baby, container);
+    return;
+  }
+  
   const isSleeping = !!activeSleep;
   const pauses: any[] = activeSleep?.pauses || [];
   const isPaused = pauses.length > 0 && !pauses[pauses.length - 1].resume_time;
@@ -111,6 +118,7 @@ export function renderDashboard(container: HTMLElement): void {
     activeSleep: activeSleep ? { start_time: activeSleep.start_time, type: activeSleep.type } : null,
     prediction,
     isNightMode,
+    wakeUpTime: todayWakeUp?.wake_time,
   });
   const arcContainer = el('div', { className: 'arc-container' });
   arcContainer.appendChild(arcSvg);
@@ -504,4 +512,65 @@ function showDiaperModal(baby: any, container: HTMLElement): void {
   document.body.appendChild(overlay);
 
   function close() { overlay.remove(); }
+}
+
+function showMorningPrompt(baby: any, container: HTMLElement): void {
+  const view = el('div', { className: 'view morning-prompt-view' });
+  
+  const prompt = el('div', { className: 'morning-prompt' }, [
+    el('div', { className: 'morning-icon' }, ['🌅']),
+    el('h2', null, ['Good morning!']),
+    el('p', null, ['When did your baby wake up today?']),
+  ]);
+  
+  const now = new Date();
+  const wakeTimeDt = makeDateTimeInputs(now.toISOString());
+  
+  prompt.appendChild(dateTimeGroup('Wake-up time', wakeTimeDt));
+  
+  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Set Wake-up Time']);
+  const skipBtn = el('button', { className: 'btn btn-ghost' }, ['Skip for now']);
+  
+  saveBtn.addEventListener('click', async () => {
+    const wakeTime = new Date(wakeTimeDt.getValue());
+    if (isNaN(wakeTime.getTime())) {
+      showToast('Invalid time', 'warning');
+      return;
+    }
+    
+    try {
+      const result = await postEvents([{
+        type: 'day.started',
+        payload: { babyId: baby.id, wakeTime: wakeTime.toISOString() },
+        clientId: getClientId(),
+      }]);
+      setAppState(result.state);
+      showToast('Wake-up time set', 'success');
+      renderDashboard(container);
+    } catch {
+      queueEvent('day.started', { babyId: baby.id, wakeTime: wakeTime.toISOString() });
+      showToast('Failed to set wake-up time', 'error');
+    }
+  });
+  
+  skipBtn.addEventListener('click', () => {
+    // Bypass morning prompt by creating a default wake-up time (6am)
+    const earlyMorning = new Date();
+    earlyMorning.setHours(6, 0, 0, 0);
+    postEvents([{
+      type: 'day.started',
+      payload: { babyId: baby.id, wakeTime: earlyMorning.toISOString() },
+      clientId: getClientId(),
+    }]).then(result => {
+      setAppState(result.state);
+      renderDashboard(container);
+    }).catch(() => {
+      // If offline, just render dashboard anyway
+      renderDashboard(container);
+    });
+  });
+  
+  prompt.appendChild(el('div', { className: 'btn-row' }, [skipBtn, saveBtn]));
+  view.appendChild(prompt);
+  container.appendChild(view);
 }

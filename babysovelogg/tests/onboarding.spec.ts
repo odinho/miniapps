@@ -7,9 +7,19 @@ function resetDb() {
   try { db.prepare('DELETE FROM sleep_pauses').run(); } catch {}
   try { db.prepare('DELETE FROM diaper_log').run(); } catch {}
   try { db.prepare('DELETE FROM sleep_log').run(); } catch {}
+  try { db.prepare('DELETE FROM day_start').run(); } catch {}
   try { db.prepare('DELETE FROM baby').run(); } catch {}
   try { db.prepare('DELETE FROM events').run(); } catch {}
   db.close();
+}
+
+/** After onboarding, the morning prompt shows. This dismisses it. */
+async function dismissMorningPrompt(page: any) {
+  const prompt = page.locator('.morning-prompt');
+  if (await prompt.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await page.click('.morning-prompt .btn-primary'); // "Set Wake-up Time"
+    await expect(page.locator('.baby-name')).toBeVisible({ timeout: 5000 });
+  }
 }
 
 test.beforeEach(() => {
@@ -29,6 +39,10 @@ test('Get Started button creates baby and navigates to dashboard', async ({ page
 
   // Click Get Started
   await page.click('button.btn-primary');
+
+  // Morning prompt shows after onboarding (no wake-up time set yet)
+  await expect(page.locator('.morning-prompt')).toBeVisible({ timeout: 5000 });
+  await page.click('.morning-prompt .btn-primary'); // Set Wake-up Time
 
   // Should navigate to dashboard and show baby name
   await expect(page.locator('.baby-name')).toHaveText('Halldis', { timeout: 5000 });
@@ -55,6 +69,9 @@ test('Get Started validates required fields', async ({ page }) => {
   // Fill date too
   await page.fill('input[type="date"]', '2025-06-12');
   await page.click('button.btn-primary');
+  // Morning prompt after onboarding
+  await expect(page.locator('.morning-prompt')).toBeVisible({ timeout: 5000 });
+  await page.click('.morning-prompt .btn-primary');
   await expect(page.locator('.baby-name')).toHaveText('Halldis', { timeout: 5000 });
 });
 
@@ -71,6 +88,9 @@ test('Sleep tracking flow after onboarding', async ({ page }) => {
 
   // Reload to dashboard
   await page.goto('/');
+  // Morning prompt shows since no wake-up time
+  await expect(page.locator('.morning-prompt')).toBeVisible({ timeout: 5000 });
+  await page.click('.morning-prompt .btn-primary');
   await expect(page.locator('.baby-name')).toHaveText('Halldis', { timeout: 5000 });
 
   // Click sleep button to start nap

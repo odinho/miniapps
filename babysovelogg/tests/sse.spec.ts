@@ -7,9 +7,16 @@ function resetDb() {
   try { db.prepare('DELETE FROM sleep_pauses').run(); } catch {}
   try { db.prepare('DELETE FROM diaper_log').run(); } catch {}
   try { db.prepare('DELETE FROM sleep_log').run(); } catch {}
+  try { db.prepare('DELETE FROM day_start').run(); } catch {}
   try { db.prepare('DELETE FROM baby').run(); } catch {}
   try { db.prepare('DELETE FROM events').run(); } catch {}
   db.close();
+}
+
+async function dismissMorningPrompt(page: any) {
+  await page.locator('.morning-prompt').waitFor({ state: 'visible', timeout: 5000 });
+  await page.click('.morning-prompt .btn-primary');
+  await page.locator('.morning-prompt').waitFor({ state: 'hidden', timeout: 5000 });
 }
 
 test.beforeEach(() => {
@@ -22,9 +29,10 @@ test('SSE: Context B sees sleep started in Context A without refresh', async ({ 
   await page.fill('input[type="text"]', 'SSE-Baby');
   await page.fill('input[type="date"]', '2025-06-12');
   await page.click('button.btn-primary');
+  await dismissMorningPrompt(page);
   await expect(page.locator('.baby-name')).toHaveText('SSE-Baby', { timeout: 5000 });
 
-  // Context B: open second browser
+  // Context B: open second browser (wake-up already set by A)
   const ctx2 = await browser.newContext();
   const page2 = await ctx2.newPage();
   await page2.goto('/');
@@ -50,9 +58,10 @@ test('SSE: Both contexts work independently', async ({ page, browser }) => {
   await page.fill('input[type="text"]', 'SSE-Baby2');
   await page.fill('input[type="date"]', '2025-06-12');
   await page.click('button.btn-primary');
+  await dismissMorningPrompt(page);
   await expect(page.locator('.baby-name')).toHaveText('SSE-Baby2', { timeout: 5000 });
 
-  // Context B
+  // Context B (wake-up already set)
   const ctx2 = await browser.newContext();
   const page2 = await ctx2.newPage();
   await page2.goto('/');

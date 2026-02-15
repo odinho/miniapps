@@ -867,4 +867,49 @@ html, body {
 .view-fade-in {
   animation: viewFadeIn 0.15s ease;
 }
+
+/* Morning prompt */
+.morning-prompt-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.morning-prompt {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 32px 24px;
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+  max-width: 400px;
+  width: 100%;
+}
+
+.morning-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.morning-prompt h2 {
+  margin: 0 0 8px;
+  color: var(--text);
+}
+
+.morning-prompt p {
+  margin: 0 0 24px;
+  color: var(--text-light);
+  font-size: 0.95rem;
+}
+
+.morning-prompt .form-group {
+  margin-bottom: 20px;
+}
+
+.morning-prompt .btn-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
 `;

@@ -14,8 +14,14 @@ interface ArcConfig {
   endIcon: string;
 }
 
-function getDayArcConfig(): ArcConfig {
-  return { arcStartHour: 6, arcEndHour: 18, startIcon: '☀️', endIcon: '🌅' };
+function getDayArcConfig(wakeUpTime?: string | null): ArcConfig {
+  let arcStartHour = 6;
+  if (wakeUpTime) {
+    const wake = new Date(wakeUpTime);
+    arcStartHour = wake.getHours() + wake.getMinutes() / 60;
+  }
+  // Arc spans ~12 hours from wake-up
+  return { arcStartHour, arcEndHour: arcStartHour + 12, startIcon: '☀️', endIcon: '🌅' };
 }
 
 function getNightArcConfig(): ArcConfig {
@@ -45,12 +51,13 @@ function fracToPoint(frac: number, cx: number, cy: number, r: number): { x: numb
 export interface ArcInput {
   todaySleeps: Array<{ start_time: string; end_time: string | null; type: 'nap' | 'night' }>;
   activeSleep: { start_time: string; type: 'nap' | 'night' } | null;
-  prediction: { nextNap: string; bedtime?: string } | null;
+  prediction: { nextNap: string; bedtime?: string; predictedNaps?: Array<{ startTime: string; endTime: string }> } | null;
   isNightMode: boolean;
+  wakeUpTime?: string | null;
 }
 
 export function renderArc(input: ArcInput): SVGElement {
-  const config = input.isNightMode ? getNightArcConfig() : getDayArcConfig();
+  const config = input.isNightMode ? getNightArcConfig() : getDayArcConfig(input.wakeUpTime);
   const W = 340, H = 200;
   const cx = W / 2, cy = H - 20, r = 140;
 
@@ -151,9 +158,19 @@ export function renderArc(input: ArcInput): SVGElement {
     });
   }
 
-  if (input.prediction?.nextNap && !input.activeSleep) {
+  // Add all predicted naps for the day (when no sleeps yet)
+  if (input.prediction?.predictedNaps && !input.activeSleep) {
+    for (const pred of input.prediction.predictedNaps) {
+      bubbles.push({
+        startTime: new Date(pred.startTime),
+        endTime: new Date(pred.endTime),
+        type: 'nap',
+        status: 'predicted',
+      });
+    }
+  } else if (input.prediction?.nextNap && !input.activeSleep) {
+    // Fallback: show single next nap prediction
     const predTime = new Date(input.prediction.nextNap);
-    // Show predicted nap as ~45min bubble
     bubbles.push({
       startTime: predTime,
       endTime: new Date(predTime.getTime() + 45 * 60000),
@@ -161,57 +178,82 @@ export function renderArc(input: ArcInput): SVGElement {
       status: 'predicted',
     });
   }
+  
+  // Add predicted bedtime bubble
+  if (input.prediction?.bedtime && !input.activeSleep) {
+    const bedtime = new Date(input.prediction.bedtime);
+    bubbles.push({
+      startTime: bedtime,
+      endTime: null,
+      type: 'night',
+      status: 'predicted',
+    });
+  }
 
   // Render bubbles on the arc
   for (const bubble of bubbles) {
+    const isBedtime = bubble.type === 'night' && bubble.status === 'predicted' && !bubble.endTime;
+    
     const startFrac = timeToArcFraction(bubble.startTime, config);
     const endFrac = bubble.endTime
       ? timeToArcFraction(bubble.endTime, config)
-      : timeToArcFraction(new Date(), config);
+      : (isBedtime ? startFrac : timeToArcFraction(new Date(), config));
 
     // Skip if entirely outside arc range
-    if (startFrac >= 1 && endFrac >= 1) continue;
-    if (startFrac <= 0 && endFrac <= 0) continue;
+    if (startFrac > 1 && endFrac > 1) continue;
+    if (startFrac < 0 && endFrac < 0) continue;
 
     const midFrac = (startFrac + endFrac) / 2;
-    const spanFrac = Math.max(0.02, Math.abs(endFrac - startFrac));
+    const spanFrac = isBedtime ? 0.04 : Math.max(0.02, Math.abs(endFrac - startFrac));
 
     const midPt = fracToPoint(midFrac, cx, cy, r);
     // Pill width proportional to duration, min 20px
     const pillW = Math.max(20, Math.min(60, spanFrac * Math.PI * r));
-    const pillH = 14;
+    const pillH = isBedtime ? 20 : 14;
 
     const g = document.createElementNS(ns, 'g');
-    g.setAttribute('class', `arc-bubble arc-bubble-${bubble.status}`);
+    g.setAttribute('class', `arc-bubble arc-bubble-${bubble.status}${isBedtime ? ' arc-bedtime' : ''}`);
 
-    const rect = document.createElementNS(ns, 'rect');
-    rect.setAttribute('x', String(midPt.x - pillW / 2));
-    rect.setAttribute('y', String(midPt.y - pillH / 2));
-    rect.setAttribute('width', String(pillW));
-    rect.setAttribute('height', String(pillH));
-    rect.setAttribute('rx', String(pillH / 2));
-    rect.setAttribute('ry', String(pillH / 2));
-
-    if (bubble.status === 'completed') {
-      rect.setAttribute('fill', 'var(--moon)');
-      rect.setAttribute('opacity', '0.8');
-    } else if (bubble.status === 'active') {
-      rect.setAttribute('fill', 'var(--moon-glow)');
-      rect.setAttribute('filter', 'url(#arc-glow)');
-      rect.setAttribute('class', 'arc-active-pulse');
+    if (isBedtime) {
+      // Bedtime: show moon icon instead of pill
+      const moon = document.createElementNS(ns, 'text');
+      moon.setAttribute('x', String(midPt.x));
+      moon.setAttribute('y', String(midPt.y));
+      moon.setAttribute('font-size', '18');
+      moon.setAttribute('text-anchor', 'middle');
+      moon.setAttribute('dominant-baseline', 'middle');
+      moon.textContent = '🌙';
+      g.appendChild(moon);
     } else {
-      rect.setAttribute('fill', 'none');
-      rect.setAttribute('stroke', 'var(--moon)');
-      rect.setAttribute('stroke-width', '2');
-      rect.setAttribute('stroke-dasharray', '4 3');
-      rect.setAttribute('opacity', '0.6');
-    }
-    g.appendChild(rect);
+      const rect = document.createElementNS(ns, 'rect');
+      rect.setAttribute('x', String(midPt.x - pillW / 2));
+      rect.setAttribute('y', String(midPt.y - pillH / 2));
+      rect.setAttribute('width', String(pillW));
+      rect.setAttribute('height', String(pillH));
+      rect.setAttribute('rx', String(pillH / 2));
+      rect.setAttribute('ry', String(pillH / 2));
 
-    // Time label on bubble
+      if (bubble.status === 'completed') {
+        rect.setAttribute('fill', 'var(--moon)');
+        rect.setAttribute('opacity', '0.8');
+      } else if (bubble.status === 'active') {
+        rect.setAttribute('fill', 'var(--moon-glow)');
+        rect.setAttribute('filter', 'url(#arc-glow)');
+        rect.setAttribute('class', 'arc-active-pulse');
+      } else {
+        rect.setAttribute('fill', 'none');
+        rect.setAttribute('stroke', 'var(--moon)');
+        rect.setAttribute('stroke-width', '2');
+        rect.setAttribute('stroke-dasharray', '4 3');
+        rect.setAttribute('opacity', '0.6');
+      }
+      g.appendChild(rect);
+    }
+
+    // Time label on bubble (below for bedtime)
     const timeLabel = document.createElementNS(ns, 'text');
     timeLabel.setAttribute('x', String(midPt.x));
-    timeLabel.setAttribute('y', String(midPt.y + 1));
+    timeLabel.setAttribute('y', String(midPt.y + (isBedtime ? 16 : 1)));
     timeLabel.setAttribute('text-anchor', 'middle');
     timeLabel.setAttribute('dominant-baseline', 'middle');
     timeLabel.setAttribute('class', 'arc-bubble-label');

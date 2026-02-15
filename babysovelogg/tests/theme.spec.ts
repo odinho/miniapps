@@ -2,25 +2,41 @@ import { test, expect } from '@playwright/test';
 import Database from 'better-sqlite3';
 import path from 'path';
 
+function getDb() {
+  return new Database(path.join(process.cwd(), 'napper.db'));
+}
+
 function resetDb() {
-  const db = new Database(path.join(process.cwd(), 'napper.db'));
+  const db = getDb();
   try { db.prepare('DELETE FROM sleep_pauses').run(); } catch {}
   try { db.prepare('DELETE FROM diaper_log').run(); } catch {}
   try { db.prepare('DELETE FROM sleep_log').run(); } catch {}
+  try { db.prepare('DELETE FROM day_start').run(); } catch {}
   try { db.prepare('DELETE FROM baby').run(); } catch {}
   try { db.prepare('DELETE FROM events').run(); } catch {}
   db.close();
 }
 
-function createBaby() {
-  const db = new Database(path.join(process.cwd(), 'napper.db'));
-  db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run('TestBaby', '2025-06-01');
+function createBaby(): number {
+  const db = getDb();
+  const info = db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run('TestBaby', '2025-06-01');
+  db.close();
+  return Number(info.lastInsertRowid);
+}
+
+function setWakeUpTime(babyId: number) {
+  const db = getDb();
+  const today = new Date();
+  today.setHours(7, 0, 0, 0);
+  const dateStr = today.toISOString().split('T')[0];
+  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(babyId, dateStr, today.toISOString());
   db.close();
 }
 
 test.beforeEach(() => {
   resetDb();
-  createBaby();
+  const babyId = createBaby();
+  setWakeUpTime(babyId);
 });
 
 test('night theme applies correct CSS variables', async ({ page }) => {

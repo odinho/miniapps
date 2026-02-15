@@ -11,15 +11,28 @@ function resetDb() {
   try { db.prepare('DELETE FROM sleep_pauses').run(); } catch {}
   try { db.prepare('DELETE FROM diaper_log').run(); } catch {}
   try { db.prepare('DELETE FROM sleep_log').run(); } catch {}
+  try { db.prepare('DELETE FROM day_start').run(); } catch {}
   try { db.prepare('DELETE FROM baby').run(); } catch {}
   try { db.prepare('DELETE FROM events').run(); } catch {}
   db.close();
 }
 
-function createBaby(name = 'Testa', birthdate = '2025-06-12') {
+function createBaby(name = 'Testa', birthdate = '2025-06-12'): number {
   const db = getDb();
   db.prepare("INSERT INTO events (type, payload) VALUES ('baby.created', ?)").run(JSON.stringify({ name, birthdate }));
-  db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run(name, birthdate);
+  const info = db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run(name, birthdate);
+  db.close();
+  return Number(info.lastInsertRowid);
+}
+
+function setWakeUpTime(babyId: number, wakeTime?: Date) {
+  const db = getDb();
+  const wake = wakeTime || new Date();
+  wake.setHours(7, 0, 0, 0);
+  const dateStr = wake.toISOString().split('T')[0];
+  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
+    babyId, dateStr, wake.toISOString()
+  );
   db.close();
 }
 
@@ -28,7 +41,8 @@ test.beforeEach(() => {
 });
 
 test('Dashboard shows baby name and sleep button', async ({ page }) => {
-  createBaby('Testa');
+  const babyId = createBaby('Testa');
+  setWakeUpTime(babyId);
   await page.goto('/');
   await expect(page.locator('.baby-name')).toHaveText('Testa');
   await expect(page.locator('.baby-age')).toContainText('old');
@@ -37,7 +51,8 @@ test('Dashboard shows baby name and sleep button', async ({ page }) => {
 });
 
 test('Can start and stop a nap', async ({ page }) => {
-  createBaby('Testa');
+  const babyId = createBaby('Testa');
+  setWakeUpTime(babyId);
   await page.goto('/');
 
   // Start sleep
@@ -51,7 +66,8 @@ test('Can start and stop a nap', async ({ page }) => {
 });
 
 test('Dashboard shows stats section', async ({ page }) => {
-  createBaby('Testa');
+  const babyId = createBaby('Testa');
+  setWakeUpTime(babyId);
   await page.goto('/');
   await expect(page.locator('.baby-name')).toHaveText('Testa', { timeout: 5000 });
 
@@ -65,7 +81,8 @@ test('Dashboard shows stats section', async ({ page }) => {
 });
 
 test('FAB button opens manual sleep modal', async ({ page }) => {
-  createBaby('Testa');
+  const babyId = createBaby('Testa');
+  setWakeUpTime(babyId);
   await page.goto('/');
 
   await page.click('.fab');
@@ -75,7 +92,8 @@ test('FAB button opens manual sleep modal', async ({ page }) => {
 });
 
 test('Can add manual sleep entry', async ({ page }) => {
-  createBaby('Testa');
+  const babyId = createBaby('Testa');
+  setWakeUpTime(babyId);
   await page.goto('/');
   await expect(page.locator('.baby-name')).toHaveText('Testa', { timeout: 5000 });
 

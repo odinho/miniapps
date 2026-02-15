@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import db from './db.js';
 import { appendEvent, getEvents } from './events.js';
 import { applyEvent } from './projections.js';
-import { calculateAgeMonths, predictNextNap, recommendBedtime } from '../src/engine/schedule.js';
+import { calculateAgeMonths, predictNextNap, recommendBedtime, predictDayNaps } from '../src/engine/schedule.js';
 import { getTodayStats } from '../src/engine/stats.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -74,9 +74,19 @@ function getState() {
   
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
+  // Use local date to match the projection logic
+  const year = todayStart.getFullYear();
+  const month = String(todayStart.getMonth() + 1).padStart(2, '0');
+  const day = String(todayStart.getDate()).padStart(2, '0');
+  const todayDateStr = `${year}-${month}-${day}`;
+  
   const todaySleeps = db.prepare(
     'SELECT * FROM sleep_log WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time DESC'
   ).all(baby.id, todayStart.toISOString()) as any[];
+  
+  const todayWakeUp = db.prepare(
+    'SELECT * FROM day_start WHERE baby_id = ? AND date = ?'
+  ).get(baby.id, todayDateStr) as any;
   
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
   const recentSleeps = db.prepare(
@@ -89,10 +99,21 @@ function getState() {
   let prediction = null;
   if (!activeSleep) {
     const lastCompleted = todaySleeps.find((s: any) => s.end_time);
-    if (lastCompleted) {
+    const wakeTimeForPrediction = lastCompleted?.end_time || todayWakeUp?.wake_time;
+    
+    if (wakeTimeForPrediction) {
+      const bedtime = recommendBedtime(todaySleeps.map((s: any) => ({ start_time: s.start_time, end_time: s.end_time, type: s.type })), ageMonths);
+      
+      // If no sleeps yet today and we have wake-up time, predict all naps for the day
+      let predictedNaps = null;
+      if (todaySleeps.length === 0 && todayWakeUp) {
+        predictedNaps = predictDayNaps(todayWakeUp.wake_time, ageMonths, recentSleeps.map((s: any) => ({ start_time: s.start_time, end_time: s.end_time, type: s.type })));
+      }
+      
       prediction = {
-        nextNap: predictNextNap(lastCompleted.end_time, ageMonths, recentSleeps.map((s: any) => ({ start_time: s.start_time, end_time: s.end_time, type: s.type }))),
-        bedtime: recommendBedtime(todaySleeps.map((s: any) => ({ start_time: s.start_time, end_time: s.end_time, type: s.type })), ageMonths),
+        nextNap: predictNextNap(wakeTimeForPrediction, ageMonths, recentSleeps.map((s: any) => ({ start_time: s.start_time, end_time: s.end_time, type: s.type }))),
+        bedtime,
+        predictedNaps,
       };
     }
   }
@@ -102,7 +123,7 @@ function getState() {
   ).get(baby.id, todayStart.toISOString()) as any;
   const diaperCount = todayDiapers?.count ?? 0;
 
-  return { baby, activeSleep, todaySleeps, stats, prediction, ageMonths, diaperCount };
+  return { baby, activeSleep, todaySleeps, stats, prediction, ageMonths, diaperCount, todayWakeUp };
 }
 
 export async function handleRequest(req: IncomingMessage, res: ServerResponse) {

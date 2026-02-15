@@ -11,6 +11,7 @@ function resetDb() {
   try { db.prepare('DELETE FROM sleep_pauses').run(); } catch {}
   try { db.prepare('DELETE FROM diaper_log').run(); } catch {}
   try { db.prepare('DELETE FROM sleep_log').run(); } catch {}
+  try { db.prepare('DELETE FROM day_start').run(); } catch {}
   try { db.prepare('DELETE FROM baby').run(); } catch {}
   try { db.prepare('DELETE FROM events').run(); } catch {}
   db.close();
@@ -41,7 +42,17 @@ test.beforeEach(() => {
 });
 
 test('Arc renders on dashboard', async ({ page }) => {
-  createBaby('Testa');
+  const babyId = createBaby('Testa');
+  // Add wake-up time so morning prompt doesn't show
+  const db = getDb();
+  const today = new Date();
+  today.setHours(7, 0, 0, 0);
+  const dateStr = today.toISOString().split('T')[0];
+  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
+    babyId, dateStr, today.toISOString()
+  );
+  db.close();
+  
   await page.goto('/');
   await expect(page.locator('.baby-name')).toHaveText('Testa');
   await expect(page.locator('.sleep-arc')).toBeVisible();
@@ -98,8 +109,8 @@ test('Predicted nap shown with dashed outline', async ({ page }) => {
 
   await page.goto('/');
   await expect(page.locator('.sleep-arc')).toBeVisible();
-  // Predicted bubble should exist (dashed)
-  await expect(page.locator('.arc-bubble-predicted')).toHaveCount(1);
+  // Predicted nap bubble should exist (dashed), excluding bedtime
+  await expect(page.locator('.arc-bubble-predicted:not(.arc-bedtime)')).toHaveCount(1);
 });
 
 test('Active sleep has pulsing animation class', async ({ page }) => {

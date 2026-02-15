@@ -11,8 +11,20 @@ function resetDb() {
   try { db.prepare('DELETE FROM sleep_pauses').run(); } catch {}
   try { db.prepare('DELETE FROM diaper_log').run(); } catch {}
   try { db.prepare('DELETE FROM sleep_log').run(); } catch {}
+  try { db.prepare('DELETE FROM day_start').run(); } catch {}
   try { db.prepare('DELETE FROM baby').run(); } catch {}
   try { db.prepare('DELETE FROM events').run(); } catch {}
+  db.close();
+}
+
+function setWakeUpTime(babyId: number) {
+  const db = getDb();
+  const today = new Date();
+  today.setHours(7, 0, 0, 0);
+  const dateStr = today.toISOString().split('T')[0];
+  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
+    babyId, dateStr, today.toISOString()
+  );
   db.close();
 }
 
@@ -41,9 +53,11 @@ test('History page shows logged sleeps', async ({ page }) => {
 
 test('History page shows empty state when no sleeps', async ({ page }) => {
   const db = getDb();
-  db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run('Testa', '2025-06-12');
   db.prepare("INSERT INTO events (type, payload) VALUES ('baby.created', ?)").run(JSON.stringify({ name: 'Testa', birthdate: '2025-06-12' }));
+  const info = db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run('Testa', '2025-06-12');
+  const babyId = Number(info.lastInsertRowid);
   db.close();
+  setWakeUpTime(babyId);
 
   await page.goto('/#/history');
   await expect(page.locator('.history-empty')).toBeVisible({ timeout: 5000 });
