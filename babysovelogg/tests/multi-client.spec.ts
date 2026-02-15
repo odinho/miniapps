@@ -1,39 +1,19 @@
-import { test, expect } from '@playwright/test';
-import Database from 'better-sqlite3';
-import path from 'path';
-
-function resetDb() {
-  const db = new Database(path.join(process.cwd(), 'napper.db'));
-  try { db.prepare('DELETE FROM sleep_pauses').run(); } catch {}
-  try { db.prepare('DELETE FROM diaper_log').run(); } catch {}
-  try { db.prepare('DELETE FROM sleep_log').run(); } catch {}
-  try { db.prepare('DELETE FROM day_start').run(); } catch {}
-  try { db.prepare('DELETE FROM baby').run(); } catch {}
-  try { db.prepare('DELETE FROM events').run(); } catch {}
-  db.close();
-}
+import { test, expect } from './fixtures';
 
 async function dismissMorningPrompt(page: any) {
   await page.locator('.morning-prompt').waitFor({ state: 'visible', timeout: 5000 });
-  await page.click('.morning-prompt .btn-primary');
+  await page.locator('.morning-prompt .btn-primary').click();
   await page.locator('.morning-prompt').waitFor({ state: 'hidden', timeout: 5000 });
 }
 
-test.beforeEach(() => {
-  resetDb();
-});
-
 test('Second browser context sees baby created in first', async ({ page, browser }) => {
-  // First client: create baby via onboarding
   await page.goto('/');
-  await page.fill('input[type="text"]', 'Testa');
-  await page.fill('input[type="date"]', '2025-06-12');
-  await page.click('button.btn-primary');
-  // Morning prompt after onboarding
+  await page.locator('input[type="text"]').fill('Testa');
+  await page.locator('input[type="date"]').fill('2025-06-12');
+  await page.locator('button.btn-primary').click();
   await dismissMorningPrompt(page);
   await expect(page.locator('.baby-name')).toHaveText('Testa', { timeout: 5000 });
 
-  // Second client: new context, same server (wake-up already set by first client)
   const ctx2 = await browser.newContext();
   const page2 = await ctx2.newPage();
   await page2.goto('/');
@@ -44,19 +24,16 @@ test('Second browser context sees baby created in first', async ({ page, browser
 });
 
 test('Sleep started in one client is visible in another after reload', async ({ page, browser }) => {
-  // Setup baby
   await page.goto('/');
-  await page.fill('input[type="text"]', 'Testa');
-  await page.fill('input[type="date"]', '2025-06-12');
-  await page.click('button.btn-primary');
+  await page.locator('input[type="text"]').fill('Testa');
+  await page.locator('input[type="date"]').fill('2025-06-12');
+  await page.locator('button.btn-primary').click();
   await dismissMorningPrompt(page);
   await expect(page.locator('.baby-name')).toHaveText('Testa', { timeout: 5000 });
 
-  // Start sleep in first client
-  await page.click('.sleep-button');
+  await page.locator('.sleep-button').click();
   await expect(page.locator('.sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
 
-  // Second client should see sleeping state (active sleep bypasses prompt)
   const ctx2 = await browser.newContext();
   const page2 = await ctx2.newPage();
   await page2.goto('/');

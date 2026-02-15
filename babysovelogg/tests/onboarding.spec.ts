@@ -1,99 +1,60 @@
-import { test, expect } from '@playwright/test';
-import Database from 'better-sqlite3';
-import path from 'path';
+import { test, expect } from './fixtures';
 
-function resetDb() {
-  const db = new Database(path.join(process.cwd(), 'napper.db'));
-  try { db.prepare('DELETE FROM sleep_pauses').run(); } catch {}
-  try { db.prepare('DELETE FROM diaper_log').run(); } catch {}
-  try { db.prepare('DELETE FROM sleep_log').run(); } catch {}
-  try { db.prepare('DELETE FROM day_start').run(); } catch {}
-  try { db.prepare('DELETE FROM baby').run(); } catch {}
-  try { db.prepare('DELETE FROM events').run(); } catch {}
-  db.close();
-}
-
-/** After onboarding, the morning prompt shows. This dismisses it. */
 async function dismissMorningPrompt(page: any) {
   const prompt = page.locator('.morning-prompt');
   if (await prompt.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await page.click('.morning-prompt .btn-primary'); // "Set Wake-up Time"
+    await page.locator('.morning-prompt .btn-primary').click();
     await expect(page.locator('.baby-name')).toBeVisible({ timeout: 5000 });
   }
 }
 
-test.beforeEach(() => {
-  resetDb();
-});
-
 test('Get Started button creates baby and navigates to dashboard', async ({ page }) => {
   await page.goto('/');
 
-  // Should redirect to onboarding since no baby exists
-  await expect(page.locator('h1')).toHaveText('Welcome to Napper');
-  await expect(page.locator('button.btn-primary')).toHaveText('Get Started ✨');
+  await expect(page.getByRole('heading', { name: 'Welcome to Napper' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Get Started ✨' })).toBeVisible();
 
-  // Fill in baby details
-  await page.fill('input[type="text"]', 'Halldis');
-  await page.fill('input[type="date"]', '2025-06-12');
+  await page.locator('input[type="text"]').fill('Halldis');
+  await page.locator('input[type="date"]').fill('2025-06-12');
 
-  // Click Get Started
-  await page.click('button.btn-primary');
+  await page.getByRole('button', { name: 'Get Started ✨' }).click();
 
-  // Morning prompt shows after onboarding (no wake-up time set yet)
   await expect(page.locator('.morning-prompt')).toBeVisible({ timeout: 5000 });
-  await page.click('.morning-prompt .btn-primary'); // Set Wake-up Time
+  await page.locator('.morning-prompt .btn-primary').click();
 
-  // Should navigate to dashboard and show baby name
   await expect(page.locator('.baby-name')).toHaveText('Halldis', { timeout: 5000 });
   await expect(page.locator('.baby-age')).toContainText('months old');
-
-  // Should show the sleep button
   await expect(page.locator('.sleep-button')).toBeVisible();
 });
 
 test('Get Started validates required fields', async ({ page }) => {
   await page.goto('/');
 
-  // Click without filling anything
-  await page.click('button.btn-primary');
+  await page.getByRole('button', { name: 'Get Started ✨' }).click();
+  await expect(page.getByRole('heading', { name: 'Welcome to Napper' })).toBeVisible();
 
-  // Should still be on onboarding
-  await expect(page.locator('h1')).toHaveText('Welcome to Napper');
+  await page.locator('input[type="text"]').fill('Halldis');
+  await page.getByRole('button', { name: 'Get Started ✨' }).click();
+  await expect(page.getByRole('heading', { name: 'Welcome to Napper' })).toBeVisible();
 
-  // Fill only name
-  await page.fill('input[type="text"]', 'Halldis');
-  await page.click('button.btn-primary');
-  await expect(page.locator('h1')).toHaveText('Welcome to Napper');
-
-  // Fill date too
-  await page.fill('input[type="date"]', '2025-06-12');
-  await page.click('button.btn-primary');
-  // Morning prompt after onboarding
+  await page.locator('input[type="date"]').fill('2025-06-12');
+  await page.getByRole('button', { name: 'Get Started ✨' }).click();
   await expect(page.locator('.morning-prompt')).toBeVisible({ timeout: 5000 });
-  await page.click('.morning-prompt .btn-primary');
+  await page.locator('.morning-prompt .btn-primary').click();
   await expect(page.locator('.baby-name')).toHaveText('Halldis', { timeout: 5000 });
 });
 
-test('Sleep tracking flow after onboarding', async ({ page }) => {
+test('Sleep tracking flow after onboarding', async ({ page, request }) => {
   // Create baby via API
-  await page.goto('/');
-  await page.evaluate(async () => {
-    await fetch('/api/events', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ events: [{ type: 'baby.created', payload: { name: 'Halldis', birthdate: '2025-06-12' } }] }),
-    });
+  await request.post('/api/events', {
+    data: { events: [{ type: 'baby.created', payload: { name: 'Halldis', birthdate: '2025-06-12' } }] },
   });
 
-  // Reload to dashboard
   await page.goto('/');
-  // Morning prompt shows since no wake-up time
   await expect(page.locator('.morning-prompt')).toBeVisible({ timeout: 5000 });
-  await page.click('.morning-prompt .btn-primary');
+  await page.locator('.morning-prompt .btn-primary').click();
   await expect(page.locator('.baby-name')).toHaveText('Halldis', { timeout: 5000 });
 
-  // Click sleep button to start nap
-  await page.click('.sleep-button');
+  await page.locator('.sleep-button').click();
   await expect(page.locator('.sleep-button')).toHaveClass(/sleeping/, { timeout: 3000 });
 });

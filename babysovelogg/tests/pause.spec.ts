@@ -1,55 +1,14 @@
-import { test, expect } from '@playwright/test';
-import Database from 'better-sqlite3';
-import path from 'path';
-
-function getDb() {
-  return new Database(path.join(process.cwd(), 'napper.db'));
-}
-
-function resetDb() {
-  const db = getDb();
-  try { db.prepare('DELETE FROM sleep_pauses').run(); } catch {}
-  try { db.prepare('DELETE FROM diaper_log').run(); } catch {}
-  try { db.prepare('DELETE FROM sleep_log').run(); } catch {}
-  try { db.prepare('DELETE FROM day_start').run(); } catch {}
-  try { db.prepare('DELETE FROM baby').run(); } catch {}
-  try { db.prepare('DELETE FROM events').run(); } catch {}
-  db.close();
-}
-
-function createBaby(name = 'Testa', birthdate = '2025-06-12'): number {
-  const db = getDb();
-  db.prepare("INSERT INTO events (type, payload) VALUES ('baby.created', ?)").run(JSON.stringify({ name, birthdate }));
-  const info = db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run(name, birthdate);
-  db.close();
-  return Number(info.lastInsertRowid);
-}
-
-function setWakeUpTime(babyId: number) {
-  const db = getDb();
-  const today = new Date();
-  today.setHours(7, 0, 0, 0);
-  const dateStr = today.toISOString().split('T')[0];
-  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(babyId, dateStr, today.toISOString());
-  db.close();
-}
-
-test.beforeEach(() => {
-  resetDb();
-});
+import { test, expect, createBaby, setWakeUpTime, getDb } from './fixtures';
 
 test('Pause button appears when sleeping', async ({ page }) => {
   const babyId = createBaby('Testa');
   setWakeUpTime(babyId);
   await page.goto('/');
   await expect(page.locator('.sleep-button')).toHaveClass(/awake/);
-  // No pause button when awake
   await expect(page.locator('.pause-btn')).not.toBeVisible();
 
-  // Start sleep
-  await page.click('.sleep-button');
+  await page.locator('.sleep-button').click();
   await expect(page.locator('.sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
-  // Pause button should appear
   await expect(page.locator('.pause-btn')).toBeVisible();
   await expect(page.locator('.pause-btn')).toContainText('Pause');
 });
@@ -59,17 +18,14 @@ test('Can pause and resume', async ({ page }) => {
   setWakeUpTime(babyId);
   await page.goto('/');
 
-  // Start sleep
-  await page.click('.sleep-button');
+  await page.locator('.sleep-button').click();
   await expect(page.locator('.sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
 
-  // Pause
-  await page.click('.pause-btn');
+  await page.locator('.pause-btn').click();
   await expect(page.locator('.pause-btn')).toContainText('Resume', { timeout: 5000 });
   await expect(page.locator('.arc-center-label')).toContainText('Paused');
 
-  // Resume
-  await page.click('.pause-btn');
+  await page.locator('.pause-btn').click();
   await expect(page.locator('.pause-btn')).toContainText('Pause', { timeout: 5000 });
   await expect(page.locator('.arc-center-label')).toContainText(/Napping|Sleeping/);
 });
@@ -103,9 +59,7 @@ test('Timer adjusts for pause duration', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
 
-  // Timer should show ~5 minutes (10 min elapsed - 5 min paused), not 10 minutes
   const timerText = await page.locator('.arc-center-text .countdown-value').textContent();
-  // Should be around 05:xx, not 10:xx
   expect(timerText).toMatch(/^0[45]:/);
 });
 
@@ -114,23 +68,21 @@ test('Multiple pauses work correctly', async ({ page }) => {
   setWakeUpTime(babyId);
   await page.goto('/');
 
-  // Start sleep
-  await page.click('.sleep-button');
+  await page.locator('.sleep-button').click();
   await expect(page.locator('.sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
 
   // First pause/resume
-  await page.click('.pause-btn');
+  await page.locator('.pause-btn').click();
   await expect(page.locator('.pause-btn')).toContainText('Resume', { timeout: 5000 });
-  await page.click('.pause-btn');
+  await page.locator('.pause-btn').click();
   await expect(page.locator('.pause-btn')).toContainText('Pause', { timeout: 5000 });
 
   // Second pause/resume
-  await page.click('.pause-btn');
+  await page.locator('.pause-btn').click();
   await expect(page.locator('.pause-btn')).toContainText('Resume', { timeout: 5000 });
-  await page.click('.pause-btn');
+  await page.locator('.pause-btn').click();
   await expect(page.locator('.pause-btn')).toContainText('Pause', { timeout: 5000 });
 
-  // Verify pauses stored in DB
   const db = getDb();
   const pauses = db.prepare('SELECT * FROM sleep_pauses').all() as any[];
   expect(pauses.length).toBe(2);
@@ -161,6 +113,5 @@ test('History shows pause info', async ({ page }) => {
 
   await page.goto('/#/history');
   await expect(page.locator('.sleep-log-item').first()).toBeVisible({ timeout: 5000 });
-  // Should show pause info
   await expect(page.locator('.sleep-log-item .log-meta').first()).toContainText('1 pause');
 });

@@ -1,44 +1,4 @@
-import { test, expect } from '@playwright/test';
-import Database from 'better-sqlite3';
-import path from 'path';
-
-function getDb() {
-  return new Database(path.join(process.cwd(), 'napper.db'));
-}
-
-function resetDb() {
-  const db = getDb();
-  try { db.prepare('DELETE FROM sleep_pauses').run(); } catch {}
-  try { db.prepare('DELETE FROM diaper_log').run(); } catch {}
-  try { db.prepare('DELETE FROM sleep_log').run(); } catch {}
-  try { db.prepare('DELETE FROM day_start').run(); } catch {}
-  try { db.prepare('DELETE FROM baby').run(); } catch {}
-  try { db.prepare('DELETE FROM events').run(); } catch {}
-  db.close();
-}
-
-function createBaby(name = 'Testa', birthdate = '2025-06-12'): number {
-  const db = getDb();
-  db.prepare("INSERT INTO events (type, payload) VALUES ('baby.created', ?)").run(JSON.stringify({ name, birthdate }));
-  const info = db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run(name, birthdate);
-  db.close();
-  return Number(info.lastInsertRowid);
-}
-
-function setWakeUpTime(babyId: number, wakeTime?: Date) {
-  const db = getDb();
-  const wake = wakeTime || new Date();
-  wake.setHours(7, 0, 0, 0);
-  const dateStr = wake.toISOString().split('T')[0];
-  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
-    babyId, dateStr, wake.toISOString()
-  );
-  db.close();
-}
-
-test.beforeEach(() => {
-  resetDb();
-});
+import { test, expect, createBaby, setWakeUpTime } from './fixtures';
 
 test('Dashboard shows baby name and sleep button', async ({ page }) => {
   const babyId = createBaby('Testa');
@@ -55,13 +15,11 @@ test('Can start and stop a nap', async ({ page }) => {
   setWakeUpTime(babyId);
   await page.goto('/');
 
-  // Start sleep
-  await page.click('.sleep-button');
+  await page.locator('.sleep-button').click();
   await expect(page.locator('.sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
   await expect(page.locator('.arc-center-label')).toContainText(/Napping|Sleeping/);
 
-  // Stop sleep
-  await page.click('.sleep-button');
+  await page.locator('.sleep-button').click();
   await expect(page.locator('.sleep-button')).toHaveClass(/awake/, { timeout: 5000 });
 });
 
@@ -71,7 +29,6 @@ test('Dashboard shows stats section', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.baby-name')).toHaveText('Testa', { timeout: 5000 });
 
-  // Stats row should be visible with cards
   await expect(page.locator('.stats-row').first()).toBeVisible();
   await expect(page.locator('.stats-card')).toHaveCount(4);
   await expect(page.locator('.stat-label').nth(0)).toHaveText('Naps today');
@@ -85,8 +42,8 @@ test('FAB button opens manual sleep modal', async ({ page }) => {
   setWakeUpTime(babyId);
   await page.goto('/');
 
-  await page.click('.fab');
-  await expect(page.locator('.modal h2')).toHaveText('Add Sleep');
+  await page.locator('.fab').click();
+  await expect(page.getByRole('heading', { name: 'Add Sleep' })).toBeVisible();
   await expect(page.locator('.modal input[type="date"]').first()).toBeVisible();
   await expect(page.locator('.modal input[type="time"]').first()).toBeVisible();
 });
@@ -97,17 +54,15 @@ test('Can add manual sleep entry', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.baby-name')).toHaveText('Testa', { timeout: 5000 });
 
-  await page.click('.fab');
-  await expect(page.locator('.modal h2')).toHaveText('Add Sleep');
-  // Default values are pre-filled (1 hour ago to now), just save
-  await page.click('.modal .btn-primary');
+  await page.locator('.fab').click();
+  await expect(page.getByRole('heading', { name: 'Add Sleep' })).toBeVisible();
+  await page.locator('.modal .btn-primary').click();
 
   await expect(page.locator('.modal-overlay')).not.toBeVisible({ timeout: 5000 });
-  // Total sleep stat (3rd card) should show non-zero value after adding a 1-hour sleep
   await expect(page.locator('.stat-value').nth(2)).not.toHaveText('0m');
 });
 
 test('Redirects to settings when no baby exists', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('h1')).toHaveText('Welcome to Napper');
+  await expect(page.getByRole('heading', { name: 'Welcome to Napper' })).toBeVisible();
 });

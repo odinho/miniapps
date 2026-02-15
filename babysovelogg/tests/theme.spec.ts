@@ -1,47 +1,12 @@
-import { test, expect } from '@playwright/test';
-import Database from 'better-sqlite3';
-import path from 'path';
+import { test, expect, createBaby, setWakeUpTime } from './fixtures';
 
-function getDb() {
-  return new Database(path.join(process.cwd(), 'napper.db'));
-}
-
-function resetDb() {
-  const db = getDb();
-  try { db.prepare('DELETE FROM sleep_pauses').run(); } catch {}
-  try { db.prepare('DELETE FROM diaper_log').run(); } catch {}
-  try { db.prepare('DELETE FROM sleep_log').run(); } catch {}
-  try { db.prepare('DELETE FROM day_start').run(); } catch {}
-  try { db.prepare('DELETE FROM baby').run(); } catch {}
-  try { db.prepare('DELETE FROM events').run(); } catch {}
-  db.close();
-}
-
-function createBaby(): number {
-  const db = getDb();
-  const info = db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run('TestBaby', '2025-06-01');
-  db.close();
-  return Number(info.lastInsertRowid);
-}
-
-function setWakeUpTime(babyId: number) {
-  const db = getDb();
-  const today = new Date();
-  today.setHours(7, 0, 0, 0);
-  const dateStr = today.toISOString().split('T')[0];
-  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(babyId, dateStr, today.toISOString());
-  db.close();
-}
-
-test.beforeEach(() => {
-  resetDb();
+test.beforeEach(async () => {
   const babyId = createBaby();
   setWakeUpTime(babyId);
 });
 
 test('night theme applies correct CSS variables', async ({ page }) => {
   await page.goto('/');
-  // Force night mode
   await page.evaluate(() => {
     document.documentElement.setAttribute('data-theme', 'night');
   });
@@ -91,7 +56,6 @@ test('night theme has stars pseudo-elements on body', async ({ page }) => {
   const beforeContent = await page.evaluate(() =>
     getComputedStyle(document.body, '::before').getPropertyValue('content')
   );
-  // Stars are rendered via ::before with content: ''
   expect(beforeContent).toBe('""');
 });
 
@@ -101,7 +65,6 @@ test('night theme cards have visible contrast', async ({ page }) => {
     document.documentElement.setAttribute('data-theme', 'night');
   });
 
-  // Check that card background differs from page background
   const whiteVar = await page.evaluate(() =>
     getComputedStyle(document.documentElement).getPropertyValue('--white').trim()
   );
@@ -122,7 +85,6 @@ test('glow effects apply on interactive elements in night mode', async ({ page }
     const boxShadow = await fab.evaluate((el) =>
       getComputedStyle(el).boxShadow
     );
-    // Should have glow (non-"none" box-shadow)
     expect(boxShadow).not.toBe('none');
   }
 });
