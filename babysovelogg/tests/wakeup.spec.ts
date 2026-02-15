@@ -4,12 +4,12 @@ test('Shows morning prompt when no wake-up time and no sleeps', async ({ page })
   createBaby('Testa');
   await page.goto('/');
   
-  await expect(page.locator('.morning-prompt')).toBeVisible();
-  await expect(page.locator('.morning-prompt h2')).toHaveText('Good morning!');
-  await expect(page.locator('.morning-icon')).toHaveText('🌅');
+  await expect(page.getByTestId('morning-prompt')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Good morning!' })).toBeVisible();
+  await expect(page.getByTestId('morning-icon')).toHaveText('🌅');
   
-  await expect(page.locator('.morning-prompt input[type="date"]')).toBeVisible();
-  await expect(page.locator('.morning-prompt input[type="time"]')).toBeVisible();
+  await expect(page.getByTestId('morning-prompt').locator('input[type="date"]')).toBeVisible();
+  await expect(page.getByTestId('morning-prompt').locator('input[type="time"]')).toBeVisible();
   
   await expect(page.getByRole('button', { name: 'Set Wake-up Time' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Skip for now' })).toBeVisible();
@@ -19,21 +19,21 @@ test('Can set wake-up time via morning prompt', async ({ page }) => {
   createBaby('Testa');
   
   await page.goto('/');
-  await expect(page.locator('.morning-prompt')).toBeVisible();
+  await expect(page.getByTestId('morning-prompt')).toBeVisible();
   
   const today = new Date();
   const dateStr = today.toISOString().split('T')[0];
-  await page.locator('.morning-prompt input[type="date"]').fill(dateStr);
-  await page.locator('.morning-prompt input[type="time"]').fill('07:30');
+  await page.getByTestId('morning-prompt').locator('input[type="date"]').fill(dateStr);
+  await page.getByTestId('morning-prompt').locator('input[type="time"]').fill('07:30');
   
   const responsePromise = page.waitForResponse(resp => resp.url().includes('/api/events') && resp.request().method() === 'POST');
   await page.getByRole('button', { name: 'Set Wake-up Time' }).click();
   const response = await responsePromise;
   const postEventResponse = await response.json();
   
-  await expect(page.locator('.morning-prompt')).not.toBeVisible({ timeout: 5000 });
-  await expect(page.locator('.dashboard')).toBeVisible();
-  await expect(page.locator('.sleep-button')).toBeVisible();
+  await expect(page.getByTestId('morning-prompt')).not.toBeVisible({ timeout: 5000 });
+  await expect(page.getByTestId('dashboard')).toBeVisible();
+  await expect(page.getByTestId('sleep-button')).toBeVisible();
   
   expect(postEventResponse).toBeTruthy();
   expect(postEventResponse.state.todayWakeUp).toBeTruthy();
@@ -51,11 +51,11 @@ test('Skip button creates default wake-up time', async ({ page }) => {
   createBaby('Testa');
   await page.goto('/');
   
-  await expect(page.locator('.morning-prompt')).toBeVisible();
+  await expect(page.getByTestId('morning-prompt')).toBeVisible();
   await page.getByRole('button', { name: 'Skip for now' }).click();
   
-  await expect(page.locator('.morning-prompt')).not.toBeVisible({ timeout: 5000 });
-  await expect(page.locator('.dashboard')).toBeVisible();
+  await expect(page.getByTestId('morning-prompt')).not.toBeVisible({ timeout: 5000 });
+  await expect(page.getByTestId('dashboard')).toBeVisible();
   
   const db = getDb();
   const baby = db.prepare('SELECT * FROM baby ORDER BY id DESC LIMIT 1').get() as any;
@@ -84,8 +84,8 @@ test('Does not show morning prompt when wake-up time already set', async ({ page
   db.close();
   
   await page.goto('/');
-  await expect(page.locator('.morning-prompt')).not.toBeVisible();
-  await expect(page.locator('.dashboard')).toBeVisible();
+  await expect(page.getByTestId('morning-prompt')).not.toBeVisible();
+  await expect(page.getByTestId('dashboard')).toBeVisible();
 });
 
 test('Does not show morning prompt when sleep already logged today', async ({ page }) => {
@@ -107,8 +107,8 @@ test('Does not show morning prompt when sleep already logged today', async ({ pa
   db.close();
   
   await page.goto('/');
-  await expect(page.locator('.morning-prompt')).not.toBeVisible();
-  await expect(page.locator('.dashboard')).toBeVisible();
+  await expect(page.getByTestId('morning-prompt')).not.toBeVisible();
+  await expect(page.getByTestId('dashboard')).toBeVisible();
 });
 
 test('Arc uses wake-up time as starting point', async ({ page }) => {
@@ -128,7 +128,7 @@ test('Arc uses wake-up time as starting point', async ({ page }) => {
   db.close();
   
   await page.goto('/');
-  await expect(page.locator('.dashboard')).toBeVisible();
+  await expect(page.getByTestId('dashboard')).toBeVisible();
   await expect(page.locator('.sleep-arc')).toBeVisible();
   
   const labels = await page.locator('.arc-hour-label').allTextContents();
@@ -152,7 +152,7 @@ test('Shows predicted nap bubbles when no sleeps yet', async ({ page }) => {
   db.close();
   
   await page.goto('/');
-  await expect(page.locator('.dashboard')).toBeVisible();
+  await expect(page.getByTestId('dashboard')).toBeVisible();
   
   const predictedNapBubbles = page.locator('.arc-bubble-predicted:not(.arc-bedtime)');
   await expect(predictedNapBubbles).toHaveCount(3, { timeout: 5000 });
@@ -176,7 +176,7 @@ test('Shows bedtime bubble at arc end', async ({ page }) => {
   db.close();
   
   await page.goto('/');
-  await expect(page.locator('.dashboard')).toBeVisible();
+  await expect(page.getByTestId('dashboard')).toBeVisible();
   await expect(page.locator('.arc-bedtime')).toBeVisible();
 });
 
@@ -197,12 +197,12 @@ test('Predicted bubbles are replaced by actual sleeps', async ({ page }) => {
   db.close();
   
   await page.goto('/');
-  await expect(page.locator('.dashboard')).toBeVisible();
+  await expect(page.getByTestId('dashboard')).toBeVisible();
   
   await expect(page.locator('.arc-bubble-predicted:not(.arc-bedtime)')).toHaveCount(3, { timeout: 5000 });
   
-  await page.locator('.sleep-button').click();
-  await expect(page.locator('.sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
+  await page.getByTestId('sleep-button').click();
+  await expect(page.getByTestId('sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
   
   await expect(page.locator('.arc-bubble-active')).toHaveCount(1);
 });
@@ -211,18 +211,18 @@ test('Morning prompt only shows once per day', async ({ page }) => {
   createBaby('Testa');
   
   await page.goto('/');
-  await expect(page.locator('.morning-prompt')).toBeVisible();
+  await expect(page.getByTestId('morning-prompt')).toBeVisible();
   
   const today = new Date();
   const dateStr = today.toISOString().split('T')[0];
-  await page.locator('.morning-prompt input[type="date"]').fill(dateStr);
-  await page.locator('.morning-prompt input[type="time"]').fill('07:00');
+  await page.getByTestId('morning-prompt').locator('input[type="date"]').fill(dateStr);
+  await page.getByTestId('morning-prompt').locator('input[type="time"]').fill('07:00');
   await page.getByRole('button', { name: 'Set Wake-up Time' }).click();
   
-  await expect(page.locator('.dashboard')).toBeVisible({ timeout: 5000 });
+  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 5000 });
   
   await page.reload();
   
-  await expect(page.locator('.morning-prompt')).not.toBeVisible();
-  await expect(page.locator('.dashboard')).toBeVisible();
+  await expect(page.getByTestId('morning-prompt')).not.toBeVisible();
+  await expect(page.getByTestId('dashboard')).toBeVisible();
 });
