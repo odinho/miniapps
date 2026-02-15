@@ -46,10 +46,10 @@ export function renderDashboard(container: HTMLElement): void {
   const isPaused = pauses.length > 0 && !pauses[pauses.length - 1].resume_time;
 
   const view = el('div', { className: 'view' });
-  const dash = el('div', { className: 'dashboard' });
+  const dash = el('div', { className: 'dashboard', 'data-testid': 'dashboard' });
 
   // Header row: baby info + sleep button
-  const btn = el('button', { className: `sleep-button ${isSleeping ? 'sleeping' : 'awake'}` }, [
+  const btn = el('button', { className: `sleep-button ${isSleeping ? 'sleeping' : 'awake'}`, 'data-testid': 'sleep-button' }, [
     el('span', { className: 'icon' }, [isSleeping ? '🌙' : '☀️']),
     el('span', { className: 'label' }, [isSleeping ? 'Wake' : 'Sleep']),
   ]);
@@ -57,8 +57,8 @@ export function renderDashboard(container: HTMLElement): void {
   dash.appendChild(
     el('div', { className: 'header-row' }, [
       el('div', { className: 'baby-info' }, [
-        el('span', { className: 'baby-name' }, [baby.name]),
-        el('span', { className: 'baby-age' }, [formatAge(baby.birthdate)]),
+        el('span', { className: 'baby-name', 'data-testid': 'baby-name' }, [baby.name]),
+        el('span', { className: 'baby-age', 'data-testid': 'baby-age' }, [formatAge(baby.birthdate)]),
       ]),
       btn,
     ])
@@ -92,7 +92,7 @@ export function renderDashboard(container: HTMLElement): void {
 
   // Pause/resume button when sleeping
   if (isSleeping && activeSleep) {
-    const pauseBtn = el('button', { className: `btn ${isPaused ? 'btn-primary' : 'btn-ghost'} pause-btn` }, [
+    const pauseBtn = el('button', { className: `btn ${isPaused ? 'btn-primary' : 'btn-ghost'} pause-btn`, 'data-testid': 'pause-btn' }, [
       isPaused ? '▶️ Resume' : '⏸️ Pause',
     ]);
     pauseBtn.addEventListener('click', async () => {
@@ -200,7 +200,7 @@ export function renderDashboard(container: HTMLElement): void {
     ]),
   ]));
 
-  const diaperBtn = el('button', { className: 'diaper-quick-btn' }, ['💩 Log Diaper']);
+  const diaperBtn = el('button', { className: 'diaper-quick-btn', 'data-testid': 'diaper-quick-btn' }, ['💩 Log Diaper']);
   diaperBtn.addEventListener('click', () => showDiaperModal(baby, container));
   dash.appendChild(diaperBtn);
 
@@ -208,7 +208,7 @@ export function renderDashboard(container: HTMLElement): void {
   container.appendChild(view);
 
   // FAB for manual sleep entry
-  const fab = el('button', { className: 'fab' }, ['+']);
+  const fab = el('button', { className: 'fab', 'data-testid': 'fab' }, ['+']);
   fab.addEventListener('click', () => showManualSleepModal(baby, container));
   container.appendChild(fab);
 }
@@ -239,7 +239,7 @@ function dateTimeGroup(label: string, dt: { dateInput: HTMLInputElement; timeInp
 }
 
 function showManualSleepModal(baby: any, container: HTMLElement): void {
-  const overlay = el('div', { className: 'modal-overlay' });
+  const overlay = el('div', { className: 'modal-overlay', 'data-testid': 'modal-overlay' });
   const modal = el('div', { className: 'modal' });
 
   const now = new Date();
@@ -298,7 +298,7 @@ function showManualSleepModal(baby: any, container: HTMLElement): void {
 }
 
 function showEditStartModal(activeSleep: any, container: HTMLElement): void {
-  const overlay = el('div', { className: 'modal-overlay' });
+  const overlay = el('div', { className: 'modal-overlay', 'data-testid': 'modal-overlay' });
   const modal = el('div', { className: 'modal' });
 
   const startDt = makeDateTimeInputs(activeSleep.start_time);
@@ -354,7 +354,7 @@ const METHODS = [
 ];
 
 function showTagSheet(sleepId: number, container: HTMLElement): void {
-  const overlay = el('div', { className: 'modal-overlay' });
+  const overlay = el('div', { className: 'modal-overlay', 'data-testid': 'modal-overlay' });
   const modal = el('div', { className: 'modal tag-sheet' });
 
   let selectedMood: string | null = null;
@@ -424,7 +424,7 @@ function showTagSheet(sleepId: number, container: HTMLElement): void {
 }
 
 function showDiaperModal(baby: any, container: HTMLElement): void {
-  const overlay = el('div', { className: 'modal-overlay' });
+  const overlay = el('div', { className: 'modal-overlay', 'data-testid': 'modal-overlay' });
   const modal = el('div', { className: 'modal' });
 
   let selectedType = 'wet';
@@ -517,8 +517,8 @@ function showDiaperModal(baby: any, container: HTMLElement): void {
 function showMorningPrompt(baby: any, container: HTMLElement): void {
   const view = el('div', { className: 'view morning-prompt-view' });
   
-  const prompt = el('div', { className: 'morning-prompt' }, [
-    el('div', { className: 'morning-icon' }, ['🌅']),
+  const prompt = el('div', { className: 'morning-prompt', 'data-testid': 'morning-prompt' }, [
+    el('div', { className: 'morning-icon', 'data-testid': 'morning-icon' }, ['🌅']),
     el('h2', null, ['Good morning!']),
     el('p', null, ['When did your baby wake up today?']),
   ]);

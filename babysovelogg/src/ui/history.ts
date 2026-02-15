@@ -118,7 +118,7 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
 }
 
 function showEditModal(entry: any, container: HTMLElement): void {
-  const overlay = el('div', { className: 'modal-overlay' });
+  const overlay = el('div', { className: 'modal-overlay', 'data-testid': 'modal-overlay' });
   const modal = el('div', { className: 'modal' });
 
   const toLocal = (iso: string) => {
@@ -235,7 +235,7 @@ function showEditModal(entry: any, container: HTMLElement): void {
 }
 
 function showDiaperEditModal(entry: any, container: HTMLElement): void {
-  const overlay = el('div', { className: 'modal-overlay' });
+  const overlay = el('div', { className: 'modal-overlay', 'data-testid': 'modal-overlay' });
   const modal = el('div', { className: 'modal' });
 
   modal.appendChild(el('h2', null, ['Diaper Details']));
