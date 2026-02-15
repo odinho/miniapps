@@ -4,13 +4,13 @@ test('Pause button appears when sleeping', async ({ page }) => {
   const babyId = createBaby('Testa');
   setWakeUpTime(babyId);
   await page.goto('/');
-  await expect(page.locator('.sleep-button')).toHaveClass(/awake/);
-  await expect(page.locator('.pause-btn')).not.toBeVisible();
+  await expect(page.getByTestId('sleep-button')).toHaveClass(/awake/);
+  await expect(page.getByTestId('pause-btn')).not.toBeVisible();
 
-  await page.locator('.sleep-button').click();
-  await expect(page.locator('.sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
-  await expect(page.locator('.pause-btn')).toBeVisible();
-  await expect(page.locator('.pause-btn')).toContainText('Pause');
+  await page.getByTestId('sleep-button').click();
+  await expect(page.getByTestId('sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
+  await expect(page.getByTestId('pause-btn')).toBeVisible();
+  await expect(page.getByTestId('pause-btn')).toContainText('Pause');
 });
 
 test('Can pause and resume', async ({ page }) => {
@@ -18,15 +18,15 @@ test('Can pause and resume', async ({ page }) => {
   setWakeUpTime(babyId);
   await page.goto('/');
 
-  await page.locator('.sleep-button').click();
-  await expect(page.locator('.sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
+  await page.getByTestId('sleep-button').click();
+  await expect(page.getByTestId('sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
 
-  await page.locator('.pause-btn').click();
-  await expect(page.locator('.pause-btn')).toContainText('Resume', { timeout: 5000 });
+  await page.getByTestId('pause-btn').click();
+  await expect(page.getByTestId('pause-btn')).toContainText('Resume', { timeout: 5000 });
   await expect(page.locator('.arc-center-label')).toContainText('Paused');
 
-  await page.locator('.pause-btn').click();
-  await expect(page.locator('.pause-btn')).toContainText('Pause', { timeout: 5000 });
+  await page.getByTestId('pause-btn').click();
+  await expect(page.getByTestId('pause-btn')).toContainText('Pause', { timeout: 5000 });
   await expect(page.locator('.arc-center-label')).toContainText(/Napping|Sleeping/);
 });
 
@@ -57,7 +57,7 @@ test('Timer adjusts for pause duration', async ({ page }) => {
   db.close();
 
   await page.goto('/');
-  await expect(page.locator('.sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
+  await expect(page.getByTestId('sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
 
   const timerText = await page.locator('.arc-center-text .countdown-value').textContent();
   expect(timerText).toMatch(/^0[45]:/);
@@ -68,20 +68,20 @@ test('Multiple pauses work correctly', async ({ page }) => {
   setWakeUpTime(babyId);
   await page.goto('/');
 
-  await page.locator('.sleep-button').click();
-  await expect(page.locator('.sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
+  await page.getByTestId('sleep-button').click();
+  await expect(page.getByTestId('sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
 
   // First pause/resume
-  await page.locator('.pause-btn').click();
-  await expect(page.locator('.pause-btn')).toContainText('Resume', { timeout: 5000 });
-  await page.locator('.pause-btn').click();
-  await expect(page.locator('.pause-btn')).toContainText('Pause', { timeout: 5000 });
+  await page.getByTestId('pause-btn').click();
+  await expect(page.getByTestId('pause-btn')).toContainText('Resume', { timeout: 5000 });
+  await page.getByTestId('pause-btn').click();
+  await expect(page.getByTestId('pause-btn')).toContainText('Pause', { timeout: 5000 });
 
   // Second pause/resume
-  await page.locator('.pause-btn').click();
-  await expect(page.locator('.pause-btn')).toContainText('Resume', { timeout: 5000 });
-  await page.locator('.pause-btn').click();
-  await expect(page.locator('.pause-btn')).toContainText('Pause', { timeout: 5000 });
+  await page.getByTestId('pause-btn').click();
+  await expect(page.getByTestId('pause-btn')).toContainText('Resume', { timeout: 5000 });
+  await page.getByTestId('pause-btn').click();
+  await expect(page.getByTestId('pause-btn')).toContainText('Pause', { timeout: 5000 });
 
   const db = getDb();
   const pauses = db.prepare('SELECT * FROM sleep_pauses').all() as any[];
