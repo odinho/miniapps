@@ -5,7 +5,7 @@ test('Arc renders on dashboard', async ({ page }) => {
   setWakeUpTime(babyId);
   
   await page.goto('/');
-  await expect(page.locator('.baby-name')).toHaveText('Testa');
+  await expect(page.getByTestId('baby-name')).toHaveText('Testa');
   await expect(page.locator('.sleep-arc')).toBeVisible();
   await expect(page.locator('.arc-container')).toBeVisible();
   await expect(page.locator('.arc-track')).toBeVisible();
