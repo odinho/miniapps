@@ -80,7 +80,7 @@ test('glow effects apply on interactive elements in night mode', async ({ page }
     document.documentElement.setAttribute('data-theme', 'night');
   });
 
-  const fab = page.locator('.fab');
+  const fab = page.getByTestId('fab');
   if (await fab.count() > 0) {
     const boxShadow = await fab.evaluate((el) =>
       getComputedStyle(el).boxShadow
