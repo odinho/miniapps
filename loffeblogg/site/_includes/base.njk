@@ -31,28 +31,24 @@
     <div class="footer-content">
       <nav class="footer-route">
         {% for p in posts | reverse %}
-        {% if p.isDestination %}
+        {# Check if post has images (content) #}
+        {% set hasImages = false %}
+        {% for day in p.days %}
+          {% if day.images and day.images.length > 0 %}
+            {% set hasImages = true %}
+          {% endif %}
+        {% endfor %}
+        
         {% if isPost and p.slug == post.slug %}
         <span class="route-stop">{{ p.title }}</span>
-        {% else %}
+        {% elif hasImages %}
         <a href="/{{ p.slug }}/" class="route-stop">{{ p.title }}</a>
+        {% else %}
+        <span class="route-stop route-stop-future">{{ p.title }}</span>
         {% endif %}
-        <span class="route-arrow">→</span>
-        {% endif %}
+        {% if not loop.last %}<span class="route-arrow">→</span>{% endif %}
         {% endfor %}
-        <span class="route-stop">Australia</span>
       </nav>
-      {% set hasArticles = false %}
-      {% for p in posts %}{% if not p.isDestination %}{% set hasArticles = true %}{% endif %}{% endfor %}
-      {% if hasArticles %}
-      <p class="footer-articles">
-        {% for article in posts %}
-        {% if not article.isDestination %}
-        <a href="/{{ article.slug }}/">{{ article.title }}</a>
-        {% endif %}
-        {% endfor %}
-      </p>
-      {% endif %}
       <p class="footer-links"><a href="/">Heim</a> · <a href="#top">Til toppen ↑</a></p>
     </div>
   </footer>

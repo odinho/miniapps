@@ -4,10 +4,50 @@ title: Heim
 showHero: true
 ---
 
-{# Destinasjonar - reisemål med datoar #}
 <section class="posts-list">
+  {# Split posts into future, regular, and undervegs #}
+  {% set futurePosts = [] %}
+  {% set regularPosts = [] %}
+  {% set undervegsPosts = [] %}
+  
   {% for post in posts %}
-  {% if post.isDestination %}
+    {% set hasContent = false %}
+    {% for day in post.days %}
+      {% if day.images and day.images.length > 0 %}
+        {% set hasContent = true %}
+      {% endif %}
+    {% endfor %}
+    
+    {% if post.slug == "tankar-pa-vegen" %}
+      {% set undervegsPosts = (undervegsPosts.push(post), undervegsPosts) %}
+    {% elif hasContent %}
+      {% set regularPosts = (regularPosts.push(post), regularPosts) %}
+    {% else %}
+      {% set futurePosts = (futurePosts.push(post), futurePosts) %}
+    {% endif %}
+  {% endfor %}
+
+  {# Show future posts as compact list FIRST #}
+  {% if futurePosts.length > 0 %}
+  <div class="future-trips">
+    <h3 class="future-trips-heading">Framtidige reiser</h3>
+    <ul class="future-trips-list">
+      {% for post in futurePosts %}
+      <li>
+        {% set firstDay = post.days | selectattr("date") | first %}
+        {% set lastDay = post.days | selectattr("date") | last %}
+        <strong>{{ post.title }}</strong>
+        {% if firstDay and lastDay %}
+        <span class="dates">{{ firstDay.date | kortdato }} – {{ (lastDay.endDate or lastDay.date) | kortdato }}</span>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {# Show regular trip posts as cards #}
+  {% for post in regularPosts %}
   <a href="/{{ post.slug }}/" class="post-card">
     <div class="post-card-thumbnail">
       {% set firstImage = null %}
@@ -38,32 +78,36 @@ showHero: true
       <span class="read-more">Les meir &rarr;</span>
     </div>
   </a>
-  {% endif %}
-  {% else %}
-  <p class="no-posts">Ingen innlegg enno. Køyr <code>npm run build</code> for å henta innhald.</p>
   {% endfor %}
-</section>
 
-{# Undervegs - refleksjonar og tekstar utan datoar #}
-{% set hasArticles = false %}
-{% for post in posts %}
-  {% if not post.isDestination %}{% set hasArticles = true %}{% endif %}
-{% endfor %}
-{% if hasArticles %}
-<section class="articles-section">
-  <h2 class="articles-heading">Undervegs</h2>
-  <div class="articles-list">
-    {% for article in posts %}
-    {% if not article.isDestination %}
-    <a href="/{{ article.slug }}/" class="article-card">
-      <div class="article-text">
-        <h3>{{ article.title }}</h3>
-        <p>Refleksjonar og observasjonar frå turen</p>
+  {# Show "Undervegs" section for Tankar på vegen #}
+  {% if undervegsPosts.length > 0 %}
+  <div class="undervegs-section">
+    <h3 class="undervegs-heading">Undervegs</h3>
+    {% for post in undervegsPosts %}
+    <a href="/{{ post.slug }}/" class="undervegs-card">
+      {% set firstImage = null %}
+      {% for day in post.days %}
+        {% if not firstImage and day.images and day.images.length > 0 %}
+          {% set firstImage = day.images[0] %}
+        {% endif %}
+      {% endfor %}
+      {% if firstImage %}
+      <div class="undervegs-thumbnail">
+        <img src="{{ firstImage.thumbnail }}" alt="{{ post.title }}">
       </div>
-      <span class="article-arrow">&rarr;</span>
+      {% endif %}
+      <div class="undervegs-content">
+        <h4>{{ post.title }}</h4>
+        <p class="post-summary">{{ post.days | countDays }} dagar</p>
+        <span class="read-more">Les meir &rarr;</span>
+      </div>
     </a>
-    {% endif %}
     {% endfor %}
   </div>
+  {% endif %}
+
+  {% if regularPosts.length == 0 and futurePosts.length == 0 and undervegsPosts.length == 0 %}
+  <p class="no-posts">Ingen innlegg enno. Køyr <code>npm run build</code> for å henta innhald.</p>
+  {% endif %}
 </section>
-{% endif %}
