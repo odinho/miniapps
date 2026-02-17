@@ -997,13 +997,16 @@ a.route-stop:hover {
 
 @media (max-width: 768px) {
   .undervegs-card {
-    flex-direction: column;
-    text-align: center;
+    gap: 1rem;
   }
 
   .undervegs-thumbnail {
-    width: 100%;
-    height: 200px;
+    width: 80px;
+    height: 80px;
+  }
+
+  .undervegs-content h4 {
+    font-size: 1.1rem;
   }
 }
 
