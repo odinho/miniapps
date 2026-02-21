@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://trekonsult.no/</loc>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://trekonsult.no/arborist-sandnes/</loc>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://trekonsult.no/arborist-sola/</loc>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://trekonsult.no/arborist-egersund/</loc>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://trekonsult.no/arborist-randaberg/</loc>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://trekonsult.no/arborist-jaeren/</loc>
+    <priority>0.8</priority>
+  </url>
+</urlset>
