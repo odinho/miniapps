@@ -205,7 +205,10 @@ export function extractImagesFromSection(html, imageMap = new Map()) {
   $('img').each((i, el) => {
     const src = $(el).attr('src');
     if (src) {
-      const mapped = imageMap.get(src);
+      // After replaceImageUrls, src is the local webThumbnail path.
+      // Check _byThumb first (set by processImages), then fall back to
+      // direct imageMap lookup, then use src as-is.
+      const mapped = imageMap._byThumb?.get(src) ?? imageMap.get(src);
       if (mapped) {
         images.push({
           original: mapped.webOriginal,
@@ -282,10 +285,10 @@ export function cleanHtml(html) {
         if (candidateText.length === 0) continue;
 
         // Check if this looks like a caption:
-        // - Short (< 80 chars)
+        // - Reasonably short (< 200 chars)
         // - Doesn't contain an image
         // - Doesn't look like a date heading
-        if (candidateText.length < 80 &&
+        if (candidateText.length < 200 &&
             candidate.find('img').length === 0 &&
             !containsDate(candidateText)) {
           candidate.addClass('image-caption');
