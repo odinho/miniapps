@@ -7,7 +7,7 @@ import { showConfirm } from './toast.js';
 const MOOD_EMOJI: Record<string, string> = { happy: '😊', normal: '😐', upset: '😢', fighting: '😤' };
 const METHOD_EMOJI: Record<string, string> = { bed: '🛏️', nursing: '🤱', held: '🤗', stroller: '🚼', car: '🚗', bottle: '🍼' };
 const DIAPER_ICONS: Record<string, string> = { wet: '💧', dirty: '💩', both: '💧💩', dry: '✨' };
-const DIAPER_LABELS: Record<string, string> = { wet: 'Wet', dirty: 'Dirty', both: 'Wet + Dirty', dry: 'Dry' };
+const DIAPER_LABELS: Record<string, string> = { wet: 'Våt', dirty: 'Skitten', both: 'Våt + skitten', dry: 'Tørr' };
 
 export async function renderHistory(container: HTMLElement): Promise<void> {
   container.innerHTML = '';
@@ -142,8 +142,8 @@ function showEditModal(entry: any, container: HTMLElement): void {
   const endTimeInput = el('input', { type: 'time', value: entry.end_time ? toLocalTime(entry.end_time) : '' }) as HTMLInputElement;
 
   let selectedType = entry.type;
-  const napPill = el('button', { className: `type-pill ${selectedType === 'nap' ? 'active' : ''}` }, ['😴 Nap']);
-  const nightPill = el('button', { className: `type-pill ${selectedType === 'night' ? 'active' : ''}` }, ['🌙 Night']);
+  const napPill = el('button', { className: `type-pill ${selectedType === 'nap' ? 'active' : ''}` }, ['😴 Lur']);
+  const nightPill = el('button', { className: `type-pill ${selectedType === 'night' ? 'active' : ''}` }, ['🌙 Natt']);
 
   const updatePills = () => {
     napPill.className = `type-pill ${selectedType === 'nap' ? 'active' : ''}`;
@@ -253,10 +253,10 @@ function showDiaperEditModal(entry: any, container: HTMLElement): void {
   // Editable type pills
   let selectedType = entry.type;
   const types = [
-    { value: 'wet', label: '💧 Wet' },
-    { value: 'dirty', label: '💩 Dirty' },
-    { value: 'both', label: '💧💩 Both' },
-    { value: 'dry', label: '✨ Dry' },
+    { value: 'wet', label: '💧 Våt' },
+    { value: 'dirty', label: '💩 Skitten' },
+    { value: 'both', label: '💧💩 Begge' },
+    { value: 'dry', label: '✨ Tørr' },
   ];
   const typePills = types.map(t => {
     const pill = el('button', { className: `type-pill ${selectedType === t.value ? 'active' : ''}`, 'data-diaper-type': t.value }, [t.label]);
@@ -269,11 +269,11 @@ function showDiaperEditModal(entry: any, container: HTMLElement): void {
   modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Type']), el('div', { className: 'type-pills diaper-type-pills' }, typePills)]));
 
   // Amount
-  let selectedAmount = entry.amount || 'medium';
+  let selectedAmount = entry.amount || 'middels';
   const amounts = [
-    { value: 'small', label: 'Small' },
-    { value: 'medium', label: 'Medium' },
-    { value: 'large', label: 'Large' },
+    { value: 'lite', label: 'Lite' },
+    { value: 'middels', label: 'Middels' },
+    { value: 'mykje', label: 'Mykje' },
   ];
   const amountPills = amounts.map(a => {
     const pill = el('button', { className: `type-pill ${selectedAmount === a.value ? 'active' : ''}` }, [a.label]);

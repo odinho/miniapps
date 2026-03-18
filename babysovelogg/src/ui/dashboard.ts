@@ -39,7 +39,10 @@ export function renderDashboard(container: HTMLElement): void {
   const { baby, activeSleep, todaySleeps, stats, prediction, ageMonths, todayWakeUp } = state;
   
   // Show morning prompt if no wake-up time set and no sleeps today
-  if (!todayWakeUp && todaySleeps.length === 0 && !activeSleep) {
+  // But only during morning hours (5-11), not in the middle of the night
+  const currentHourForPrompt = new Date().getHours();
+  const isMorningTime = currentHourForPrompt >= 5 && currentHourForPrompt < 12;
+  if (!todayWakeUp && todaySleeps.length === 0 && !activeSleep && isMorningTime) {
     showMorningPrompt(baby, container);
     return;
   }
@@ -299,8 +302,8 @@ function showManualSleepModal(baby: any, container: HTMLElement): void {
   const endDt = makeDateTimeInputs(now.toISOString());
 
   let selectedType = now.getHours() >= 18 || now.getHours() < 6 ? 'night' : 'nap';
-  const napPill = el('button', { className: `type-pill ${selectedType === 'nap' ? 'active' : ''}` }, ['😴 Nap']);
-  const nightPill = el('button', { className: `type-pill ${selectedType === 'night' ? 'active' : ''}` }, ['🌙 Night']);
+  const napPill = el('button', { className: `type-pill ${selectedType === 'nap' ? 'active' : ''}` }, ['😴 Lur']);
+  const nightPill = el('button', { className: `type-pill ${selectedType === 'night' ? 'active' : ''}` }, ['🌙 Natt']);
   const updatePills = () => {
     napPill.className = `type-pill ${selectedType === 'nap' ? 'active' : ''}`;
     nightPill.className = `type-pill ${selectedType === 'night' ? 'active' : ''}`;
@@ -479,10 +482,10 @@ function showDiaperModal(baby: any, container: HTMLElement): void {
 
   let selectedType = 'wet';
   const types = [
-    { value: 'wet', label: '💧 Wet' },
-    { value: 'dirty', label: '💩 Dirty' },
-    { value: 'both', label: '💧💩 Both' },
-    { value: 'dry', label: '✨ Dry' },
+    { value: 'wet', label: '💧 Våt' },
+    { value: 'dirty', label: '💩 Skitten' },
+    { value: 'both', label: '💧💩 Begge' },
+    { value: 'dry', label: '✨ Tørr' },
   ];
 
   const typePills = types.map(t => {
@@ -500,11 +503,11 @@ function showDiaperModal(baby: any, container: HTMLElement): void {
     });
   };
 
-  let selectedAmount = 'medium';
+  let selectedAmount = 'middels';
   const amounts = [
-    { value: 'small', label: 'Small' },
-    { value: 'medium', label: 'Medium' },
-    { value: 'large', label: 'Large' },
+    { value: 'lite', label: 'Lite' },
+    { value: 'middels', label: 'Middels' },
+    { value: 'mykje', label: 'Mykje' },
   ];
 
   const amountPills = amounts.map(a => {

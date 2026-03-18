@@ -11,6 +11,7 @@ export interface AppState {
   prediction: any;
   ageMonths?: number;
   diaperCount?: number;
+  todayWakeUp?: any;
 }
 
 export async function getDiapers(opts?: {limit?: number}): Promise<any[]> {
