@@ -41,6 +41,13 @@ function timeToArcFraction(d: Date, config: ArcConfig): number {
   return Math.max(0, Math.min(1, frac));
 }
 
+/** Raw fraction without clamping - for checking if a time is within arc range. */
+function timeToArcFractionRaw(d: Date, config: ArcConfig): number {
+  let h = hourOfDay(d);
+  if (config.arcStartHour >= 18 && h < 12) h += 24;
+  return (h - config.arcStartHour) / (config.arcEndHour - config.arcStartHour);
+}
+
 /** Convert fraction (0..1) to a point on a semicircular arc. */
 function fracToPoint(frac: number, cx: number, cy: number, r: number): { x: number; y: number } {
   // Arc goes from left (π) to right (0) — a top semicircle
@@ -122,16 +129,16 @@ export function renderArc(input: ArcInput): SVGElement {
     svg.appendChild(label);
   }
 
-  // Anchor icons
+  // Anchor icons (positioned below the arc endpoints to avoid label overlap)
   const iconStart = document.createElementNS(ns, 'text');
-  iconStart.setAttribute('x', String(startPt.x - 18)); iconStart.setAttribute('y', String(startPt.y + 6));
-  iconStart.setAttribute('font-size', '18'); iconStart.setAttribute('text-anchor', 'middle');
+  iconStart.setAttribute('x', String(startPt.x - 6)); iconStart.setAttribute('y', String(startPt.y + 22));
+  iconStart.setAttribute('font-size', '16'); iconStart.setAttribute('text-anchor', 'middle');
   iconStart.textContent = config.startIcon;
   svg.appendChild(iconStart);
 
   const iconEnd = document.createElementNS(ns, 'text');
-  iconEnd.setAttribute('x', String(endPt.x + 18)); iconEnd.setAttribute('y', String(endPt.y + 6));
-  iconEnd.setAttribute('font-size', '18'); iconEnd.setAttribute('text-anchor', 'middle');
+  iconEnd.setAttribute('x', String(endPt.x + 6)); iconEnd.setAttribute('y', String(endPt.y + 22));
+  iconEnd.setAttribute('font-size', '16'); iconEnd.setAttribute('text-anchor', 'middle');
   iconEnd.textContent = config.endIcon;
   svg.appendChild(iconEnd);
 
@@ -194,14 +201,19 @@ export function renderArc(input: ArcInput): SVGElement {
   for (const bubble of bubbles) {
     const isBedtime = bubble.type === 'night' && bubble.status === 'predicted' && !bubble.endTime;
     
+    // Check raw fractions to skip bubbles entirely outside the arc range
+    const startFracRaw = timeToArcFractionRaw(bubble.startTime, config);
+    const endFracRaw = bubble.endTime
+      ? timeToArcFractionRaw(bubble.endTime, config)
+      : (isBedtime ? startFracRaw : timeToArcFractionRaw(new Date(), config));
+
+    if (startFracRaw > 1.05 && endFracRaw > 1.05) continue;
+    if (startFracRaw < -0.05 && endFracRaw < -0.05) continue;
+
     const startFrac = timeToArcFraction(bubble.startTime, config);
     const endFrac = bubble.endTime
       ? timeToArcFraction(bubble.endTime, config)
       : (isBedtime ? startFrac : timeToArcFraction(new Date(), config));
-
-    // Skip if entirely outside arc range
-    if (startFrac > 1 && endFrac > 1) continue;
-    if (startFrac < 0 && endFrac < 0) continue;
 
     const midFrac = (startFrac + endFrac) / 2;
     const spanFrac = isBedtime ? 0.04 : Math.max(0.02, Math.abs(endFrac - startFrac));
@@ -250,10 +262,11 @@ export function renderArc(input: ArcInput): SVGElement {
       g.appendChild(rect);
     }
 
-    // Time label on bubble (below for bedtime)
+    // Time label on bubble (below for bedtime, below for predicted, inside for completed/active)
     const timeLabel = document.createElementNS(ns, 'text');
     timeLabel.setAttribute('x', String(midPt.x));
-    timeLabel.setAttribute('y', String(midPt.y + (isBedtime ? 16 : 1)));
+    const labelOffset = isBedtime ? 16 : (bubble.status === 'predicted' ? pillH / 2 + 10 : 1);
+    timeLabel.setAttribute('y', String(midPt.y + labelOffset));
     timeLabel.setAttribute('text-anchor', 'middle');
     timeLabel.setAttribute('dominant-baseline', 'middle');
     timeLabel.setAttribute('class', 'arc-bubble-label');

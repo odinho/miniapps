@@ -115,7 +115,11 @@ export async function renderStats(container: HTMLElement): Promise<void> {
   view.removeChild(loading);
 
   if (sleeps.length === 0) {
-    view.appendChild(el('div', { className: 'history-empty' }, ['No sleep data yet. Start tracking to see statistics!']));
+    view.appendChild(el('div', { className: 'history-empty' }, [
+      el('div', { style: { fontSize: '3rem', marginBottom: '16px' } }, ['📊']),
+      el('div', null, ['No sleep data yet']),
+      el('div', { style: { fontSize: '0.9rem', marginTop: '8px' } }, ['Start tracking sleep to see charts and trends here']),
+    ]));
     return;
   }
 

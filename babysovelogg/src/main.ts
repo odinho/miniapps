@@ -39,7 +39,7 @@ async function main() {
   injectStyles();
   
   const app = document.getElementById('app')!;
-  const content = el('div', { id: 'content' });
+  const content = el('div', { id: 'content', style: { flex: '1', overflow: 'hidden', display: 'flex', flexDirection: 'column' } });
   app.appendChild(content);
 
   // Bottom nav

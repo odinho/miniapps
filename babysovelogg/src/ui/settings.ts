@@ -32,7 +32,6 @@ export function renderSettings(container: HTMLElement, opts?: { onboarding?: boo
   saveBtn.addEventListener('click', async () => {
     const name = nameInput.value.trim();
     const birthdate = dateInput.value;
-    console.log('[Napper] Save clicked', { name, birthdate, nameInDOM: document.body.contains(nameInput), dateInDOM: document.body.contains(dateInput) });
     if (!name || !birthdate) {
       nameInput.style.borderColor = !name ? 'var(--danger)' : '';
       dateInput.style.borderColor = !birthdate ? 'var(--danger)' : '';
@@ -44,12 +43,9 @@ export function renderSettings(container: HTMLElement, opts?: { onboarding?: boo
     const payload = { name, birthdate };
     
     try {
-      console.log('[Napper] Posting event', eventType, payload);
       await postEvents([{ type: eventType, payload, clientId: getClientId() }]);
       await refreshState();
-      console.log('[Napper] Success, navigating to dashboard');
     } catch (err) {
-      console.error('[Napper] API error, queuing event', err);
       queueEvent(eventType, payload);
       showToast('Saved offline — will sync when connection is restored', 'warning');
     }

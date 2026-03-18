@@ -23,7 +23,11 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
   view.appendChild(el('h2', { className: 'history-header' }, ['History']));
 
   if (entries.length === 0) {
-    view.appendChild(el('div', { className: 'history-empty' }, ['No entries yet\n🌙 Tap the big button to start tracking']));
+    view.appendChild(el('div', { className: 'history-empty' }, [
+      el('div', { style: { fontSize: '3rem', marginBottom: '16px' } }, ['📋']),
+      el('div', null, ['No entries yet']),
+      el('div', { style: { fontSize: '0.9rem', marginTop: '8px' } }, ['Tap the sleep button on the home screen to start tracking']),
+    ]));
     container.appendChild(view);
     return;
   }

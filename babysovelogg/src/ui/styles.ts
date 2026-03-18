@@ -34,6 +34,7 @@ const CSS = `
   --radius: 16px;
   --radius-sm: 10px;
   --shadow: 0 2px 16px rgba(74, 63, 92, 0.08);
+  --shadow-md: 0 4px 20px rgba(74, 63, 92, 0.10);
   --shadow-lg: 0 8px 32px rgba(74, 63, 92, 0.12);
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --safe-top: env(safe-area-inset-top, 0px);
@@ -597,7 +598,7 @@ html, body {
 /* FAB button */
 .fab {
   position: fixed;
-  bottom: calc(130px + var(--safe-bottom));
+  bottom: calc(70px + var(--safe-bottom));
   right: 16px;
   width: 56px;
   height: 56px;

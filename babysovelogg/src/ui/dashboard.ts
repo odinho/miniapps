@@ -21,6 +21,9 @@ let cleanups: (() => void)[] = [];
 export function cleanupDashboard() {
   cleanups.forEach(fn => fn());
   cleanups = [];
+  // Remove FAB when leaving dashboard
+  const fab = document.querySelector('.fab');
+  if (fab) fab.remove();
 }
 
 export function renderDashboard(container: HTMLElement): void {
@@ -134,11 +137,58 @@ export function renderDashboard(container: HTMLElement): void {
     const editLink = el('span', { className: 'edit-start-link' }, ['Started ' + formatTime(activeSleep.start_time)]);
     editLink.addEventListener('click', () => showEditStartModal(activeSleep, container));
     arcCenter.appendChild(editLink);
-  } else if (prediction?.nextNap) {
-    const cd = renderCountdown(prediction.nextNap);
-    cleanups.push(cd.stop);
-    arcCenter.appendChild(el('div', { className: 'arc-center-label' }, ['Next nap']));
-    arcCenter.appendChild(cd.element);
+  } else {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const isDeepNight = currentHour >= 0 && currentHour < 5;
+    const isEvening = currentHour >= 20;
+
+    if (isDeepNight) {
+      // Middle of the night - show sleep encouragement & wake-up time
+      arcCenter.appendChild(el('div', { className: 'arc-center-label' }, ['Good night 💤']));
+      if (todayWakeUp?.wake_time) {
+        const wakeTime = new Date(todayWakeUp.wake_time);
+        const msUntilWake = wakeTime.getTime() - now.getTime();
+        if (msUntilWake > 0) {
+          arcCenter.appendChild(el('span', { className: 'countdown-value' }, [formatDuration(msUntilWake)]));
+          arcCenter.appendChild(el('div', { className: 'edit-start-link', style: { textDecoration: 'none', cursor: 'default', pointerEvents: 'auto' } }, [`Wake-up ${formatTime(todayWakeUp.wake_time)}`]));
+        }
+      }
+    } else if (prediction?.nextNap) {
+      const nextNapTime = new Date(prediction.nextNap);
+      const hoursUntilNap = (nextNapTime.getTime() - now.getTime()) / 3600000;
+
+      if ((isEvening || hoursUntilNap < 0) && prediction?.bedtime) {
+        // Evening or past nap time - show bedtime
+        const bedtime = new Date(prediction.bedtime);
+        const bedtimeInPast = bedtime.getTime() < now.getTime();
+        if (bedtimeInPast) {
+          arcCenter.appendChild(el('div', { className: 'arc-center-label' }, ['Past bedtime']));
+          arcCenter.appendChild(el('span', { className: 'countdown-value' }, [formatTime(prediction.bedtime)]));
+        } else {
+          const cd = renderCountdown(prediction.bedtime);
+          cleanups.push(cd.stop);
+          arcCenter.appendChild(el('div', { className: 'arc-center-label' }, ['Bedtime in']));
+          arcCenter.appendChild(cd.element);
+          arcCenter.appendChild(el('div', { className: 'edit-start-link', style: { textDecoration: 'none', cursor: 'default', pointerEvents: 'auto' } }, [formatTime(prediction.bedtime)]));
+        }
+      } else if (hoursUntilNap > 0) {
+        const cd = renderCountdown(prediction.nextNap);
+        cleanups.push(cd.stop);
+        arcCenter.appendChild(el('div', { className: 'arc-center-label' }, ['Next nap']));
+        arcCenter.appendChild(cd.element);
+      }
+
+      // Show "awake since" info (only if wake time is in the past)
+      const lastSleep = todaySleeps.find((s: any) => s.end_time);
+      const awakeSince = lastSleep?.end_time || todayWakeUp?.wake_time;
+      if (awakeSince) {
+        const awakeMs = now.getTime() - new Date(awakeSince).getTime();
+        if (awakeMs > 60000) {
+          arcCenter.appendChild(el('div', { className: 'edit-start-link', style: { textDecoration: 'none', cursor: 'default', pointerEvents: 'auto' } }, [`Awake ${formatDuration(awakeMs)}`]));
+        }
+      }
+    }
   }
 
   arcContainer.appendChild(arcCenter);
@@ -178,7 +228,7 @@ export function renderDashboard(container: HTMLElement): void {
     dash.appendChild(el('div', { className: 'stats-row' }, [
       el('div', { className: 'stats-card' }, [
         napCountEl,
-        el('div', { className: 'stat-label' }, ['Naps today']),
+        el('div', { className: 'stat-label' }, ['Naps']),
       ]),
       el('div', { className: 'stats-card' }, [
         napTimeEl,
@@ -186,31 +236,31 @@ export function renderDashboard(container: HTMLElement): void {
       ]),
       el('div', { className: 'stats-card' }, [
         totalSleepEl,
-        el('div', { className: 'stat-label' }, ['Total sleep']),
+        el('div', { className: 'stat-label' }, ['Total']),
+      ]),
+      el('div', { className: 'stats-card' }, [
+        el('div', { className: 'stat-value' }, [String(state.diaperCount ?? 0)]),
+        el('div', { className: 'stat-label' }, ['Diapers']),
       ]),
     ]));
   }
 
-  // Diaper stats + quick log
+  // Diaper quick log
   const diaperCount = state.diaperCount ?? 0;
-  dash.appendChild(el('div', { className: 'stats-row' }, [
-    el('div', { className: 'stats-card' }, [
-      el('div', { className: 'stat-value' }, [String(diaperCount)]),
-      el('div', { className: 'stat-label' }, ['Diapers today']),
-    ]),
-  ]));
 
-  const diaperBtn = el('button', { className: 'diaper-quick-btn', 'data-testid': 'diaper-quick-btn' }, ['💩 Log Diaper']);
+  const diaperBtn = el('button', { className: 'diaper-quick-btn', 'data-testid': 'diaper-quick-btn' }, [`🧷 Diaper (${diaperCount} today)`]);
   diaperBtn.addEventListener('click', () => showDiaperModal(baby, container));
   dash.appendChild(diaperBtn);
 
   view.appendChild(dash);
   container.appendChild(view);
 
-  // FAB for manual sleep entry
+  // FAB for manual sleep entry (append to #app to avoid animation containing block)
+  const existingFab = document.querySelector('.fab');
+  if (existingFab) existingFab.remove();
   const fab = el('button', { className: 'fab', 'data-testid': 'fab' }, ['+']);
   fab.addEventListener('click', () => showManualSleepModal(baby, container));
-  container.appendChild(fab);
+  document.getElementById('app')!.appendChild(fab);
 }
 
 function toLocal(iso: string): string {
@@ -450,11 +500,11 @@ function showDiaperModal(baby: any, container: HTMLElement): void {
     });
   };
 
-  let selectedAmount = 'middels';
+  let selectedAmount = 'medium';
   const amounts = [
-    { value: 'lite', label: 'Lite' },
-    { value: 'middels', label: 'Middels' },
-    { value: 'mykje', label: 'Mykje' },
+    { value: 'small', label: 'Small' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'large', label: 'Large' },
   ];
 
   const amountPills = amounts.map(a => {
