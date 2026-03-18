@@ -644,6 +644,36 @@ html, body {
 }
 .fab:active { transform: scale(0.92); }
 
+.fab-menu {
+  position: fixed;
+  bottom: calc(140px + var(--safe-bottom));
+  right: 16px;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 50;
+  animation: fadeIn 0.15s;
+}
+
+.fab-item {
+  padding: 10px 18px;
+  border-radius: 24px;
+  border: none;
+  background: var(--white);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-lg);
+  white-space: nowrap;
+  transition: transform 0.15s;
+}
+.fab-item:active { transform: scale(0.95); }
+
+@media (min-width: 500px) {
+  .fab-menu { position: absolute !important; }
+}
+
 /* Pause/resume button */
 .pause-btn {
   max-width: 340px;
@@ -886,6 +916,31 @@ html, body {
   font-size: 0.85rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+/* Compact summary row */
+.summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text-light);
+  padding: 8px 0;
+}
+
+.summary-row .stat-value {
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-label {
+  font-weight: 400;
+}
+
+.summary-sep {
+  opacity: 0.4;
 }
 
 /* Sleep info panel */

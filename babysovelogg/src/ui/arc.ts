@@ -10,8 +10,6 @@ interface SleepBubble {
 interface ArcConfig {
   arcStartHour: number;
   arcEndHour: number;
-  startIcon: string;
-  endIcon: string;
 }
 
 function getDayArcConfig(wakeUpTime?: string | null): ArcConfig {
@@ -20,11 +18,11 @@ function getDayArcConfig(wakeUpTime?: string | null): ArcConfig {
     const wake = new Date(wakeUpTime);
     arcStartHour = wake.getHours() + wake.getMinutes() / 60;
   }
-  return { arcStartHour, arcEndHour: arcStartHour + 12, startIcon: '☀️', endIcon: '🌙' };
+  return { arcStartHour, arcEndHour: arcStartHour + 12 };
 }
 
 function getNightArcConfig(): ArcConfig {
-  return { arcStartHour: 18, arcEndHour: 30, startIcon: '🌙', endIcon: '☀️' };
+  return { arcStartHour: 18, arcEndHour: 30 };
 }
 
 function hourOfDay(d: Date): number {
@@ -44,22 +42,29 @@ function timeToArcFractionRaw(d: Date, config: ArcConfig): number {
   return (h - config.arcStartHour) / (config.arcEndHour - config.arcStartHour);
 }
 
-// 270-degree arc: starts at bottom-left (225°) and goes clockwise to bottom-right (315°)
-// The gap is at the bottom center
-const ARC_START_ANGLE = (5 / 4) * Math.PI;  // 225° = bottom-left
-const ARC_SWEEP = (3 / 2) * Math.PI;         // 270° sweep
+// 270-degree arc with gap at bottom
+// frac 0 = bottom-left (start of period), frac 1 = bottom-right (end of period)
+// Arc sweeps clockwise from bottom-left, through left, top, right, to bottom-right
+const ARC_TOTAL_DEG = 270;
+const ARC_TOTAL_RAD = ARC_TOTAL_DEG * Math.PI / 180;
+// Start angle in standard math: 225° (bottom-left)
+const ARC_START_ANGLE_DEG = 225;
 
 function fracToPoint(frac: number, cx: number, cy: number, r: number): { x: number; y: number } {
-  const angle = ARC_START_ANGLE - frac * ARC_SWEEP;
-  return { x: cx + r * Math.cos(angle), y: cy - r * Math.sin(angle) };
+  // Go clockwise from 225° by frac * 270°
+  // In standard math coords, clockwise = decreasing angle
+  const angleDeg = ARC_START_ANGLE_DEG - frac * ARC_TOTAL_DEG;
+  const angleRad = angleDeg * Math.PI / 180;
+  return { x: cx + r * Math.cos(angleRad), y: cy - r * Math.sin(angleRad) };
 }
 
 function describeArc(cx: number, cy: number, r: number, startFrac: number, endFrac: number): string {
-  const start = fracToPoint(startFrac, cx, cy, r);
-  const end = fracToPoint(endFrac, cx, cy, r);
-  const sweep = (endFrac - startFrac) * ARC_SWEEP;
-  const largeArc = sweep > Math.PI ? 1 : 0;
-  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 0 ${end.x} ${end.y}`;
+  const p1 = fracToPoint(startFrac, cx, cy, r);
+  const p2 = fracToPoint(endFrac, cx, cy, r);
+  const sweepDeg = (endFrac - startFrac) * ARC_TOTAL_DEG;
+  const largeArc = sweepDeg > 180 ? 1 : 0;
+  // sweep-flag=1 for clockwise in SVG (y-down) coordinates
+  return `M ${p1.x} ${p1.y} A ${r} ${r} 0 ${largeArc} 1 ${p2.x} ${p2.y}`;
 }
 
 export interface ArcInput {
@@ -72,9 +77,9 @@ export interface ArcInput {
 
 export function renderArc(input: ArcInput): SVGElement {
   const config = input.isNightMode ? getNightArcConfig() : getDayArcConfig(input.wakeUpTime);
-  const S = 320; // square viewbox
+  const S = 320;
   const cx = S / 2, cy = S / 2, r = 130;
-  const trackWidth = 12;
+  const trackWidth = 14;
 
   const ns = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(ns, 'svg');
@@ -82,17 +87,14 @@ export function renderArc(input: ArcInput): SVGElement {
   svg.setAttribute('width', '100%');
   svg.setAttribute('class', 'sleep-arc');
 
-  // Defs
+  // Defs - glow filter
   const defs = document.createElementNS(ns, 'defs');
-
-  // Glow filter
   const filter = document.createElementNS(ns, 'filter');
   filter.setAttribute('id', 'arc-glow');
   filter.setAttribute('x', '-50%'); filter.setAttribute('y', '-50%');
   filter.setAttribute('width', '200%'); filter.setAttribute('height', '200%');
   const blur = document.createElementNS(ns, 'feGaussianBlur');
-  blur.setAttribute('stdDeviation', '4');
-  blur.setAttribute('result', 'glow');
+  blur.setAttribute('stdDeviation', '4'); blur.setAttribute('result', 'glow');
   filter.appendChild(blur);
   const merge = document.createElementNS(ns, 'feMerge');
   const mn1 = document.createElementNS(ns, 'feMergeNode'); mn1.setAttribute('in', 'glow');
@@ -102,50 +104,39 @@ export function renderArc(input: ArcInput): SVGElement {
   defs.appendChild(filter);
   svg.appendChild(defs);
 
-  // Background track (270-degree arc)
+  // Background track
   const trackPath = document.createElementNS(ns, 'path');
   trackPath.setAttribute('d', describeArc(cx, cy, r, 0, 1));
   trackPath.setAttribute('fill', 'none');
-  // Use a visible color that works on both day and night themes
   const isNight = document.documentElement.getAttribute('data-theme') === 'night';
-  trackPath.setAttribute('stroke', isNight ? 'rgba(160, 150, 200, 0.35)' : 'var(--lavender-dark)');
+  trackPath.setAttribute('stroke', isNight ? 'rgba(120, 110, 170, 0.3)' : 'var(--lavender-dark)');
   trackPath.setAttribute('stroke-width', String(trackWidth));
   trackPath.setAttribute('stroke-linecap', 'round');
   svg.appendChild(trackPath);
 
-  // Endpoint icons at the gap
+  // Small endpoint dots at the gap
   const startPt = fracToPoint(0, cx, cy, r);
   const endPt = fracToPoint(1, cx, cy, r);
+  for (const pt of [startPt, endPt]) {
+    const dot = document.createElementNS(ns, 'circle');
+    dot.setAttribute('cx', String(pt.x)); dot.setAttribute('cy', String(pt.y));
+    dot.setAttribute('r', '3');
+    dot.setAttribute('fill', isNight ? 'rgba(200, 190, 230, 0.5)' : 'var(--lavender-dark)');
+    svg.appendChild(dot);
+  }
 
-  const iconStart = document.createElementNS(ns, 'text');
-  iconStart.setAttribute('x', String(startPt.x));
-  iconStart.setAttribute('y', String(startPt.y + 24));
-  iconStart.setAttribute('font-size', '16');
-  iconStart.setAttribute('text-anchor', 'middle');
-  iconStart.textContent = config.startIcon;
-  svg.appendChild(iconStart);
-
-  const iconEnd = document.createElementNS(ns, 'text');
-  iconEnd.setAttribute('x', String(endPt.x));
-  iconEnd.setAttribute('y', String(endPt.y + 24));
-  iconEnd.setAttribute('font-size', '16');
-  iconEnd.setAttribute('text-anchor', 'middle');
-  iconEnd.textContent = config.endIcon;
-  svg.appendChild(iconEnd);
-
-  // Current time indicator (thin line)
+  // Current time indicator
   const nowFracRaw = timeToArcFractionRaw(new Date(), config);
   if (nowFracRaw >= 0 && nowFracRaw <= 1) {
     const nowFrac = Math.max(0, Math.min(1, nowFracRaw));
-    const nowOuter = fracToPoint(nowFrac, cx, cy, r + trackWidth / 2 + 4);
-    const nowInner = fracToPoint(nowFrac, cx, cy, r - trackWidth / 2 - 4);
+    const nowOuter = fracToPoint(nowFrac, cx, cy, r + trackWidth / 2 + 3);
+    const nowInner = fracToPoint(nowFrac, cx, cy, r - trackWidth / 2 - 3);
     const marker = document.createElementNS(ns, 'line');
     marker.setAttribute('x1', String(nowOuter.x)); marker.setAttribute('y1', String(nowOuter.y));
     marker.setAttribute('x2', String(nowInner.x)); marker.setAttribute('y2', String(nowInner.y));
     marker.setAttribute('stroke', 'var(--sun)');
-    marker.setAttribute('stroke-width', '2.5');
+    marker.setAttribute('stroke-width', '3');
     marker.setAttribute('stroke-linecap', 'round');
-    marker.setAttribute('opacity', '0.9');
     svg.appendChild(marker);
   }
 
@@ -155,60 +146,28 @@ export function renderArc(input: ArcInput): SVGElement {
   for (const s of input.todaySleeps) {
     if (input.activeSleep && !s.end_time) continue;
     if (!s.end_time) continue;
-    bubbles.push({
-      startTime: new Date(s.start_time),
-      endTime: new Date(s.end_time),
-      type: s.type as 'nap' | 'night',
-      status: 'completed',
-    });
+    bubbles.push({ startTime: new Date(s.start_time), endTime: new Date(s.end_time), type: s.type as 'nap' | 'night', status: 'completed' });
   }
 
   if (input.activeSleep) {
-    bubbles.push({
-      startTime: new Date(input.activeSleep.start_time),
-      endTime: null,
-      type: input.activeSleep.type as 'nap' | 'night',
-      status: 'active',
-    });
+    bubbles.push({ startTime: new Date(input.activeSleep.start_time), endTime: null, type: input.activeSleep.type as 'nap' | 'night', status: 'active' });
   }
 
   if (input.prediction?.predictedNaps && !input.activeSleep) {
     for (const pred of input.prediction.predictedNaps) {
-      bubbles.push({
-        startTime: new Date(pred.startTime),
-        endTime: new Date(pred.endTime),
-        type: 'nap',
-        status: 'predicted',
-      });
+      bubbles.push({ startTime: new Date(pred.startTime), endTime: new Date(pred.endTime), type: 'nap', status: 'predicted' });
     }
   } else if (input.prediction?.nextNap && !input.activeSleep) {
     const predTime = new Date(input.prediction.nextNap);
-    bubbles.push({
-      startTime: predTime,
-      endTime: new Date(predTime.getTime() + 45 * 60000),
-      type: 'nap',
-      status: 'predicted',
-    });
-  }
-
-  if (input.prediction?.bedtime && !input.activeSleep) {
-    const bedtime = new Date(input.prediction.bedtime);
-    bubbles.push({
-      startTime: bedtime,
-      endTime: null,
-      type: 'night',
-      status: 'predicted',
-    });
+    bubbles.push({ startTime: predTime, endTime: new Date(predTime.getTime() + 45 * 60000), type: 'nap', status: 'predicted' });
   }
 
   // Render bubbles as arc segments
   for (const bubble of bubbles) {
-    const isBedtime = bubble.type === 'night' && bubble.status === 'predicted' && !bubble.endTime;
-
     const startFracRaw = timeToArcFractionRaw(bubble.startTime, config);
     const endFracRaw = bubble.endTime
       ? timeToArcFractionRaw(bubble.endTime, config)
-      : (isBedtime ? startFracRaw : timeToArcFractionRaw(new Date(), config));
+      : timeToArcFractionRaw(new Date(), config);
 
     if (startFracRaw > 1.05 && endFracRaw > 1.05) continue;
     if (startFracRaw < -0.05 && endFracRaw < -0.05) continue;
@@ -216,85 +175,56 @@ export function renderArc(input: ArcInput): SVGElement {
     const startFrac = timeToArcFraction(bubble.startTime, config);
     const endFrac = bubble.endTime
       ? timeToArcFraction(bubble.endTime, config)
-      : (isBedtime ? Math.min(1, startFrac + 0.03) : timeToArcFraction(new Date(), config));
+      : timeToArcFraction(new Date(), config);
 
-    if (Math.abs(endFrac - startFrac) < 0.005 && !isBedtime) continue;
+    if (Math.abs(endFrac - startFrac) < 0.005) continue;
 
     const g = document.createElementNS(ns, 'g');
-    g.setAttribute('class', `arc-bubble arc-bubble-${bubble.status}${isBedtime ? ' arc-bedtime' : ''}`);
+    g.setAttribute('class', `arc-bubble arc-bubble-${bubble.status}`);
 
-    if (isBedtime) {
-      // Bedtime: moon icon on the arc
-      const midFrac = startFrac;
-      const pt = fracToPoint(midFrac, cx, cy, r);
-      const moon = document.createElementNS(ns, 'text');
-      moon.setAttribute('x', String(pt.x));
-      moon.setAttribute('y', String(pt.y + 1));
-      moon.setAttribute('font-size', '20');
-      moon.setAttribute('text-anchor', 'middle');
-      moon.setAttribute('dominant-baseline', 'middle');
-      moon.textContent = '🌙';
-      g.appendChild(moon);
+    const segPath = document.createElementNS(ns, 'path');
+    segPath.setAttribute('d', describeArc(cx, cy, r, startFrac, endFrac));
+    segPath.setAttribute('fill', 'none');
+    segPath.setAttribute('stroke-linecap', 'round');
+
+    if (bubble.status === 'completed') {
+      segPath.setAttribute('stroke', bubble.type === 'night' ? 'var(--moon)' : 'var(--peach-dark)');
+      segPath.setAttribute('stroke-width', String(trackWidth + 2));
+      segPath.setAttribute('opacity', '0.9');
+    } else if (bubble.status === 'active') {
+      segPath.setAttribute('stroke', 'var(--moon-glow)');
+      segPath.setAttribute('stroke-width', String(trackWidth + 4));
+      segPath.setAttribute('filter', 'url(#arc-glow)');
+      segPath.setAttribute('class', 'arc-active-pulse');
     } else {
-      // Arc segment for sleep
-      const segPath = document.createElementNS(ns, 'path');
-      segPath.setAttribute('d', describeArc(cx, cy, r, startFrac, endFrac));
-      segPath.setAttribute('fill', 'none');
-      segPath.setAttribute('stroke-linecap', 'round');
+      segPath.setAttribute('stroke', 'var(--moon)');
+      segPath.setAttribute('stroke-width', String(trackWidth + 2));
+      segPath.setAttribute('stroke-dasharray', '6 4');
+      segPath.setAttribute('opacity', '0.35');
+    }
+    g.appendChild(segPath);
 
-      const segWidth = trackWidth + 4;
-
-      if (bubble.status === 'completed') {
-        segPath.setAttribute('stroke', 'var(--moon)');
-        segPath.setAttribute('stroke-width', String(segWidth));
-        segPath.setAttribute('opacity', '0.85');
-      } else if (bubble.status === 'active') {
-        segPath.setAttribute('stroke', 'var(--moon-glow)');
-        segPath.setAttribute('stroke-width', String(segWidth + 2));
-        segPath.setAttribute('filter', 'url(#arc-glow)');
-        segPath.setAttribute('class', 'arc-active-pulse');
-      } else {
-        segPath.setAttribute('stroke', 'var(--moon)');
-        segPath.setAttribute('stroke-width', String(segWidth));
-        segPath.setAttribute('stroke-dasharray', '6 4');
-        segPath.setAttribute('opacity', '0.4');
+    // Duration/time label outside arc
+    const midFrac = (startFrac + endFrac) / 2;
+    const labelPt = fracToPoint(midFrac, cx, cy, r + 24);
+    if (bubble.status === 'completed' && bubble.endTime) {
+      const durationMs = bubble.endTime.getTime() - bubble.startTime.getTime();
+      if (durationMs > 10 * 60000) {
+        const durLabel = document.createElementNS(ns, 'text');
+        durLabel.setAttribute('x', String(labelPt.x)); durLabel.setAttribute('y', String(labelPt.y));
+        durLabel.setAttribute('text-anchor', 'middle'); durLabel.setAttribute('dominant-baseline', 'middle');
+        durLabel.setAttribute('fill', 'var(--text-light)'); durLabel.setAttribute('font-size', '9');
+        durLabel.textContent = formatDuration(durationMs);
+        g.appendChild(durLabel);
       }
-      g.appendChild(segPath);
-
-      // Duration label outside the arc for completed/active sleeps
-      if (bubble.status === 'completed' && bubble.endTime) {
-        const durationMs = bubble.endTime.getTime() - bubble.startTime.getTime();
-        if (durationMs > 10 * 60000) { // Only show for > 10min
-          const midFrac = (startFrac + endFrac) / 2;
-          const labelPt = fracToPoint(midFrac, cx, cy, r + 22);
-          const durLabel = document.createElementNS(ns, 'text');
-          durLabel.setAttribute('x', String(labelPt.x));
-          durLabel.setAttribute('y', String(labelPt.y));
-          durLabel.setAttribute('text-anchor', 'middle');
-          durLabel.setAttribute('dominant-baseline', 'middle');
-          durLabel.setAttribute('class', 'arc-bubble-label');
-          durLabel.setAttribute('fill', 'var(--text-light)');
-          durLabel.setAttribute('font-size', '9');
-          durLabel.textContent = formatDuration(durationMs);
-          g.appendChild(durLabel);
-        }
-      }
-
-      // Time labels for predicted naps (outside arc)
-      if (bubble.status === 'predicted') {
-        const midFrac = (startFrac + endFrac) / 2;
-        const labelPt = fracToPoint(midFrac, cx, cy, r + 22);
-        const timeLabel = document.createElementNS(ns, 'text');
-        timeLabel.setAttribute('x', String(labelPt.x));
-        timeLabel.setAttribute('y', String(labelPt.y));
-        timeLabel.setAttribute('text-anchor', 'middle');
-        timeLabel.setAttribute('dominant-baseline', 'middle');
-        timeLabel.setAttribute('fill', 'var(--text-light)');
-        timeLabel.setAttribute('font-size', '9');
-        timeLabel.setAttribute('opacity', '0.7');
-        timeLabel.textContent = formatTime(bubble.startTime);
-        g.appendChild(timeLabel);
-      }
+    } else if (bubble.status === 'predicted') {
+      const tLabel = document.createElementNS(ns, 'text');
+      tLabel.setAttribute('x', String(labelPt.x)); tLabel.setAttribute('y', String(labelPt.y));
+      tLabel.setAttribute('text-anchor', 'middle'); tLabel.setAttribute('dominant-baseline', 'middle');
+      tLabel.setAttribute('fill', 'var(--text-light)'); tLabel.setAttribute('font-size', '9');
+      tLabel.setAttribute('opacity', '0.6');
+      tLabel.textContent = formatTime(bubble.startTime);
+      g.appendChild(tLabel);
     }
 
     svg.appendChild(g);

@@ -21,9 +21,9 @@ let cleanups: (() => void)[] = [];
 export function cleanupDashboard() {
   cleanups.forEach(fn => fn());
   cleanups = [];
-  // Remove FAB when leaving dashboard
-  const fab = document.querySelector('.fab');
-  if (fab) fab.remove();
+  // Remove FAB and menu when leaving dashboard
+  document.querySelector('.fab')?.remove();
+  document.querySelector('.fab-menu')?.remove();
 }
 
 export function renderDashboard(container: HTMLElement): void {
@@ -147,13 +147,15 @@ export function renderDashboard(container: HTMLElement): void {
     const isEvening = currentHour >= 20;
 
     if (isDeepNight) {
-      // Middle of the night - show sleep encouragement & wake-up time
+      // Middle of the night - show sleep encouragement & wake-up countdown
       arcCenter.appendChild(el('div', { className: 'arc-center-label' }, ['God natt 💤']));
       if (todayWakeUp?.wake_time) {
         const wakeTime = new Date(todayWakeUp.wake_time);
         const msUntilWake = wakeTime.getTime() - now.getTime();
         if (msUntilWake > 0) {
-          arcCenter.appendChild(el('span', { className: 'countdown-value' }, [formatDuration(msUntilWake)]));
+          const cd = renderCountdown(todayWakeUp.wake_time);
+          cleanups.push(cd.stop);
+          arcCenter.appendChild(cd.element);
           arcCenter.appendChild(el('div', { className: 'edit-start-link', style: { textDecoration: 'none', cursor: 'default', pointerEvents: 'auto' } }, [`Vaknar ${formatTime(todayWakeUp.wake_time)}`]));
         }
       }
@@ -228,42 +230,55 @@ export function renderDashboard(container: HTMLElement): void {
       cleanups.push(() => clearInterval(statsInterval));
     }
 
-    dash.appendChild(el('div', { className: 'stats-row' }, [
-      el('div', { className: 'stats-card' }, [
-        napCountEl,
-        el('div', { className: 'stat-label' }, ['Lurar']),
-      ]),
-      el('div', { className: 'stats-card' }, [
-        napTimeEl,
-        el('div', { className: 'stat-label' }, ['Lurtid']),
-      ]),
-      el('div', { className: 'stats-card' }, [
-        totalSleepEl,
-        el('div', { className: 'stat-label' }, ['Totalt']),
-      ]),
-      el('div', { className: 'stats-card' }, [
-        el('div', { className: 'stat-value' }, [String(state.diaperCount ?? 0)]),
-        el('div', { className: 'stat-label' }, ['Bleier']),
-      ]),
-    ]));
+    // Compact inline summary below arc
+    const summaryRow = el('div', { className: 'summary-row' }, [
+      el('span', null, [napCountEl, el('span', { className: 'summary-label' }, [' lurar'])]),
+      el('span', { className: 'summary-sep' }, ['·']),
+      el('span', null, [napTimeEl, el('span', { className: 'summary-label' }, [' lurtid'])]),
+      el('span', { className: 'summary-sep' }, ['·']),
+      el('span', null, [totalSleepEl, el('span', { className: 'summary-label' }, [' totalt'])]),
+    ]);
+    dash.appendChild(summaryRow);
   }
 
-  // Diaper quick log
-  const diaperCount = state.diaperCount ?? 0;
-
-  const diaperBtn = el('button', { className: 'diaper-quick-btn', 'data-testid': 'diaper-quick-btn' }, [`🧷 Bleie (${diaperCount} i dag)`]);
-  diaperBtn.addEventListener('click', () => showDiaperModal(baby, container));
-  dash.appendChild(diaperBtn);
+  // (Diaper logging moved to + FAB menu)
 
   view.appendChild(dash);
   container.appendChild(view);
 
-  // FAB for manual sleep entry (append to #app to avoid animation containing block)
+  // FAB with quick actions (append to #app to avoid animation containing block)
   const existingFab = document.querySelector('.fab');
   if (existingFab) existingFab.remove();
+  const existingFabMenu = document.querySelector('.fab-menu');
+  if (existingFabMenu) existingFabMenu.remove();
+
   const fab = el('button', { className: 'fab', 'data-testid': 'fab' }, ['+']);
-  fab.addEventListener('click', () => showManualSleepModal(baby, container));
-  document.getElementById('app')!.appendChild(fab);
+  const fabMenu = el('div', { className: 'fab-menu' }, [
+    el('button', { className: 'fab-item', 'data-testid': 'fab-sleep' }, ['😴 Legg til søvn']),
+    el('button', { className: 'fab-item', 'data-testid': 'fab-diaper' }, ['🧷 Logg bleie']),
+  ]);
+  fabMenu.style.display = 'none';
+
+  fab.addEventListener('click', () => {
+    const visible = fabMenu.style.display !== 'none';
+    fabMenu.style.display = visible ? 'none' : 'flex';
+    fab.textContent = visible ? '+' : '×';
+  });
+
+  fabMenu.querySelector('[data-testid="fab-sleep"]')!.addEventListener('click', () => {
+    fabMenu.style.display = 'none';
+    fab.textContent = '+';
+    showManualSleepModal(baby, container);
+  });
+  fabMenu.querySelector('[data-testid="fab-diaper"]')!.addEventListener('click', () => {
+    fabMenu.style.display = 'none';
+    fab.textContent = '+';
+    showDiaperModal(baby, container);
+  });
+
+  const appEl = document.getElementById('app')!;
+  appEl.appendChild(fabMenu);
+  appEl.appendChild(fab);
 }
 
 function toLocal(iso: string): string {
