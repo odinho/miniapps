@@ -21,7 +21,7 @@ let cleanups: (() => void)[] = [];
 export function cleanupDashboard() {
   cleanups.forEach(fn => fn());
   cleanups = [];
-  // Remove FAB and menu when leaving dashboard
+  // Clean up any lingering elements
   document.querySelector('.fab')?.remove();
   document.querySelector('.fab-menu')?.remove();
 }
@@ -125,6 +125,26 @@ export function renderDashboard(container: HTMLElement): void {
     prediction,
     isNightMode,
     wakeUpTime: todayWakeUp?.wake_time,
+    onStartClick: () => {
+      if (isNightMode) {
+        // Night start = bedtime was set, show details
+        showToast('Starten av natta', 'info');
+      } else {
+        // Day start = wake-up time, allow editing
+        showWakeUpPanel(baby, container);
+      }
+    },
+    onEndClick: () => {
+      if (isNightMode) {
+        // Night end = morning wake-up
+        showWakeUpPanel(baby, container);
+      } else {
+        // Day end = bedtime info
+        if (prediction?.bedtime) {
+          showToast(`Leggetid: ${formatTime(prediction.bedtime)}`, 'info');
+        }
+      }
+    },
   });
   const arcContainer = el('div', { className: 'arc-container' });
   arcContainer.appendChild(arcSvg);
@@ -197,9 +217,65 @@ export function renderDashboard(container: HTMLElement): void {
   }
 
   arcContainer.appendChild(arcCenter);
-  dash.appendChild(arcContainer);
 
-  // (Timer/countdown now shown in arc center — no duplicate card)
+  // Action buttons in the arc gap
+  const arcActions = el('div', { className: 'arc-actions' });
+  if (isNightMode) {
+    if (isSleeping) {
+      // During active night sleep: pause + diaper
+      const pauseActionBtn = el('button', { className: 'arc-action-btn night' }, [isPaused ? '▶️ Fortset' : '⏸️ Pause']);
+      pauseActionBtn.addEventListener('click', async () => {
+        const eventType = isPaused ? 'sleep.resumed' : 'sleep.paused';
+        const payload = isPaused
+          ? { sleepId: activeSleep!.id, resumeTime: new Date().toISOString() }
+          : { sleepId: activeSleep!.id, pauseTime: new Date().toISOString() };
+        try { const result = await postEvents([{ type: eventType, payload, clientId: getClientId() }]); setAppState(result.state); } catch { queueEvent(eventType, payload); }
+        renderDashboard(container);
+      });
+      arcActions.appendChild(pauseActionBtn);
+    } else {
+      // Night, not sleeping: night waking + morning
+      const nightBtn = el('button', { className: 'arc-action-btn night' }, ['🌙 Nattevaking']);
+      nightBtn.addEventListener('click', async () => {
+        const events = [{ type: 'sleep.started', payload: { babyId: baby.id, startTime: new Date().toISOString(), type: 'night' }, clientId: getClientId() }];
+        try { const result = await postEvents(events); setAppState(result.state); } catch { queueEvent('sleep.started', events[0].payload); }
+        renderDashboard(container);
+      });
+      const morningBtn = el('button', { className: 'arc-action-btn morning' }, ['☀️ Morgon']);
+      morningBtn.addEventListener('click', () => showWakeUpPanel(baby, container));
+      arcActions.appendChild(nightBtn);
+      arcActions.appendChild(morningBtn);
+    }
+  } else {
+    if (isSleeping) {
+      // Sleeping during day: pause + wake
+      const pauseActionBtn = el('button', { className: 'arc-action-btn nap' }, [isPaused ? '▶️ Fortset' : '⏸️ Pause']);
+      pauseActionBtn.addEventListener('click', async () => {
+        const eventType = isPaused ? 'sleep.resumed' : 'sleep.paused';
+        const payload = isPaused
+          ? { sleepId: activeSleep!.id, resumeTime: new Date().toISOString() }
+          : { sleepId: activeSleep!.id, pauseTime: new Date().toISOString() };
+        try { const result = await postEvents([{ type: eventType, payload, clientId: getClientId() }]); setAppState(result.state); } catch { queueEvent(eventType, payload); }
+        renderDashboard(container);
+      });
+      arcActions.appendChild(pauseActionBtn);
+    } else {
+      // Daytime, awake: nap + diaper
+      const napBtn = el('button', { className: 'arc-action-btn nap' }, ['😴 Lur']);
+      napBtn.addEventListener('click', async () => {
+        const events = [{ type: 'sleep.started', payload: { babyId: baby.id, startTime: new Date().toISOString(), type: 'nap' }, clientId: getClientId() }];
+        try { const result = await postEvents(events); setAppState(result.state); } catch { queueEvent('sleep.started', events[0].payload); }
+        renderDashboard(container);
+      });
+      const diaperBtn = el('button', { className: 'arc-action-btn diaper' }, ['🧷 Bleie']);
+      diaperBtn.addEventListener('click', () => showDiaperModal(baby, container));
+      arcActions.appendChild(napBtn);
+      arcActions.appendChild(diaperBtn);
+    }
+  }
+  arcContainer.appendChild(arcActions);
+
+  dash.appendChild(arcContainer);
 
   // Today's stats
   if (stats) {
@@ -241,44 +317,8 @@ export function renderDashboard(container: HTMLElement): void {
     dash.appendChild(summaryRow);
   }
 
-  // (Diaper logging moved to + FAB menu)
-
   view.appendChild(dash);
   container.appendChild(view);
-
-  // FAB with quick actions (append to #app to avoid animation containing block)
-  const existingFab = document.querySelector('.fab');
-  if (existingFab) existingFab.remove();
-  const existingFabMenu = document.querySelector('.fab-menu');
-  if (existingFabMenu) existingFabMenu.remove();
-
-  const fab = el('button', { className: 'fab', 'data-testid': 'fab' }, ['+']);
-  const fabMenu = el('div', { className: 'fab-menu' }, [
-    el('button', { className: 'fab-item', 'data-testid': 'fab-sleep' }, ['😴 Legg til søvn']),
-    el('button', { className: 'fab-item', 'data-testid': 'fab-diaper' }, ['🧷 Logg bleie']),
-  ]);
-  fabMenu.style.display = 'none';
-
-  fab.addEventListener('click', () => {
-    const visible = fabMenu.style.display !== 'none';
-    fabMenu.style.display = visible ? 'none' : 'flex';
-    fab.textContent = visible ? '+' : '×';
-  });
-
-  fabMenu.querySelector('[data-testid="fab-sleep"]')!.addEventListener('click', () => {
-    fabMenu.style.display = 'none';
-    fab.textContent = '+';
-    showManualSleepModal(baby, container);
-  });
-  fabMenu.querySelector('[data-testid="fab-diaper"]')!.addEventListener('click', () => {
-    fabMenu.style.display = 'none';
-    fab.textContent = '+';
-    showDiaperModal(baby, container);
-  });
-
-  const appEl = document.getElementById('app')!;
-  appEl.appendChild(fabMenu);
-  appEl.appendChild(fab);
 }
 
 function toLocal(iso: string): string {
@@ -568,6 +608,45 @@ function showDiaperModal(baby: any, container: HTMLElement): void {
       close();
       renderDashboard(container);
     } catch {
+      showToast('Klarte ikkje lagra', 'error');
+    }
+  });
+
+  cancelBtn.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  modal.appendChild(el('div', { className: 'btn-row' }, [cancelBtn, saveBtn]));
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  function close() { overlay.remove(); }
+}
+
+function showWakeUpPanel(baby: any, container: HTMLElement): void {
+  const overlay = el('div', { className: 'modal-overlay', 'data-testid': 'modal-overlay' });
+  const modal = el('div', { className: 'modal' });
+
+  const now = new Date();
+  const wakeTimeDt = makeDateTimeInputs(now.toISOString());
+
+  modal.appendChild(el('h2', null, ['☀️ God morgon!']));
+  modal.appendChild(el('p', { style: { color: 'var(--text-light)', marginBottom: '16px', fontSize: '0.9rem' } }, ['Når vakna babyen?']));
+  modal.appendChild(dateTimeGroup('Vaknetid', wakeTimeDt));
+
+  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Lagra']);
+  const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Avbryt']);
+
+  saveBtn.addEventListener('click', async () => {
+    const wakeTime = new Date(wakeTimeDt.getValue());
+    if (isNaN(wakeTime.getTime())) { showToast('Ugyldig tid', 'warning'); return; }
+    try {
+      const result = await postEvents([{ type: 'day.started', payload: { babyId: baby.id, wakeTime: wakeTime.toISOString() }, clientId: getClientId() }]);
+      setAppState(result.state);
+      showToast('Vaknetid sett', 'success');
+      close();
+      renderDashboard(container);
+    } catch {
+      queueEvent('day.started', { babyId: baby.id, wakeTime: wakeTime.toISOString() });
       showToast('Klarte ikkje lagra', 'error');
     }
   });

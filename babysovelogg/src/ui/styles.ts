@@ -799,6 +799,66 @@ html, body {
   50% { opacity: 1; }
 }
 
+/* Arc action buttons in the gap */
+.arc-actions {
+  position: absolute;
+  bottom: 4%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 2;
+}
+
+.arc-action-btn {
+  padding: 8px 18px;
+  border-radius: 20px;
+  border: none;
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 36px;
+  transition: transform 0.15s, box-shadow 0.2s;
+  white-space: nowrap;
+}
+.arc-action-btn:active { transform: scale(0.95); }
+
+.arc-action-btn.nap {
+  background: var(--lavender);
+  color: var(--text);
+}
+.arc-action-btn.diaper {
+  background: var(--peach);
+  color: #4a3f5c;
+}
+.arc-action-btn.night {
+  background: var(--moon);
+  color: var(--white);
+}
+.arc-action-btn.morning {
+  background: linear-gradient(135deg, var(--sun), var(--sun-glow));
+  color: #4a3f5c;
+}
+
+[data-theme="night"] .arc-action-btn.nap {
+  background: rgba(184, 169, 212, 0.25);
+  color: var(--text);
+}
+[data-theme="night"] .arc-action-btn.diaper {
+  background: rgba(248, 213, 196, 0.2);
+  color: var(--peach);
+}
+[data-theme="night"] .arc-action-btn.night {
+  box-shadow: 0 0 12px rgba(184, 169, 212, 0.3);
+}
+
+/* Arc endpoint icons */
+.arc-endpoint-icon { cursor: pointer; }
+.arc-endpoint-icon:hover circle:first-child {
+  opacity: 0.8;
+}
+
 .arc-center-text {
   position: absolute;
   top: 50%;

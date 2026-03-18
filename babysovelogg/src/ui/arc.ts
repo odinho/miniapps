@@ -73,6 +73,8 @@ export interface ArcInput {
   prediction: { nextNap: string; bedtime?: string; predictedNaps?: Array<{ startTime: string; endTime: string }> } | null;
   isNightMode: boolean;
   wakeUpTime?: string | null;
+  onStartClick?: () => void;
+  onEndClick?: () => void;
 }
 
 export function renderArc(input: ArcInput): SVGElement {
@@ -114,15 +116,41 @@ export function renderArc(input: ArcInput): SVGElement {
   trackPath.setAttribute('stroke-linecap', 'round');
   svg.appendChild(trackPath);
 
-  // Small endpoint dots at the gap
+  // Clickable endpoint icons at the arc gap
   const startPt = fracToPoint(0, cx, cy, r);
   const endPt = fracToPoint(1, cx, cy, r);
-  for (const pt of [startPt, endPt]) {
-    const dot = document.createElementNS(ns, 'circle');
-    dot.setAttribute('cx', String(pt.x)); dot.setAttribute('cy', String(pt.y));
-    dot.setAttribute('r', '3');
-    dot.setAttribute('fill', isNight ? 'rgba(200, 190, 230, 0.5)' : 'var(--lavender-dark)');
-    svg.appendChild(dot);
+  const startIcon = isNight ? '🌙' : '☀️';
+  const endIcon = isNight ? '☀️' : '🌙';
+
+  for (const [pt, icon, handler] of [
+    [startPt, startIcon, input.onStartClick],
+    [endPt, endIcon, input.onEndClick],
+  ] as [{ x: number; y: number }, string, (() => void) | undefined][]) {
+    const g = document.createElementNS(ns, 'g');
+    g.setAttribute('class', 'arc-endpoint-icon');
+    // Glow circle behind icon
+    const glow = document.createElementNS(ns, 'circle');
+    glow.setAttribute('cx', String(pt.x)); glow.setAttribute('cy', String(pt.y));
+    glow.setAttribute('r', '16');
+    glow.setAttribute('fill', isNight ? 'rgba(100, 90, 150, 0.3)' : 'rgba(232, 223, 245, 0.6)');
+    g.appendChild(glow);
+    // Icon text
+    const txt = document.createElementNS(ns, 'text');
+    txt.setAttribute('x', String(pt.x)); txt.setAttribute('y', String(pt.y + 1));
+    txt.setAttribute('font-size', '18');
+    txt.setAttribute('text-anchor', 'middle');
+    txt.setAttribute('dominant-baseline', 'middle');
+    txt.textContent = icon;
+    g.appendChild(txt);
+    // Transparent tap target
+    const tap = document.createElementNS(ns, 'circle');
+    tap.setAttribute('cx', String(pt.x)); tap.setAttribute('cy', String(pt.y));
+    tap.setAttribute('r', '24');
+    tap.setAttribute('fill', 'transparent');
+    tap.setAttribute('style', 'cursor:pointer');
+    if (handler) tap.addEventListener('click', handler);
+    g.appendChild(tap);
+    svg.appendChild(g);
   }
 
   // Current time indicator
