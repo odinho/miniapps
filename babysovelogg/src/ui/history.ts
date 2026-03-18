@@ -21,13 +21,13 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
   ];
   entries.sort((a, b) => new Date(b._sortTime).getTime() - new Date(a._sortTime).getTime());
 
-  view.appendChild(el('h2', { className: 'history-header' }, ['History']));
+  view.appendChild(el('h2', { className: 'history-header' }, ['Logg']));
 
   if (entries.length === 0) {
     view.appendChild(el('div', { className: 'history-empty' }, [
       el('div', { style: { fontSize: '3rem', marginBottom: '16px' } }, ['📋']),
-      el('div', null, ['No entries yet']),
-      el('div', { style: { fontSize: '0.9rem', marginTop: '8px' } }, ['Tap the sleep button on the home screen to start tracking']),
+      el('div', null, ['Ingen oppføringar enno']),
+      el('div', { style: { fontSize: '0.9rem', marginTop: '8px' } }, ['Trykk på søvnknappen på heimeskjermen for å starta']),
     ]));
     container.appendChild(view);
     return;
@@ -51,7 +51,9 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
   for (const [date, dayEntries] of grouped) {
     const d = new Date(date + 'T12:00:00');
     const isToday = date === todayLocal;
-    const label = isToday ? 'Today' : d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+    const yesterdayLocal = (() => { const y = new Date(); y.setDate(y.getDate() - 1); return toLocalDate(y.toISOString()); })();
+    const isYesterday = date === yesterdayLocal;
+    const label = isToday ? 'I dag' : isYesterday ? 'I går' : d.toLocaleDateString('nb-NO', { weekday: 'short', month: 'short', day: 'numeric' });
 
     log.appendChild(el('div', { style: { fontSize: '0.8rem', color: 'var(--text-light)', padding: '8px 4px 4px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.03em' } }, [label]));
 
@@ -72,7 +74,7 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
         const times = `${formatTime(entry.start_time)} — ${entry.end_time ? formatTime(entry.end_time) : 'now'}`;
 
         const entryPauses: any[] = entry.pauses || [];
-        const metaChildren: (Node | string)[] = [entry.type === 'night' ? 'Night sleep' : 'Nap'];
+        const metaChildren: (Node | string)[] = [entry.type === 'night' ? 'Nattesøvn' : 'Lur'];
         if (entryPauses.length > 0) {
           let totalPauseMs = 0;
           for (const p of entryPauses) {
@@ -81,7 +83,7 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
             totalPauseMs += pe - ps;
           }
           const pauseMin = Math.floor(totalPauseMs / 60000);
-          metaChildren.push(` · ${entryPauses.length} pause${entryPauses.length > 1 ? 's' : ''} (${pauseMin}m)`);
+          metaChildren.push(` · ${entryPauses.length} pause${entryPauses.length > 1 ? 'r' : ''} (${pauseMin}m)`);
         }
         if (entry.mood || entry.method) {
           const badges: (Node | string)[] = [];
@@ -110,7 +112,7 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
             el('div', { className: 'log-times' }, [formatTime(entry.time)]),
             el('div', { className: 'log-meta' }, [meta]),
           ]),
-          el('span', { className: 'log-duration' }, ['Diaper']),
+          el('span', { className: 'log-duration' }, ['Bleie']),
         ]);
         item.addEventListener('click', () => showDiaperEditModal(entry, container));
         log.appendChild(item);
@@ -190,16 +192,16 @@ function showEditModal(entry: any, container: HTMLElement): void {
     return pill;
   });
 
-  modal.appendChild(el('h2', null, ['Edit Sleep']));
+  modal.appendChild(el('h2', null, ['Endra søvn']));
   modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Type']), el('div', { className: 'type-pills' }, [napPill, nightPill])]));
   modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Start']), el('div', { className: 'datetime-row' }, [startDateInput, startTimeInput])]));
-  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['End']), el('div', { className: 'datetime-row' }, [endDateInput, endTimeInput])]));
-  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Mood']), el('div', { className: 'tag-pills' }, moodPills)]));
-  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Method']), el('div', { className: 'tag-pills' }, methodPills)]));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Slutt']), el('div', { className: 'datetime-row' }, [endDateInput, endTimeInput])]));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Humør']), el('div', { className: 'tag-pills' }, moodPills)]));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Metode']), el('div', { className: 'tag-pills' }, methodPills)]));
 
-  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Save']);
-  const deleteBtn = el('button', { className: 'btn btn-danger' }, ['Delete']);
-  const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Cancel']);
+  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Lagra']);
+  const deleteBtn = el('button', { className: 'btn btn-danger' }, ['Slett']);
+  const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Avbryt']);
 
   saveBtn.addEventListener('click', async () => {
     await postEvents([{
@@ -220,7 +222,7 @@ function showEditModal(entry: any, container: HTMLElement): void {
   });
 
   deleteBtn.addEventListener('click', async () => {
-    const confirmed = await showConfirm('Delete this sleep entry? This cannot be undone.');
+    const confirmed = await showConfirm('Sletta denne søvnoppføringa? Dette kan ikkje angrast.', 'Slett', 'Avbryt');
     if (confirmed) {
       await postEvents([{ type: 'sleep.deleted', payload: { sleepId: entry.id }, clientId: getClientId() }]);
       close();
@@ -246,7 +248,7 @@ function showDiaperEditModal(entry: any, container: HTMLElement): void {
   const overlay = el('div', { className: 'modal-overlay', 'data-testid': 'modal-overlay' });
   const modal = el('div', { className: 'modal' });
 
-  modal.appendChild(el('h2', null, ['Diaper Details']));
+  modal.appendChild(el('h2', null, ['Bleiedetaljar']));
 
   // Editable type pills
   let selectedType = entry.type;
@@ -281,20 +283,20 @@ function showDiaperEditModal(entry: any, container: HTMLElement): void {
     });
     return pill;
   });
-  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Amount']), el('div', { className: 'type-pills' }, amountPills)]));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Mengd']), el('div', { className: 'type-pills' }, amountPills)]));
 
   // Note
-  const noteInput = el('input', { type: 'text', placeholder: 'Optional note...', value: entry.note || '' }) as HTMLInputElement;
-  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Note']), noteInput]));
+  const noteInput = el('input', { type: 'text', placeholder: 'Valfritt notat...', value: entry.note || '' }) as HTMLInputElement;
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Notat']), noteInput]));
 
   // Time display
-  modal.appendChild(el('div', { style: { color: 'var(--text-light)', fontSize: '0.85rem', marginBottom: '16px' } }, [`Logged at ${formatTime(entry.time)}`]));
+  modal.appendChild(el('div', { style: { color: 'var(--text-light)', fontSize: '0.85rem', marginBottom: '16px' } }, [`Logga kl. ${formatTime(entry.time)}`]));
 
-  const deleteBtn = el('button', { className: 'btn btn-danger' }, ['Delete']);
-  const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Close']);
+  const deleteBtn = el('button', { className: 'btn btn-danger' }, ['Slett']);
+  const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Lukk']);
 
   deleteBtn.addEventListener('click', async () => {
-    const confirmed = await showConfirm('Delete this diaper entry? This cannot be undone.');
+    const confirmed = await showConfirm('Sletta denne bleieoppføringa? Dette kan ikkje angrast.', 'Slett', 'Avbryt');
     if (confirmed) {
       await postEvents([{ type: 'diaper.deleted', payload: { diaperId: entry.id }, clientId: getClientId() }]);
       close();

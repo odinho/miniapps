@@ -45,10 +45,10 @@ async function main() {
   // Bottom nav
   const nav = el('nav', { className: 'nav-bar' });
   const tabs = [
-    { icon: '☀️', label: 'Home', hash: '#/' },
-    { icon: '📋', label: 'History', hash: '#/history' },
-    { icon: '📊', label: 'Stats', hash: '#/stats' },
-    { icon: '⚙️', label: 'Settings', hash: '#/settings' },
+    { icon: '🏠', label: 'Heim', hash: '#/' },
+    { icon: '📋', label: 'Logg', hash: '#/history' },
+    { icon: '📊', label: 'Statistikk', hash: '#/stats' },
+    { icon: '⚙️', label: 'Innstillingar', hash: '#/settings' },
   ];
   const tabButtons: HTMLButtonElement[] = [];
   for (const tab of tabs) {
@@ -60,9 +60,9 @@ async function main() {
     tabButtons.push(btn);
     nav.appendChild(btn);
   }
-  // Sync indicator dot
+  // Sync indicator dot (subtle, inside the nav)
   const syncDot = el('span', { id: 'sync-dot' });
-  Object.assign(syncDot.style, { width: '8px', height: '8px', borderRadius: '50%', background: '#999', position: 'absolute', top: '6px', right: '6px' });
+  Object.assign(syncDot.style, { width: '6px', height: '6px', borderRadius: '50%', background: 'var(--success)', position: 'absolute', top: '8px', right: '8px', opacity: '0.6' });
   nav.style.position = 'relative';
   nav.appendChild(syncDot);
   app.appendChild(nav);

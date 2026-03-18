@@ -54,7 +54,7 @@ export function renderDashboard(container: HTMLElement): void {
   // Header row: baby info + sleep button
   const btn = el('button', { className: `sleep-button ${isSleeping ? 'sleeping' : 'awake'}`, 'data-testid': 'sleep-button' }, [
     el('span', { className: 'icon' }, [isSleeping ? '🌙' : '☀️']),
-    el('span', { className: 'label' }, [isSleeping ? 'Wake' : 'Sleep']),
+    el('span', { className: 'label' }, [isSleeping ? 'Vakn' : 'Sov']),
   ]);
 
   dash.appendChild(
@@ -96,7 +96,7 @@ export function renderDashboard(container: HTMLElement): void {
   // Pause/resume button when sleeping
   if (isSleeping && activeSleep) {
     const pauseBtn = el('button', { className: `btn ${isPaused ? 'btn-primary' : 'btn-ghost'} pause-btn`, 'data-testid': 'pause-btn' }, [
-      isPaused ? '▶️ Resume' : '⏸️ Pause',
+      isPaused ? '▶️ Fortset' : '⏸️ Pause',
     ]);
     pauseBtn.addEventListener('click', async () => {
       const eventType = isPaused ? 'sleep.resumed' : 'sleep.paused';
@@ -132,9 +132,9 @@ export function renderDashboard(container: HTMLElement): void {
   if (isSleeping && activeSleep) {
     const arcTimer = renderTimerWithPauses(activeSleep.start_time, () => calcPauseMs(pauses), isPaused);
     cleanups.push(arcTimer.stop);
-    arcCenter.appendChild(el('div', { className: 'arc-center-label' }, [isPaused ? '⏸️ Paused' : activeSleep.type === 'night' ? '💤 Sleeping' : '😴 Napping']));
+    arcCenter.appendChild(el('div', { className: 'arc-center-label' }, [isPaused ? '⏸️ Pause' : activeSleep.type === 'night' ? '💤 Søv' : '😴 Lurar']));
     arcCenter.appendChild(arcTimer.element);
-    const editLink = el('span', { className: 'edit-start-link' }, ['Started ' + formatTime(activeSleep.start_time)]);
+    const editLink = el('span', { className: 'edit-start-link' }, ['Starta ' + formatTime(activeSleep.start_time)]);
     editLink.addEventListener('click', () => showEditStartModal(activeSleep, container));
     arcCenter.appendChild(editLink);
   } else {
@@ -145,13 +145,13 @@ export function renderDashboard(container: HTMLElement): void {
 
     if (isDeepNight) {
       // Middle of the night - show sleep encouragement & wake-up time
-      arcCenter.appendChild(el('div', { className: 'arc-center-label' }, ['Good night 💤']));
+      arcCenter.appendChild(el('div', { className: 'arc-center-label' }, ['God natt 💤']));
       if (todayWakeUp?.wake_time) {
         const wakeTime = new Date(todayWakeUp.wake_time);
         const msUntilWake = wakeTime.getTime() - now.getTime();
         if (msUntilWake > 0) {
           arcCenter.appendChild(el('span', { className: 'countdown-value' }, [formatDuration(msUntilWake)]));
-          arcCenter.appendChild(el('div', { className: 'edit-start-link', style: { textDecoration: 'none', cursor: 'default', pointerEvents: 'auto' } }, [`Wake-up ${formatTime(todayWakeUp.wake_time)}`]));
+          arcCenter.appendChild(el('div', { className: 'edit-start-link', style: { textDecoration: 'none', cursor: 'default', pointerEvents: 'auto' } }, [`Vaknar ${formatTime(todayWakeUp.wake_time)}`]));
         }
       }
     } else if (prediction?.nextNap) {
@@ -163,19 +163,19 @@ export function renderDashboard(container: HTMLElement): void {
         const bedtime = new Date(prediction.bedtime);
         const bedtimeInPast = bedtime.getTime() < now.getTime();
         if (bedtimeInPast) {
-          arcCenter.appendChild(el('div', { className: 'arc-center-label' }, ['Past bedtime']));
+          arcCenter.appendChild(el('div', { className: 'arc-center-label' }, ['Etter leggetid']));
           arcCenter.appendChild(el('span', { className: 'countdown-value' }, [formatTime(prediction.bedtime)]));
         } else {
           const cd = renderCountdown(prediction.bedtime);
           cleanups.push(cd.stop);
-          arcCenter.appendChild(el('div', { className: 'arc-center-label' }, ['Bedtime in']));
+          arcCenter.appendChild(el('div', { className: 'arc-center-label' }, ['Leggetid om']));
           arcCenter.appendChild(cd.element);
           arcCenter.appendChild(el('div', { className: 'edit-start-link', style: { textDecoration: 'none', cursor: 'default', pointerEvents: 'auto' } }, [formatTime(prediction.bedtime)]));
         }
       } else if (hoursUntilNap > 0) {
         const cd = renderCountdown(prediction.nextNap);
         cleanups.push(cd.stop);
-        arcCenter.appendChild(el('div', { className: 'arc-center-label' }, ['Next nap']));
+        arcCenter.appendChild(el('div', { className: 'arc-center-label' }, ['Neste lur']));
         arcCenter.appendChild(cd.element);
       }
 
@@ -185,7 +185,7 @@ export function renderDashboard(container: HTMLElement): void {
       if (awakeSince) {
         const awakeMs = now.getTime() - new Date(awakeSince).getTime();
         if (awakeMs > 60000) {
-          arcCenter.appendChild(el('div', { className: 'edit-start-link', style: { textDecoration: 'none', cursor: 'default', pointerEvents: 'auto' } }, [`Awake ${formatDuration(awakeMs)}`]));
+          arcCenter.appendChild(el('div', { className: 'edit-start-link', style: { textDecoration: 'none', cursor: 'default', pointerEvents: 'auto' } }, [`Vaken ${formatDuration(awakeMs)}`]));
         }
       }
     }
@@ -228,19 +228,19 @@ export function renderDashboard(container: HTMLElement): void {
     dash.appendChild(el('div', { className: 'stats-row' }, [
       el('div', { className: 'stats-card' }, [
         napCountEl,
-        el('div', { className: 'stat-label' }, ['Naps']),
+        el('div', { className: 'stat-label' }, ['Lurar']),
       ]),
       el('div', { className: 'stats-card' }, [
         napTimeEl,
-        el('div', { className: 'stat-label' }, ['Nap time']),
+        el('div', { className: 'stat-label' }, ['Lurtid']),
       ]),
       el('div', { className: 'stats-card' }, [
         totalSleepEl,
-        el('div', { className: 'stat-label' }, ['Total']),
+        el('div', { className: 'stat-label' }, ['Totalt']),
       ]),
       el('div', { className: 'stats-card' }, [
         el('div', { className: 'stat-value' }, [String(state.diaperCount ?? 0)]),
-        el('div', { className: 'stat-label' }, ['Diapers']),
+        el('div', { className: 'stat-label' }, ['Bleier']),
       ]),
     ]));
   }
@@ -248,7 +248,7 @@ export function renderDashboard(container: HTMLElement): void {
   // Diaper quick log
   const diaperCount = state.diaperCount ?? 0;
 
-  const diaperBtn = el('button', { className: 'diaper-quick-btn', 'data-testid': 'diaper-quick-btn' }, [`🧷 Diaper (${diaperCount} today)`]);
+  const diaperBtn = el('button', { className: 'diaper-quick-btn', 'data-testid': 'diaper-quick-btn' }, [`🧷 Bleie (${diaperCount} i dag)`]);
   diaperBtn.addEventListener('click', () => showDiaperModal(baby, container));
   dash.appendChild(diaperBtn);
 
@@ -308,19 +308,19 @@ function showManualSleepModal(baby: any, container: HTMLElement): void {
   napPill.addEventListener('click', () => { selectedType = 'nap'; updatePills(); });
   nightPill.addEventListener('click', () => { selectedType = 'night'; updatePills(); });
 
-  modal.appendChild(el('h2', null, ['Add Sleep']));
+  modal.appendChild(el('h2', null, ['Legg til søvn']));
   modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Type']), el('div', { className: 'type-pills' }, [napPill, nightPill])]));
   modal.appendChild(dateTimeGroup('Start', startDt));
-  modal.appendChild(dateTimeGroup('End', endDt));
+  modal.appendChild(dateTimeGroup('Slutt', endDt));
 
-  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Save']);
-  const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Cancel']);
+  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Lagra']);
+  const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Avbryt']);
 
   saveBtn.addEventListener('click', async () => {
     const start = new Date(startDt.getValue());
     const end = new Date(endDt.getValue());
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) { showToast('Please fill in both times', 'warning'); return; }
-    if (end <= start) { showToast('End must be after start', 'warning'); return; }
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) { showToast('Fyll inn begge tidene', 'warning'); return; }
+    if (end <= start) { showToast('Slutt må vera etter start', 'warning'); return; }
 
     try {
       const result = await postEvents([{
@@ -329,11 +329,11 @@ function showManualSleepModal(baby: any, container: HTMLElement): void {
         clientId: getClientId(),
       }]);
       setAppState(result.state);
-      showToast('Sleep entry added', 'success');
+      showToast('Søvn lagt til', 'success');
       close();
       renderDashboard(container);
     } catch {
-      showToast('Failed to save', 'error');
+      showToast('Klarte ikkje lagra', 'error');
     }
   });
 
@@ -353,15 +353,15 @@ function showEditStartModal(activeSleep: any, container: HTMLElement): void {
 
   const startDt = makeDateTimeInputs(activeSleep.start_time);
 
-  modal.appendChild(el('h2', null, ['Edit Start Time']));
-  modal.appendChild(dateTimeGroup('Started at', startDt));
+  modal.appendChild(el('h2', null, ['Endra starttid']));
+  modal.appendChild(dateTimeGroup('Starta kl.', startDt));
 
-  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Save']);
-  const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Cancel']);
+  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Lagra']);
+  const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Avbryt']);
 
   saveBtn.addEventListener('click', async () => {
     const start = new Date(startDt.getValue());
-    if (isNaN(start.getTime())) { showToast('Invalid time', 'warning'); return; }
+    if (isNaN(start.getTime())) { showToast('Ugyldig tid', 'warning'); return; }
     try {
       const result = await postEvents([{
         type: 'sleep.updated',
@@ -369,11 +369,11 @@ function showEditStartModal(activeSleep: any, container: HTMLElement): void {
         clientId: getClientId(),
       }]);
       setAppState(result.state);
-      showToast('Start time updated', 'success');
+      showToast('Starttid oppdatert', 'success');
       close();
       renderDashboard(container);
     } catch {
-      showToast('Failed to update', 'error');
+      showToast('Klarte ikkje oppdatera', 'error');
     }
   });
 
@@ -388,19 +388,19 @@ function showEditStartModal(activeSleep: any, container: HTMLElement): void {
 }
 
 const MOODS = [
-  { value: 'happy', label: '😊', title: 'Happy' },
+  { value: 'happy', label: '😊', title: 'Glad' },
   { value: 'normal', label: '😐', title: 'Normal' },
-  { value: 'upset', label: '😢', title: 'Upset' },
-  { value: 'fighting', label: '😤', title: 'Fighting sleep' },
+  { value: 'upset', label: '😢', title: 'Uroleg' },
+  { value: 'fighting', label: '😤', title: 'Kjempa mot' },
 ];
 
 const METHODS = [
-  { value: 'bed', label: '🛏️', title: 'In bed' },
-  { value: 'nursing', label: '🤱', title: 'Nursing' },
-  { value: 'held', label: '🤗', title: 'Held/worn' },
-  { value: 'stroller', label: '🚼', title: 'Stroller' },
-  { value: 'car', label: '🚗', title: 'Car' },
-  { value: 'bottle', label: '🍼', title: 'Bottle' },
+  { value: 'bed', label: '🛏️', title: 'I senga' },
+  { value: 'nursing', label: '🤱', title: 'Amming' },
+  { value: 'held', label: '🤗', title: 'Boren' },
+  { value: 'stroller', label: '🚼', title: 'Vogn' },
+  { value: 'car', label: '🚗', title: 'Bil' },
+  { value: 'bottle', label: '🍼', title: 'Flaske' },
 ];
 
 function showTagSheet(sleepId: number, container: HTMLElement): void {
@@ -410,11 +410,11 @@ function showTagSheet(sleepId: number, container: HTMLElement): void {
   let selectedMood: string | null = null;
   let selectedMethod: string | null = null;
 
-  modal.appendChild(el('h2', null, ['How did it go?']));
+  modal.appendChild(el('h2', null, ['Korleis gjekk det?']));
 
   // Mood selection
   modal.appendChild(el('div', { className: 'form-group' }, [
-    el('label', null, ['Mood']),
+    el('label', null, ['Humør']),
     el('div', { className: 'tag-pills' }, MOODS.map(m => {
       const pill = el('button', {
         className: 'tag-pill',
@@ -431,7 +431,7 @@ function showTagSheet(sleepId: number, container: HTMLElement): void {
 
   // Method selection
   modal.appendChild(el('div', { className: 'form-group' }, [
-    el('label', null, ['Method']),
+    el('label', null, ['Metode']),
     el('div', { className: 'tag-pills' }, METHODS.map(m => {
       const pill = el('button', {
         className: 'tag-pill',
@@ -446,8 +446,8 @@ function showTagSheet(sleepId: number, container: HTMLElement): void {
     })),
   ]));
 
-  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Save']);
-  const skipBtn = el('button', { className: 'btn btn-ghost' }, ['Skip']);
+  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Lagra']);
+  const skipBtn = el('button', { className: 'btn btn-ghost' }, ['Hopp over']);
 
   saveBtn.addEventListener('click', async () => {
     if (selectedMood || selectedMethod) {
@@ -519,20 +519,20 @@ function showDiaperModal(baby: any, container: HTMLElement): void {
   });
 
   const timeDt = makeDateTimeInputs(new Date().toISOString());
-  const noteInput = el('input', { type: 'text', placeholder: 'Optional note...' }) as HTMLInputElement;
+  const noteInput = el('input', { type: 'text', placeholder: 'Valfritt notat...' }) as HTMLInputElement;
 
-  modal.appendChild(el('h2', null, ['Log Diaper']));
+  modal.appendChild(el('h2', null, ['Logg bleie']));
   modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Type']), el('div', { className: 'type-pills diaper-type-pills' }, typePills)]));
-  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Amount']), el('div', { className: 'type-pills' }, amountPills)]));
-  modal.appendChild(dateTimeGroup('Time', timeDt));
-  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Note']), noteInput]));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Mengd']), el('div', { className: 'type-pills' }, amountPills)]));
+  modal.appendChild(dateTimeGroup('Tid', timeDt));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Notat']), noteInput]));
 
-  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Save']);
-  const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Cancel']);
+  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Lagra']);
+  const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Avbryt']);
 
   saveBtn.addEventListener('click', async () => {
     const time = new Date(timeDt.getValue());
-    if (isNaN(time.getTime())) { showToast('Invalid time', 'warning'); return; }
+    if (isNaN(time.getTime())) { showToast('Ugyldig tid', 'warning'); return; }
     try {
       const result = await postEvents([{
         type: 'diaper.logged',
@@ -546,11 +546,11 @@ function showDiaperModal(baby: any, container: HTMLElement): void {
         clientId: getClientId(),
       }]);
       setAppState(result.state);
-      showToast('Diaper logged', 'success');
+      showToast('Bleie logga', 'success');
       close();
       renderDashboard(container);
     } catch {
-      showToast('Failed to save', 'error');
+      showToast('Klarte ikkje lagra', 'error');
     }
   });
 
@@ -569,22 +569,22 @@ function showMorningPrompt(baby: any, container: HTMLElement): void {
   
   const prompt = el('div', { className: 'morning-prompt', 'data-testid': 'morning-prompt' }, [
     el('div', { className: 'morning-icon', 'data-testid': 'morning-icon' }, ['🌅']),
-    el('h2', null, ['Good morning!']),
-    el('p', null, ['When did your baby wake up today?']),
+    el('h2', null, ['God morgon!']),
+    el('p', null, ['Når vakna babyen i dag?']),
   ]);
   
   const now = new Date();
   const wakeTimeDt = makeDateTimeInputs(now.toISOString());
   
-  prompt.appendChild(dateTimeGroup('Wake-up time', wakeTimeDt));
+  prompt.appendChild(dateTimeGroup('Vaknetid', wakeTimeDt));
   
-  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Set Wake-up Time']);
-  const skipBtn = el('button', { className: 'btn btn-ghost' }, ['Skip for now']);
+  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Sett vaknetid']);
+  const skipBtn = el('button', { className: 'btn btn-ghost' }, ['Hopp over']);
   
   saveBtn.addEventListener('click', async () => {
     const wakeTime = new Date(wakeTimeDt.getValue());
     if (isNaN(wakeTime.getTime())) {
-      showToast('Invalid time', 'warning');
+      showToast('Ugyldig tid', 'warning');
       return;
     }
     
@@ -595,7 +595,7 @@ function showMorningPrompt(baby: any, container: HTMLElement): void {
         clientId: getClientId(),
       }]);
       setAppState(result.state);
-      showToast('Wake-up time set', 'success');
+      showToast('Vaknetid sett', 'success');
       renderDashboard(container);
     } catch {
       queueEvent('day.started', { babyId: baby.id, wakeTime: wakeTime.toISOString() });

@@ -10,7 +10,7 @@ function svgEl(tag: string, attrs: Record<string, string> = {}): SVGElement {
 
 function dayLabel(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
-  return d.toLocaleDateString([], { weekday: 'short' });
+  return d.toLocaleDateString('nb-NO', { weekday: 'short' });
 }
 
 function renderBarChart(weekStats: WeekStats): SVGElement {
@@ -99,17 +99,17 @@ export async function renderStats(container: HTMLElement): Promise<void> {
   const view = el('div', { className: 'view stats-view' });
   container.appendChild(view);
 
-  view.appendChild(el('h1', { className: 'history-header' }, ['📊 Statistics']));
+  view.appendChild(el('h1', { className: 'history-header' }, ['📊 Statistikk']));
 
   // Loading
-  const loading = el('div', { className: 'history-empty' }, ['Loading...']);
+  const loading = el('div', { className: 'history-empty' }, ['Lastar...']);
   view.appendChild(loading);
 
   let sleeps: SleepEntry[];
   try {
     sleeps = await getStatsData();
   } catch {
-    loading.textContent = 'Could not load stats';
+    loading.textContent = 'Klarte ikkje lasta statistikk';
     return;
   }
   view.removeChild(loading);
@@ -117,8 +117,8 @@ export async function renderStats(container: HTMLElement): Promise<void> {
   if (sleeps.length === 0) {
     view.appendChild(el('div', { className: 'history-empty' }, [
       el('div', { style: { fontSize: '3rem', marginBottom: '16px' } }, ['📊']),
-      el('div', null, ['No sleep data yet']),
-      el('div', { style: { fontSize: '0.9rem', marginTop: '8px' } }, ['Start tracking sleep to see charts and trends here']),
+      el('div', null, ['Ingen søvndata enno']),
+      el('div', { style: { fontSize: '0.9rem', marginTop: '8px' } }, ['Start med å spora søvn for å sjå diagram og trendar her']),
     ]));
     return;
   }
@@ -135,21 +135,21 @@ export async function renderStats(container: HTMLElement): Promise<void> {
   const legend = el('div', { className: 'stats-legend' }, [
     el('span', { className: 'stats-legend-item' }, [
       el('span', { className: 'stats-dot', style: { background: 'var(--peach-dark)' } }),
-      ' Naps'
+      ' Lurar'
     ]),
     el('span', { className: 'stats-legend-item' }, [
       el('span', { className: 'stats-dot', style: { background: 'var(--moon)' } }),
-      ' Night'
+      ' Natt'
     ]),
   ]);
   chartContainer.appendChild(legend);
-  view.appendChild(section('Last 7 Days', [chartContainer]));
+  view.appendChild(section('Siste 7 dagar', [chartContainer]));
 
   // 2. Wake windows
   const wakeAvg = getAverageWakeWindow(week7);
-  view.appendChild(section('Wake Windows', [
+  view.appendChild(section('Vakevindu', [
     el('div', { className: 'stats-row' }, [
-      statCard(wakeAvg ? formatDuration(wakeAvg * 60000) : '—', 'Avg Wake Window'),
+      statCard(wakeAvg ? formatDuration(wakeAvg * 60000) : '—', 'Snitt vakevindu'),
     ]),
   ]));
 
@@ -157,13 +157,13 @@ export async function renderStats(container: HTMLElement): Promise<void> {
   const avgTotalSleep7 = weekStats.avgNapMinutesPerDay + weekStats.avgNightMinutesPerDay;
   const avgTotalSleep30 = allStats.avgNapMinutesPerDay + allStats.avgNightMinutesPerDay;
 
-  view.appendChild(section('Sleep Trends', [
+  view.appendChild(section('Søvntrendar', [
     el('div', { className: 'stats-trends-table' }, [
-      trendRow('', '7 days', '30 days'),
-      trendRow('Total sleep/day', formatDuration(avgTotalSleep7 * 60000), formatDuration(avgTotalSleep30 * 60000)),
-      trendRow('Avg nap duration', formatDuration(weekStats.avgNapMinutesPerDay * 60000 / Math.max(1, weekStats.avgNapsPerDay)), formatDuration(allStats.avgNapMinutesPerDay * 60000 / Math.max(1, allStats.avgNapsPerDay))),
-      trendRow('Naps/day', String(weekStats.avgNapsPerDay), String(allStats.avgNapsPerDay)),
-      trendRow('Night sleep', formatDuration(weekStats.avgNightMinutesPerDay * 60000), formatDuration(allStats.avgNightMinutesPerDay * 60000)),
+      trendRow('', '7 dagar', '30 dagar'),
+      trendRow('Total søvn/dag', formatDuration(avgTotalSleep7 * 60000), formatDuration(avgTotalSleep30 * 60000)),
+      trendRow('Snitt lurvarighet', formatDuration(weekStats.avgNapMinutesPerDay * 60000 / Math.max(1, weekStats.avgNapsPerDay)), formatDuration(allStats.avgNapMinutesPerDay * 60000 / Math.max(1, allStats.avgNapsPerDay))),
+      trendRow('Lurar/dag', String(weekStats.avgNapsPerDay), String(allStats.avgNapsPerDay)),
+      trendRow('Nattesøvn', formatDuration(weekStats.avgNightMinutesPerDay * 60000), formatDuration(allStats.avgNightMinutesPerDay * 60000)),
     ]),
   ]));
 
@@ -179,10 +179,10 @@ export async function renderStats(container: HTMLElement): Promise<void> {
     const worst = daysWithTotal[daysWithTotal.length - 1];
     const fmtDate = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 
-    view.appendChild(section('Best & Worst', [
+    view.appendChild(section('Best og verst', [
       el('div', { className: 'stats-row' }, [
-        statCard(`${fmtDate(best.date)}`, `Most sleep: ${formatDuration(best.total * 60000)}`),
-        statCard(`${fmtDate(worst.date)}`, `Least sleep: ${formatDuration(worst.total * 60000)}`),
+        statCard(`${fmtDate(best.date)}`, `Mest søvn: ${formatDuration(best.total * 60000)}`),
+        statCard(`${fmtDate(worst.date)}`, `Minst søvn: ${formatDuration(worst.total * 60000)}`),
       ]),
     ]));
   }
