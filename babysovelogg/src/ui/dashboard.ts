@@ -273,8 +273,6 @@ export function renderDashboard(container: HTMLElement): void {
       arcActions.appendChild(diaperBtn);
     }
   }
-  arcContainer.appendChild(arcActions);
-
   dash.appendChild(arcContainer);
 
   // Today's stats
@@ -316,6 +314,9 @@ export function renderDashboard(container: HTMLElement): void {
     ]);
     dash.appendChild(summaryRow);
   }
+
+  // Action buttons - below stats, in the big open space
+  dash.appendChild(arcActions);
 
   view.appendChild(dash);
   container.appendChild(view);

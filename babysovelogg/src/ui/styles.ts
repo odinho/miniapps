@@ -799,30 +799,29 @@ html, body {
   50% { opacity: 1; }
 }
 
-/* Arc action buttons in the gap */
+/* Action buttons below stats */
 .arc-actions {
-  position: absolute;
-  bottom: 4%;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
-  gap: 10px;
-  z-index: 2;
+  gap: 12px;
+  width: 100%;
+  max-width: 340px;
+  margin-top: 8px;
 }
 
 .arc-action-btn {
-  padding: 8px 18px;
-  border-radius: 20px;
+  flex: 1;
+  padding: 16px 12px;
+  border-radius: var(--radius-sm);
   border: none;
   font-family: var(--font);
-  font-size: 0.8rem;
+  font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  min-height: 36px;
+  min-height: 56px;
   transition: transform 0.15s, box-shadow 0.2s;
   white-space: nowrap;
 }
-.arc-action-btn:active { transform: scale(0.95); }
+.arc-action-btn:active { transform: scale(0.97); }
 
 .arc-action-btn.nap {
   background: var(--lavender);
