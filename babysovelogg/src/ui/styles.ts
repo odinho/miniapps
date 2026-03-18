@@ -152,7 +152,33 @@ html, body {
   user-select: none;
 }
 
+/* Desktop: center the app like a phone */
+@media (min-width: 500px) {
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0d0d1a;
+  }
+  [data-theme="night"] body {
+    background: #0a0a15;
+  }
+  #app {
+    max-width: 430px;
+    max-height: 932px;
+    border-radius: 24px;
+    box-shadow: 0 0 60px rgba(0,0,0,0.5);
+    overflow: hidden;
+    position: relative;
+    padding-top: 8px;
+  }
+  .fab {
+    position: absolute !important;
+  }
+}
+
 #app {
+  width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -164,7 +190,7 @@ html, body {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 24px 20px 100px;
+  padding: 16px 16px 24px;
 }
 
 /* Dashboard */
@@ -172,7 +198,7 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
   text-align: center;
 }
 
@@ -182,7 +208,7 @@ html, body {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  margin-top: 8px;
+  margin-top: 0;
   padding: 0 4px;
 }
 
@@ -704,6 +730,7 @@ html, body {
   position: relative;
   width: 100%;
   max-width: 340px;
+  aspect-ratio: 1;
 }
 
 .sleep-arc {
@@ -744,9 +771,9 @@ html, body {
 
 .arc-center-text {
   position: absolute;
-  bottom: 30px;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   text-align: center;
   pointer-events: none;
 }
@@ -771,7 +798,8 @@ html, body {
 }
 
 .arc-center-text .countdown-value {
-  font-size: 1.4rem;
+  font-size: 2rem;
+  font-weight: 700;
 }
 
 /* Stats page */
