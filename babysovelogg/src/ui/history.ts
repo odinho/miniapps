@@ -2,6 +2,7 @@ import { getSleeps, getDiapers, postEvents } from '../api.js';
 import { getClientId } from '../sync.js';
 import { refreshState } from '../main.js';
 import { el, formatDuration, formatTime } from './components.js';
+import { showConfirm } from './toast.js';
 
 const MOOD_EMOJI: Record<string, string> = { happy: '😊', normal: '😐', upset: '😢', fighting: '😤' };
 const METHOD_EMOJI: Record<string, string> = { bed: '🛏️', nursing: '🤱', held: '🤗', stroller: '🚼', car: '🚗', bottle: '🍼' };
@@ -219,7 +220,8 @@ function showEditModal(entry: any, container: HTMLElement): void {
   });
 
   deleteBtn.addEventListener('click', async () => {
-    if (confirm('Delete this sleep entry?')) {
+    const confirmed = await showConfirm('Delete this sleep entry? This cannot be undone.');
+    if (confirmed) {
       await postEvents([{ type: 'sleep.deleted', payload: { sleepId: entry.id }, clientId: getClientId() }]);
       close();
       await refreshState();
@@ -229,13 +231,15 @@ function showEditModal(entry: any, container: HTMLElement): void {
 
   cancelBtn.addEventListener('click', close);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  const escHandler = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', escHandler);
 
   modal.appendChild(el('div', { className: 'btn-row' }, [deleteBtn, saveBtn]));
   modal.appendChild(el('div', { style: { textAlign: 'center', marginTop: '12px' } }, [cancelBtn]));
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 
-  function close() { overlay.remove(); }
+  function close() { overlay.remove(); document.removeEventListener('keydown', escHandler); }
 }
 
 function showDiaperEditModal(entry: any, container: HTMLElement): void {
@@ -244,18 +248,54 @@ function showDiaperEditModal(entry: any, container: HTMLElement): void {
 
   modal.appendChild(el('h2', null, ['Diaper Details']));
 
-  const icon = DIAPER_ICONS[entry.type] || '💩';
-  const label = DIAPER_LABELS[entry.type] || entry.type;
-  modal.appendChild(el('div', { style: { fontSize: '1.2rem', marginBottom: '8px' } }, [`${icon} ${label}`]));
-  if (entry.amount) modal.appendChild(el('div', { style: { color: 'var(--text-light)', marginBottom: '4px' } }, [`Amount: ${entry.amount}`]));
-  if (entry.note) modal.appendChild(el('div', { style: { color: 'var(--text-light)', marginBottom: '4px' } }, [`Note: ${entry.note}`]));
-  modal.appendChild(el('div', { style: { color: 'var(--text-light)', marginBottom: '16px' } }, [`Time: ${formatTime(entry.time)}`]));
+  // Editable type pills
+  let selectedType = entry.type;
+  const types = [
+    { value: 'wet', label: '💧 Wet' },
+    { value: 'dirty', label: '💩 Dirty' },
+    { value: 'both', label: '💧💩 Both' },
+    { value: 'dry', label: '✨ Dry' },
+  ];
+  const typePills = types.map(t => {
+    const pill = el('button', { className: `type-pill ${selectedType === t.value ? 'active' : ''}`, 'data-diaper-type': t.value }, [t.label]);
+    pill.addEventListener('click', () => {
+      selectedType = t.value;
+      typePills.forEach((p, i) => { p.className = `type-pill ${selectedType === types[i].value ? 'active' : ''}`; });
+    });
+    return pill;
+  });
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Type']), el('div', { className: 'type-pills diaper-type-pills' }, typePills)]));
+
+  // Amount
+  let selectedAmount = entry.amount || 'medium';
+  const amounts = [
+    { value: 'small', label: 'Small' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'large', label: 'Large' },
+  ];
+  const amountPills = amounts.map(a => {
+    const pill = el('button', { className: `type-pill ${selectedAmount === a.value ? 'active' : ''}` }, [a.label]);
+    pill.addEventListener('click', () => {
+      selectedAmount = a.value;
+      amountPills.forEach((p, i) => { p.className = `type-pill ${selectedAmount === amounts[i].value ? 'active' : ''}`; });
+    });
+    return pill;
+  });
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Amount']), el('div', { className: 'type-pills' }, amountPills)]));
+
+  // Note
+  const noteInput = el('input', { type: 'text', placeholder: 'Optional note...', value: entry.note || '' }) as HTMLInputElement;
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Note']), noteInput]));
+
+  // Time display
+  modal.appendChild(el('div', { style: { color: 'var(--text-light)', fontSize: '0.85rem', marginBottom: '16px' } }, [`Logged at ${formatTime(entry.time)}`]));
 
   const deleteBtn = el('button', { className: 'btn btn-danger' }, ['Delete']);
   const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Close']);
 
   deleteBtn.addEventListener('click', async () => {
-    if (confirm('Delete this diaper entry?')) {
+    const confirmed = await showConfirm('Delete this diaper entry? This cannot be undone.');
+    if (confirmed) {
       await postEvents([{ type: 'diaper.deleted', payload: { diaperId: entry.id }, clientId: getClientId() }]);
       close();
       await refreshState();
@@ -266,9 +306,12 @@ function showDiaperEditModal(entry: any, container: HTMLElement): void {
   cancelBtn.addEventListener('click', close);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 
+  const escHandler = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', escHandler);
+
   modal.appendChild(el('div', { className: 'btn-row' }, [deleteBtn, cancelBtn]));
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 
-  function close() { overlay.remove(); }
+  function close() { overlay.remove(); document.removeEventListener('keydown', escHandler); }
 }

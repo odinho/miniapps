@@ -44,7 +44,7 @@ export function formatDurationLong(ms: number): string {
 
 export function formatTime(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
 export function formatAge(birthdate: string): string {
@@ -52,12 +52,12 @@ export function formatAge(birthdate: string): string {
   const now = new Date();
   let months = (now.getFullYear() - birth.getFullYear()) * 12 + (now.getMonth() - birth.getMonth());
   if (now.getDate() < birth.getDate()) months--;
-  if (months < 1) return "newborn";
-  if (months < 12) return `${months} month${months !== 1 ? "s" : ""} old`;
+  if (months < 1) return "nyfødd";
+  if (months < 12) return `${months} mnd`;
   const y = Math.floor(months / 12);
   const m = months % 12;
-  if (m === 0) return `${y} year${y !== 1 ? "s" : ""} old`;
-  return `${y}y ${m}m old`;
+  if (m === 0) return `${y} år`;
+  return `${y} år ${m} mnd`;
 }
 
 /** Returns a span that updates every second showing elapsed time from startTime. */

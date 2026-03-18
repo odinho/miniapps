@@ -56,3 +56,54 @@ export function showToast(message: string, type: 'error' | 'warning' | 'success'
   c.appendChild(toast);
   setTimeout(() => toast.remove(), 3000);
 }
+
+/** Styled confirm dialog replacement for native confirm(). Returns a Promise<boolean>. */
+export function showConfirm(message: string, confirmLabel = 'Delete', cancelLabel = 'Cancel'): Promise<boolean> {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.alignItems = 'center';
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.borderRadius = '16px';
+    modal.style.maxWidth = '340px';
+    modal.style.textAlign = 'center';
+
+    const msg = document.createElement('p');
+    msg.textContent = message;
+    msg.style.fontSize = '1rem';
+    msg.style.marginBottom = '20px';
+    msg.style.lineHeight = '1.5';
+    modal.appendChild(msg);
+
+    const btnRow = document.createElement('div');
+    btnRow.className = 'btn-row';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn btn-ghost';
+    cancelBtn.textContent = cancelLabel;
+    cancelBtn.style.flex = '1';
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.className = 'btn btn-danger';
+    confirmBtn.textContent = confirmLabel;
+    confirmBtn.style.flex = '1';
+
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(confirmBtn);
+    modal.appendChild(btnRow);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    function close(result: boolean) {
+      overlay.remove();
+      resolve(result);
+    }
+    cancelBtn.addEventListener('click', () => close(false));
+    confirmBtn.addEventListener('click', () => close(true));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(false); });
+    document.addEventListener('keydown', function handler(e) {
+      if (e.key === 'Escape') { close(false); document.removeEventListener('keydown', handler); }
+    });
+  });
+}

@@ -860,6 +860,15 @@ html, body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Sleep info panel */
+.sleep-info-panel {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 4px 0;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
 /* Page fade-in transition */
 @keyframes viewFadeIn {
   from { opacity: 0; }

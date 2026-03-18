@@ -1,4 +1,5 @@
 import { WAKE_WINDOWS, NAP_COUNTS, findByAge } from "./constants.js";
+export { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, findByAge } from "./constants.js";
 
 export interface SleepEntry {
   start_time: string;
