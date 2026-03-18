@@ -802,26 +802,23 @@ html, body {
 /* Action buttons below stats */
 .arc-actions {
   display: flex;
-  gap: 12px;
-  width: 100%;
-  max-width: 340px;
-  margin-top: 8px;
+  gap: 10px;
+  margin-top: 4px;
 }
 
 .arc-action-btn {
-  flex: 1;
-  padding: 16px 12px;
-  border-radius: var(--radius-sm);
+  padding: 8px 16px;
+  border-radius: 20px;
   border: none;
   font-family: var(--font);
-  font-size: 0.95rem;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
-  min-height: 56px;
+  min-height: 36px;
   transition: transform 0.15s, box-shadow 0.2s;
   white-space: nowrap;
 }
-.arc-action-btn:active { transform: scale(0.97); }
+.arc-action-btn:active { transform: scale(0.95); }
 
 .arc-action-btn.nap {
   background: var(--lavender);
