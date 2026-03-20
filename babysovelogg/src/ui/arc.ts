@@ -220,7 +220,7 @@ export function renderArc(input: ArcInput): SVGElement {
       segPath.setAttribute('stroke-width', String(trackWidth + 2));
       segPath.setAttribute('opacity', '0.9');
     } else if (bubble.status === 'active') {
-      segPath.setAttribute('stroke', 'var(--moon-glow)');
+      segPath.setAttribute('stroke', bubble.type === 'night' ? 'var(--moon)' : 'var(--peach-dark)');
       segPath.setAttribute('stroke-width', String(trackWidth + 4));
       segPath.setAttribute('filter', 'url(#arc-glow)');
       segPath.setAttribute('class', 'arc-active-pulse');
