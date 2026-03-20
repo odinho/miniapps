@@ -1,146 +1,159 @@
 # Babysovelogg UX Fixes & QA Checklist
 
-## Fixes
+## Fixes — Round 1 (done)
 
-### A. Critical UX Bugs (blocking normal use)
+### A. Critical UX Bugs
 
 - [x] **A1. Wake button shows moon during daytime nap**
-  The main sleep button always shows 🌙 when sleeping, even during a daytime nap.
-  Should show ☀️ (sun/"Vakn") during day, 🌙 only at night.
-  _Fix: use time-of-day or sleep type to pick icon._
+  _Fix: icon based on sleep type (☀️ nap, 🌙 night), not always moon._
 
 - [x] **A2. "1 lurar" → "1 lur" pluralization**
-  Summary row always says "lurar" even when count is 1. Should be "1 lur", "2 lurar".
-  _Fix: conditional plural in summary row._
+  _Fix: MutationObserver on count element toggles singular/plural._
 
 - [x] **A3. Night sleep mis-classified as nap**
-  At ~17:30–17:59, sleep is classified as nap because cutoff is `hour >= 18`. A 9mo baby
-  going to bed at 17:45 after a full day should be classified as night.
-  _Fix: smarter heuristic — if it's after ~16:00 and the last nap was hours ago (or expected
-  naps are done), treat it as night sleep._
+  _Fix: smart classifier — after 16:00, if expected naps (by age) are done → night._
 
 - [x] **A4. Settings "green dot" always visible on nav**
-  The sync-dot is positioned absolute top-right in the nav, appearing on/near the settings
-  icon. Users think settings has a notification badge.
-  _Fix: move sync dot away from settings icon, or hide when connected (only show when
-  reconnecting/offline)._
+  _Fix: sync dot hidden when SSE connected, only shown on reconnecting/offline._
 
 - [x] **A5. Active sleep arc segment too low contrast**
-  The current-sleep arc bubble pulses between opacity 0.7–1.0 using moon-glow color.
-  Hard to see against the track, especially in day mode.
-  _Fix: use a more distinct color/stroke, higher minimum opacity, or a subtle fill/outline._
+  _Fix: type-matched color (peach nap, moon night) + min opacity 0.85._
 
-### B. Missing Features (expected in normal use)
+### B. Missing Features
 
 - [x] **B1. No click targets on completed nap arc bubbles**
-  Completed sleep bubbles on the arc have no tap handler. User can't tap to view/edit a nap
-  from the dashboard.
-  _Fix: add transparent tap targets on completed bubbles that open the edit modal._
+  _Fix: transparent tap target on completed bubbles → opens edit modal._
 
 - [x] **B2. Tag sheet: missing "time to fall asleep" buckets**
-  After ending a sleep, the tag sheet asks mood/method but not how long it took to put baby
-  down. Buckets: <5 min, 5–15 min, 15–30 min, 30+ min.
-  _Fix: add "Innsovning" (falling asleep) section to tag sheet + store in DB._
+  _Fix: 4 buckets (<5, 5–15, 15–30, 30+ min) + DB column fall_asleep_time._
 
 - [x] **B3. Tag sheet: missing notes field for sleep**
-  Diaper log has a notes field, sleep does not. Parents want to add context.
-  _Fix: add optional note input to tag sheet + edit modal, store in sleep_log.notes._
+  _Fix: optional note input on tag sheet + edit modal._
 
 - [x] **B4. Minutes > 60 should show hours+min in settings**
-  Wake window "210–300 min" is shown in the settings sleep info panel. Hard to parse.
-  Should show "3h 30m – 5h" when ≥ 60 min.
-  _Fix: use formatDuration or similar in settings panel for wake window values._
+  _Fix: formatDuration for wake window values ≥ 60 min._
 
-### C. Data Integrity / Logic Issues
+### C. Data Integrity / Logic
 
-- [x] **C1. Pause at end of nap counts as sleep time in some places**
-  If a nap ends while paused, the time during the trailing pause should not be sleep.
-  History view subtracts pauses correctly, but stats (engine/stats.ts) does not account
-  for pauses at all — it uses raw start_time/end_time.
-  _Fix: ensure stats calculation subtracts pause time. Also: if sleep ends paused, the
-  effective wake time is the last pause_time, not end_time._
+- [x] **C1. Pause at end of nap counts as sleep time**
+  _Fix: stats subtract pause duration; trailing pauses use end_time as pause end._
 
 - [x] **C2. Offline clicks give no feedback**
-  When offline, button clicks try postEvents, fail silently or hang. Need optimistic UI:
-  queue event, update UI immediately, show subtle dirty-state indicator.
-  _Fix: wrap action handlers with optimistic path — queue event + update local state + show
-  indicator._
+  _Fix: sendEvent() helper queues + shows toast "Lagra offline — synkar snart"._
 
 ### D. Minor Polish
 
-- [x] **D1. Tag sheet mood labels: clarify going-to-bed vs wakeup**
-  Current "Humør" is ambiguous — is it how baby was when going to sleep or waking up?
-  _Fix: relabel to "Humør ved legging" (Mood at bedtime) to make clear it's about going to
-  bed._
+- [x] **D1. Tag sheet mood label clarified**
+  _Fix: "Humør ved legging" (mood at bedtime)._
 
-- [x] **D2. Stats trend table headers say "7 days" / "30 days" in English**
-  Should be "7 dagar" / "30 dagar" in Norwegian.
-  _Fix: translate headers._
+- [x] **D2. Stats headers translated to Norwegian**
+  _Fix: "7 dagar" / "30 dagar"._
+
+## Fixes — Round 2 (done)
+
+- [x] **E1. Tag sheet shown on wake-up instead of sleep-start (duplicate nap feeling)**
+  Bedtime details (mood, method, fall-asleep, notes) should be captured when
+  STARTING sleep — that's when you remember how bedtime went. Showing it on
+  wake-up was confusing and could overwrite previously set data.
+  _Fix: tag sheet now appears on sleep START. New "Oppvakning" (wake-up) sheet
+  on sleep END — saves end time immediately, then optionally captures woke_by
+  (self/woken) and wake notes._
+
+## Fixes — Round 3 (TODO for next session)
+
+- [ ] **F1. Existing Playwright tests use old English strings**
+  Tests reference "How did it go?", "Happy", "Nursing", "Save", "Skip", "Naps today",
+  "Welcome to Napper", etc. All UI is now Norwegian nynorsk. Tests will fail.
+  _Fix: rewrite all test assertions to use current Norwegian strings._
+
+- [ ] **F2. Diaper-before-bed nudge (nice-to-have extra)**
+  User wants a subtle nudge to log diaper before bedtime so they remember to check
+  the potty on wake-up. Not core functionality — should be an optional/discoverable feature.
+  _Approach: if no diaper logged in last 2h before bedtime, show a small reminder in the
+  bedtime tag sheet. Keep it very light._
 
 ---
 
-## QA Test Walkthroughs
+## Playwright Test Plan
 
-### Walk 1: First-time setup (evening)
-- [ ] Open app with no baby → redirects to settings/onboarding
-- [ ] Enter name + birthdate → click "Kom i gang" → navigates to dashboard
-- [ ] At night: should NOT show morning prompt, should show reasonable night dashboard
-- [ ] App does not hang or get stuck
+All existing tests need updating (English → Norwegian). Additionally, write these scenario tests.
+Tests should use the existing fixture pattern (resetDb, createBaby, setWakeUpTime, addCompletedSleep, addActiveSleep).
 
-### Walk 2: Morning start
-- [ ] Morning (5–11): shows morning prompt with "God morgon!" and wake time input
-- [ ] Enter wake time → dashboard loads with arc, predictions, stats
-- [ ] "Hopp over" sets default 06:00 wake time and shows dashboard
+### PW 1: Onboarding flow (`tests/onboarding.spec.ts`)
+- [ ] No baby → redirects to settings, shows "Velkomen til Napper"
+- [ ] Enter name + birthdate → "Kom i gang" → navigates to dashboard
+- [ ] Dashboard shows baby name and age
 
-### Walk 3: Log a nap (happy path)
-- [ ] Click "😴 Lur" button → sleep starts, timer shows, arc updates
-- [ ] Wake button shows ☀️ sun icon (not moon) during daytime
-- [ ] Click wake button → sleep ends, tag sheet appears
-- [ ] Tag sheet has: mood, method, time-to-fall-asleep, notes
-- [ ] Fill in tags → save → back to dashboard, nap appears on arc
-- [ ] Nap bubble on arc is tappable → opens edit modal
+### PW 2: Morning prompt (`tests/wakeup.spec.ts`)
+- [ ] Morning hours + no wake time → shows "God morgon!" prompt
+- [ ] Enter wake time → dashboard loads with predictions
+- [ ] "Hopp over" → dashboard loads with default wake time
+- [ ] Night hours → does NOT show morning prompt
 
-### Walk 4: Log night sleep at 17:45
-- [ ] At 17:45 with no pending naps, clicking sleep → type = "night" (not nap)
-- [ ] Arc/dashboard reflects night sleep correctly
+### PW 3: Start nap + bedtime tag sheet (`tests/nap-flow.spec.ts`)
+- [ ] Click "😴 Lur" → sleep starts, timer visible, button shows ☀️ + "Vakn"
+- [ ] Bedtime tag sheet "Korleis gjekk legginga?" appears
+- [ ] Can select mood, method, fall-asleep bucket, enter note → save
+- [ ] Tags persist — visible in Logg view on that sleep entry
+- [ ] Skip tag sheet → sleep still running, no tags set
 
-### Walk 5: Pause during nap
-- [ ] Start nap → click Pause → timer freezes, shows "⏸️ Pause"
-- [ ] Resume → timer continues from where it left off
-- [ ] End sleep → duration in history subtracts pause time
-- [ ] Stats also subtract pause time from totals
+### PW 4: End nap + wake-up sheet (`tests/nap-flow.spec.ts`)
+- [ ] While sleeping, click "Vakn" → sleep ends immediately
+- [ ] Wake-up sheet "Oppvakning" appears with "Vakna sjølv" / "Vekt av oss"
+- [ ] Can enter wake-up note → save
+- [ ] Skip → sleep ended, dashboard shows awake state
+- [ ] Previously set bedtime tags are NOT overwritten by wake-up sheet
 
-### Walk 6: Pause at end of nap (baby wakes during re-settle)
-- [ ] Start nap → pause → end sleep (while paused)
-- [ ] Effective wake time = pause start, not sleep end
-- [ ] Duration does not include trailing pause
+### PW 5: Night sleep classification at 17:xx (`tests/classification.spec.ts`)
+- [ ] Baby with 2 expected naps, 2 completed naps → new sleep at 17:45 → type = "night"
+- [ ] Baby with 2 expected naps, 0 completed naps → new sleep at 17:00 → type = "nap"
+- [ ] Any time after 20:00 → always "night"
+- [ ] Any time before 16:00 → always "nap"
 
-### Walk 7: Pluralization
-- [ ] 0 naps: "0 lurar"
-- [ ] 1 nap: "1 lur"
-- [ ] 2+ naps: "2 lurar"
+### PW 6: Pause flow (`tests/pause.spec.ts`)
+- [ ] Start nap → pause → timer label shows "⏸️ Pause"
+- [ ] Resume → timer continues
+- [ ] End nap → history shows duration minus pause time
+- [ ] End nap while paused → duration excludes trailing pause
 
-### Walk 8: Settings & sync dot
-- [ ] Settings icon has NO notification badge
-- [ ] Sync dot only visible when reconnecting or offline (not when connected)
+### PW 7: Arc interactions (`tests/arc.spec.ts`)
+- [ ] Completed nap bubble on arc is clickable → opens edit modal
+- [ ] Active sleep bubble visible with pulsing animation
+- [ ] Arc center text shows timer when sleeping, countdown when awake
 
-### Walk 9: Offline use
-- [ ] Disconnect network → tap "😴 Lur" → immediate feedback, timer starts
-- [ ] Toast/indicator shows offline/pending state
-- [ ] Reconnect → events flush, state syncs
+### PW 8: Pluralization (`tests/dashboard.spec.ts`)
+- [ ] 0 completed naps: "0 lurar"
+- [ ] 1 completed nap: "1 lur"
+- [ ] 2 completed naps: "2 lurar"
 
-### Walk 10: Minutes display in settings
-- [ ] Wake window shows "3h 30m – 5h" format (not "210–300 min") for older babies
+### PW 9: Settings display (`tests/settings.spec.ts`)
+- [ ] Wake window shows "Xh Ym" format for values ≥ 60 min
+- [ ] "1 lur" / "2 lurar" pluralization in sleep info panel
+- [ ] Sync dot not visible when connected
+
+### PW 10: History edit (`tests/history.spec.ts`)
+- [ ] Click sleep entry → edit modal with type, times, mood, method, fall-asleep, notes
+- [ ] Change type nap → night → save → reflected in list
+- [ ] Delete entry → confirm → entry removed
+- [ ] Notes and fall-asleep-time visible in history list
+
+### PW 11: Stats (`tests/stats.spec.ts`)
+- [ ] Headers say "7 dagar" / "30 dagar" (not English)
+- [ ] Stats subtract pause time from sleep durations
+- [ ] Bar chart renders with nap + night bars
 
 ---
 
 ## Adversarial Review Checklist
 
 - [ ] No feature creep: each fix does ONE thing
-- [ ] No new DB migrations unless absolutely needed (B2 needs sleep_log.fall_asleep_time column)
+- [ ] DB migrations are additive only (ALTER TABLE ADD COLUMN with try/catch)
 - [ ] No unnecessary abstractions or helpers
 - [ ] All strings in Norwegian (nynorsk), no English leaking
 - [ ] CSS changes are minimal, scoped
 - [ ] No breaking changes to existing data
 - [ ] Pause edge cases tested (trailing pause, multiple pauses, no pauses)
 - [ ] Offline path tested (queue, flush, no data loss)
+- [ ] Tag sheet on start doesn't block timer from running
+- [ ] Wake-up sheet saves end_time before showing modal (no data loss if dismissed)
+- [ ] Existing bedtime tags preserved when wake-up sheet is used
