@@ -55,9 +55,12 @@ export function renderDashboard(container: HTMLElement): void {
   const dash = el('div', { className: 'dashboard', 'data-testid': 'dashboard' });
 
   // Header row: baby info + sleep button
+  const isNapSleep = isSleeping && activeSleep?.type === 'nap';
+  const sleepIcon = isSleeping ? (isNapSleep ? '☀️' : '🌙') : '☀️';
+  const sleepLabel = isSleeping ? 'Vakn' : 'Sov';
   const btn = el('button', { className: `sleep-button ${isSleeping ? 'sleeping' : 'awake'}`, 'data-testid': 'sleep-button' }, [
-    el('span', { className: 'icon' }, [isSleeping ? '🌙' : '☀️']),
-    el('span', { className: 'label' }, [isSleeping ? 'Vakn' : 'Sov']),
+    el('span', { className: 'icon' }, [sleepIcon]),
+    el('span', { className: 'label' }, [sleepLabel]),
   ]);
 
   dash.appendChild(
