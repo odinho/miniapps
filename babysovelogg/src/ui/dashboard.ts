@@ -305,8 +305,19 @@ export function renderDashboard(container: HTMLElement): void {
     }
 
     // Compact inline summary below arc
+    const napLabel = el('span', { className: 'summary-label' }, [' lurar']);
+    const updateNapLabel = () => {
+      napLabel.textContent = napCountEl.textContent === '1' ? ' lur' : ' lurar';
+    };
+
+    // Observe changes to nap count to update singular/plural
+    const observer = new MutationObserver(updateNapLabel);
+    observer.observe(napCountEl, { childList: true, characterData: true, subtree: true });
+    cleanups.push(() => observer.disconnect());
+    updateNapLabel();
+
     const summaryRow = el('div', { className: 'summary-row' }, [
-      el('span', null, [napCountEl, el('span', { className: 'summary-label' }, [' lurar'])]),
+      el('span', null, [napCountEl, napLabel]),
       el('span', { className: 'summary-sep' }, ['·']),
       el('span', null, [napTimeEl, el('span', { className: 'summary-label' }, [' lurtid'])]),
       el('span', { className: 'summary-sep' }, ['·']),
