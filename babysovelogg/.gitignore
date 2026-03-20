@@ -1,4 +1,5 @@
 node_modules/
 dist/
 *.db
-napper.db
+*.db-shm
+*.db-wal
