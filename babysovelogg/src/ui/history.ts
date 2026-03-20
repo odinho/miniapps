@@ -91,13 +91,21 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
           if (entry.method && METHOD_EMOJI[entry.method]) badges.push(el('span', { className: 'tag-badge' }, [METHOD_EMOJI[entry.method]]));
           metaChildren.push(el('span', { className: 'tag-badges' }, badges));
         }
+        if (entry.fall_asleep_time) {
+          metaChildren.push(` · ${entry.fall_asleep_time}`);
+        }
+
+        const infoChildren: (Node | string)[] = [
+          el('div', { className: 'log-times' }, [times]),
+          el('div', { className: 'log-meta' }, metaChildren),
+        ];
+        if (entry.notes) {
+          infoChildren.push(el('div', { className: 'log-meta', style: { fontStyle: 'italic' } }, [entry.notes]));
+        }
 
         const item = el('div', { className: 'sleep-log-item' }, [
           el('span', { className: 'log-icon' }, [icon]),
-          el('div', { className: 'log-info' }, [
-            el('div', { className: 'log-times' }, [times]),
-            el('div', { className: 'log-meta' }, metaChildren),
-          ]),
+          el('div', { className: 'log-info' }, infoChildren),
           el('span', { className: 'log-duration' }, [duration]),
         ]);
         item.addEventListener('click', () => showEditModal(entry, container));
@@ -155,10 +163,10 @@ function showEditModal(entry: any, container: HTMLElement): void {
   // Mood pills
   let selectedMood: string | null = entry.mood || null;
   const MOODS = [
-    { value: 'happy', label: '😊', title: 'Happy' },
+    { value: 'happy', label: '😊', title: 'Glad' },
     { value: 'normal', label: '😐', title: 'Normal' },
-    { value: 'upset', label: '😢', title: 'Upset' },
-    { value: 'fighting', label: '😤', title: 'Fighting sleep' },
+    { value: 'upset', label: '😢', title: 'Uroleg' },
+    { value: 'fighting', label: '😤', title: 'Kjempa mot' },
   ];
   const moodPills = MOODS.map(m => {
     const pill = el('button', { className: `tag-pill ${selectedMood === m.value ? 'active' : ''}`, 'data-mood': m.value }, [
@@ -174,12 +182,12 @@ function showEditModal(entry: any, container: HTMLElement): void {
   // Method pills
   let selectedMethod: string | null = entry.method || null;
   const METHODS = [
-    { value: 'bed', label: '🛏️', title: 'In bed' },
-    { value: 'nursing', label: '🤱', title: 'Nursing' },
-    { value: 'held', label: '🤗', title: 'Held/worn' },
-    { value: 'stroller', label: '🚼', title: 'Stroller' },
-    { value: 'car', label: '🚗', title: 'Car' },
-    { value: 'bottle', label: '🍼', title: 'Bottle' },
+    { value: 'bed', label: '🛏️', title: 'I senga' },
+    { value: 'nursing', label: '🤱', title: 'Amming' },
+    { value: 'held', label: '🤗', title: 'Boren' },
+    { value: 'stroller', label: '🚼', title: 'Vogn' },
+    { value: 'car', label: '🚗', title: 'Bil' },
+    { value: 'bottle', label: '🍼', title: 'Flaske' },
   ];
   const methodPills = METHODS.map(m => {
     const pill = el('button', { className: `tag-pill ${selectedMethod === m.value ? 'active' : ''}`, 'data-method': m.value }, [
@@ -192,12 +200,34 @@ function showEditModal(entry: any, container: HTMLElement): void {
     return pill;
   });
 
+  // Fall-asleep time
+  let selectedFallAsleep: string | null = entry.fall_asleep_time || null;
+  const FALL_ASLEEP = [
+    { value: '<5', label: '< 5 min' },
+    { value: '5-15', label: '5–15 min' },
+    { value: '15-30', label: '15–30 min' },
+    { value: '30+', label: '30+ min' },
+  ];
+  const fallAsleepPills = FALL_ASLEEP.map(b => {
+    const pill = el('button', { className: `type-pill ${selectedFallAsleep === b.value ? 'active' : ''}`, 'data-fall-asleep': b.value }, [b.label]);
+    pill.addEventListener('click', () => {
+      selectedFallAsleep = selectedFallAsleep === b.value ? null : b.value;
+      fallAsleepPills.forEach((p, i) => p.className = `type-pill ${selectedFallAsleep === FALL_ASLEEP[i].value ? 'active' : ''}`);
+    });
+    return pill;
+  });
+
+  // Notes
+  const noteInput = el('input', { type: 'text', placeholder: 'Valfritt notat...', value: entry.notes || '' }) as HTMLInputElement;
+
   modal.appendChild(el('h2', null, ['Endra søvn']));
   modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Type']), el('div', { className: 'type-pills' }, [napPill, nightPill])]));
   modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Start']), el('div', { className: 'datetime-row' }, [startDateInput, startTimeInput])]));
   modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Slutt']), el('div', { className: 'datetime-row' }, [endDateInput, endTimeInput])]));
-  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Humør']), el('div', { className: 'tag-pills' }, moodPills)]));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Humør ved legging']), el('div', { className: 'tag-pills' }, moodPills)]));
   modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Metode']), el('div', { className: 'tag-pills' }, methodPills)]));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Innsovningstid']), el('div', { className: 'type-pills' }, fallAsleepPills)]));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Notat']), noteInput]));
 
   const saveBtn = el('button', { className: 'btn btn-primary' }, ['Lagra']);
   const deleteBtn = el('button', { className: 'btn btn-danger' }, ['Slett']);
@@ -213,6 +243,8 @@ function showEditModal(entry: any, container: HTMLElement): void {
         type: selectedType,
         mood: selectedMood,
         method: selectedMethod,
+        fallAsleepTime: selectedFallAsleep,
+        notes: noteInput.value.trim() || undefined,
       },
       clientId: getClientId(),
     }]);

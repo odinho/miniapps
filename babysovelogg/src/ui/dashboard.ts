@@ -505,6 +505,7 @@ function showTagSheet(sleepId: number, container: HTMLElement): void {
 
   let selectedMood: string | null = null;
   let selectedMethod: string | null = null;
+  let selectedFallAsleep: string | null = null;
 
   modal.appendChild(el('h2', null, ['Korleis gjekk det?']));
 
@@ -542,15 +543,47 @@ function showTagSheet(sleepId: number, container: HTMLElement): void {
     })),
   ]));
 
+  // Fall-asleep time buckets
+  const FALL_ASLEEP_BUCKETS = [
+    { value: '<5', label: '< 5 min' },
+    { value: '5-15', label: '5–15 min' },
+    { value: '15-30', label: '15–30 min' },
+    { value: '30+', label: '30+ min' },
+  ];
+  modal.appendChild(el('div', { className: 'form-group' }, [
+    el('label', null, ['Innsovningstid']),
+    el('div', { className: 'type-pills' }, FALL_ASLEEP_BUCKETS.map(b => {
+      const pill = el('button', { className: 'type-pill', 'data-fall-asleep': b.value }, [b.label]);
+      pill.addEventListener('click', () => {
+        selectedFallAsleep = selectedFallAsleep === b.value ? null : b.value;
+        modal.querySelectorAll('[data-fall-asleep]').forEach(p => p.classList.toggle('active', p.getAttribute('data-fall-asleep') === selectedFallAsleep));
+      });
+      return pill;
+    })),
+  ]));
+
+  // Notes
+  const noteInput = el('input', { type: 'text', placeholder: 'Valfritt notat...' }) as HTMLInputElement;
+  modal.appendChild(el('div', { className: 'form-group' }, [
+    el('label', null, ['Notat']),
+    noteInput,
+  ]));
+
   const saveBtn = el('button', { className: 'btn btn-primary' }, ['Lagra']);
   const skipBtn = el('button', { className: 'btn btn-ghost' }, ['Hopp over']);
 
   saveBtn.addEventListener('click', async () => {
-    if (selectedMood || selectedMethod) {
+    if (selectedMood || selectedMethod || selectedFallAsleep || noteInput.value.trim()) {
       try {
         const result = await postEvents([{
           type: 'sleep.tagged',
-          payload: { sleepId, mood: selectedMood, method: selectedMethod },
+          payload: {
+            sleepId,
+            mood: selectedMood,
+            method: selectedMethod,
+            fallAsleepTime: selectedFallAsleep,
+            notes: noteInput.value.trim() || undefined,
+          },
           clientId: getClientId(),
         }]);
         setAppState(result.state);

@@ -64,8 +64,9 @@ db.exec(`
   );
 `);
 
-// Migrate: add mood/method columns if missing
+// Migrate: add columns if missing
 try { db.exec('ALTER TABLE sleep_log ADD COLUMN mood TEXT'); } catch {}
 try { db.exec('ALTER TABLE sleep_log ADD COLUMN method TEXT'); } catch {}
+try { db.exec('ALTER TABLE sleep_log ADD COLUMN fall_asleep_time TEXT'); } catch {}
 
 export default db;

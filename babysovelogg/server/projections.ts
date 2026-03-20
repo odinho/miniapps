@@ -43,13 +43,14 @@ export function applyEvent(event: NapperEvent): void {
       if (payload.notes !== undefined) { sets.push('notes = ?'); vals.push(payload.notes); }
       if (payload.mood !== undefined) { sets.push('mood = ?'); vals.push(payload.mood); }
       if (payload.method !== undefined) { sets.push('method = ?'); vals.push(payload.method); }
+      if (payload.fallAsleepTime !== undefined) { sets.push('fall_asleep_time = ?'); vals.push(payload.fallAsleepTime); }
       if (sets.length > 0) {
         vals.push(payload.sleepId);
         db.prepare(`UPDATE sleep_log SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
       }
       break;
     }
-    
+
     case 'sleep.manual':
       db.prepare(
         'INSERT INTO sleep_log (baby_id, start_time, end_time, type) VALUES (?, ?, ?, ?)'
@@ -65,6 +66,8 @@ export function applyEvent(event: NapperEvent): void {
       const vals: any[] = [];
       if (payload.mood !== undefined) { sets.push('mood = ?'); vals.push(payload.mood); }
       if (payload.method !== undefined) { sets.push('method = ?'); vals.push(payload.method); }
+      if (payload.fallAsleepTime !== undefined) { sets.push('fall_asleep_time = ?'); vals.push(payload.fallAsleepTime); }
+      if (payload.notes !== undefined) { sets.push('notes = ?'); vals.push(payload.notes); }
       if (sets.length > 0) {
         vals.push(payload.sleepId);
         db.prepare(`UPDATE sleep_log SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
