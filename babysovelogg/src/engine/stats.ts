@@ -1,7 +1,13 @@
+export interface SleepPause {
+  pause_time: string;
+  resume_time: string | null;
+}
+
 export interface SleepEntry {
   start_time: string;
   end_time: string | null;
   type: "nap" | "night";
+  pauses?: SleepPause[];
 }
 
 export interface DayStats {
@@ -18,8 +24,21 @@ export interface WeekStats {
   avgNapsPerDay: number;
 }
 
-function durationMinutes(start: string, end: string): number {
-  return (new Date(end).getTime() - new Date(start).getTime()) / 60000;
+function pauseMinutes(pauses: SleepPause[] | undefined, endTime: string): number {
+  if (!pauses || pauses.length === 0) return 0;
+  let total = 0;
+  for (const p of pauses) {
+    const ps = new Date(p.pause_time).getTime();
+    const pe = p.resume_time ? new Date(p.resume_time).getTime() : new Date(endTime).getTime();
+    total += pe - ps;
+  }
+  return total / 60000;
+}
+
+function durationMinutes(s: SleepEntry): number {
+  if (!s.end_time) return 0;
+  const raw = (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60000;
+  return raw - pauseMinutes(s.pauses, s.end_time);
 }
 
 /** Get stats for today's sleeps. */
@@ -30,7 +49,7 @@ export function getTodayStats(sleeps: SleepEntry[]): DayStats {
 
   for (const s of sleeps) {
     if (!s.end_time) continue;
-    const dur = durationMinutes(s.start_time, s.end_time);
+    const dur = durationMinutes(s);
     if (dur <= 0) continue;
 
     if (s.type === "nap") {

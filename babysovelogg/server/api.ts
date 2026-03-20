@@ -94,7 +94,12 @@ function getState() {
   ).all(baby.id, weekAgo) as any[];
   
   const ageMonths = calculateAgeMonths(baby.birthdate);
-  const stats = getTodayStats(todaySleeps.map((s: any) => ({ start_time: s.start_time, end_time: s.end_time, type: s.type })));
+  // Include pauses in stats so pause time is subtracted from sleep duration
+  const todaySleepsWithPauses = todaySleeps.map((s: any) => {
+    const pauses = db.prepare('SELECT * FROM sleep_pauses WHERE sleep_id = ? ORDER BY pause_time ASC').all(s.id);
+    return { start_time: s.start_time, end_time: s.end_time, type: s.type, pauses };
+  });
+  const stats = getTodayStats(todaySleepsWithPauses);
   
   let prediction = null;
   if (!activeSleep) {
