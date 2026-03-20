@@ -92,5 +92,10 @@ export function connectSSE(onUpdate: (state: AppState) => void): () => void {
 function updateSyncDot() {
   const dot = document.getElementById('sync-dot');
   if (!dot) return;
-  dot.style.background = sseStatus === 'connected' ? '#4caf50' : sseStatus === 'reconnecting' ? '#ff9800' : '#999';
+  if (sseStatus === 'connected') {
+    dot.style.display = 'none';
+  } else {
+    dot.style.display = 'block';
+    dot.style.background = sseStatus === 'reconnecting' ? '#ff9800' : '#999';
+  }
 }
