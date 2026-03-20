@@ -1,7 +1,7 @@
 import { getAppState, refreshState, navigateTo } from '../main.js';
 import { postEvents } from '../api.js';
 import { queueEvent, getClientId } from '../sync.js';
-import { el, formatAge } from './components.js';
+import { el, formatAge, formatDuration } from './components.js';
 import { showToast } from './toast.js';
 import { calculateAgeMonths, WAKE_WINDOWS, findByAge } from '../engine/schedule.js';
 
@@ -88,8 +88,9 @@ function renderSleepInfoPanel(ageMonths: number, wakeWindow: { minMinutes: numbe
   const sleepNeed = getSleepNeedForAge(ageMonths);
   const napCount = getNapCountForAge(ageMonths);
 
+  const fmtMin = (m: number) => m >= 60 ? formatDuration(m * 60000) : `${Math.round(m)} min`;
   const rows = [
-    { label: 'Vakevindu', value: `${Math.round(wakeWindow.minMinutes)}–${Math.round(wakeWindow.maxMinutes)} min` },
+    { label: 'Vakevindu', value: `${fmtMin(wakeWindow.minMinutes)} – ${fmtMin(wakeWindow.maxMinutes)}` },
     { label: 'Lurar per dag', value: napCount },
     { label: 'Søvnbehov (24t)', value: sleepNeed },
   ];
