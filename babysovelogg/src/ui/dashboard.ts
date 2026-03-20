@@ -7,6 +7,19 @@ import { showToast } from './toast.js';
 import { renderArc } from './arc.js';
 import { showEditModal } from './history.js';
 
+/** Send event optimistically — if offline, queue it and show a toast. Returns true if online. */
+async function sendEvent(type: string, payload: any): Promise<boolean> {
+  try {
+    const result = await postEvents([{ type, payload, clientId: getClientId() }]);
+    setAppState(result.state);
+    return true;
+  } catch {
+    queueEvent(type, payload);
+    showToast('Lagra offline — synkar snart', 'warning');
+    return false;
+  }
+}
+
 /** Simple hour-based classification fallback. */
 function classifySleepTypeByHour(): 'nap' | 'night' {
   const hour = new Date().getHours();
@@ -100,27 +113,14 @@ export function renderDashboard(container: HTMLElement): void {
 
   btn.addEventListener('click', async () => {
     if (isSleeping && activeSleep) {
-      const events = [{ type: 'sleep.ended', payload: { sleepId: activeSleep.id, endTime: new Date().toISOString() }, clientId: getClientId() }];
-      try {
-        const result = await postEvents(events);
-        setAppState(result.state);
-        renderDashboard(container);
-        showTagSheet(activeSleep.id, container);
-        return;
-      } catch {
-        queueEvent('sleep.ended', { sleepId: activeSleep.id, endTime: new Date().toISOString() });
-      }
+      const online = await sendEvent('sleep.ended', { sleepId: activeSleep.id, endTime: new Date().toISOString() });
+      renderDashboard(container);
+      if (online) showTagSheet(activeSleep.id, container);
     } else {
       const type = classifySleepType(todaySleeps, ageMonths);
-      const events = [{ type: 'sleep.started', payload: { babyId: baby.id, startTime: new Date().toISOString(), type }, clientId: getClientId() }];
-      try {
-        const result = await postEvents(events);
-        setAppState(result.state);
-      } catch {
-        queueEvent('sleep.started', { babyId: baby.id, startTime: new Date().toISOString(), type });
-      }
+      await sendEvent('sleep.started', { babyId: baby.id, startTime: new Date().toISOString(), type });
+      renderDashboard(container);
     }
-    renderDashboard(container);
   });
 
   // Pause/resume button when sleeping
@@ -133,12 +133,7 @@ export function renderDashboard(container: HTMLElement): void {
       const payload = isPaused
         ? { sleepId: activeSleep.id, resumeTime: new Date().toISOString() }
         : { sleepId: activeSleep.id, pauseTime: new Date().toISOString() };
-      try {
-        const result = await postEvents([{ type: eventType, payload, clientId: getClientId() }]);
-        setAppState(result.state);
-      } catch {
-        queueEvent(eventType, payload);
-      }
+      await sendEvent(eventType, payload);
       renderDashboard(container);
     });
     dash.appendChild(pauseBtn);
@@ -260,7 +255,7 @@ export function renderDashboard(container: HTMLElement): void {
         const payload = isPaused
           ? { sleepId: activeSleep!.id, resumeTime: new Date().toISOString() }
           : { sleepId: activeSleep!.id, pauseTime: new Date().toISOString() };
-        try { const result = await postEvents([{ type: eventType, payload, clientId: getClientId() }]); setAppState(result.state); } catch { queueEvent(eventType, payload); }
+        await sendEvent(eventType, payload);
         renderDashboard(container);
       });
       arcActions.appendChild(pauseActionBtn);
@@ -268,8 +263,7 @@ export function renderDashboard(container: HTMLElement): void {
       // Night, not sleeping: night waking + morning
       const nightBtn = el('button', { className: 'arc-action-btn night' }, ['🌙 Nattevaking']);
       nightBtn.addEventListener('click', async () => {
-        const events = [{ type: 'sleep.started', payload: { babyId: baby.id, startTime: new Date().toISOString(), type: 'night' }, clientId: getClientId() }];
-        try { const result = await postEvents(events); setAppState(result.state); } catch { queueEvent('sleep.started', events[0].payload); }
+        await sendEvent('sleep.started', { babyId: baby.id, startTime: new Date().toISOString(), type: 'night' });
         renderDashboard(container);
       });
       const morningBtn = el('button', { className: 'arc-action-btn morning' }, ['☀️ Morgon']);
@@ -286,7 +280,7 @@ export function renderDashboard(container: HTMLElement): void {
         const payload = isPaused
           ? { sleepId: activeSleep!.id, resumeTime: new Date().toISOString() }
           : { sleepId: activeSleep!.id, pauseTime: new Date().toISOString() };
-        try { const result = await postEvents([{ type: eventType, payload, clientId: getClientId() }]); setAppState(result.state); } catch { queueEvent(eventType, payload); }
+        await sendEvent(eventType, payload);
         renderDashboard(container);
       });
       arcActions.appendChild(pauseActionBtn);
@@ -294,8 +288,7 @@ export function renderDashboard(container: HTMLElement): void {
       // Daytime, awake: nap + diaper
       const napBtn = el('button', { className: 'arc-action-btn nap' }, ['😴 Lur']);
       napBtn.addEventListener('click', async () => {
-        const events = [{ type: 'sleep.started', payload: { babyId: baby.id, startTime: new Date().toISOString(), type: 'nap' }, clientId: getClientId() }];
-        try { const result = await postEvents(events); setAppState(result.state); } catch { queueEvent('sleep.started', events[0].payload); }
+        await sendEvent('sleep.started', { babyId: baby.id, startTime: new Date().toISOString(), type: 'nap' });
         renderDashboard(container);
       });
       const diaperBtn = el('button', { className: 'arc-action-btn diaper' }, ['🧷 Bleie']);
