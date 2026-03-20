@@ -193,7 +193,7 @@ function trendRow(label: string, val7: string, val30: string): HTMLElement {
   const cls = isHeader ? 'stats-trend-row stats-trend-header' : 'stats-trend-row';
   return el('div', { className: cls }, [
     el('div', { className: 'stats-trend-label' }, [label || '']),
-    el('div', { className: 'stats-trend-val' }, [isHeader ? '7 days' : val7]),
-    el('div', { className: 'stats-trend-val' }, [isHeader ? '30 days' : val30]),
+    el('div', { className: 'stats-trend-val' }, [isHeader ? '7 dagar' : val7]),
+    el('div', { className: 'stats-trend-val' }, [isHeader ? '30 dagar' : val30]),
   ]);
 }
