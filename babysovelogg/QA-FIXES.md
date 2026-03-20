@@ -63,8 +63,8 @@
 
 - [ ] **F1. Existing Playwright tests use old English strings**
   Tests reference "How did it go?", "Happy", "Nursing", "Save", "Skip", "Naps today",
-  "Welcome to Napper", etc. All UI is now Norwegian nynorsk. Tests will fail.
-  _Fix: rewrite all test assertions to use current Norwegian strings._
+  "Welcome to Napper", etc. All UI is now Norwegian nynorsk (hardcoded, no i18n system).
+  Tests will fail. _Fix: update all test assertions to match current Norwegian strings._
 
 - [ ] **F2. Diaper-before-bed nudge (nice-to-have extra)**
   User wants a subtle nudge to log diaper before bedtime so they remember to check
