@@ -508,9 +508,9 @@ function showTagSheet(sleepId: number, container: HTMLElement): void {
 
   modal.appendChild(el('h2', null, ['Korleis gjekk det?']));
 
-  // Mood selection
+  // Mood selection — specifically about going to sleep
   modal.appendChild(el('div', { className: 'form-group' }, [
-    el('label', null, ['Humør']),
+    el('label', null, ['Humør ved legging']),
     el('div', { className: 'tag-pills' }, MOODS.map(m => {
       const pill = el('button', {
         className: 'tag-pill',
