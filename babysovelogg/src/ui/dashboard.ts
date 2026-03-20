@@ -1,10 +1,34 @@
 import { getAppState, refreshState, setAppState } from '../main.js';
 import { postEvents } from '../api.js';
 import { queueEvent, getClientId } from '../sync.js';
-import { calculateAgeMonths, predictNextNap } from '../engine/schedule.js';
+import { calculateAgeMonths, predictNextNap, NAP_COUNTS, findByAge } from '../engine/schedule.js';
 import { el, formatAge, formatDuration, formatDurationLong, renderTimer, renderTimerWithPauses, renderCountdown, formatTime } from './components.js';
 import { showToast } from './toast.js';
 import { renderArc } from './arc.js';
+
+/** Simple hour-based classification fallback. */
+function classifySleepTypeByHour(): 'nap' | 'night' {
+  const hour = new Date().getHours();
+  return hour >= 18 || hour < 6 ? 'night' : 'nap';
+}
+
+/** Smart classification: considers time-of-day, nap count, and last wake time. */
+function classifySleepType(todaySleeps: any[], ageMonths?: number): 'nap' | 'night' {
+  const hour = new Date().getHours();
+  // Clear night (before 6am or after 8pm)
+  if (hour < 6 || hour >= 20) return 'night';
+  // Clear daytime (before 4pm)
+  if (hour < 16) return 'nap';
+  // Ambiguous zone (16:00–19:59): check if naps are done for the day
+  if (ageMonths != null) {
+    const napCount = findByAge(NAP_COUNTS, ageMonths);
+    const completedNaps = todaySleeps.filter((s: any) => s.type === 'nap' && s.end_time).length;
+    if (completedNaps >= napCount.naps) return 'night';
+  }
+  // In the 16–18 range, if we haven't met nap count, still likely a nap
+  if (hour < 18) return 'nap';
+  return 'night';
+}
 
 function calcPauseMs(pauses: any[]): number {
   let total = 0;
@@ -86,8 +110,7 @@ export function renderDashboard(container: HTMLElement): void {
         queueEvent('sleep.ended', { sleepId: activeSleep.id, endTime: new Date().toISOString() });
       }
     } else {
-      const hour = new Date().getHours();
-      const type = hour >= 18 || hour < 6 ? 'night' : 'nap';
+      const type = classifySleepType(todaySleeps, ageMonths);
       const events = [{ type: 'sleep.started', payload: { babyId: baby.id, startTime: new Date().toISOString(), type }, clientId: getClientId() }];
       try {
         const result = await postEvents(events);
@@ -371,7 +394,7 @@ function showManualSleepModal(baby: any, container: HTMLElement): void {
   const startDt = makeDateTimeInputs(oneHourAgo.toISOString());
   const endDt = makeDateTimeInputs(now.toISOString());
 
-  let selectedType = now.getHours() >= 18 || now.getHours() < 6 ? 'night' : 'nap';
+  let selectedType = classifySleepTypeByHour();
   const napPill = el('button', { className: `type-pill ${selectedType === 'nap' ? 'active' : ''}` }, ['😴 Lur']);
   const nightPill = el('button', { className: `type-pill ${selectedType === 'night' ? 'active' : ''}` }, ['🌙 Natt']);
   const updatePills = () => {
