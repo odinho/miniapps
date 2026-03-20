@@ -128,7 +128,12 @@ function getState() {
   ).get(baby.id, todayStart.toISOString()) as any;
   const diaperCount = todayDiapers?.count ?? 0;
 
-  return { baby, activeSleep, todaySleeps, stats, prediction, ageMonths, diaperCount, todayWakeUp };
+  const lastDiaper = db.prepare(
+    'SELECT time FROM diaper_log WHERE baby_id = ? AND deleted = 0 ORDER BY time DESC LIMIT 1'
+  ).get(baby.id) as any;
+  const lastDiaperTime = lastDiaper?.time ?? null;
+
+  return { baby, activeSleep, todaySleeps, stats, prediction, ageMonths, diaperCount, lastDiaperTime, todayWakeUp };
 }
 
 export async function handleRequest(req: IncomingMessage, res: ServerResponse) {

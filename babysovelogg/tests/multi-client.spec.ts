@@ -1,8 +1,12 @@
-import { test, expect } from './fixtures';
+import { test, expect, forceMorning } from './fixtures';
+
+test.beforeEach(async ({ page }) => {
+  await forceMorning(page);
+});
 
 async function dismissMorningPrompt(page: any) {
   await page.getByTestId('morning-prompt').waitFor({ state: 'visible', timeout: 5000 });
-  await page.getByRole('button', { name: 'Set Wake-up Time' }).click();
+  await page.getByRole('button', { name: 'Sett vaknetid' }).click();
   await page.getByTestId('morning-prompt').waitFor({ state: 'hidden', timeout: 5000 });
 }
 
@@ -10,7 +14,7 @@ test('Second browser context sees baby created in first', async ({ page, browser
   await page.goto('/');
   await page.locator('input[type="text"]').fill('Testa');
   await page.locator('input[type="date"]').fill('2025-06-12');
-  await page.getByRole('button', { name: 'Get Started ✨' }).click();
+  await page.getByRole('button', { name: 'Kom i gang ✨' }).click();
   await dismissMorningPrompt(page);
   await expect(page.getByTestId('baby-name')).toHaveText('Testa', { timeout: 5000 });
 
@@ -27,7 +31,7 @@ test('Sleep started in one client is visible in another after reload', async ({ 
   await page.goto('/');
   await page.locator('input[type="text"]').fill('Testa');
   await page.locator('input[type="date"]').fill('2025-06-12');
-  await page.getByRole('button', { name: 'Get Started ✨' }).click();
+  await page.getByRole('button', { name: 'Kom i gang ✨' }).click();
   await dismissMorningPrompt(page);
   await expect(page.getByTestId('baby-name')).toHaveText('Testa', { timeout: 5000 });
 

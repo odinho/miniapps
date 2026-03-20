@@ -601,6 +601,24 @@ function showTagSheet(sleepId: number, container: HTMLElement): void {
   skipBtn.addEventListener('click', close);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 
+  // Diaper-before-bed nudge: remind if no diaper in the last 2 hours
+  const appState = getAppState();
+  const lastDiaper = appState?.lastDiaperTime;
+  const twoHoursAgo = Date.now() - 2 * 3600000;
+  if (!lastDiaper || new Date(lastDiaper).getTime() < twoHoursAgo) {
+    const nudge = el('div', { className: 'diaper-nudge', style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px', padding: '10px 12px', background: 'var(--lavender)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', color: 'var(--text-light)', marginBottom: '12px' } }, [
+      '🧷 Inga bleie dei siste 2 timane',
+    ]);
+    const logDiaperBtn = el('button', { className: 'btn btn-ghost', style: { fontSize: '0.8rem', padding: '2px 10px' } }, ['Logg bleie']);
+    logDiaperBtn.addEventListener('click', () => {
+      close();
+      const baby = appState?.baby;
+      if (baby) showDiaperModal(baby, container);
+    });
+    nudge.appendChild(logDiaperBtn);
+    modal.appendChild(nudge);
+  }
+
   modal.appendChild(el('div', { className: 'btn-row' }, [skipBtn, saveBtn]));
   overlay.appendChild(modal);
   document.body.appendChild(overlay);

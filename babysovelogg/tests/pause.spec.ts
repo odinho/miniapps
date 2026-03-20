@@ -1,4 +1,8 @@
-import { test, expect, createBaby, setWakeUpTime, getDb } from './fixtures';
+import { test, expect, createBaby, setWakeUpTime, getDb, dismissSheet, forceMorning } from './fixtures';
+
+test.beforeEach(async ({ page }) => {
+  await forceMorning(page);
+});
 
 test('Pause button appears when sleeping', async ({ page }) => {
   const babyId = createBaby('Testa');
@@ -9,6 +13,8 @@ test('Pause button appears when sleeping', async ({ page }) => {
 
   await page.getByTestId('sleep-button').click();
   await expect(page.getByTestId('sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
+  // Dismiss bedtime tag sheet to access pause button
+  await dismissSheet(page);
   await expect(page.getByTestId('pause-btn')).toBeVisible();
   await expect(page.getByTestId('pause-btn')).toContainText('Pause');
 });
@@ -20,14 +26,15 @@ test('Can pause and resume', async ({ page }) => {
 
   await page.getByTestId('sleep-button').click();
   await expect(page.getByTestId('sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
+  await dismissSheet(page);
 
   await page.getByTestId('pause-btn').click();
-  await expect(page.getByTestId('pause-btn')).toContainText('Resume', { timeout: 5000 });
-  await expect(page.locator('.arc-center-label')).toContainText('Paused');
+  await expect(page.getByTestId('pause-btn')).toContainText('Fortset', { timeout: 5000 });
+  await expect(page.locator('.arc-center-label')).toContainText('Pause');
 
   await page.getByTestId('pause-btn').click();
   await expect(page.getByTestId('pause-btn')).toContainText('Pause', { timeout: 5000 });
-  await expect(page.locator('.arc-center-label')).toContainText(/Napping|Sleeping/);
+  await expect(page.locator('.arc-center-label')).toContainText(/Lurar|Søv/);
 });
 
 test('Timer adjusts for pause duration', async ({ page }) => {
@@ -70,16 +77,17 @@ test('Multiple pauses work correctly', async ({ page }) => {
 
   await page.getByTestId('sleep-button').click();
   await expect(page.getByTestId('sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
+  await dismissSheet(page);
 
   // First pause/resume
   await page.getByTestId('pause-btn').click();
-  await expect(page.getByTestId('pause-btn')).toContainText('Resume', { timeout: 5000 });
+  await expect(page.getByTestId('pause-btn')).toContainText('Fortset', { timeout: 5000 });
   await page.getByTestId('pause-btn').click();
   await expect(page.getByTestId('pause-btn')).toContainText('Pause', { timeout: 5000 });
 
   // Second pause/resume
   await page.getByTestId('pause-btn').click();
-  await expect(page.getByTestId('pause-btn')).toContainText('Resume', { timeout: 5000 });
+  await expect(page.getByTestId('pause-btn')).toContainText('Fortset', { timeout: 5000 });
   await page.getByTestId('pause-btn').click();
   await expect(page.getByTestId('pause-btn')).toContainText('Pause', { timeout: 5000 });
 

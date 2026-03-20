@@ -11,6 +11,7 @@ export interface AppState {
   prediction: any;
   ageMonths?: number;
   diaperCount?: number;
+  lastDiaperTime?: string | null;
   todayWakeUp?: any;
 }
 

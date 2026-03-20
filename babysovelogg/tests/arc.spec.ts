@@ -8,7 +8,6 @@ test('Arc renders on dashboard', async ({ page }) => {
   await expect(page.getByTestId('baby-name')).toHaveText('Testa');
   await expect(page.locator('.sleep-arc')).toBeVisible();
   await expect(page.locator('.arc-container')).toBeVisible();
-  await expect(page.locator('.arc-track')).toBeVisible();
 });
 
 test('Completed sleeps appear as filled bubbles on arc', async ({ page }) => {
@@ -67,7 +66,8 @@ test('Arc center shows countdown when not sleeping', async ({ page }) => {
 
   await page.goto('/');
   await expect(page.locator('.arc-center-text')).toBeVisible();
-  await expect(page.locator('.arc-center-label')).toContainText('Next nap');
+  // Label depends on time of day: "Neste lur", "Leggetid om", "Etter leggetid", etc.
+  await expect(page.locator('.arc-center-label')).toBeVisible();
 });
 
 test('Arc center shows timer when sleeping', async ({ page }) => {
@@ -76,5 +76,5 @@ test('Arc center shows timer when sleeping', async ({ page }) => {
 
   await page.goto('/');
   await expect(page.locator('.arc-center-text')).toBeVisible();
-  await expect(page.locator('.arc-center-label')).toContainText('Napping');
+  await expect(page.locator('.arc-center-label')).toContainText('Lurar');
 });

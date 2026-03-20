@@ -61,16 +61,19 @@
 
 ## Fixes — Round 3 (TODO for next session)
 
-- [ ] **F1. Existing Playwright tests use old English strings**
+- [x] **F1. Existing Playwright tests use old English strings**
   Tests reference "How did it go?", "Happy", "Nursing", "Save", "Skip", "Naps today",
   "Welcome to Napper", etc. All UI is now Norwegian nynorsk (hardcoded, no i18n system).
-  Tests will fail. _Fix: update all test assertions to match current Norwegian strings._
+  Tests will fail. _Fix: update all test assertions to match current Norwegian strings.
+  Also updated tag sheet flow (now on sleep START), added `forceMorning` helper for
+  time-independent tests, fixed custom confirm dialog handling._
 
-- [ ] **F2. Diaper-before-bed nudge (nice-to-have extra)**
+- [x] **F2. Diaper-before-bed nudge (nice-to-have extra)**
   User wants a subtle nudge to log diaper before bedtime so they remember to check
   the potty on wake-up. Not core functionality — should be an optional/discoverable feature.
-  _Approach: if no diaper logged in last 2h before bedtime, show a small reminder in the
-  bedtime tag sheet. Keep it very light._
+  _Fix: if no diaper logged in last 2h, bedtime tag sheet shows "🧷 Inga bleie dei siste
+  2 timane" with a "Logg bleie" button that opens the diaper modal. Server state now
+  includes `lastDiaperTime`._
 
 ---
 

@@ -1,10 +1,14 @@
-import { test, expect, createBaby, setWakeUpTime, seedBabyWithSleep } from './fixtures';
+import { test, expect, createBaby, setWakeUpTime, seedBabyWithSleep, forceMorning } from './fixtures';
+
+test.beforeEach(async ({ page }) => {
+  await forceMorning(page);
+});
 
 test('History page shows logged sleeps', async ({ page }) => {
   seedBabyWithSleep();
   await page.goto('/#/history');
   await expect(page.locator('.sleep-log-item')).toHaveCount(1, { timeout: 5000 });
-  await expect(page.locator('.log-meta')).toContainText('Nap');
+  await expect(page.locator('.log-meta')).toContainText('Lur');
 });
 
 test('History page shows empty state when no sleeps', async ({ page }) => {
@@ -12,7 +16,7 @@ test('History page shows empty state when no sleeps', async ({ page }) => {
   setWakeUpTime(babyId);
 
   await page.goto('/#/history');
-  await expect(page.getByText('No entries yet')).toBeVisible({ timeout: 5000 });
+  await expect(page.getByText('Ingen oppføringar enno')).toBeVisible({ timeout: 5000 });
 });
 
 test('Clicking a sleep entry opens edit modal', async ({ page }) => {
@@ -21,8 +25,8 @@ test('Clicking a sleep entry opens edit modal', async ({ page }) => {
   await expect(page.locator('.sleep-log-item')).toHaveCount(1, { timeout: 5000 });
 
   await page.locator('.sleep-log-item').click();
-  await expect(page.getByRole('heading', { name: 'Edit Sleep' })).toBeVisible();
-  await expect(page.locator('.type-pill.active')).toContainText('Nap');
+  await expect(page.getByRole('heading', { name: 'Endra søvn' })).toBeVisible();
+  await expect(page.locator('.type-pill.active')).toContainText('Lur');
 });
 
 test('Can edit a sleep entry type', async ({ page }) => {
@@ -31,13 +35,13 @@ test('Can edit a sleep entry type', async ({ page }) => {
   await expect(page.locator('.sleep-log-item')).toHaveCount(1, { timeout: 5000 });
 
   await page.locator('.sleep-log-item').click();
-  await expect(page.getByRole('heading', { name: 'Edit Sleep' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Endra søvn' })).toBeVisible();
 
-  await page.getByText('Night').click();
-  await page.getByRole('button', { name: 'Save' }).click();
+  await page.locator('.type-pill', { hasText: 'Natt' }).click();
+  await page.getByRole('button', { name: 'Lagra' }).click();
 
-  await expect(page.locator('.modal')).not.toBeVisible({ timeout: 3000 });
-  await expect(page.locator('.log-meta')).toContainText('Night');
+  await expect(page.getByRole('heading', { name: 'Endra søvn' })).not.toBeVisible({ timeout: 3000 });
+  await expect(page.locator('.log-meta')).toContainText('Nattesøvn');
 });
 
 test('Can delete a sleep entry', async ({ page }) => {
@@ -46,9 +50,10 @@ test('Can delete a sleep entry', async ({ page }) => {
   await expect(page.locator('.sleep-log-item')).toHaveCount(1, { timeout: 5000 });
 
   await page.locator('.sleep-log-item').click();
-  page.on('dialog', dialog => dialog.accept());
-  await page.getByRole('button', { name: 'Delete' }).click();
+  // Click Slett in edit modal — opens custom confirm dialog
+  await page.getByRole('button', { name: 'Slett' }).first().click();
+  // Click Slett in confirm dialog
+  await page.locator('.modal-overlay').last().getByRole('button', { name: 'Slett' }).click();
 
-  await expect(page.locator('.modal')).not.toBeVisible({ timeout: 3000 });
-  await expect(page.getByText('No entries yet')).toBeVisible({ timeout: 5000 });
+  await expect(page.getByText('Ingen oppføringar enno')).toBeVisible({ timeout: 5000 });
 });

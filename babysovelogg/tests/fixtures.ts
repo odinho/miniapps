@@ -68,4 +68,23 @@ export const test = base.extend<{ autoResetDb: void }>({
   }, { auto: true }],
 });
 
+/** Force morning hours (8 AM) in the browser so morning prompt and day theme work at any time */
+export async function forceMorning(page: any) {
+  await page.addInitScript(() => {
+    Date.prototype.getHours = function() { return 8; };
+  });
+}
+
+/** Dismiss any visible modal sheet (tag sheet or wake-up sheet) by clicking "Hopp over" */
+export async function dismissSheet(page: any) {
+  const overlay = page.getByTestId('modal-overlay');
+  try {
+    await overlay.waitFor({ state: 'visible', timeout: 3000 });
+    await page.getByRole('button', { name: 'Hopp over' }).click();
+    await overlay.waitFor({ state: 'hidden', timeout: 3000 });
+  } catch {
+    // No sheet visible, that's fine
+  }
+}
+
 export { expect };
