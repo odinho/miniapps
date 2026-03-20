@@ -5,6 +5,7 @@ import { calculateAgeMonths, predictNextNap, NAP_COUNTS, findByAge } from '../en
 import { el, formatAge, formatDuration, formatDurationLong, renderTimer, renderTimerWithPauses, renderCountdown, formatTime } from './components.js';
 import { showToast } from './toast.js';
 import { renderArc } from './arc.js';
+import { showEditModal } from './history.js';
 
 /** Simple hour-based classification fallback. */
 function classifySleepTypeByHour(): 'nap' | 'night' {
@@ -151,6 +152,10 @@ export function renderDashboard(container: HTMLElement): void {
     prediction,
     isNightMode,
     wakeUpTime: todayWakeUp?.wake_time,
+    onSleepClick: (index: number) => {
+      const sleep = todaySleeps[index];
+      if (sleep) showEditModal(sleep, container);
+    },
     onStartClick: () => {
       if (isNightMode) {
         // Night start = bedtime was set, show details

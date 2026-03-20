@@ -75,6 +75,7 @@ export interface ArcInput {
   wakeUpTime?: string | null;
   onStartClick?: () => void;
   onEndClick?: () => void;
+  onSleepClick?: (index: number) => void;
 }
 
 export function renderArc(input: ArcInput): SVGElement {
@@ -169,12 +170,13 @@ export function renderArc(input: ArcInput): SVGElement {
   }
 
   // Collect bubbles
-  const bubbles: SleepBubble[] = [];
+  const bubbles: (SleepBubble & { sleepIndex?: number })[] = [];
 
-  for (const s of input.todaySleeps) {
+  for (let si = 0; si < input.todaySleeps.length; si++) {
+    const s = input.todaySleeps[si];
     if (input.activeSleep && !s.end_time) continue;
     if (!s.end_time) continue;
-    bubbles.push({ startTime: new Date(s.start_time), endTime: new Date(s.end_time), type: s.type as 'nap' | 'night', status: 'completed' });
+    bubbles.push({ startTime: new Date(s.start_time), endTime: new Date(s.end_time), type: s.type as 'nap' | 'night', status: 'completed', sleepIndex: si });
   }
 
   if (input.activeSleep) {
@@ -231,6 +233,19 @@ export function renderArc(input: ArcInput): SVGElement {
       segPath.setAttribute('opacity', '0.35');
     }
     g.appendChild(segPath);
+
+    // Tap target for completed sleep bubbles
+    if (bubble.status === 'completed' && input.onSleepClick && bubble.sleepIndex != null) {
+      const tapPath = document.createElementNS(ns, 'path');
+      tapPath.setAttribute('d', describeArc(cx, cy, r, startFrac, endFrac));
+      tapPath.setAttribute('fill', 'none');
+      tapPath.setAttribute('stroke', 'transparent');
+      tapPath.setAttribute('stroke-width', String(trackWidth + 16));
+      tapPath.setAttribute('style', 'cursor:pointer');
+      const idx = bubble.sleepIndex;
+      tapPath.addEventListener('click', () => input.onSleepClick!(idx));
+      g.appendChild(tapPath);
+    }
 
     // Duration/time label outside arc
     const midFrac = (startFrac + endFrac) / 2;
