@@ -113,13 +113,21 @@ export function renderDashboard(container: HTMLElement): void {
 
   btn.addEventListener('click', async () => {
     if (isSleeping && activeSleep) {
-      const online = await sendEvent('sleep.ended', { sleepId: activeSleep.id, endTime: new Date().toISOString() });
+      // End sleep — save immediately, then show optional wake-up sheet
+      const sleepId = activeSleep.id;
+      await sendEvent('sleep.ended', { sleepId, endTime: new Date().toISOString() });
       renderDashboard(container);
-      if (online) showTagSheet(activeSleep.id, container);
+      showWakeUpSheet(sleepId, container);
     } else {
+      // Start sleep — then show bedtime tag sheet
       const type = classifySleepType(todaySleeps, ageMonths);
       await sendEvent('sleep.started', { babyId: baby.id, startTime: new Date().toISOString(), type });
       renderDashboard(container);
+      // Get the new active sleep ID from state
+      const newState = getAppState();
+      if (newState?.activeSleep?.id) {
+        showTagSheet(newState.activeSleep.id, container);
+      }
     }
   });
 
@@ -505,7 +513,7 @@ function showTagSheet(sleepId: number, container: HTMLElement): void {
   let selectedMethod: string | null = null;
   let selectedFallAsleep: string | null = null;
 
-  modal.appendChild(el('h2', null, ['Korleis gjekk det?']));
+  modal.appendChild(el('h2', null, ['Korleis gjekk legginga?']));
 
   // Mood selection — specifically about going to sleep
   modal.appendChild(el('div', { className: 'form-group' }, [
@@ -582,6 +590,69 @@ function showTagSheet(sleepId: number, container: HTMLElement): void {
             fallAsleepTime: selectedFallAsleep,
             notes: noteInput.value.trim() || undefined,
           },
+          clientId: getClientId(),
+        }]);
+        setAppState(result.state);
+      } catch {}
+    }
+    close();
+  });
+
+  skipBtn.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  modal.appendChild(el('div', { className: 'btn-row' }, [skipBtn, saveBtn]));
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  function close() { overlay.remove(); }
+}
+
+function showWakeUpSheet(sleepId: number, container: HTMLElement): void {
+  const overlay = el('div', { className: 'modal-overlay', 'data-testid': 'modal-overlay' });
+  const modal = el('div', { className: 'modal tag-sheet' });
+
+  modal.appendChild(el('h2', null, ['Oppvakning']));
+  modal.appendChild(el('p', { style: { color: 'var(--text-light)', fontSize: '0.9rem', marginBottom: '16px' } }, ['Søvn avslutta. Noko å notera?']));
+
+  // Woke self vs was woken
+  let wokeBy: string | null = null;
+  const WOKE_OPTIONS = [
+    { value: 'self', label: 'Vakna sjølv' },
+    { value: 'woken', label: 'Vekt av oss' },
+  ];
+  const wokePills = WOKE_OPTIONS.map(o => {
+    const pill = el('button', { className: 'type-pill', 'data-woke': o.value }, [o.label]);
+    pill.addEventListener('click', () => {
+      wokeBy = wokeBy === o.value ? null : o.value;
+      wokePills.forEach((p, i) => p.className = `type-pill ${wokeBy === WOKE_OPTIONS[i].value ? 'active' : ''}`);
+    });
+    return pill;
+  });
+  modal.appendChild(el('div', { className: 'form-group' }, [
+    el('label', null, ['Oppvakning']),
+    el('div', { className: 'type-pills' }, wokePills),
+  ]));
+
+  // Notes
+  const noteInput = el('input', { type: 'text', placeholder: 'Valfritt notat...' }) as HTMLInputElement;
+  modal.appendChild(el('div', { className: 'form-group' }, [
+    el('label', null, ['Notat']),
+    noteInput,
+  ]));
+
+  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Lagra']);
+  const skipBtn = el('button', { className: 'btn btn-ghost' }, ['Hopp over']);
+
+  saveBtn.addEventListener('click', async () => {
+    if (wokeBy || noteInput.value.trim()) {
+      try {
+        const payload: any = { sleepId };
+        if (wokeBy) payload.wokeBy = wokeBy;
+        if (noteInput.value.trim()) payload.wakeNotes = noteInput.value.trim();
+        const result = await postEvents([{
+          type: 'sleep.updated',
+          payload,
           clientId: getClientId(),
         }]);
         setAppState(result.state);

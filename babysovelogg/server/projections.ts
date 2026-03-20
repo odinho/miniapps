@@ -44,6 +44,8 @@ export function applyEvent(event: NapperEvent): void {
       if (payload.mood !== undefined) { sets.push('mood = ?'); vals.push(payload.mood); }
       if (payload.method !== undefined) { sets.push('method = ?'); vals.push(payload.method); }
       if (payload.fallAsleepTime !== undefined) { sets.push('fall_asleep_time = ?'); vals.push(payload.fallAsleepTime); }
+      if (payload.wokeBy !== undefined) { sets.push('woke_by = ?'); vals.push(payload.wokeBy); }
+      if (payload.wakeNotes !== undefined) { sets.push('wake_notes = ?'); vals.push(payload.wakeNotes); }
       if (sets.length > 0) {
         vals.push(payload.sleepId);
         db.prepare(`UPDATE sleep_log SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
