@@ -21,7 +21,7 @@ function renderBarChart(weekStats: WeekStats): SVGElement {
   if (days.length === 0) {
     const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%' });
     const t = svgEl('text', { x: String(W / 2), y: String(H / 2), 'text-anchor': 'middle', fill: 'var(--text-light)', 'font-size': '14' });
-    t.textContent = 'No data yet';
+    t.textContent = 'Ingen data enno';
     svg.appendChild(t);
     return svg;
   }

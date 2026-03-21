@@ -48,6 +48,12 @@ export function addActiveSleep(babyId: number, startTime: string, type = 'nap') 
   db.close();
 }
 
+export function addDiaper(babyId: number, time: string, type = 'wet', amount = 'middels') {
+  const db = getDb();
+  db.prepare("INSERT INTO diaper_log (baby_id, time, type, amount) VALUES (?, ?, ?, ?)").run(babyId, time, type, amount);
+  db.close();
+}
+
 export function seedBabyWithSleep() {
   const db = getDb();
   db.prepare("INSERT INTO events (type, payload) VALUES ('baby.created', ?)").run(JSON.stringify({ name: 'Testa', birthdate: '2025-06-12' }));
@@ -73,6 +79,13 @@ export async function forceMorning(page: any) {
   await page.addInitScript(() => {
     Date.prototype.getHours = function() { return 8; };
   });
+}
+
+/** Force a specific hour in the browser for time-dependent tests */
+export async function forceHour(page: any, hour: number) {
+  await page.addInitScript((h: number) => {
+    Date.prototype.getHours = function() { return h; };
+  }, hour);
 }
 
 /** Dismiss any visible modal sheet (tag sheet or wake-up sheet) by clicking "Hopp over" */

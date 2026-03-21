@@ -97,7 +97,7 @@ export function renderCountdown(targetTime: string | Date): { element: HTMLSpanE
   const update = () => {
     const remaining = target - Date.now();
     if (remaining <= 0) {
-      span.textContent = "now!";
+      span.textContent = "no!";
       span.style.color = "var(--peach-dark)";
     } else {
       span.textContent = formatDuration(remaining);

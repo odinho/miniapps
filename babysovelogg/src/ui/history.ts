@@ -71,7 +71,7 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
         }
         const duration = entry.end_time ? formatDuration(Math.max(0, durationMs)) : 'ongoing…';
         const icon = entry.type === 'night' ? '🌙' : '😴';
-        const times = `${formatTime(entry.start_time)} — ${entry.end_time ? formatTime(entry.end_time) : 'now'}`;
+        const times = `${formatTime(entry.start_time)} — ${entry.end_time ? formatTime(entry.end_time) : 'no'}`;
 
         const entryPauses: any[] = entry.pauses || [];
         const metaChildren: (Node | string)[] = [entry.type === 'night' ? 'Nattesøvn' : 'Lur'];
@@ -92,7 +92,11 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
           metaChildren.push(el('span', { className: 'tag-badges' }, badges));
         }
         if (entry.fall_asleep_time) {
-          metaChildren.push(` · ${entry.fall_asleep_time}`);
+          const FALL_ASLEEP_LABELS: Record<string, string> = { '<5': '< 5 min', '5-15': '5–15 min', '15-30': '15–30 min', '30+': '30+ min' };
+          metaChildren.push(` · ⏱️ ${FALL_ASLEEP_LABELS[entry.fall_asleep_time] || entry.fall_asleep_time}`);
+        }
+        if (entry.woke_by) {
+          metaChildren.push(` · ${entry.woke_by === 'self' ? 'Vakna sjølv' : 'Vekt av oss'}`);
         }
 
         const infoChildren: (Node | string)[] = [
@@ -101,6 +105,9 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
         ];
         if (entry.notes) {
           infoChildren.push(el('div', { className: 'log-meta', style: { fontStyle: 'italic' } }, [entry.notes]));
+        }
+        if (entry.wake_notes) {
+          infoChildren.push(el('div', { className: 'log-meta', style: { fontStyle: 'italic' } }, [`Oppvakning: ${entry.wake_notes}`]));
         }
 
         const item = el('div', { className: 'sleep-log-item' }, [
@@ -324,8 +331,25 @@ function showDiaperEditModal(entry: any, container: HTMLElement): void {
   // Time display
   modal.appendChild(el('div', { style: { color: 'var(--text-light)', fontSize: '0.85rem', marginBottom: '16px' } }, [`Logga kl. ${formatTime(entry.time)}`]));
 
+  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Lagra']);
   const deleteBtn = el('button', { className: 'btn btn-danger' }, ['Slett']);
-  const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Lukk']);
+  const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Avbryt']);
+
+  saveBtn.addEventListener('click', async () => {
+    await postEvents([{
+      type: 'diaper.updated',
+      payload: {
+        diaperId: entry.id,
+        type: selectedType,
+        amount: selectedAmount,
+        note: noteInput.value.trim() || undefined,
+      },
+      clientId: getClientId(),
+    }]);
+    close();
+    await refreshState();
+    renderHistory(container);
+  });
 
   deleteBtn.addEventListener('click', async () => {
     const confirmed = await showConfirm('Sletta denne bleieoppføringa? Dette kan ikkje angrast.', 'Slett', 'Avbryt');
@@ -343,7 +367,8 @@ function showDiaperEditModal(entry: any, container: HTMLElement): void {
   const escHandler = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
   document.addEventListener('keydown', escHandler);
 
-  modal.appendChild(el('div', { className: 'btn-row' }, [deleteBtn, cancelBtn]));
+  modal.appendChild(el('div', { className: 'btn-row' }, [deleteBtn, saveBtn]));
+  modal.appendChild(el('div', { style: { textAlign: 'center', marginTop: '12px' } }, [cancelBtn]));
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 

@@ -1,4 +1,4 @@
-import { test, expect, createBaby, getDb, forceMorning } from './fixtures';
+import { test, expect, createBaby, getDb, forceMorning, forceHour } from './fixtures';
 
 test('Shows morning prompt when no wake-up time and no sleeps', async ({ page }) => {
   await forceMorning(page);
@@ -201,6 +201,17 @@ test('Predicted bubbles are replaced by actual sleeps', async ({ page }) => {
 
   await page.getByTestId('sleep-button').click();
   await expect(page.getByTestId('sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
+});
+
+test('Does not show morning prompt during night hours', async ({ page }) => {
+  await forceHour(page, 2);
+  createBaby('Testa');
+  await page.goto('/');
+
+  // At 2 AM, no morning prompt should appear
+  await expect(page.getByTestId('morning-prompt')).not.toBeVisible();
+  // Dashboard should render (even if it shows night-mode content)
+  await expect(page.getByTestId('dashboard')).toBeVisible();
 });
 
 test('Morning prompt only shows once per day', async ({ page }) => {

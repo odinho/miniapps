@@ -97,6 +97,19 @@ export function applyEvent(event: NapperEvent): void {
       ).run(payload.babyId, payload.time, payload.type, payload.amount ?? null, payload.note ?? null);
       break;
 
+    case 'diaper.updated': {
+      const sets: string[] = [];
+      const vals: any[] = [];
+      if (payload.type !== undefined) { sets.push('type = ?'); vals.push(payload.type); }
+      if (payload.amount !== undefined) { sets.push('amount = ?'); vals.push(payload.amount); }
+      if (payload.note !== undefined) { sets.push('note = ?'); vals.push(payload.note); }
+      if (sets.length > 0) {
+        vals.push(payload.diaperId);
+        db.prepare(`UPDATE diaper_log SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+      }
+      break;
+    }
+
     case 'diaper.deleted':
       db.prepare('UPDATE diaper_log SET deleted = 1 WHERE id = ?').run(payload.diaperId);
       break;

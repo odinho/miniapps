@@ -1,4 +1,4 @@
-import { test, expect, createBaby, setWakeUpTime, seedBabyWithSleep, forceMorning } from './fixtures';
+import { test, expect, createBaby, setWakeUpTime, seedBabyWithSleep, getDb, forceMorning } from './fixtures';
 
 test.beforeEach(async ({ page }) => {
   await forceMorning(page);
@@ -42,6 +42,30 @@ test('Can edit a sleep entry type', async ({ page }) => {
 
   await expect(page.getByRole('heading', { name: 'Endra søvn' })).not.toBeVisible({ timeout: 3000 });
   await expect(page.locator('.log-meta')).toContainText('Nattesøvn');
+});
+
+test('Notes and fall-asleep-time visible in history list', async ({ page }) => {
+  const babyId = createBaby('Testa');
+  setWakeUpTime(babyId);
+  const db = getDb();
+  const now = new Date();
+  const start = new Date(now.getTime() - 3600000).toISOString();
+  const end = now.toISOString();
+  db.prepare("INSERT INTO sleep_log (baby_id, start_time, end_time, type, fall_asleep_time, notes, woke_by, wake_notes) VALUES (?, ?, ?, 'nap', '5-15', 'Roleg kveld', 'self', 'Glad ved oppvakning')").run(babyId, start, end);
+  db.close();
+
+  await page.goto('/#/history');
+  await expect(page.locator('.sleep-log-item').first()).toBeVisible({ timeout: 5000 });
+
+  const item = page.locator('.sleep-log-item').first();
+  // Fall-asleep time should be formatted
+  await expect(item).toContainText('5–15 min');
+  // Notes visible
+  await expect(item).toContainText('Roleg kveld');
+  // Woke-by info visible
+  await expect(item).toContainText('Vakna sjølv');
+  // Wake notes visible
+  await expect(item).toContainText('Glad ved oppvakning');
 });
 
 test('Can delete a sleep entry', async ({ page }) => {

@@ -114,10 +114,13 @@ export function renderDashboard(container: HTMLElement): void {
   btn.addEventListener('click', async () => {
     if (isSleeping && activeSleep) {
       // End sleep — save immediately, then show optional wake-up sheet
+      // Get fresh sleep data with any tags set after start (via tag sheet)
+      const currentState = getAppState();
+      const sleepSnapshot = currentState?.activeSleep ? { ...currentState.activeSleep } : { ...activeSleep };
       const sleepId = activeSleep.id;
       await sendEvent('sleep.ended', { sleepId, endTime: new Date().toISOString() });
       renderDashboard(container);
-      showWakeUpSheet(sleepId, container);
+      showWakeUpSheet(sleepId, sleepSnapshot, container);
     } else {
       // Start sleep — then show bedtime tag sheet
       const type = classifySleepType(todaySleeps, ageMonths);
@@ -626,12 +629,74 @@ function showTagSheet(sleepId: number, container: HTMLElement): void {
   function close() { overlay.remove(); }
 }
 
-function showWakeUpSheet(sleepId: number, container: HTMLElement): void {
+const MOOD_EMOJI: Record<string, string> = { happy: '😊', normal: '😐', upset: '😢', fighting: '😤' };
+const METHOD_EMOJI: Record<string, string> = { bed: '🛏️', nursing: '🤱', held: '🤗', stroller: '🚼', car: '🚗', bottle: '🍼' };
+const FALL_ASLEEP_LABELS: Record<string, string> = { '<5': '< 5 min', '5-15': '5–15 min', '15-30': '15–30 min', '30+': '30+ min' };
+
+function showWakeUpSheet(sleepId: number, sleepData: any, container: HTMLElement): void {
   const overlay = el('div', { className: 'modal-overlay', 'data-testid': 'modal-overlay' });
   const modal = el('div', { className: 'modal tag-sheet' });
 
   modal.appendChild(el('h2', null, ['Oppvakning']));
-  modal.appendChild(el('p', { style: { color: 'var(--text-light)', fontSize: '0.9rem', marginBottom: '16px' } }, ['Søvn avslutta. Noko å notera?']));
+
+  // Compact bedtime summary — show what was recorded at sleep start
+  const hasBedtimeTags = sleepData?.mood || sleepData?.method || sleepData?.fall_asleep_time || sleepData?.notes;
+  if (hasBedtimeTags) {
+    const badges: (Node | string)[] = [];
+    if (sleepData.mood && MOOD_EMOJI[sleepData.mood]) {
+      const m = MOODS.find(x => x.value === sleepData.mood);
+      badges.push(el('span', { className: 'tag-badge', title: m?.title || '' }, [MOOD_EMOJI[sleepData.mood]]));
+    }
+    if (sleepData.method && METHOD_EMOJI[sleepData.method]) {
+      const m = METHODS.find(x => x.value === sleepData.method);
+      badges.push(el('span', { className: 'tag-badge', title: m?.title || '' }, [METHOD_EMOJI[sleepData.method]]));
+    }
+
+    const metaParts: (Node | string)[] = [];
+    if (badges.length > 0) metaParts.push(el('span', { className: 'tag-badges', style: { gap: '4px' } }, badges));
+    if (sleepData.fall_asleep_time) {
+      metaParts.push(el('span', { style: { color: 'var(--text-light)', fontSize: '0.8rem' } }, [
+        '⏱️ ' + (FALL_ASLEEP_LABELS[sleepData.fall_asleep_time] || sleepData.fall_asleep_time),
+      ]));
+    }
+
+    const summaryChildren: (Node | string)[] = [];
+    if (metaParts.length > 0) {
+      summaryChildren.push(el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } }, metaParts));
+    }
+    if (sleepData.notes) {
+      summaryChildren.push(el('div', { style: { fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--text-light)', marginTop: '4px' } }, [
+        `"${sleepData.notes}"`,
+      ]));
+    }
+
+    const editLink = el('span', { style: { fontSize: '0.75rem', color: 'var(--primary)', cursor: 'pointer' } }, ['Endra →']);
+
+    const summaryCard = el('div', {
+      className: 'bedtime-summary',
+      'data-testid': 'bedtime-summary',
+      style: {
+        padding: '10px 12px', background: 'var(--lavender)', borderRadius: 'var(--radius-sm)',
+        marginBottom: '16px', cursor: 'pointer',
+      },
+    }, [
+      el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: summaryChildren.length ? '4px' : '0' } }, [
+        el('span', { style: { fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.03em' } }, ['Legging']),
+        editLink,
+      ]),
+      ...summaryChildren,
+    ]);
+
+    summaryCard.addEventListener('click', () => {
+      close();
+      // Find the sleep entry in todaySleeps for the full edit modal
+      const state = getAppState();
+      const entry = state?.todaySleeps?.find((s: any) => s.id === sleepId);
+      if (entry) showEditModal(entry, container);
+    });
+
+    modal.appendChild(summaryCard);
+  }
 
   // Woke self vs was woken
   let wokeBy: string | null = null;
@@ -854,7 +919,7 @@ function showMorningPrompt(baby: any, container: HTMLElement): void {
       renderDashboard(container);
     } catch {
       queueEvent('day.started', { babyId: baby.id, wakeTime: wakeTime.toISOString() });
-      showToast('Failed to set wake-up time', 'error');
+      showToast('Klarte ikkje lagra vaknetid', 'error');
     }
   });
   

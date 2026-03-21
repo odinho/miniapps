@@ -1,4 +1,4 @@
-import { test, expect, createBaby, setWakeUpTime, dismissSheet, forceMorning } from './fixtures';
+import { test, expect, createBaby, setWakeUpTime, addCompletedSleep, dismissSheet, forceMorning } from './fixtures';
 
 test.beforeEach(async ({ page }) => {
   await forceMorning(page);
@@ -42,6 +42,55 @@ test('Dashboard shows stats section', async ({ page }) => {
   await expect(page.getByText('lurar')).toBeVisible();
   await expect(page.getByText('lurtid')).toBeVisible();
   await expect(page.getByText('totalt')).toBeVisible();
+});
+
+test('Pluralization: 0 naps shows "0 lurar"', async ({ page }) => {
+  const babyId = createBaby('Testa');
+  setWakeUpTime(babyId);
+  await page.goto('/');
+
+  await expect(page.getByTestId('baby-name')).toHaveText('Testa', { timeout: 5000 });
+  await expect(page.locator('.summary-row')).toContainText('0');
+  await expect(page.locator('.summary-row')).toContainText('lurar');
+});
+
+test('Pluralization: 1 nap shows "1 lur"', async ({ page }) => {
+  const babyId = createBaby('Testa');
+  setWakeUpTime(babyId);
+  const now = new Date();
+  addCompletedSleep(babyId,
+    new Date(now.getTime() - 3600000).toISOString(),
+    new Date(now.getTime() - 1800000).toISOString(),
+    'nap'
+  );
+
+  await page.goto('/');
+  await expect(page.getByTestId('baby-name')).toHaveText('Testa', { timeout: 5000 });
+  await expect(page.locator('.summary-row')).toContainText('1 lur');
+  // Make sure it's "lur" not "lurar"
+  const text = await page.locator('.summary-row').textContent();
+  expect(text).toMatch(/1\s*lur[^a]/);
+});
+
+test('Pluralization: 2 naps shows "2 lurar"', async ({ page }) => {
+  const babyId = createBaby('Testa');
+  setWakeUpTime(babyId);
+  const now = new Date();
+  addCompletedSleep(babyId,
+    new Date(now.getTime() - 4 * 3600000).toISOString(),
+    new Date(now.getTime() - 3 * 3600000).toISOString(),
+    'nap'
+  );
+  addCompletedSleep(babyId,
+    new Date(now.getTime() - 2 * 3600000).toISOString(),
+    new Date(now.getTime() - 1 * 3600000).toISOString(),
+    'nap'
+  );
+
+  await page.goto('/');
+  await expect(page.getByTestId('baby-name')).toHaveText('Testa', { timeout: 5000 });
+  await expect(page.locator('.summary-row')).toContainText('2');
+  await expect(page.locator('.summary-row')).toContainText('lurar');
 });
 
 test('Redirects to settings when no baby exists', async ({ page }) => {
