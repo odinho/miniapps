@@ -25,6 +25,7 @@ export interface EventPayload {
   type: string;
   payload: Record<string, unknown>;
   clientId?: string;
+  clientEventId?: string;
 }
 
 export async function getDiapers(opts?: { limit?: number }): Promise<DiaperLogRow[]> {
@@ -58,6 +59,13 @@ export async function postEvents(
 export async function getStatsData(): Promise<SleepLogRow[]> {
   const from = new Date(Date.now() - 30 * 86400000).toISOString();
   const res = await fetch(`${BASE}/api/sleeps?from=${encodeURIComponent(from)}&limit=500`);
+  return res.json();
+}
+
+export async function getDiapersForStats(): Promise<DiaperLogRow[]> {
+  const from = new Date(Date.now() - 30 * 86400000).toISOString();
+  const params = new URLSearchParams({ from, limit: "500" });
+  const res = await fetch(`${BASE}/api/diapers?${params}`);
   return res.json();
 }
 

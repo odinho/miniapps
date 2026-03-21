@@ -81,7 +81,10 @@ test("Stats subtracts pause time from sleep durations", async ({ page }) => {
 
   await page.goto("/#/stats");
   // The stats should exist and show data
-  await expect(page.locator(".stats-section")).toHaveCount(3, { timeout: 5000 });
+  // Should have at least 3 sections (chart, wake windows, trends; possibly more with diaper stats + export)
+  const sections = page.locator(".stats-section");
+  await expect(sections.first()).toBeVisible({ timeout: 5000 });
+  expect(await sections.count()).toBeGreaterThanOrEqual(3);
 });
 
 test("Stats shows empty state when no data", async ({ page }) => {

@@ -128,10 +128,16 @@ async function main() {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   }
 
-  // Real-time sync via SSE
+  // Real-time sync via SSE — only re-render dashboard (the live view).
+  // History and stats fetch their own data, so re-rendering them on every SSE update
+  // would cause unnecessary refetches and disrupt scroll position / modal state.
   connectSSE((state) => {
     setAppState(state);
-    route();
+    const hash = window.location.hash || "#/";
+    if (hash === "#/" || hash === "") {
+      renderDashboard(content);
+    }
+    // Other routes will pick up the new state when navigated to
   });
 }
 

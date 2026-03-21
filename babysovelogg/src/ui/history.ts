@@ -3,22 +3,15 @@ import { getClientId } from "../sync.js";
 import { refreshState } from "../main.js";
 import { el, formatDuration, formatTime } from "./components.js";
 import { showConfirm } from "./toast.js";
+import {
+  MOODS,
+  METHODS,
+  MOOD_EMOJI,
+  METHOD_EMOJI,
+  FALL_ASLEEP_LABELS,
+} from "../constants.js";
+import { toLocal, toLocalDate } from "../utils.js";
 import type { SleepLogRow, SleepPauseRow, DiaperLogRow } from "../../types.js";
-
-const MOOD_EMOJI: Record<string, string> = {
-  happy: "😊",
-  normal: "😐",
-  upset: "😢",
-  fighting: "😤",
-};
-const METHOD_EMOJI: Record<string, string> = {
-  bed: "🛏️",
-  nursing: "🤱",
-  held: "🤗",
-  stroller: "🚼",
-  car: "🚗",
-  bottle: "🍼",
-};
 const DIAPER_ICONS: Record<string, string> = {
   wet: "💧",
   dirty: "💩",
@@ -48,17 +41,6 @@ const DIAPER_STATUS_LABELS: Record<string, string> = {
 type HistoryEntry =
   | (SleepLogRow & { _kind: "sleep"; _sortTime: string })
   | (DiaperLogRow & { _kind: "diaper"; _sortTime: string });
-
-function toLocalDate(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function toLocal(iso: string): string {
-  const d = new Date(iso);
-  const off = d.getTimezoneOffset();
-  return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16);
-}
 
 export async function renderHistory(container: HTMLElement): Promise<void> {
   container.innerHTML = "";
@@ -181,12 +163,6 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
           metaChildren.push(el("span", { className: "tag-badges" }, badges));
         }
         if (entry.fall_asleep_time) {
-          const FALL_ASLEEP_LABELS: Record<string, string> = {
-            "<5": "< 5 min",
-            "5-15": "5–15 min",
-            "15-30": "15–30 min",
-            "30+": "30+ min",
-          };
           metaChildren.push(
             ` · ⏱️ ${FALL_ASLEEP_LABELS[entry.fall_asleep_time] || entry.fall_asleep_time}`,
           );
@@ -297,12 +273,6 @@ export function showEditModal(entry: SleepLogRow, container: HTMLElement): void 
 
   // Mood pills
   let selectedMood: string | null = entry.mood || null;
-  const MOODS = [
-    { value: "happy", label: "😊", title: "Glad" },
-    { value: "normal", label: "😐", title: "Normal" },
-    { value: "upset", label: "😢", title: "Uroleg" },
-    { value: "fighting", label: "😤", title: "Kjempa mot" },
-  ];
   const moodPills = MOODS.map((m) => {
     const pill = el(
       "button",
@@ -323,14 +293,6 @@ export function showEditModal(entry: SleepLogRow, container: HTMLElement): void 
 
   // Method pills
   let selectedMethod: string | null = entry.method || null;
-  const METHODS = [
-    { value: "bed", label: "🛏️", title: "I senga" },
-    { value: "nursing", label: "🤱", title: "Amming" },
-    { value: "held", label: "🤗", title: "Boren" },
-    { value: "stroller", label: "🚼", title: "Vogn" },
-    { value: "car", label: "🚗", title: "Bil" },
-    { value: "bottle", label: "🍼", title: "Flaske" },
-  ];
   const methodPills = METHODS.map((m) => {
     const pill = el(
       "button",
@@ -359,7 +321,7 @@ export function showEditModal(entry: SleepLogRow, container: HTMLElement): void 
     { value: "5-15", label: "5–15 min" },
     { value: "15-30", label: "15–30 min" },
     { value: "30+", label: "30+ min" },
-  ];
+  ] as const;
   const fallAsleepPills = FALL_ASLEEP.map((b) => {
     const pill = el(
       "button",

@@ -6,10 +6,10 @@ export function el<K extends keyof HTMLElementTagNameMap>(
   const elem = document.createElement(tag);
   if (props) {
     for (const [k, v] of Object.entries(props)) {
-      if (k === "className") elem.className = v;
+      if (k === "className") elem.className = v as string;
       else if (k === "style" && typeof v === "object") Object.assign(elem.style, v);
       else if (k.startsWith("on") && typeof v === "function")
-        elem.addEventListener(k.slice(2).toLowerCase(), v);
+        elem.addEventListener(k.slice(2).toLowerCase(), v as EventListener);
       else if (k === "htmlFor") (elem as HTMLLabelElement).htmlFor = String(v);
       else elem.setAttribute(k, String(v));
     }

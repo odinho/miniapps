@@ -1,11 +1,7 @@
 import { WAKE_WINDOWS, NAP_COUNTS, findByAge } from "./constants.js";
 export { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, findByAge } from "./constants.js";
-
-export interface SleepEntry {
-  start_time: string;
-  end_time: string | null;
-  type: "nap" | "night";
-}
+export type { SleepEntry } from "../../types.js";
+import type { SleepEntry } from "../../types.js";
 
 /** Calculate age in months from birthdate ISO string. */
 export function calculateAgeMonths(birthdate: string, now?: Date): number {
@@ -59,16 +55,19 @@ export function predictDayNaps(
   recentSleeps?: SleepEntry[],
   customNapCount?: number | null,
 ): PredictedNap[] {
-  const ww = getWakeWindow(ageMonths, recentSleeps);
+  const defaultWW = getWakeWindow(ageMonths, recentSleeps);
   const expectedNaps = getExpectedNapCount(ageMonths, customNapCount);
+  const positionalWWs = getPositionalWakeWindows(recentSleeps, ageMonths);
 
   const predictions: PredictedNap[] = [];
   let currentWake = new Date(wakeUpTime);
 
-  // Estimate nap duration based on age (younger babies = longer naps)
-  const napDurationMinutes = ageMonths < 6 ? 60 : ageMonths < 12 ? 45 : 30;
+  // Learn nap duration from recent data, fallback to age-based defaults
+  const napDurationMinutes = getLearnedNapDuration(recentSleeps, ageMonths);
 
   for (let i = 0; i < expectedNaps; i++) {
+    // Use positional wake window if available, otherwise fall back to global average
+    const ww = positionalWWs[i] ?? defaultWW;
     const napStart = new Date(currentWake.getTime() + ww * 60 * 1000);
     const napEnd = new Date(napStart.getTime() + napDurationMinutes * 60 * 1000);
 
@@ -149,6 +148,80 @@ export function detectNapTransition(
     currentAvgNaps: Math.round(avgNaps * 10) / 10,
     suggestedNaps: Math.round(avgNaps),
   };
+}
+
+/**
+ * Compute per-position average wake windows (1st WW, 2nd WW, etc.) from recent sleeps.
+ * First WW is typically shorter, last WW is typically longer.
+ * Returns a sparse array indexed by position (0-based).
+ */
+function getPositionalWakeWindows(
+  recentSleeps?: SleepEntry[],
+  ageMonths?: number,
+): number[] {
+  if (!recentSleeps || recentSleeps.length < 4) return [];
+
+  const range = ageMonths != null ? findByAge(WAKE_WINDOWS, ageMonths) : null;
+
+  // Group sleeps by day
+  const byDay = new Map<string, SleepEntry[]>();
+  for (const s of recentSleeps) {
+    if (!s.end_time) continue;
+    const day = s.start_time.slice(0, 10);
+    if (!byDay.has(day)) byDay.set(day, []);
+    byDay.get(day)!.push(s);
+  }
+
+  // Collect wake windows by position across all days
+  const gapsByPosition = new Map<number, number[]>();
+  for (const daySleeps of byDay.values()) {
+    const sorted = [...daySleeps]
+      .filter((s) => s.end_time)
+      .toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+    for (let i = 1; i < sorted.length; i++) {
+      const prevEnd = new Date(sorted[i - 1].end_time!).getTime();
+      const nextStart = new Date(sorted[i].start_time).getTime();
+      const gapMin = (nextStart - prevEnd) / 60000;
+      if (gapMin >= 10 && gapMin <= 480) {
+        const position = i - 1; // 0 = first wake window
+        if (!gapsByPosition.has(position)) gapsByPosition.set(position, []);
+        gapsByPosition.get(position)!.push(gapMin);
+      }
+    }
+  }
+
+  // Average each position, clamped to age-appropriate range
+  const result: number[] = [];
+  for (const [pos, gaps] of gapsByPosition) {
+    if (gaps.length < 2) continue;
+    let avg = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+    if (range) {
+      avg = Math.max(range.minMinutes, Math.min(range.maxMinutes, avg));
+    }
+    result[pos] = Math.round(avg);
+  }
+
+  return result;
+}
+
+/** Learn average nap duration from recent completed naps, fallback to age-based defaults. */
+function getLearnedNapDuration(recentSleeps?: SleepEntry[], ageMonths?: number): number {
+  const defaultDuration = !ageMonths ? 45 : ageMonths < 6 ? 60 : ageMonths < 12 ? 45 : 30;
+
+  if (!recentSleeps || recentSleeps.length === 0) return defaultDuration;
+
+  const naps = recentSleeps.filter(
+    (s) => s.type === "nap" && s.end_time,
+  );
+  if (naps.length < 3) return defaultDuration;
+
+  const durations = naps.map((s) => {
+    const dur = (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60000;
+    return dur;
+  }).filter((d) => d >= 10 && d <= 180); // Filter out unreasonable values
+
+  if (durations.length < 3) return defaultDuration;
+  return Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);
 }
 
 /** Helper: compute average wake window from a list of sleeps (in minutes). */

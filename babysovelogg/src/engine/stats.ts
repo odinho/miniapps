@@ -1,14 +1,5 @@
-export interface SleepPause {
-  pause_time: string;
-  resume_time: string | null;
-}
-
-export interface SleepEntry {
-  start_time: string;
-  end_time: string | null;
-  type: "nap" | "night";
-  pauses?: SleepPause[];
-}
+export type { SleepEntry, SleepPause } from "../../types.js";
+import type { SleepEntry, SleepPause } from "../../types.js";
 
 export interface DayStats {
   totalNapMinutes: number;

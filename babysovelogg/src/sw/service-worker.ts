@@ -2,7 +2,7 @@
 declare const self: ServiceWorkerGlobalScope;
 
 const CACHE_NAME = "babysovelogg-v1";
-const SHELL_ASSETS = ["/", "/index.html", "/dist/bundle.js", "/manifest.json"];
+const SHELL_ASSETS = ["/", "/index.html", "/bundle.js", "/manifest.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_ASSETS)));

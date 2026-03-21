@@ -88,6 +88,12 @@ try {
 try {
   db.exec("ALTER TABLE baby ADD COLUMN potty_mode INTEGER DEFAULT 0");
 } catch {}
+try {
+  db.exec("ALTER TABLE events ADD COLUMN client_event_id TEXT");
+} catch {}
+try {
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_events_client_event_id ON events(client_event_id) WHERE client_event_id IS NOT NULL");
+} catch {}
 
 /** Clean shutdown. Called on process exit. */
 export function closeDb() {

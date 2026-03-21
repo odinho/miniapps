@@ -50,10 +50,24 @@ export interface DayStartRow {
   created_at: string;
 }
 
+/** Unified sleep entry used by both engine/schedule.ts and engine/stats.ts */
+export interface SleepEntry {
+  start_time: string;
+  end_time: string | null;
+  type: "nap" | "night";
+  pauses?: SleepPause[];
+}
+
+export interface SleepPause {
+  pause_time: string;
+  resume_time: string | null;
+}
+
 export interface EventRow {
   id: number;
   type: string;
   payload: string;
   client_id: string | null;
+  client_event_id: string | null;
   timestamp: string;
 }

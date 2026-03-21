@@ -9,7 +9,13 @@ export interface AppEvent {
   timestamp: string;
 }
 
-const insertStmt = db.prepare("INSERT INTO events (type, payload, client_id) VALUES (?, ?, ?)");
+const insertStmt = db.prepare(
+  "INSERT INTO events (type, payload, client_id, client_event_id) VALUES (?, ?, ?, ?)",
+);
+
+const checkDupStmt = db.prepare(
+  "SELECT id FROM events WHERE client_event_id = ?",
+);
 
 const getEventsSinceStmt = db.prepare("SELECT * FROM events WHERE id > ? ORDER BY id ASC");
 
@@ -19,8 +25,22 @@ export function appendEvent(
   type: string,
   payload: Record<string, unknown>,
   clientId?: string,
-): AppEvent {
-  const result = insertStmt.run(type, JSON.stringify(payload), clientId ?? null);
+  clientEventId?: string,
+): AppEvent | null {
+  // Deduplicate: if clientEventId already exists, skip
+  if (clientEventId) {
+    const existing = checkDupStmt.get(clientEventId) as { id: number } | undefined;
+    if (existing) {
+      return null; // Duplicate — already processed
+    }
+  }
+
+  const result = insertStmt.run(
+    type,
+    JSON.stringify(payload),
+    clientId ?? null,
+    clientEventId ?? null,
+  );
   return {
     id: result.lastInsertRowid as number,
     type,

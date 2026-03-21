@@ -52,7 +52,7 @@ export function applyEvent(event: AppEvent): void {
 
     case "sleep.updated": {
       const sets: string[] = [];
-      const vals: (string | number | null | undefined | unknown)[] = [];
+      const vals: unknown[] = [];
       if (payload.startTime !== undefined) {
         sets.push("start_time = ?");
         vals.push(payload.startTime);
@@ -108,7 +108,7 @@ export function applyEvent(event: AppEvent): void {
 
     case "sleep.tagged": {
       const sets: string[] = [];
-      const vals: (string | number | null | undefined | unknown)[] = [];
+      const vals: unknown[] = [];
       if (payload.mood !== undefined) {
         sets.push("mood = ?");
         vals.push(payload.mood);
@@ -161,7 +161,7 @@ export function applyEvent(event: AppEvent): void {
 
     case "diaper.updated": {
       const sets: string[] = [];
-      const vals: (string | number | null | undefined | unknown)[] = [];
+      const vals: unknown[] = [];
       if (payload.type !== undefined) {
         sets.push("type = ?");
         vals.push(payload.type);

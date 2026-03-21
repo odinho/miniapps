@@ -1,13 +1,24 @@
 import { postEvents, type AppState } from "./api.js";
+import { showToast } from "./ui/toast.js";
 
 const QUEUE_KEY = "babysovelogg_event_queue";
 const CLIENT_ID_KEY = "babysovelogg_client_id";
 const STATE_CACHE_KEY = "babysovelogg_cached_state";
 
+function safeSetItem(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch (err) {
+    console.error("localStorage quota exceeded:", err);
+    showToast("Lagring full — slett gamle data i nettlesaren", "error");
+  }
+}
+
 interface QueuedEvent {
   type: string;
   payload: Record<string, unknown>;
   clientId: string;
+  clientEventId: string;
   timestamp: string;
 }
 
@@ -33,14 +44,21 @@ export function getClientId(): string {
 
 export function queueEvent(type: string, payload: Record<string, unknown>): void {
   const queue = getQueue();
-  queue.push({ type, payload, clientId: getClientId(), timestamp: new Date().toISOString() });
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+  queue.push({
+    type,
+    payload,
+    clientId: getClientId(),
+    clientEventId: generateId(),
+    timestamp: new Date().toISOString(),
+  });
+  safeSetItem(QUEUE_KEY, JSON.stringify(queue));
 }
 
 function getQueue(): QueuedEvent[] {
   try {
     return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]");
-  } catch {
+  } catch (err) {
+    console.error("Failed to parse event queue:", err);
     return [];
   }
 }
@@ -50,22 +68,24 @@ export async function flushQueue(): Promise<{ events: unknown[]; state: AppState
   if (queue.length === 0) return null;
   try {
     const result = await postEvents(queue);
-    localStorage.setItem(QUEUE_KEY, "[]");
+    safeSetItem(QUEUE_KEY, "[]");
     cacheState(result.state);
     return result;
-  } catch {
+  } catch (err) {
+    console.error("Failed to flush event queue:", err);
     return null; // Still offline, keep queue
   }
 }
 
 export function cacheState(state: AppState): void {
-  localStorage.setItem(STATE_CACHE_KEY, JSON.stringify(state));
+  safeSetItem(STATE_CACHE_KEY, JSON.stringify(state));
 }
 
 export function getCachedState(): AppState | null {
   try {
     return JSON.parse(localStorage.getItem(STATE_CACHE_KEY) || "null");
-  } catch {
+  } catch (err) {
+    console.error("Failed to parse cached state:", err);
     return null;
   }
 }
@@ -105,7 +125,9 @@ export function connectSSE(onUpdate: (state: AppState) => void): () => void {
       cacheState(state);
       if (Date.now() - lastMutationTime < SSE_SUPPRESS_MS) return; // skip re-render for own mutation
       onUpdate(state);
-    } catch {}
+    } catch (err) {
+      console.error("Failed to parse SSE update:", err);
+    }
   });
   return () => {
     es.close();

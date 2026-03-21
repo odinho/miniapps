@@ -13,6 +13,15 @@ import {
 import { showToast } from "./toast.js";
 import { renderArc } from "./arc.js";
 import { showEditModal } from "./history.js";
+import {
+  MOODS,
+  METHODS,
+  MOOD_EMOJI,
+  METHOD_EMOJI,
+  FALL_ASLEEP_LABELS,
+  FALL_ASLEEP_BUCKETS,
+} from "../constants.js";
+import { toLocalDate, toLocalTime } from "../utils.js";
 import type { Baby, SleepLogRow, SleepPauseRow } from "../../types.js";
 
 /** Send event optimistically — if offline, queue it and show a toast. Returns true if online. */
@@ -226,10 +235,10 @@ export function renderDashboard(container: HTMLElement): void {
     todaySleeps: todaySleeps.map((s) => ({
       start_time: s.start_time,
       end_time: s.end_time,
-      type: s.type,
+      type: s.type as "nap" | "night",
     })),
     activeSleep: activeSleep
-      ? { start_time: activeSleep.start_time, type: activeSleep.type }
+      ? { start_time: activeSleep.start_time, type: activeSleep.type as "nap" | "night" }
       : null,
     prediction: filteredPrediction,
     isNightMode,
@@ -526,18 +535,6 @@ export function renderDashboard(container: HTMLElement): void {
   container.appendChild(view);
 }
 
-function toLocal(iso: string): string {
-  const d = new Date(iso);
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-}
-
-function toLocalDate(iso: string): string {
-  return toLocal(iso).slice(0, 10);
-}
-function toLocalTime(iso: string): string {
-  return toLocal(iso).slice(11, 16);
-}
-
 function makeDateTimeInputs(iso: string): {
   dateInput: HTMLInputElement;
   timeInput: HTMLInputElement;
@@ -706,22 +703,6 @@ function _showEditStartModal(activeSleep: SleepLogRow, container: HTMLElement): 
   }
 }
 
-const MOODS = [
-  { value: "happy", label: "😊", title: "Glad" },
-  { value: "normal", label: "😐", title: "Normal" },
-  { value: "upset", label: "😢", title: "Uroleg" },
-  { value: "fighting", label: "😤", title: "Kjempa mot" },
-];
-
-const METHODS = [
-  { value: "bed", label: "🛏️", title: "I senga" },
-  { value: "nursing", label: "🤱", title: "Amming" },
-  { value: "held", label: "🤗", title: "Boren" },
-  { value: "stroller", label: "🚼", title: "Vogn" },
-  { value: "car", label: "🚗", title: "Bil" },
-  { value: "bottle", label: "🍼", title: "Flaske" },
-];
-
 function showTagSheet(sleepId: number, container: HTMLElement): void {
   const overlay = el("div", { className: "modal-overlay", "data-testid": "modal-overlay" });
   const modal = el("div", { className: "modal tag-sheet" });
@@ -801,12 +782,6 @@ function showTagSheet(sleepId: number, container: HTMLElement): void {
   );
 
   // Fall-asleep time buckets
-  const FALL_ASLEEP_BUCKETS = [
-    { value: "<5", label: "< 5 min" },
-    { value: "5-15", label: "5–15 min" },
-    { value: "15-30", label: "15–30 min" },
-    { value: "30+", label: "30+ min" },
-  ];
   modal.appendChild(
     el("div", { className: "form-group" }, [
       el("label", null, ["Innsovningstid"]),
@@ -915,31 +890,12 @@ function showTagSheet(sleepId: number, container: HTMLElement): void {
           },
         ]);
         setAppState(result.state);
-      } catch {}
+      } catch (err) {
+        console.error("Failed to save sleep tags:", err);
+      }
     }
   }
 }
-
-const MOOD_EMOJI: Record<string, string> = {
-  happy: "😊",
-  normal: "😐",
-  upset: "😢",
-  fighting: "😤",
-};
-const METHOD_EMOJI: Record<string, string> = {
-  bed: "🛏️",
-  nursing: "🤱",
-  held: "🤗",
-  stroller: "🚼",
-  car: "🚗",
-  bottle: "🍼",
-};
-const FALL_ASLEEP_LABELS: Record<string, string> = {
-  "<5": "< 5 min",
-  "5-15": "5–15 min",
-  "15-30": "15–30 min",
-  "30+": "30+ min",
-};
 
 function showWakeUpSheet(sleepId: number, sleepData: SleepLogRow, container: HTMLElement): void {
   const overlay = el("div", { className: "modal-overlay", "data-testid": "modal-overlay" });
@@ -1126,7 +1082,9 @@ function showWakeUpSheet(sleepId: number, sleepData: SleepLogRow, container: HTM
           },
         ]);
         setAppState(result.state);
-      } catch {}
+      } catch (err) {
+        console.error("Failed to save wake-up info:", err);
+      }
     }
   }
 }

@@ -1,11 +1,12 @@
 import { el, formatDuration } from "./components.js";
-import { getStatsData } from "../api.js";
+import { getStatsData, getDiapersForStats } from "../api.js";
 import {
   getWeekStats,
   getAverageWakeWindow,
   type SleepEntry,
   type WeekStats,
 } from "../engine/stats.js";
+import type { DiaperLogRow } from "../../types.js";
 
 function fmtDate(d: string): string {
   return new Date(d + "T12:00:00").toLocaleDateString([], {
@@ -151,6 +152,49 @@ function section(title: string, children: (HTMLElement | SVGElement)[]): HTMLEle
   return div;
 }
 
+interface DiaperStats {
+  total: number;
+  perDay: number;
+  wetCount: number;
+  dirtyCount: number;
+  bothCount: number;
+  pottyCount: number;
+  pottySuccessRate: number | null;
+}
+
+function computeDiaperStats(diapers: DiaperLogRow[]): DiaperStats {
+  const total = diapers.length;
+  const byDay = new Set(diapers.map((d) => d.time.slice(0, 10)));
+  const dayCount = byDay.size || 1;
+
+  let wetCount = 0;
+  let dirtyCount = 0;
+  let bothCount = 0;
+  let pottyTotal = 0;
+  let pottySuccess = 0;
+
+  for (const d of diapers) {
+    if (d.type === "wet") wetCount++;
+    else if (d.type === "dirty") dirtyCount++;
+    else if (d.type === "both") bothCount++;
+
+    if (d.type.startsWith("potty_")) {
+      pottyTotal++;
+      if (d.type === "potty_wet" || d.type === "potty_dirty") pottySuccess++;
+    }
+  }
+
+  return {
+    total,
+    perDay: Math.round((total / dayCount) * 10) / 10,
+    wetCount,
+    dirtyCount,
+    bothCount,
+    pottyCount: pottyTotal,
+    pottySuccessRate: pottyTotal >= 3 ? Math.round((pottySuccess / pottyTotal) * 100) : null,
+  };
+}
+
 export async function renderStats(container: HTMLElement): Promise<void> {
   container.innerHTML = "";
   const view = el("div", { className: "view stats-view" });
@@ -163,15 +207,18 @@ export async function renderStats(container: HTMLElement): Promise<void> {
   view.appendChild(loading);
 
   let sleeps: SleepEntry[];
+  let diapers: DiaperLogRow[];
   try {
-    sleeps = await getStatsData();
+    const [rawSleeps, rawDiapers] = await Promise.all([getStatsData(), getDiapersForStats()]);
+    sleeps = rawSleeps as SleepEntry[];
+    diapers = rawDiapers;
   } catch {
     loading.textContent = "Klarte ikkje lasta statistikk";
     return;
   }
   view.removeChild(loading);
 
-  if (sleeps.length === 0) {
+  if (sleeps.length === 0 && diapers.length === 0) {
     view.appendChild(
       el("div", { className: "history-empty" }, [
         el("div", { style: { fontSize: "3rem", marginBottom: "16px" } }, ["📊"]),
@@ -274,6 +321,47 @@ export async function renderStats(container: HTMLElement): Promise<void> {
       ]),
     );
   }
+
+  // 5. Diaper statistics
+  if (diapers.length > 0) {
+    const dStats = computeDiaperStats(diapers);
+    const week7Diapers = diapers.filter(
+      (d) => new Date(d.time).getTime() > Date.now() - 7 * 86400000,
+    );
+    const dStats7 = computeDiaperStats(week7Diapers);
+
+    const cards: HTMLElement[] = [
+      statCard(String(dStats7.perDay), "Bleier/dag (7d)"),
+      statCard(`${dStats7.wetCount}/${dStats7.dirtyCount}/${dStats7.bothCount}`, "Våt/Skitten/Begge"),
+    ];
+
+    if (dStats.pottyCount > 0 && dStats.pottySuccessRate != null) {
+      cards.push(statCard(`${dStats.pottySuccessRate}%`, "Suksessrate do"));
+    }
+
+    view.appendChild(
+      section("Bleie/Do", [
+        el("div", { className: "stats-row" }, cards),
+      ]),
+    );
+  }
+
+  // 6. Export button
+  const exportBtn = el("button", { className: "btn btn-ghost", "data-testid": "export-btn" }, [
+    "📤 Eksporter data",
+  ]);
+  exportBtn.addEventListener("click", () => {
+    window.open("/api/export?format=csv", "_blank");
+  });
+  const exportJson = el("button", { className: "btn btn-ghost" }, ["📋 Eksporter JSON"]);
+  exportJson.addEventListener("click", () => {
+    window.open("/api/export", "_blank");
+  });
+  view.appendChild(
+    section("Eksport", [
+      el("div", { className: "stats-row", style: { gap: "8px" } }, [exportBtn, exportJson]),
+    ]),
+  );
 }
 
 function trendRow(label: string, val7: string, val30: string): HTMLElement {
