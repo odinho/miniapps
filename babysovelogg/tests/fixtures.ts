@@ -3,7 +3,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 
 export function getDb() {
-  return new Database(path.join(process.cwd(), 'napper.db'));
+  return new Database(path.join(process.cwd(), 'db.sqlite'));
 }
 
 export function resetDb() {

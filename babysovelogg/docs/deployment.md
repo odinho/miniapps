@@ -14,7 +14,7 @@ This runs esbuild to bundle the client TypeScript into `dist/bundle.js` and comp
 PORT=3200 node dist/server.js
 ```
 
-The server serves both the API and static files. SQLite database (`napper.db`) is created in the working directory.
+The server serves both the API and static files. SQLite database (`db.sqlite`) is created in the working directory.
 
 ## systemd Service
 
@@ -73,12 +73,12 @@ Key points:
 
 ## Database
 
-SQLite file (`napper.db`) in the working directory. Uses DELETE journal mode
+SQLite file (`db.sqlite`) in the working directory. Uses DELETE journal mode
 (SQLite default) — all data is always in the single `.db` file. No `-wal`/`-shm`
 files to worry about.
 
-**Backups:** Copy `napper.db` while the server is stopped, or use
-`sqlite3 napper.db '.backup backup.db'` while running.
+**Backups:** Copy `db.sqlite` while the server is stopped, or use
+`sqlite3 db.sqlite '.backup backup.db'` while running.
 
 **Deploy safety:** The server handles SIGTERM/SIGINT for clean DB shutdown.
 The systemd default `KillSignal=SIGTERM` is fine.
