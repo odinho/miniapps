@@ -1,4 +1,4 @@
-import { test, expect, createBaby, getDb, forceMorning, forceHour } from "./fixtures";
+import { test, expect, createBaby, setWakeUpTime, getDb, forceMorning, forceHour, generateId } from "./fixtures";
 import type { Baby, DayStartRow } from "../types";
 
 test("Shows morning prompt when no wake-up time and no sleeps", async ({ page }) => {
@@ -79,22 +79,8 @@ test("Skip button creates default wake-up time", async ({ page }) => {
 
 test("Does not show morning prompt when wake-up time already set", async ({ page }) => {
   await forceMorning(page);
-  createBaby("Testa");
-
-  const db = getDb();
-  const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby;
-  const today = new Date();
-  today.setHours(7, 0, 0, 0);
-  const dateStr = today.toISOString().split("T")[0];
-  db.prepare("INSERT INTO events (type, payload) VALUES ('day.started', ?)").run(
-    JSON.stringify({ babyId: baby.id, wakeTime: today.toISOString() }),
-  );
-  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
-    baby.id,
-    dateStr,
-    today.toISOString(),
-  );
-  db.close();
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
 
   await page.goto("/");
   await expect(page.getByTestId("morning-prompt")).not.toBeVisible();
@@ -103,24 +89,15 @@ test("Does not show morning prompt when wake-up time already set", async ({ page
 
 test("Does not show morning prompt when sleep already logged today", async ({ page }) => {
   await forceMorning(page);
-  createBaby("Testa");
+  const babyId = createBaby("Testa");
 
-  const db = getDb();
-  const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby;
   const now = new Date();
   const oneHourAgo = new Date(now.getTime() - 3600000);
-  db.prepare("INSERT INTO events (type, payload) VALUES ('sleep.started', ?)").run(
-    JSON.stringify({ babyId: baby.id, startTime: oneHourAgo.toISOString(), type: "nap" }),
-  );
-  db.prepare("INSERT INTO events (type, payload) VALUES ('sleep.ended', ?)").run(
-    JSON.stringify({ sleepId: 1, endTime: now.toISOString() }),
-  );
-  db.prepare("INSERT INTO sleep_log (baby_id, start_time, end_time, type) VALUES (?, ?, ?, ?)").run(
-    baby.id,
-    oneHourAgo.toISOString(),
-    now.toISOString(),
-    "nap",
-  );
+  const db = getDb();
+  const domainId = generateId();
+  db.prepare(
+    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, ?, ?)",
+  ).run(babyId, oneHourAgo.toISOString(), now.toISOString(), "nap", domainId);
   db.close();
 
   await page.goto("/");
@@ -129,22 +106,8 @@ test("Does not show morning prompt when sleep already logged today", async ({ pa
 });
 
 test("Arc uses wake-up time as starting point", async ({ page }) => {
-  createBaby("Testa");
-
-  const db = getDb();
-  const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby;
-  const today = new Date();
-  today.setHours(8, 0, 0, 0);
-  const dateStr = today.toISOString().split("T")[0];
-  db.prepare("INSERT INTO events (type, payload) VALUES ('day.started', ?)").run(
-    JSON.stringify({ babyId: baby.id, wakeTime: today.toISOString() }),
-  );
-  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
-    baby.id,
-    dateStr,
-    today.toISOString(),
-  );
-  db.close();
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
 
   await page.goto("/");
   await expect(page.getByTestId("dashboard")).toBeVisible();
@@ -152,22 +115,8 @@ test("Arc uses wake-up time as starting point", async ({ page }) => {
 });
 
 test("Shows predicted nap bubbles when no sleeps yet", async ({ page }) => {
-  createBaby("Testa", "2025-10-01");
-
-  const db = getDb();
-  const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby;
-  const today = new Date();
-  today.setHours(7, 0, 0, 0);
-  const dateStr = today.toISOString().split("T")[0];
-  db.prepare("INSERT INTO events (type, payload) VALUES ('day.started', ?)").run(
-    JSON.stringify({ babyId: baby.id, wakeTime: today.toISOString() }),
-  );
-  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
-    baby.id,
-    dateStr,
-    today.toISOString(),
-  );
-  db.close();
+  const babyId = createBaby("Testa", "2025-10-01");
+  setWakeUpTime(babyId);
 
   await page.goto("/");
   await expect(page.getByTestId("dashboard")).toBeVisible();
@@ -176,22 +125,8 @@ test("Shows predicted nap bubbles when no sleeps yet", async ({ page }) => {
 });
 
 test("Shows bedtime bubble at arc end", async ({ page }) => {
-  createBaby("Testa", "2025-10-01");
-
-  const db = getDb();
-  const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby;
-  const today = new Date();
-  today.setHours(7, 0, 0, 0);
-  const dateStr = today.toISOString().split("T")[0];
-  db.prepare("INSERT INTO events (type, payload) VALUES ('day.started', ?)").run(
-    JSON.stringify({ babyId: baby.id, wakeTime: today.toISOString() }),
-  );
-  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
-    baby.id,
-    dateStr,
-    today.toISOString(),
-  );
-  db.close();
+  const babyId = createBaby("Testa", "2025-10-01");
+  setWakeUpTime(babyId);
 
   await page.goto("/");
   await expect(page.getByTestId("dashboard")).toBeVisible();
@@ -199,22 +134,8 @@ test("Shows bedtime bubble at arc end", async ({ page }) => {
 });
 
 test("Predicted bubbles are replaced by actual sleeps", async ({ page }) => {
-  createBaby("Testa", "2025-10-01");
-
-  const db = getDb();
-  const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby;
-  const today = new Date();
-  today.setHours(7, 0, 0, 0);
-  const dateStr = today.toISOString().split("T")[0];
-  db.prepare("INSERT INTO events (type, payload) VALUES ('day.started', ?)").run(
-    JSON.stringify({ babyId: baby.id, wakeTime: today.toISOString() }),
-  );
-  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
-    baby.id,
-    dateStr,
-    today.toISOString(),
-  );
-  db.close();
+  const babyId = createBaby("Testa", "2025-10-01");
+  setWakeUpTime(babyId);
 
   await page.goto("/");
   await expect(page.getByTestId("dashboard")).toBeVisible();

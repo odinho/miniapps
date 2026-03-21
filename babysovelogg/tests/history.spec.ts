@@ -61,9 +61,10 @@ test("Notes and fall-asleep-time visible in history list", async ({ page }) => {
   const now = new Date();
   const start = new Date(now.getTime() - 3600000).toISOString();
   const end = now.toISOString();
+  const { generateId: gid } = await import("./fixtures");
   db.prepare(
-    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, fall_asleep_time, notes, woke_by, wake_notes) VALUES (?, ?, ?, 'nap', '5-15', 'Roleg kveld', 'self', 'Glad ved oppvakning')",
-  ).run(babyId, start, end);
+    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, fall_asleep_time, notes, woke_by, wake_notes, domain_id) VALUES (?, ?, ?, 'nap', '5-15', 'Roleg kveld', 'self', 'Glad ved oppvakning', ?)",
+  ).run(babyId, start, end, gid());
   db.close();
 
   await page.goto("/#/history");

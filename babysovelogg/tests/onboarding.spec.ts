@@ -41,10 +41,16 @@ test("Get Started validates required fields", async ({ page }) => {
 });
 
 test("Sleep tracking flow after onboarding", async ({ page, request }) => {
+  const { generateId } = await import("./fixtures");
   // Create baby via API
   await request.post("/api/events", {
     data: {
-      events: [{ type: "baby.created", payload: { name: "Halldis", birthdate: "2025-06-12" } }],
+      events: [{
+        type: "baby.created",
+        payload: { name: "Halldis", birthdate: "2025-06-12" },
+        clientId: "test",
+        clientEventId: generateId(),
+      }],
     },
   });
 

@@ -6,8 +6,9 @@ import {
   getDb,
   dismissSheet,
   forceMorning,
+  generateId,
 } from "./fixtures";
-import type { SleepLogRow, SleepPauseRow } from "../types";
+import type { SleepPauseRow } from "../types";
 
 test.beforeEach(async ({ page }) => {
   await forceMorning(page);
@@ -54,28 +55,19 @@ test("Timer adjusts for pause duration", async ({ page }) => {
   const startTime = new Date(now - 10 * 60000).toISOString();
   const pauseTime = new Date(now - 8 * 60000).toISOString();
   const resumeTime = new Date(now - 3 * 60000).toISOString();
+  const domainId = generateId();
 
-  db.prepare("INSERT INTO events (type, payload) VALUES ('sleep.started', ?)").run(
-    JSON.stringify({ babyId, startTime, type: "nap" }),
-  );
-  db.prepare("INSERT INTO sleep_log (baby_id, start_time, type) VALUES (?, ?, 'nap')").run(
-    babyId,
-    startTime,
-  );
+  db.prepare(
+    "INSERT INTO sleep_log (baby_id, start_time, type, domain_id) VALUES (?, ?, 'nap', ?)",
+  ).run(babyId, startTime, domainId);
   const sleepId = (
-    db.prepare("SELECT id FROM sleep_log ORDER BY id DESC LIMIT 1").get() as SleepLogRow
+    db.prepare("SELECT id FROM sleep_log ORDER BY id DESC LIMIT 1").get() as { id: number }
   ).id;
 
-  db.prepare("INSERT INTO events (type, payload) VALUES ('sleep.paused', ?)").run(
-    JSON.stringify({ sleepId, pauseTime }),
-  );
   db.prepare("INSERT INTO sleep_pauses (sleep_id, pause_time, resume_time) VALUES (?, ?, ?)").run(
     sleepId,
     pauseTime,
     resumeTime,
-  );
-  db.prepare("INSERT INTO events (type, payload) VALUES ('sleep.resumed', ?)").run(
-    JSON.stringify({ sleepId, resumeTime }),
   );
   db.close();
 
@@ -124,15 +116,13 @@ test("History shows pause info", async ({ page }) => {
   const endTime = new Date(now - 10 * 60000).toISOString();
   const pauseTime = new Date(now - 50 * 60000).toISOString();
   const resumeTime2 = new Date(now - 40 * 60000).toISOString();
+  const domainId = generateId();
 
-  db.prepare("INSERT INTO events (type, payload) VALUES ('sleep.started', ?)").run(
-    JSON.stringify({ babyId, startTime, type: "nap" }),
-  );
   db.prepare(
-    "INSERT INTO sleep_log (baby_id, start_time, end_time, type) VALUES (?, ?, ?, 'nap')",
-  ).run(babyId, startTime, endTime);
+    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, 'nap', ?)",
+  ).run(babyId, startTime, endTime, domainId);
   const sleepId = (
-    db.prepare("SELECT id FROM sleep_log ORDER BY id DESC LIMIT 1").get() as SleepLogRow
+    db.prepare("SELECT id FROM sleep_log ORDER BY id DESC LIMIT 1").get() as { id: number }
   ).id;
   db.prepare("INSERT INTO sleep_pauses (sleep_id, pause_time, resume_time) VALUES (?, ?, ?)").run(
     sleepId,

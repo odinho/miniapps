@@ -1,6 +1,7 @@
 import type { Baby, SleepLogRow, DayStartRow, DiaperLogRow } from "../types.js";
 import type { DayStats } from "./engine/stats.js";
 import type { PredictedNap } from "./engine/schedule.js";
+import { getClientId, generateId } from "./identity.js";
 
 const BASE = ""; // Same origin
 
@@ -44,10 +45,16 @@ export async function postEvents(
   events: EventPayload[],
 ): Promise<{ events: EventPayload[]; state: AppState }> {
   if (_onMutation) _onMutation();
+  // Auto-fill clientId and clientEventId if not present (required by server validation)
+  const enriched = events.map((e) => ({
+    ...e,
+    clientId: e.clientId || getClientId(),
+    clientEventId: e.clientEventId || generateId(),
+  }));
   const res = await fetch(`${BASE}/api/events`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ events }),
+    body: JSON.stringify({ events: enriched }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");

@@ -67,9 +67,10 @@ test("Tags shown in history as emoji badges", async ({ page }) => {
   const now = new Date();
   const start = new Date(now.getTime() - 3600000).toISOString();
   const end = now.toISOString();
+  const { generateId: gid } = await import("./fixtures");
   db.prepare(
-    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, mood, method) VALUES (?, ?, ?, 'nap', 'happy', 'nursing')",
-  ).run(babyId, start, end);
+    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, mood, method, domain_id) VALUES (?, ?, ?, 'nap', 'happy', 'nursing', ?)",
+  ).run(babyId, start, end, gid());
   db.close();
 
   await page.goto("/#/history");

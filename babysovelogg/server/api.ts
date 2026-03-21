@@ -3,8 +3,9 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import db from "./db.js";
-import { appendEvent, getEvents } from "./events.js";
-import { applyEvent } from "./projections.js";
+import { processBatchTx, getEvents } from "./events.js";
+import { rebuildAll } from "./projections.js";
+import { validateBatch } from "./schemas.js";
 import {
   calculateAgeMonths,
   predictNextNap,
@@ -12,7 +13,7 @@ import {
   predictDayNaps,
 } from "../src/engine/schedule.js";
 import { getTodayStats } from "../src/engine/stats.js";
-import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry } from "../types.js";
+import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry, EventRow } from "../types.js";
 
 /** Convert DB row type (string) to SleepEntry type ("nap" | "night"). */
 function toSleepEntry(s: SleepLogRow): SleepEntry {
@@ -265,28 +266,98 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
 
   if (url.pathname === "/api/events" && method === "GET") {
     const since = url.searchParams.get("since");
-    return json(res, getEvents(since ? parseInt(since) : undefined));
+    const typeFilter = url.searchParams.get("type");
+    const domainIdFilter = url.searchParams.get("domainId");
+    const limit = url.searchParams.get("limit");
+    const offset = url.searchParams.get("offset");
+
+    // Simple path: just since filter
+    if (!typeFilter && !domainIdFilter && !limit) {
+      return json(res, getEvents(since ? parseInt(since) : undefined));
+    }
+
+    // Advanced query with filters and pagination
+    let sql = "SELECT * FROM events WHERE 1=1";
+    let countSql = "SELECT COUNT(*) as total FROM events WHERE 1=1";
+    const params: (string | number)[] = [];
+    const countParams: (string | number)[] = [];
+
+    if (since) {
+      sql += " AND id > ?";
+      countSql += " AND id > ?";
+      params.push(parseInt(since));
+      countParams.push(parseInt(since));
+    }
+    if (typeFilter) {
+      sql += " AND type = ?";
+      countSql += " AND type = ?";
+      params.push(typeFilter);
+      countParams.push(typeFilter);
+    }
+    if (domainIdFilter) {
+      sql += " AND domain_id = ?";
+      countSql += " AND domain_id = ?";
+      params.push(domainIdFilter);
+      countParams.push(domainIdFilter);
+    }
+
+    const total = (db.prepare(countSql).get(...countParams) as { total: number }).total;
+
+    sql += " ORDER BY id DESC";
+    if (limit) {
+      sql += " LIMIT ?";
+      params.push(parseInt(limit));
+    }
+    if (offset) {
+      sql += " OFFSET ?";
+      params.push(parseInt(offset));
+    }
+
+    const rows = db.prepare(sql).all(...params) as EventRow[];
+    const events = rows.map((r) => ({ ...r, payload: JSON.parse(r.payload) }));
+    return json(res, { events, total });
   }
 
   if (url.pathname === "/api/events" && method === "POST") {
     try {
       const body = JSON.parse(await readBody(req));
-      const results = [];
-      for (const evt of body.events || [body]) {
-        const event = appendEvent(evt.type, evt.payload, evt.clientId, evt.clientEventId);
-        if (!event) continue; // Duplicate event, skip
-        applyEvent(event);
-        results.push(event);
+
+      // Level 1+2 validation
+      const validation = validateBatch(body);
+      if (!validation.ok) {
+        return json(res, { errors: validation.errors }, 400);
       }
+
+      // Process all events in one transaction
+      const results = processBatchTx(validation.events);
+
       const state = getState();
-      broadcast("update", { state });
-      return json(res, { events: results, state });
+      // Only broadcast if at least one event was actually applied (not duplicate)
+      if (results.some((r) => !r.duplicate)) {
+        broadcast("update", { state });
+      }
+      return json(res, {
+        events: results.map((r) => ({ ...r.event, duplicate: r.duplicate })),
+        state,
+      });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       if (message === "Request body too large") {
         return json(res, { error: message }, 413);
       }
       console.error(`[ERROR] POST /api/events:`, message);
+      return json(res, { error: message }, 500);
+    }
+  }
+
+  // Admin: rebuild projections
+  if (url.pathname === "/api/admin/rebuild" && method === "POST") {
+    try {
+      const report = rebuildAll();
+      return json(res, report, report.success ? 200 : 400);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[ERROR] POST /api/admin/rebuild:`, message);
       return json(res, { error: message }, 500);
     }
   }
@@ -298,7 +369,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     if (!baby) return json(res, []);
     const from = url.searchParams.get("from");
     const to = url.searchParams.get("to");
-    const limit = url.searchParams.get("limit") || "50";
+    const limitParam = url.searchParams.get("limit") || "50";
     let sql = "SELECT * FROM sleep_log WHERE baby_id = ? AND deleted = 0";
     const params: (string | number)[] = [baby.id];
     if (from) {
@@ -310,7 +381,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       params.push(to);
     }
     sql += " ORDER BY start_time DESC LIMIT ?";
-    params.push(parseInt(limit));
+    params.push(parseInt(limitParam));
     const sleeps = db.prepare(sql).all(...params) as SleepLogRow[];
     // Batch-fetch pauses for all returned sleeps
     const sleepIds = sleeps.map((s) => s.id);
@@ -340,7 +411,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       | undefined;
     if (!baby) return json(res, []);
     const from = url.searchParams.get("from");
-    const limit = url.searchParams.get("limit") || "50";
+    const limitParam = url.searchParams.get("limit") || "50";
     let sql = "SELECT * FROM diaper_log WHERE baby_id = ? AND deleted = 0";
     const params: (string | number)[] = [baby.id];
     if (from) {
@@ -348,7 +419,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       params.push(from);
     }
     sql += " ORDER BY time DESC LIMIT ?";
-    params.push(parseInt(limit));
+    params.push(parseInt(limitParam));
     return json(res, db.prepare(sql).all(...params));
   }
 

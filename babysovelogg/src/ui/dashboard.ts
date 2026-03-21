@@ -1,6 +1,6 @@
 import { getAppState, setAppState } from "../main.js";
 import { postEvents } from "../api.js";
-import { queueEvent, getClientId } from "../sync.js";
+import { queueEvent, getClientId, generateId } from "../sync.js";
 import { getExpectedNapCount } from "../engine/schedule.js";
 import {
   el,
@@ -175,24 +175,22 @@ export function renderDashboard(container: HTMLElement): void {
       const sleepSnapshot = currentState?.activeSleep
         ? { ...currentState.activeSleep }
         : { ...activeSleep };
-      const sleepId = activeSleep.id;
-      await sendEvent("sleep.ended", { sleepId, endTime: new Date().toISOString() });
+      await sendEvent("sleep.ended", { sleepDomainId: activeSleep.domain_id, endTime: new Date().toISOString() });
       renderDashboard(container);
-      showWakeUpSheet(sleepId, sleepSnapshot, container);
+      showWakeUpSheet(activeSleep.domain_id, sleepSnapshot, container);
     } else {
       // Start sleep — then show bedtime tag sheet
       const type = classifySleepType(todaySleeps, ageMonths, baby.custom_nap_count);
+      const sleepDomainId = generateId();
       await sendEvent("sleep.started", {
         babyId: baby.id,
         startTime: new Date().toISOString(),
         type,
+        sleepDomainId,
       });
       renderDashboard(container);
-      // Get the new active sleep ID from state
-      const newState = getAppState();
-      if (newState?.activeSleep?.id) {
-        showTagSheet(newState.activeSleep.id, container);
-      }
+      // Show tag sheet using the domain ID we just generated
+      showTagSheet(sleepDomainId, container);
     }
   });
 
@@ -209,8 +207,8 @@ export function renderDashboard(container: HTMLElement): void {
     pauseBtn.addEventListener("click", async () => {
       const eventType = isPaused ? "sleep.resumed" : "sleep.paused";
       const payload = isPaused
-        ? { sleepId: activeSleep.id, resumeTime: new Date().toISOString() }
-        : { sleepId: activeSleep.id, pauseTime: new Date().toISOString() };
+        ? { sleepDomainId: activeSleep.domain_id, resumeTime: new Date().toISOString() }
+        : { sleepDomainId: activeSleep.domain_id, pauseTime: new Date().toISOString() };
       await sendEvent(eventType, payload);
       renderDashboard(container);
     });
@@ -415,8 +413,8 @@ export function renderDashboard(container: HTMLElement): void {
       pauseActionBtn.addEventListener("click", async () => {
         const eventType = isPaused ? "sleep.resumed" : "sleep.paused";
         const payload = isPaused
-          ? { sleepId: activeSleep!.id, resumeTime: new Date().toISOString() }
-          : { sleepId: activeSleep!.id, pauseTime: new Date().toISOString() };
+          ? { sleepDomainId: activeSleep!.domain_id, resumeTime: new Date().toISOString() }
+          : { sleepDomainId: activeSleep!.domain_id, pauseTime: new Date().toISOString() };
         await sendEvent(eventType, payload);
         renderDashboard(container);
       });
@@ -429,6 +427,7 @@ export function renderDashboard(container: HTMLElement): void {
           babyId: baby.id,
           startTime: new Date().toISOString(),
           type: "night",
+          sleepDomainId: generateId(),
         });
         renderDashboard(container);
       });
@@ -446,8 +445,8 @@ export function renderDashboard(container: HTMLElement): void {
       pauseActionBtn.addEventListener("click", async () => {
         const eventType = isPaused ? "sleep.resumed" : "sleep.paused";
         const payload = isPaused
-          ? { sleepId: activeSleep!.id, resumeTime: new Date().toISOString() }
-          : { sleepId: activeSleep!.id, pauseTime: new Date().toISOString() };
+          ? { sleepDomainId: activeSleep!.domain_id, resumeTime: new Date().toISOString() }
+          : { sleepDomainId: activeSleep!.domain_id, pauseTime: new Date().toISOString() };
         await sendEvent(eventType, payload);
         renderDashboard(container);
       });
@@ -460,6 +459,7 @@ export function renderDashboard(container: HTMLElement): void {
           babyId: baby.id,
           startTime: new Date().toISOString(),
           type: "nap",
+          sleepDomainId: generateId(),
         });
         renderDashboard(container);
       });
@@ -676,7 +676,7 @@ function _showEditStartModal(activeSleep: SleepLogRow, container: HTMLElement): 
       const result = await postEvents([
         {
           type: "sleep.updated",
-          payload: { sleepId: activeSleep.id, startTime: start.toISOString() },
+          payload: { sleepDomainId: activeSleep.domain_id, startTime: start.toISOString() },
           clientId: getClientId(),
         },
       ]);
@@ -703,7 +703,7 @@ function _showEditStartModal(activeSleep: SleepLogRow, container: HTMLElement): 
   }
 }
 
-function showTagSheet(sleepId: number, container: HTMLElement): void {
+function showTagSheet(sleepDomainId: string, container: HTMLElement): void {
   const overlay = el("div", { className: "modal-overlay", "data-testid": "modal-overlay" });
   const modal = el("div", { className: "modal tag-sheet" });
 
@@ -880,7 +880,7 @@ function showTagSheet(sleepId: number, container: HTMLElement): void {
           {
             type: "sleep.tagged",
             payload: {
-              sleepId,
+              sleepDomainId,
               mood: selectedMood,
               method: selectedMethod,
               fallAsleepTime: selectedFallAsleep,
@@ -897,7 +897,7 @@ function showTagSheet(sleepId: number, container: HTMLElement): void {
   }
 }
 
-function showWakeUpSheet(sleepId: number, sleepData: SleepLogRow, container: HTMLElement): void {
+function showWakeUpSheet(sleepDomainId: string, sleepData: SleepLogRow, container: HTMLElement): void {
   const overlay = el("div", { className: "modal-overlay", "data-testid": "modal-overlay" });
   const modal = el("div", { className: "modal tag-sheet" });
 
@@ -1016,7 +1016,7 @@ function showWakeUpSheet(sleepId: number, sleepData: SleepLogRow, container: HTM
       close();
       // Find the sleep entry in todaySleeps for the full edit modal
       const state = getAppState();
-      const entry = state?.todaySleeps?.find((s) => s.id === sleepId);
+      const entry = state?.todaySleeps?.find((s) => s.domain_id === sleepDomainId);
       if (entry) showEditModal(entry, container);
     });
 
@@ -1071,7 +1071,7 @@ function showWakeUpSheet(sleepId: number, sleepData: SleepLogRow, container: HTM
     overlay.remove();
     if (wokeBy || noteInput.value.trim()) {
       try {
-        const payload: Record<string, unknown> = { sleepId };
+        const payload: Record<string, unknown> = { sleepDomainId };
         if (wokeBy) payload.wokeBy = wokeBy;
         if (noteInput.value.trim()) payload.wakeNotes = noteInput.value.trim();
         const result = await postEvents([
@@ -1188,6 +1188,7 @@ function showDiaperModal(baby: Baby, container: HTMLElement): void {
             type: selectedType,
             amount: selectedAmount,
             note: noteInput.value || undefined,
+            diaperDomainId: generateId(),
           },
           clientId: getClientId(),
         },
@@ -1236,14 +1237,15 @@ function showPredictedNapSheet(
 
   startBtn.addEventListener("click", async () => {
     close();
+    const sleepDomainId = generateId();
     await sendEvent("sleep.started", {
       babyId: baby.id,
       startTime: new Date().toISOString(),
       type: "nap",
+      sleepDomainId,
     });
     renderDashboard(container);
-    const newState = getAppState();
-    if (newState?.activeSleep?.id) showTagSheet(newState.activeSleep.id, container);
+    showTagSheet(sleepDomainId, container);
   });
 
   skipBtn.addEventListener("click", () => {
@@ -1353,6 +1355,7 @@ function showPottyModal(baby: Baby, container: HTMLElement): void {
             type: selectedResult,
             amount: selectedResult === "diaper_only" ? null : selectedDiaperStatus,
             note: noteInput.value || undefined,
+            diaperDomainId: generateId(),
           },
           clientId: getClientId(),
         },

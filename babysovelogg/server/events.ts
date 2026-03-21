@@ -1,58 +1,90 @@
 import db from "./db.js";
+import { applyEvent } from "./projections.js";
 import type { EventRow } from "../types.js";
 
 export interface AppEvent {
   id: number;
   type: string;
   payload: Record<string, unknown>;
-  client_id: string | null;
+  client_id: string;
+  client_event_id: string;
   timestamp: string;
+  schema_version: number | null;
+  correlation_id: string | null;
+  caused_by_event_id: number | null;
+  domain_id: string | null;
+}
+
+export interface ProcessedEvent {
+  event: AppEvent;
+  duplicate: boolean;
 }
 
 const insertStmt = db.prepare(
-  "INSERT INTO events (type, payload, client_id, client_event_id) VALUES (?, ?, ?, ?)",
+  "INSERT INTO events (type, payload, client_id, client_event_id, domain_id) VALUES (?, ?, ?, ?, ?)",
 );
 
 const checkDupStmt = db.prepare(
-  "SELECT id FROM events WHERE client_event_id = ?",
+  "SELECT id FROM events WHERE client_id = ? AND client_event_id = ?",
 );
+
+const getEventByIdStmt = db.prepare("SELECT * FROM events WHERE id = ?");
 
 const getEventsSinceStmt = db.prepare("SELECT * FROM events WHERE id > ? ORDER BY id ASC");
 
 const getAllEventsStmt = db.prepare("SELECT * FROM events ORDER BY id ASC");
 
-export function appendEvent(
-  type: string,
-  payload: Record<string, unknown>,
-  clientId?: string,
-  clientEventId?: string,
-): AppEvent | null {
-  // Deduplicate: if clientEventId already exists, skip
-  if (clientEventId) {
-    const existing = checkDupStmt.get(clientEventId) as { id: number } | undefined;
-    if (existing) {
-      return null; // Duplicate — already processed
-    }
-  }
-
-  const result = insertStmt.run(
-    type,
-    JSON.stringify(payload),
-    clientId ?? null,
-    clientEventId ?? null,
-  );
+function rowToAppEvent(row: EventRow): AppEvent {
   return {
-    id: result.lastInsertRowid as number,
-    type,
-    payload,
-    client_id: clientId ?? null,
-    timestamp: new Date().toISOString(),
-  };
+    ...row,
+    payload: JSON.parse(row.payload),
+  } as unknown as AppEvent;
 }
+
+/**
+ * Process an entire batch of events inside one transaction.
+ * Dedup check → append → project for each event.
+ * If any projection fails, the entire batch rolls back.
+ */
+export const processBatchTx = db.transaction(
+  (
+    events: { type: string; payload: Record<string, unknown>; clientId: string; clientEventId: string }[],
+  ): ProcessedEvent[] => {
+    const results: ProcessedEvent[] = [];
+    for (const { type, payload, clientId, clientEventId } of events) {
+      // dedup check on (clientId, clientEventId)
+      const existing = checkDupStmt.get(clientId, clientEventId) as { id: number } | undefined;
+      if (existing) {
+        const row = getEventByIdStmt.get(existing.id) as EventRow;
+        results.push({ event: rowToAppEvent(row), duplicate: true });
+        continue;
+      }
+      // extract domain_id from payload
+      const domainId =
+        (payload.sleepDomainId as string) ?? (payload.diaperDomainId as string) ?? null;
+      // insert
+      const result = insertStmt.run(type, JSON.stringify(payload), clientId, clientEventId, domainId);
+      const event: AppEvent = {
+        id: result.lastInsertRowid as number,
+        type,
+        payload,
+        client_id: clientId,
+        client_event_id: clientEventId,
+        timestamp: new Date().toISOString(),
+        schema_version: null,
+        correlation_id: null,
+        caused_by_event_id: null,
+        domain_id: domainId,
+      };
+      // project — if this throws, the ENTIRE batch rolls back
+      applyEvent(event);
+      results.push({ event, duplicate: false });
+    }
+    return results;
+  },
+);
 
 export function getEvents(since?: number): AppEvent[] {
   const rows = since != null ? getEventsSinceStmt.all(since) : getAllEventsStmt.all();
-  return (rows as EventRow[]).map(
-    (r) => Object.assign(r, { payload: JSON.parse(r.payload) }) as unknown as AppEvent,
-  );
+  return (rows as EventRow[]).map(rowToAppEvent);
 }

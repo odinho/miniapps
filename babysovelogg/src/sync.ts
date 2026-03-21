@@ -1,18 +1,11 @@
 import { postEvents, type AppState } from "./api.js";
 import { showToast } from "./ui/toast.js";
+import { generateId, getClientId } from "./identity.js";
+
+export { generateId, getClientId };
 
 const QUEUE_KEY = "babysovelogg_event_queue";
-const CLIENT_ID_KEY = "babysovelogg_client_id";
 const STATE_CACHE_KEY = "babysovelogg_cached_state";
-
-function safeSetItem(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch (err) {
-    console.error("localStorage quota exceeded:", err);
-    showToast("Lagring full — slett gamle data i nettlesaren", "error");
-  }
-}
 
 interface QueuedEvent {
   type: string;
@@ -22,27 +15,7 @@ interface QueuedEvent {
   timestamp: string;
 }
 
-function generateId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  // Fallback for non-secure contexts (HTTP)
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
-  });
-}
-
-export function getClientId(): string {
-  let id = localStorage.getItem(CLIENT_ID_KEY);
-  if (!id) {
-    id = generateId();
-    localStorage.setItem(CLIENT_ID_KEY, id);
-  }
-  return id;
-}
-
-export function queueEvent(type: string, payload: Record<string, unknown>): void {
+export function queueEvent(type: string, payload: Record<string, unknown>): boolean {
   const queue = getQueue();
   queue.push({
     type,
@@ -51,7 +24,13 @@ export function queueEvent(type: string, payload: Record<string, unknown>): void
     clientEventId: generateId(),
     timestamp: new Date().toISOString(),
   });
-  safeSetItem(QUEUE_KEY, JSON.stringify(queue));
+  try {
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+    return true;
+  } catch {
+    showToast("Kunne ikkje lagra hendinga offline — prøv igjen med nett", "error");
+    return false;
+  }
 }
 
 function getQueue(): QueuedEvent[] {
@@ -68,17 +47,23 @@ export async function flushQueue(): Promise<{ events: unknown[]; state: AppState
   if (queue.length === 0) return null;
   try {
     const result = await postEvents(queue);
-    safeSetItem(QUEUE_KEY, "[]");
+    localStorage.setItem(QUEUE_KEY, "[]");
     cacheState(result.state);
+    showToast(`Synkroniserte ${queue.length} hendingar`, "success");
     return result;
   } catch (err) {
     console.error("Failed to flush event queue:", err);
+    showToast(`${queue.length} hendingar ventar — prøver igjen snart`, "warning");
     return null; // Still offline, keep queue
   }
 }
 
 export function cacheState(state: AppState): void {
-  safeSetItem(STATE_CACHE_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(STATE_CACHE_KEY, JSON.stringify(state));
+  } catch (err) {
+    console.error("localStorage quota exceeded:", err);
+  }
 }
 
 export function getCachedState(): AppState | null {
@@ -92,6 +77,10 @@ export function getCachedState(): AppState | null {
 
 export function hasPendingEvents(): boolean {
   return getQueue().length > 0;
+}
+
+export function getPendingCount(): number {
+  return getQueue().length;
 }
 
 export type SSEStatus = "connected" | "reconnecting" | "disconnected";
@@ -138,10 +127,26 @@ export function connectSSE(onUpdate: (state: AppState) => void): () => void {
 function updateSyncDot() {
   const dot = document.getElementById("sync-dot");
   if (!dot) return;
-  if (sseStatus === "connected") {
+  const pending = getPendingCount();
+  if (sseStatus === "connected" && pending === 0) {
     dot.style.display = "none";
   } else {
     dot.style.display = "block";
-    dot.style.background = sseStatus === "reconnecting" ? "#ff9800" : "#999";
+    if (pending > 0) {
+      dot.style.background = "#ff9800";
+      dot.textContent = String(pending);
+      dot.style.fontSize = "9px";
+      dot.style.color = "#fff";
+      dot.style.lineHeight = "14px";
+      dot.style.textAlign = "center";
+      dot.style.width = "14px";
+      dot.style.height = "14px";
+    } else {
+      dot.textContent = "";
+      dot.style.width = "6px";
+      dot.style.height = "6px";
+      dot.style.background = sseStatus === "reconnecting" ? "#ff9800" : "#999";
+    }
+    dot.style.opacity = "0.8";
   }
 }

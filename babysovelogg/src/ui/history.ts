@@ -398,7 +398,7 @@ export function showEditModal(entry: SleepLogRow, container: HTMLElement): void 
       {
         type: "sleep.updated",
         payload: {
-          sleepId: entry.id,
+          sleepDomainId: entry.domain_id,
           startTime: new Date(`${startDateInput.value}T${startTimeInput.value}`).toISOString(),
           endTime:
             endDateInput.value && endTimeInput.value
@@ -426,7 +426,7 @@ export function showEditModal(entry: SleepLogRow, container: HTMLElement): void 
     );
     if (confirmed) {
       await postEvents([
-        { type: "sleep.deleted", payload: { sleepId: entry.id }, clientId: getClientId() },
+        { type: "sleep.deleted", payload: { sleepDomainId: entry.domain_id }, clientId: getClientId() },
       ]);
       close();
       await refreshState();
@@ -444,6 +444,20 @@ export function showEditModal(entry: SleepLogRow, container: HTMLElement): void 
   document.addEventListener("keydown", escHandler);
 
   modal.appendChild(el("div", { className: "btn-row" }, [deleteBtn, saveBtn]));
+
+  // Entity history link
+  if (entry.domain_id) {
+    const historyLink = el("button", {
+      className: "btn btn-ghost",
+      style: { width: "100%", fontSize: "0.8rem", marginTop: "8px" },
+    }, ["Hendingslogg"]);
+    historyLink.addEventListener("click", () => {
+      close();
+      window.location.hash = `#/events?domainId=${entry.domain_id}`;
+    });
+    modal.appendChild(historyLink);
+  }
+
   modal.appendChild(el("div", { style: { textAlign: "center", marginTop: "12px" } }, [cancelBtn]));
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
@@ -548,7 +562,7 @@ function showDiaperEditModal(entry: DiaperLogRow, container: HTMLElement): void 
       {
         type: "diaper.updated",
         payload: {
-          diaperId: entry.id,
+          diaperDomainId: entry.domain_id,
           type: selectedType,
           amount: selectedAmount,
           note: noteInput.value.trim() || undefined,
@@ -569,7 +583,7 @@ function showDiaperEditModal(entry: DiaperLogRow, container: HTMLElement): void 
     );
     if (confirmed) {
       await postEvents([
-        { type: "diaper.deleted", payload: { diaperId: entry.id }, clientId: getClientId() },
+        { type: "diaper.deleted", payload: { diaperDomainId: entry.domain_id }, clientId: getClientId() },
       ]);
       close();
       await refreshState();
@@ -588,6 +602,20 @@ function showDiaperEditModal(entry: DiaperLogRow, container: HTMLElement): void 
   document.addEventListener("keydown", escHandler);
 
   modal.appendChild(el("div", { className: "btn-row" }, [deleteBtn, saveBtn]));
+
+  // Entity history link
+  if (entry.domain_id) {
+    const historyLink = el("button", {
+      className: "btn btn-ghost",
+      style: { width: "100%", fontSize: "0.8rem", marginTop: "8px" },
+    }, ["Hendingslogg"]);
+    historyLink.addEventListener("click", () => {
+      close();
+      window.location.hash = `#/events?domainId=${entry.domain_id}`;
+    });
+    modal.appendChild(historyLink);
+  }
+
   modal.appendChild(el("div", { style: { textAlign: "center", marginTop: "12px" } }, [cancelBtn]));
   overlay.appendChild(modal);
   document.body.appendChild(overlay);

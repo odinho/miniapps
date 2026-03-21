@@ -7,6 +7,8 @@ export interface Baby {
   created_at: string;
   custom_nap_count: number | null;
   potty_mode: number;
+  created_by_event_id: number | null;
+  updated_by_event_id: number | null;
 }
 
 export interface SleepLogRow {
@@ -22,6 +24,9 @@ export interface SleepLogRow {
   woke_by: string | null;
   wake_notes: string | null;
   deleted: number;
+  domain_id: string;
+  created_by_event_id: number | null;
+  updated_by_event_id: number | null;
   pauses?: SleepPauseRow[];
 }
 
@@ -30,6 +35,7 @@ export interface SleepPauseRow {
   sleep_id: number;
   pause_time: string;
   resume_time: string | null;
+  created_by_event_id: number | null;
 }
 
 export interface DiaperLogRow {
@@ -40,6 +46,9 @@ export interface DiaperLogRow {
   amount: string | null;
   note: string | null;
   deleted: number;
+  domain_id: string;
+  created_by_event_id: number | null;
+  updated_by_event_id: number | null;
 }
 
 export interface DayStartRow {
@@ -48,6 +57,7 @@ export interface DayStartRow {
   date: string;
   wake_time: string;
   created_at: string;
+  created_by_event_id: number | null;
 }
 
 /** Unified sleep entry used by both engine/schedule.ts and engine/stats.ts */
@@ -67,7 +77,11 @@ export interface EventRow {
   id: number;
   type: string;
   payload: string;
-  client_id: string | null;
-  client_event_id: string | null;
+  client_id: string;
+  client_event_id: string;
   timestamp: string;
+  schema_version: number | null;
+  correlation_id: string | null;
+  caused_by_event_id: number | null;
+  domain_id: string | null;
 }

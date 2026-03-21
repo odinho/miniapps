@@ -26,14 +26,27 @@ export function resetDb() {
   try {
     db.prepare("DELETE FROM events").run();
   } catch {}
+  // Reset autoincrement counters so rebuild produces matching IDs
+  try {
+    db.prepare("DELETE FROM sqlite_sequence").run();
+  } catch {}
   db.close();
+}
+
+function generateId(): string {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
 }
 
 export function createBaby(name = "Testa", birthdate = "2025-06-12"): number {
   const db = getDb();
-  db.prepare("INSERT INTO events (type, payload) VALUES ('baby.created', ?)").run(
-    JSON.stringify({ name, birthdate }),
-  );
+  const clientId = generateId();
+  const clientEventId = generateId();
+  db.prepare(
+    "INSERT INTO events (type, payload, client_id, client_event_id) VALUES ('baby.created', ?, ?, ?)",
+  ).run(JSON.stringify({ name, birthdate }), clientId, clientEventId);
   const info = db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run(name, birthdate);
   db.close();
   return Number(info.lastInsertRowid);
@@ -57,51 +70,62 @@ export function addCompletedSleep(
   startTime: string,
   endTime: string,
   type = "nap",
+  domainId?: string,
 ) {
   const db = getDb();
-  db.prepare("INSERT INTO sleep_log (baby_id, start_time, end_time, type) VALUES (?, ?, ?, ?)").run(
-    babyId,
-    startTime,
-    endTime,
-    type,
-  );
+  const did = domainId || generateId();
+  db.prepare(
+    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, ?, ?)",
+  ).run(babyId, startTime, endTime, type, did);
   db.close();
+  return did;
 }
 
-export function addActiveSleep(babyId: number, startTime: string, type = "nap") {
+export function addActiveSleep(babyId: number, startTime: string, type = "nap", domainId?: string) {
   const db = getDb();
-  db.prepare("INSERT INTO sleep_log (baby_id, start_time, type) VALUES (?, ?, ?)").run(
+  const did = domainId || generateId();
+  db.prepare("INSERT INTO sleep_log (baby_id, start_time, type, domain_id) VALUES (?, ?, ?, ?)").run(
     babyId,
     startTime,
     type,
+    did,
   );
   db.close();
+  return did;
 }
 
-export function addDiaper(babyId: number, time: string, type = "wet", amount = "middels") {
+export function addDiaper(
+  babyId: number,
+  time: string,
+  type = "wet",
+  amount = "middels",
+  domainId?: string,
+) {
   const db = getDb();
-  db.prepare("INSERT INTO diaper_log (baby_id, time, type, amount) VALUES (?, ?, ?, ?)").run(
-    babyId,
-    time,
-    type,
-    amount,
-  );
+  const did = domainId || generateId();
+  db.prepare(
+    "INSERT INTO diaper_log (baby_id, time, type, amount, domain_id) VALUES (?, ?, ?, ?, ?)",
+  ).run(babyId, time, type, amount, did);
   db.close();
+  return did;
 }
 
 export function seedBabyWithSleep() {
   const db = getDb();
-  db.prepare("INSERT INTO events (type, payload) VALUES ('baby.created', ?)").run(
-    JSON.stringify({ name: "Testa", birthdate: "2025-06-12" }),
-  );
+  const clientId = generateId();
+  const clientEventId = generateId();
+  db.prepare(
+    "INSERT INTO events (type, payload, client_id, client_event_id) VALUES ('baby.created', ?, ?, ?)",
+  ).run(JSON.stringify({ name: "Testa", birthdate: "2025-06-12" }), clientId, clientEventId);
   db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run("Testa", "2025-06-12");
   const babyId = db.prepare("SELECT id FROM baby LIMIT 1").get() as { id: number };
   const now = new Date();
   const start = new Date(now.getTime() - 3600000).toISOString();
   const end = now.toISOString();
+  const domainId = generateId();
   db.prepare(
-    "INSERT INTO sleep_log (baby_id, start_time, end_time, type) VALUES (?, ?, ?, 'nap')",
-  ).run(babyId.id, start, end);
+    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, 'nap', ?)",
+  ).run(babyId.id, start, end, domainId);
   db.close();
 }
 
@@ -146,5 +170,8 @@ export async function dismissSheet(page: Page) {
     // No sheet visible, that's fine
   }
 }
+
+/** Helper to generate a UUID for tests */
+export { generateId };
 
 export { expect };

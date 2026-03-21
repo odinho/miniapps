@@ -5,6 +5,7 @@ import { renderDashboard, cleanupDashboard } from "./ui/dashboard.js";
 import { renderHistory } from "./ui/history.js";
 import { renderSettings } from "./ui/settings.js";
 import { renderStats } from "./ui/stats.js";
+import { renderEventsScreen } from "./ui/events.js";
 import { el } from "./ui/components.js";
 
 let currentState: AppState | null = null;
@@ -98,7 +99,8 @@ async function main() {
       btn.classList.toggle("active", hash === tabs[i].hash);
     });
 
-    switch (hash) {
+    const hashBase = hash.split("?")[0];
+    switch (hashBase) {
       case "#/history":
         await renderHistory(content);
         break;
@@ -107,6 +109,9 @@ async function main() {
         break;
       case "#/settings":
         renderSettings(content, { onboarding: !currentState?.baby });
+        break;
+      case "#/events":
+        await renderEventsScreen(content);
         break;
       default:
         renderDashboard(content);

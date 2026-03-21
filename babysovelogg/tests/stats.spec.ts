@@ -6,8 +6,8 @@ import {
   addCompletedSleep,
   getDb,
   forceMorning,
+  generateId,
 } from "./fixtures";
-import type { SleepLogRow } from "../types";
 
 test.beforeEach(async ({ page }) => {
   await forceMorning(page);
@@ -66,11 +66,12 @@ test("Stats subtracts pause time from sleep durations", async ({ page }) => {
   // Add a 60-min nap with a 10-min pause (should show ~50 min)
   const startTime = new Date(now - 3600000).toISOString();
   const endTime = new Date(now).toISOString();
+  const domainId = generateId();
   db.prepare(
-    "INSERT INTO sleep_log (baby_id, start_time, end_time, type) VALUES (?, ?, ?, 'nap')",
-  ).run(babyId, startTime, endTime);
+    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, 'nap', ?)",
+  ).run(babyId, startTime, endTime, domainId);
   const sleepId = (
-    db.prepare("SELECT id FROM sleep_log ORDER BY id DESC LIMIT 1").get() as SleepLogRow
+    db.prepare("SELECT id FROM sleep_log ORDER BY id DESC LIMIT 1").get() as { id: number }
   ).id;
   db.prepare("INSERT INTO sleep_pauses (sleep_id, pause_time, resume_time) VALUES (?, ?, ?)").run(
     sleepId,
