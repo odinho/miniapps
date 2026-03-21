@@ -88,12 +88,12 @@ export async function forceHour(page: any, hour: number) {
   }, hour);
 }
 
-/** Dismiss any visible modal sheet (tag sheet or wake-up sheet) by clicking "Hopp over" */
+/** Dismiss any visible modal sheet (tag sheet or wake-up sheet) by clicking "Ferdig" */
 export async function dismissSheet(page: any) {
   const overlay = page.getByTestId('modal-overlay');
   try {
     await overlay.waitFor({ state: 'visible', timeout: 3000 });
-    await page.getByRole('button', { name: 'Hopp over' }).click();
+    await page.getByRole('button', { name: 'Ferdig' }).click();
     await overlay.waitFor({ state: 'hidden', timeout: 3000 });
   } catch {
     // No sheet visible, that's fine

@@ -94,7 +94,7 @@ export function renderDashboard(container: HTMLElement): void {
 
   // Header row: baby info + sleep button
   const isNapSleep = isSleeping && activeSleep?.type === 'nap';
-  const sleepIcon = isSleeping ? (isNapSleep ? '☀️' : '🌙') : '☀️';
+  const sleepIcon = isSleeping ? '☀️' : '😴';
   const sleepLabel = isSleeping ? 'Vakn' : 'Sov';
   const btn = el('button', { className: `sleep-button ${isSleeping ? 'sleeping' : 'awake'}`, 'data-testid': 'sleep-button' }, [
     el('span', { className: 'icon' }, [sleepIcon]),
@@ -195,7 +195,7 @@ export function renderDashboard(container: HTMLElement): void {
     arcCenter.appendChild(el('div', { className: 'arc-center-label' }, [isPaused ? '⏸️ Pause' : activeSleep.type === 'night' ? '💤 Søv' : '😴 Lurar']));
     arcCenter.appendChild(arcTimer.element);
     const editLink = el('span', { className: 'edit-start-link' }, ['Starta ' + formatTime(activeSleep.start_time)]);
-    editLink.addEventListener('click', () => showEditStartModal(activeSleep, container));
+    editLink.addEventListener('click', () => showEditModal(activeSleep, container));
     arcCenter.appendChild(editLink);
   } else {
     const now = new Date();
@@ -578,30 +578,9 @@ function showTagSheet(sleepId: number, container: HTMLElement): void {
     noteInput,
   ]));
 
-  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Lagra']);
-  const skipBtn = el('button', { className: 'btn btn-ghost' }, ['Hopp over']);
+  const doneBtn = el('button', { className: 'btn btn-primary' }, ['Ferdig']);
 
-  saveBtn.addEventListener('click', async () => {
-    if (selectedMood || selectedMethod || selectedFallAsleep || noteInput.value.trim()) {
-      try {
-        const result = await postEvents([{
-          type: 'sleep.tagged',
-          payload: {
-            sleepId,
-            mood: selectedMood,
-            method: selectedMethod,
-            fallAsleepTime: selectedFallAsleep,
-            notes: noteInput.value.trim() || undefined,
-          },
-          clientId: getClientId(),
-        }]);
-        setAppState(result.state);
-      } catch {}
-    }
-    close();
-  });
-
-  skipBtn.addEventListener('click', close);
+  doneBtn.addEventListener('click', close);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 
   // Diaper-before-bed nudge: remind if no diaper in the last 2 hours
@@ -622,11 +601,30 @@ function showTagSheet(sleepId: number, container: HTMLElement): void {
     modal.appendChild(nudge);
   }
 
-  modal.appendChild(el('div', { className: 'btn-row' }, [skipBtn, saveBtn]));
+  modal.appendChild(el('div', { style: { marginTop: '16px' } }, [doneBtn]));
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 
-  function close() { overlay.remove(); }
+  // Auto-save on any close — never lose entered data
+  async function close() {
+    overlay.remove();
+    if (selectedMood || selectedMethod || selectedFallAsleep || noteInput.value.trim()) {
+      try {
+        const result = await postEvents([{
+          type: 'sleep.tagged',
+          payload: {
+            sleepId,
+            mood: selectedMood,
+            method: selectedMethod,
+            fallAsleepTime: selectedFallAsleep,
+            notes: noteInput.value.trim() || undefined,
+          },
+          clientId: getClientId(),
+        }]);
+        setAppState(result.state);
+      } catch {}
+    }
+  }
 }
 
 const MOOD_EMOJI: Record<string, string> = { happy: '😊', normal: '😐', upset: '😢', fighting: '😤' };
@@ -724,10 +722,18 @@ function showWakeUpSheet(sleepId: number, sleepData: any, container: HTMLElement
     noteInput,
   ]));
 
-  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Lagra']);
-  const skipBtn = el('button', { className: 'btn btn-ghost' }, ['Hopp over']);
+  const doneBtn = el('button', { className: 'btn btn-primary' }, ['Ferdig']);
 
-  saveBtn.addEventListener('click', async () => {
+  doneBtn.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  modal.appendChild(el('div', { style: { marginTop: '16px' } }, [doneBtn]));
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  // Auto-save on any close
+  async function close() {
+    overlay.remove();
     if (wokeBy || noteInput.value.trim()) {
       try {
         const payload: any = { sleepId };
@@ -741,17 +747,7 @@ function showWakeUpSheet(sleepId: number, sleepData: any, container: HTMLElement
         setAppState(result.state);
       } catch {}
     }
-    close();
-  });
-
-  skipBtn.addEventListener('click', close);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-
-  modal.appendChild(el('div', { className: 'btn-row' }, [skipBtn, saveBtn]));
-  overlay.appendChild(modal);
-  document.body.appendChild(overlay);
-
-  function close() { overlay.remove(); }
+  }
 }
 
 function showDiaperModal(baby: any, container: HTMLElement): void {

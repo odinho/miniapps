@@ -606,6 +606,7 @@ html, body {
   border: 2px solid var(--cream-dark);
   border-radius: var(--radius-sm);
   background: var(--white);
+  color: var(--text);
   font-family: var(--font);
   font-size: 0.9rem;
   cursor: pointer;
