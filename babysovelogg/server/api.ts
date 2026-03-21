@@ -2,7 +2,7 @@ import { IncomingMessage, ServerResponse } from 'node:http';
 import { readFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import db, { checkpoint } from './db.js';
+import db from './db.js';
 import { appendEvent, getEvents } from './events.js';
 import { applyEvent } from './projections.js';
 import { calculateAgeMonths, predictNextNap, recommendBedtime, predictDayNaps } from '../src/engine/schedule.js';
@@ -191,7 +191,6 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       }
       const state = getState();
       broadcast('update', { state });
-      checkpoint(); // Flush WAL → main .db after every write
       return json(res, { events: results, state });
     } catch (err: any) {
       console.error(`[ERROR] POST /api/events:`, err.message);

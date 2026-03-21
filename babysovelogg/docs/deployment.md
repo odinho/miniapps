@@ -73,19 +73,15 @@ Key points:
 
 ## Database
 
-SQLite file (`napper.db`) in the working directory. WAL mode enabled for concurrent reads.
+SQLite file (`napper.db`) in the working directory. Uses DELETE journal mode
+(SQLite default) — all data is always in the single `.db` file. No `-wal`/`-shm`
+files to worry about.
 
-**WAL safety:** The server checkpoints the WAL after every write and on shutdown
-(SIGTERM/SIGINT). This ensures the main `.db` file always has all data. The `-wal`
-and `-shm` files may still exist but the `.db` file is self-sufficient after checkpoint.
+**Backups:** Copy `napper.db` while the server is stopped, or use
+`sqlite3 napper.db '.backup backup.db'` while running.
 
-**Backups:** The safest method is `sqlite3 napper.db '.backup backup.db'`. If copying
-files directly, **you must copy all three files** (`.db`, `.db-wal`, `.db-shm`) together
-— copying only `.db` while the WAL has uncheckpointed data will lose that data.
-
-**Deploy safety:** The systemd service should use `KillSignal=SIGTERM` (default) so
-the server gets a clean shutdown and checkpoints the database. Never delete `-wal`/`-shm`
-files while the server is running.
+**Deploy safety:** The server handles SIGTERM/SIGINT for clean DB shutdown.
+The systemd default `KillSignal=SIGTERM` is fine.
 
 ## Environment Variables
 

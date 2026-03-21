@@ -9,9 +9,9 @@ server.listen(PORT, () => {
   console.log(`🍼 Babysovelogg server running on http://localhost:${PORT}`);
 });
 
-// Graceful shutdown: checkpoint WAL and close DB before exit
+// Graceful shutdown: close DB cleanly before exit
 function shutdown(signal: string) {
-  console.log(`\n[${signal}] Shutting down — checkpointing database...`);
+  console.log(`\n[${signal}] Shutting down...`);
   server.close(() => {
     closeDb();
     console.log('Database closed. Bye!');

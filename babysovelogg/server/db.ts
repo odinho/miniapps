@@ -5,12 +5,11 @@ import { fileURLToPath } from 'url';
 const dbPath = path.join(process.cwd(), 'napper.db');
 
 const db = new Database(dbPath);
-db.pragma('journal_mode = WAL');
+// DELETE journal mode (SQLite default): writes go straight to the .db file.
+// No -wal/-shm files to manage, backup = copy one file.
+// WAL is pointless here — single server, 2-3 writes/day, no concurrent write pressure.
+db.pragma('journal_mode = DELETE');
 db.pragma('foreign_keys = ON');
-// Checkpoint after every page change — critical for low-write apps.
-// Default (1000 pages) means WAL accumulates indefinitely with 2-3 writes/day,
-// leaving the main .db file empty and all data only in the -wal file.
-db.pragma('wal_autocheckpoint = 1');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS events (
@@ -75,17 +74,9 @@ try { db.exec('ALTER TABLE sleep_log ADD COLUMN fall_asleep_time TEXT'); } catch
 try { db.exec('ALTER TABLE sleep_log ADD COLUMN woke_by TEXT'); } catch {}
 try { db.exec('ALTER TABLE sleep_log ADD COLUMN wake_notes TEXT'); } catch {}
 
-/** Flush WAL to main DB file. Called after writes to ensure .db file has all data. */
-export function checkpoint() {
-  db.pragma('wal_checkpoint(PASSIVE)');
-}
-
-/** Full shutdown: checkpoint + close. Called on process exit. */
+/** Clean shutdown. Called on process exit. */
 export function closeDb() {
-  try {
-    db.pragma('wal_checkpoint(TRUNCATE)');
-    db.close();
-  } catch {}
+  try { db.close(); } catch {}
 }
 
 export default db;
