@@ -13,7 +13,14 @@ import {
   predictDayNaps,
 } from "../src/engine/schedule.js";
 import { getTodayStats } from "../src/engine/stats.js";
-import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry, EventRow } from "../types.js";
+import type {
+  Baby,
+  SleepLogRow,
+  SleepPauseRow,
+  DayStartRow,
+  SleepEntry,
+  EventRow,
+} from "../types.js";
 
 /** Convert DB row type (string) to SleepEntry type ("nap" | "night"). */
 function toSleepEntry(s: SleepLogRow): SleepEntry {
@@ -157,11 +164,7 @@ function getState() {
 
     if (wakeTimeForPrediction) {
       const customNaps = baby.custom_nap_count ?? null;
-      const bedtime = recommendBedtime(
-        todaySleeps.map(toSleepEntry),
-        ageMonths,
-        customNaps,
-      );
+      const bedtime = recommendBedtime(todaySleeps.map(toSleepEntry), ageMonths, customNaps);
 
       // Predict remaining naps for the day, accounting for completed naps
       let predictedNaps = null;
@@ -178,11 +181,7 @@ function getState() {
       }
 
       prediction = {
-        nextNap: predictNextNap(
-          wakeTimeForPrediction,
-          ageMonths,
-          recentSleeps.map(toSleepEntry),
-        ),
+        nextNap: predictNextNap(wakeTimeForPrediction, ageMonths, recentSleeps.map(toSleepEntry)),
         bedtime,
         predictedNaps,
       };
@@ -432,9 +431,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
 
     const format = url.searchParams.get("format") || "json";
     const sleeps = db
-      .prepare(
-        "SELECT * FROM sleep_log WHERE baby_id = ? AND deleted = 0 ORDER BY start_time DESC",
-      )
+      .prepare("SELECT * FROM sleep_log WHERE baby_id = ? AND deleted = 0 ORDER BY start_time DESC")
       .all(baby.id) as SleepLogRow[];
 
     // Batch-fetch pauses
@@ -454,9 +451,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     }
 
     const diapers = db
-      .prepare(
-        "SELECT * FROM diaper_log WHERE baby_id = ? AND deleted = 0 ORDER BY time DESC",
-      )
+      .prepare("SELECT * FROM diaper_log WHERE baby_id = ? AND deleted = 0 ORDER BY time DESC")
       .all(baby.id);
 
     const dayStarts = db
@@ -478,7 +473,12 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
           ].join(","),
         );
       }
-      for (const d of diapers as { time: string; type: string; amount: string | null; note: string | null }[]) {
+      for (const d of diapers as {
+        time: string;
+        type: string;
+        amount: string | null;
+        note: string | null;
+      }[]) {
         lines.push(
           ["diaper", d.time, "", d.type, "", "", (d.note || "").replace(/,/g, ";")].join(","),
         );

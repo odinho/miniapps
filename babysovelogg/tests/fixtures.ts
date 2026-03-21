@@ -95,12 +95,9 @@ export function addCompletedSleep(
 export function addActiveSleep(babyId: number, startTime: string, type = "nap", domainId?: string) {
   const db = getDb();
   const did = domainId || generateSleepId();
-  db.prepare("INSERT INTO sleep_log (baby_id, start_time, type, domain_id) VALUES (?, ?, ?, ?)").run(
-    babyId,
-    startTime,
-    type,
-    did,
-  );
+  db.prepare(
+    "INSERT INTO sleep_log (baby_id, start_time, type, domain_id) VALUES (?, ?, ?, ?)",
+  ).run(babyId, startTime, type, did);
   db.close();
   return did;
 }

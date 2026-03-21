@@ -1,4 +1,13 @@
-import { test, expect, createBaby, setWakeUpTime, getDb, forceMorning, forceHour, generateId } from "./fixtures";
+import {
+  test,
+  expect,
+  createBaby,
+  setWakeUpTime,
+  getDb,
+  forceMorning,
+  forceHour,
+  generateId,
+} from "./fixtures";
 import type { Baby, DayStartRow } from "../types";
 
 test("Shows morning prompt when no wake-up time and no sleeps", async ({ page }) => {

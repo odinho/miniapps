@@ -110,10 +110,14 @@ export async function renderEventsScreen(container: HTMLElement): Promise<void> 
     listEl.querySelector(".load-more-btn")?.remove();
 
     if (offset < total) {
-      const loadMoreBtn = el("button", {
-        className: "btn btn-ghost load-more-btn",
-        style: { width: "100%", marginTop: "8px" },
-      }, ["Last fleire..."]);
+      const loadMoreBtn = el(
+        "button",
+        {
+          className: "btn btn-ghost load-more-btn",
+          style: { width: "100%", marginTop: "8px" },
+        },
+        ["Last fleire..."],
+      );
       loadMoreBtn.addEventListener("click", () => loadEvents());
       listEl.appendChild(loadMoreBtn);
     }
@@ -126,64 +130,88 @@ export async function renderEventsScreen(container: HTMLElement): Promise<void> 
 function renderEventCard(evt: EventItem): HTMLElement {
   const color = TYPE_COLORS[evt.type] || "#666";
 
-  const pill = el("span", {
-    style: {
-      display: "inline-block",
-      padding: "2px 8px",
-      borderRadius: "12px",
-      background: color,
-      color: "#fff",
-      fontSize: "0.75rem",
-      fontWeight: "600",
+  const pill = el(
+    "span",
+    {
+      style: {
+        display: "inline-block",
+        padding: "2px 8px",
+        borderRadius: "12px",
+        background: color,
+        color: "#fff",
+        fontSize: "0.75rem",
+        fontWeight: "600",
+      },
     },
-  }, [evt.type]);
+    [evt.type],
+  );
 
-  const time = el("span", {
-    style: { color: "var(--text-light)", fontSize: "0.8rem" },
-  }, [formatEventTime(evt.timestamp)]);
-
-  const headerRow = el("div", {
-    style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" },
-  }, [pill, time]);
-
-  const preview = el("div", {
-    style: {
-      fontSize: "0.8rem",
-      color: "var(--text-light)",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-      marginTop: "4px",
+  const time = el(
+    "span",
+    {
+      style: { color: "var(--text-light)", fontSize: "0.8rem" },
     },
-  }, [payloadPreview(evt.payload)]);
+    [formatEventTime(evt.timestamp)],
+  );
 
-  const expandedPayload = el("pre", {
-    style: {
-      display: "none",
-      fontSize: "0.75rem",
-      background: "var(--bg)",
-      padding: "8px",
-      borderRadius: "8px",
-      overflow: "auto",
-      maxHeight: "200px",
-      marginTop: "8px",
-      whiteSpace: "pre-wrap",
-      wordBreak: "break-all",
+  const headerRow = el(
+    "div",
+    {
+      style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" },
     },
-  }, [JSON.stringify(evt.payload, null, 2)]);
+    [pill, time],
+  );
 
-  const card = el("div", {
-    className: "event-card",
-    "data-testid": "event-card",
-    style: {
-      padding: "10px 12px",
-      marginBottom: "6px",
-      background: "var(--surface)",
-      borderRadius: "10px",
-      cursor: "pointer",
-      borderLeft: `3px solid ${color}`,
+  const preview = el(
+    "div",
+    {
+      style: {
+        fontSize: "0.8rem",
+        color: "var(--text-light)",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+        marginTop: "4px",
+      },
     },
-  }, [headerRow, preview, expandedPayload]);
+    [payloadPreview(evt.payload)],
+  );
+
+  const expandedPayload = el(
+    "pre",
+    {
+      style: {
+        display: "none",
+        fontSize: "0.75rem",
+        background: "var(--bg)",
+        padding: "8px",
+        borderRadius: "8px",
+        overflow: "auto",
+        maxHeight: "200px",
+        marginTop: "8px",
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-all",
+      },
+    },
+    [JSON.stringify(evt.payload, null, 2)],
+  );
+
+  const card = el(
+    "div",
+    {
+      className: "event-card",
+      "data-testid": "event-card",
+      style: {
+        padding: "10px 12px",
+        marginBottom: "6px",
+        background: "var(--surface)",
+        borderRadius: "10px",
+        cursor: "pointer",
+        borderLeft: `3px solid ${color}`,
+      },
+    },
+    [headerRow, preview, expandedPayload],
+  );
 
   card.addEventListener("click", () => {
     const isExpanded = expandedPayload.style.display !== "none";

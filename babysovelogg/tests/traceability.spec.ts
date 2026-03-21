@@ -1,4 +1,14 @@
-import { test, expect, createBaby, setWakeUpTime, forceMorning, getDb, generateId, generateSleepId, generateDiaperId } from "./fixtures";
+import {
+  test,
+  expect,
+  createBaby,
+  setWakeUpTime,
+  forceMorning,
+  getDb,
+  generateId,
+  generateSleepId,
+  generateDiaperId,
+} from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await forceMorning(page);
@@ -24,7 +34,9 @@ test("After sleep.started, sleep_log row has created_by_event_id", async ({ page
   const eventId = data.events[0].id;
 
   const db = getDb();
-  const sleep = db.prepare("SELECT created_by_event_id FROM sleep_log WHERE domain_id = ?").get(did) as { created_by_event_id: number };
+  const sleep = db
+    .prepare("SELECT created_by_event_id FROM sleep_log WHERE domain_id = ?")
+    .get(did) as { created_by_event_id: number };
   db.close();
   expect(sleep.created_by_event_id).toBe(eventId);
 });
@@ -45,7 +57,9 @@ test("After sleep.tagged, sleep_log row has updated_by_event_id", async ({ page 
   const tagEventId = tagData.events[0].id;
 
   const db = getDb();
-  const sleep = db.prepare("SELECT updated_by_event_id FROM sleep_log WHERE domain_id = ?").get(did) as { updated_by_event_id: number };
+  const sleep = db
+    .prepare("SELECT updated_by_event_id FROM sleep_log WHERE domain_id = ?")
+    .get(did) as { updated_by_event_id: number };
   db.close();
   expect(sleep.updated_by_event_id).toBe(tagEventId);
 });
@@ -55,13 +69,20 @@ test("After diaper.logged, diaper_log row has created_by_event_id", async ({ pag
   const did = generateDiaperId();
 
   const res = await postEvent(page, [
-    makeEvent("diaper.logged", { babyId, time: new Date().toISOString(), type: "wet", diaperDomainId: did }),
+    makeEvent("diaper.logged", {
+      babyId,
+      time: new Date().toISOString(),
+      type: "wet",
+      diaperDomainId: did,
+    }),
   ]);
   const data = await res.json();
   const eventId = data.events[0].id;
 
   const db = getDb();
-  const diaper = db.prepare("SELECT created_by_event_id FROM diaper_log WHERE domain_id = ?").get(did) as { created_by_event_id: number };
+  const diaper = db
+    .prepare("SELECT created_by_event_id FROM diaper_log WHERE domain_id = ?")
+    .get(did) as { created_by_event_id: number };
   db.close();
   expect(diaper.created_by_event_id).toBe(eventId);
 });
@@ -87,7 +108,9 @@ test("After rebuild, traceability columns are correct", async ({ page }) => {
   await page.request.post("/api/admin/rebuild");
 
   const db = getDb();
-  const sleep = db.prepare("SELECT created_by_event_id, updated_by_event_id FROM sleep_log WHERE domain_id = ?").get(did) as {
+  const sleep = db
+    .prepare("SELECT created_by_event_id, updated_by_event_id FROM sleep_log WHERE domain_id = ?")
+    .get(did) as {
     created_by_event_id: number;
     updated_by_event_id: number;
   };

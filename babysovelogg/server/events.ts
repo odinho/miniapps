@@ -48,7 +48,12 @@ function rowToAppEvent(row: EventRow): AppEvent {
  */
 export const processBatchTx = db.transaction(
   (
-    events: { type: string; payload: Record<string, unknown>; clientId: string; clientEventId: string }[],
+    events: {
+      type: string;
+      payload: Record<string, unknown>;
+      clientId: string;
+      clientEventId: string;
+    }[],
   ): ProcessedEvent[] => {
     const results: ProcessedEvent[] = [];
     for (const { type, payload, clientId, clientEventId } of events) {
@@ -63,7 +68,13 @@ export const processBatchTx = db.transaction(
       const domainId =
         (payload.sleepDomainId as string) ?? (payload.diaperDomainId as string) ?? null;
       // insert
-      const result = insertStmt.run(type, JSON.stringify(payload), clientId, clientEventId, domainId);
+      const result = insertStmt.run(
+        type,
+        JSON.stringify(payload),
+        clientId,
+        clientEventId,
+        domainId,
+      );
       const event: AppEvent = {
         id: result.lastInsertRowid as number,
         type,

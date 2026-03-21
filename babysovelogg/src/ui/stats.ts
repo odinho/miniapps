@@ -332,18 +332,17 @@ export async function renderStats(container: HTMLElement): Promise<void> {
 
     const cards: HTMLElement[] = [
       statCard(String(dStats7.perDay), "Bleier/dag (7d)"),
-      statCard(`${dStats7.wetCount}/${dStats7.dirtyCount}/${dStats7.bothCount}`, "Våt/Skitten/Begge"),
+      statCard(
+        `${dStats7.wetCount}/${dStats7.dirtyCount}/${dStats7.bothCount}`,
+        "Våt/Skitten/Begge",
+      ),
     ];
 
     if (dStats.pottyCount > 0 && dStats.pottySuccessRate != null) {
       cards.push(statCard(`${dStats.pottySuccessRate}%`, "Suksessrate do"));
     }
 
-    view.appendChild(
-      section("Bleie/Do", [
-        el("div", { className: "stats-row" }, cards),
-      ]),
-    );
+    view.appendChild(section("Bleie/Do", [el("div", { className: "stats-row" }, cards)]));
   }
 
   // 6. Export button

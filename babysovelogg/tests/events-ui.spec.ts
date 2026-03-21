@@ -1,4 +1,13 @@
-import { test, expect, createBaby, setWakeUpTime, forceMorning, generateId, generateSleepId, generateDiaperId } from "./fixtures";
+import {
+  test,
+  expect,
+  createBaby,
+  setWakeUpTime,
+  forceMorning,
+  generateId,
+  generateSleepId,
+  generateDiaperId,
+} from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await forceMorning(page);
@@ -17,10 +26,19 @@ test("GET /api/events with type filter narrows results", async ({ page }) => {
   setWakeUpTime(babyId);
 
   await postEvent(page, [
-    makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: generateSleepId() }),
+    makeEvent("sleep.started", {
+      babyId,
+      startTime: new Date().toISOString(),
+      sleepDomainId: generateSleepId(),
+    }),
   ]);
   await postEvent(page, [
-    makeEvent("diaper.logged", { babyId, time: new Date().toISOString(), type: "wet", diaperDomainId: generateDiaperId() }),
+    makeEvent("diaper.logged", {
+      babyId,
+      time: new Date().toISOString(),
+      type: "wet",
+      diaperDomainId: generateDiaperId(),
+    }),
   ]);
 
   const res = await page.request.get("/api/events?type=diaper.logged&limit=50");
@@ -39,11 +57,14 @@ test("GET /api/events with domainId filter returns entity events", async ({ page
   await postEvent(page, [
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
   ]);
+  await postEvent(page, [makeEvent("sleep.tagged", { sleepDomainId: did, mood: "calm" })]);
   await postEvent(page, [
-    makeEvent("sleep.tagged", { sleepDomainId: did, mood: "calm" }),
-  ]);
-  await postEvent(page, [
-    makeEvent("diaper.logged", { babyId, time: new Date().toISOString(), type: "wet", diaperDomainId: generateDiaperId() }),
+    makeEvent("diaper.logged", {
+      babyId,
+      time: new Date().toISOString(),
+      type: "wet",
+      diaperDomainId: generateDiaperId(),
+    }),
   ]);
 
   const res = await page.request.get(`/api/events?domainId=${did}&limit=50`);
@@ -59,7 +80,12 @@ test("GET /api/events with pagination returns correct total", async ({ page }) =
   await Promise.all(
     Array.from({ length: 5 }, () =>
       postEvent(page, [
-        makeEvent("diaper.logged", { babyId, time: new Date().toISOString(), type: "wet", diaperDomainId: generateDiaperId() }),
+        makeEvent("diaper.logged", {
+          babyId,
+          time: new Date().toISOString(),
+          type: "wet",
+          diaperDomainId: generateDiaperId(),
+        }),
       ]),
     ),
   );
@@ -76,7 +102,12 @@ test("Events screen renders with recent events", async ({ page }) => {
   setWakeUpTime(babyId);
 
   await postEvent(page, [
-    makeEvent("diaper.logged", { babyId, time: new Date().toISOString(), type: "wet", diaperDomainId: generateDiaperId() }),
+    makeEvent("diaper.logged", {
+      babyId,
+      time: new Date().toISOString(),
+      type: "wet",
+      diaperDomainId: generateDiaperId(),
+    }),
   ]);
 
   await page.goto("/#/events");
@@ -90,7 +121,12 @@ test("Tap event card expands payload", async ({ page }) => {
   setWakeUpTime(babyId);
 
   await postEvent(page, [
-    makeEvent("diaper.logged", { babyId, time: new Date().toISOString(), type: "wet", diaperDomainId: generateDiaperId() }),
+    makeEvent("diaper.logged", {
+      babyId,
+      time: new Date().toISOString(),
+      type: "wet",
+      diaperDomainId: generateDiaperId(),
+    }),
   ]);
 
   await page.goto("/#/events");

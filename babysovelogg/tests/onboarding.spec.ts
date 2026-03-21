@@ -45,12 +45,14 @@ test("Sleep tracking flow after onboarding", async ({ page, request }) => {
   // Create baby via API
   await request.post("/api/events", {
     data: {
-      events: [{
-        type: "baby.created",
-        payload: { name: "Halldis", birthdate: "2025-06-12" },
-        clientId: "test",
-        clientEventId: generateId(),
-      }],
+      events: [
+        {
+          type: "baby.created",
+          payload: { name: "Halldis", birthdate: "2025-06-12" },
+          clientId: "test",
+          clientEventId: generateId(),
+        },
+      ],
     },
   });
 

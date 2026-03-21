@@ -1,4 +1,14 @@
-import { test, expect, createBaby, setWakeUpTime, forceMorning, getDb, generateId, generateSleepId, generateDiaperId } from "./fixtures";
+import {
+  test,
+  expect,
+  createBaby,
+  setWakeUpTime,
+  forceMorning,
+  getDb,
+  generateId,
+  generateSleepId,
+  generateDiaperId,
+} from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await forceMorning(page);
@@ -38,7 +48,9 @@ test("POST with missing clientEventId returns 400", async ({ page }) => {
 test("POST with payload as string instead of object returns 400", async ({ page }) => {
   const res = await page.request.post("/api/events", {
     data: {
-      events: [{ type: "baby.created", payload: "not-object", clientId: "c", clientEventId: generateId() }],
+      events: [
+        { type: "baby.created", payload: "not-object", clientId: "c", clientEventId: generateId() },
+      ],
     },
   });
   expect(res.status()).toBe(400);
@@ -137,7 +149,8 @@ test("POST batch where one event is invalid returns 400, nothing written", async
   setWakeUpTime(babyId);
 
   const db = getDb();
-  const eventCountBefore = (db.prepare("SELECT COUNT(*) as c FROM events").get() as { c: number }).c;
+  const eventCountBefore = (db.prepare("SELECT COUNT(*) as c FROM events").get() as { c: number })
+    .c;
   db.close();
 
   const res = await page.request.post("/api/events", {
@@ -145,7 +158,11 @@ test("POST batch where one event is invalid returns 400, nothing written", async
       events: [
         {
           type: "sleep.started",
-          payload: { babyId, startTime: new Date().toISOString(), sleepDomainId: generateSleepId() },
+          payload: {
+            babyId,
+            startTime: new Date().toISOString(),
+            sleepDomainId: generateSleepId(),
+          },
           clientId: "c",
           clientEventId: generateId(),
         },
@@ -161,7 +178,8 @@ test("POST batch where one event is invalid returns 400, nothing written", async
   expect(res.status()).toBe(400);
 
   const db2 = getDb();
-  const eventCountAfter = (db2.prepare("SELECT COUNT(*) as c FROM events").get() as { c: number }).c;
+  const eventCountAfter = (db2.prepare("SELECT COUNT(*) as c FROM events").get() as { c: number })
+    .c;
   db2.close();
   expect(eventCountAfter).toBe(eventCountBefore);
 });
@@ -171,7 +189,8 @@ test("POST batch where projection fails midway returns 500, nothing written", as
   setWakeUpTime(babyId);
 
   const db = getDb();
-  const eventCountBefore = (db.prepare("SELECT COUNT(*) as c FROM events").get() as { c: number }).c;
+  const eventCountBefore = (db.prepare("SELECT COUNT(*) as c FROM events").get() as { c: number })
+    .c;
   db.close();
 
   // sleep.ended with nonexistent domain_id will throw during projection
@@ -180,7 +199,11 @@ test("POST batch where projection fails midway returns 500, nothing written", as
       events: [
         {
           type: "sleep.started",
-          payload: { babyId, startTime: new Date().toISOString(), sleepDomainId: generateSleepId() },
+          payload: {
+            babyId,
+            startTime: new Date().toISOString(),
+            sleepDomainId: generateSleepId(),
+          },
           clientId: "c",
           clientEventId: generateId(),
         },
@@ -196,7 +219,8 @@ test("POST batch where projection fails midway returns 500, nothing written", as
   expect(res.status()).toBe(500);
 
   const db2 = getDb();
-  const eventCountAfter = (db2.prepare("SELECT COUNT(*) as c FROM events").get() as { c: number }).c;
+  const eventCountAfter = (db2.prepare("SELECT COUNT(*) as c FROM events").get() as { c: number })
+    .c;
   db2.close();
   expect(eventCountAfter).toBe(eventCountBefore);
 });

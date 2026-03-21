@@ -11,7 +11,8 @@
     "lint": "oxlint src/ server/ tests/",
     "fmt": "oxfmt --write src/ server/ tests/ types.ts",
     "fmt:check": "oxfmt --check src/ server/ tests/ types.ts",
-    "check": "oxlint src/ server/ tests/ && oxfmt --check src/ server/ tests/ types.ts"
+    "typecheck": "tsgo --noEmit",
+    "check": "tsgo --noEmit && oxlint src/ server/ tests/ && oxfmt --check src/ server/ tests/ types.ts"
   },
   "dependencies": {
     "better-sqlite3": "^11.0.0",
@@ -20,6 +21,7 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@types/better-sqlite3": "^7.6.0",
+    "@typescript/native-preview": "^7.0.0-dev.20260321.1",
     "concurrently": "^9.0.0",
     "esbuild": "^0.24.0",
     "oxfmt": "^0.41.0",

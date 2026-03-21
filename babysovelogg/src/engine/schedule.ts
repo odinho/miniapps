@@ -155,10 +155,7 @@ export function detectNapTransition(
  * First WW is typically shorter, last WW is typically longer.
  * Returns a sparse array indexed by position (0-based).
  */
-function getPositionalWakeWindows(
-  recentSleeps?: SleepEntry[],
-  ageMonths?: number,
-): number[] {
+function getPositionalWakeWindows(recentSleeps?: SleepEntry[], ageMonths?: number): number[] {
   if (!recentSleeps || recentSleeps.length < 4) return [];
 
   const range = ageMonths != null ? findByAge(WAKE_WINDOWS, ageMonths) : null;
@@ -210,15 +207,15 @@ function getLearnedNapDuration(recentSleeps?: SleepEntry[], ageMonths?: number):
 
   if (!recentSleeps || recentSleeps.length === 0) return defaultDuration;
 
-  const naps = recentSleeps.filter(
-    (s) => s.type === "nap" && s.end_time,
-  );
+  const naps = recentSleeps.filter((s) => s.type === "nap" && s.end_time);
   if (naps.length < 3) return defaultDuration;
 
-  const durations = naps.map((s) => {
-    const dur = (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60000;
-    return dur;
-  }).filter((d) => d >= 10 && d <= 180); // Filter out unreasonable values
+  const durations = naps
+    .map((s) => {
+      const dur = (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60000;
+      return dur;
+    })
+    .filter((d) => d >= 10 && d <= 180); // Filter out unreasonable values
 
   if (durations.length < 3) return defaultDuration;
   return Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);

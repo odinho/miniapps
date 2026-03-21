@@ -3,13 +3,7 @@ import { getClientId } from "../sync.js";
 import { refreshState } from "../main.js";
 import { el, formatDuration, formatTime } from "./components.js";
 import { showConfirm } from "./toast.js";
-import {
-  MOODS,
-  METHODS,
-  MOOD_EMOJI,
-  METHOD_EMOJI,
-  FALL_ASLEEP_LABELS,
-} from "../constants.js";
+import { MOODS, METHODS, MOOD_EMOJI, METHOD_EMOJI, FALL_ASLEEP_LABELS } from "../constants.js";
 import { toLocal, toLocalDate } from "../utils.js";
 import type { SleepLogRow, SleepPauseRow, DiaperLogRow } from "../../types.js";
 const DIAPER_ICONS: Record<string, string> = {
@@ -426,7 +420,11 @@ export function showEditModal(entry: SleepLogRow, container: HTMLElement): void 
     );
     if (confirmed) {
       await postEvents([
-        { type: "sleep.deleted", payload: { sleepDomainId: entry.domain_id }, clientId: getClientId() },
+        {
+          type: "sleep.deleted",
+          payload: { sleepDomainId: entry.domain_id },
+          clientId: getClientId(),
+        },
       ]);
       close();
       await refreshState();
@@ -447,10 +445,14 @@ export function showEditModal(entry: SleepLogRow, container: HTMLElement): void 
 
   // Entity history link
   if (entry.domain_id) {
-    const historyLink = el("button", {
-      className: "btn btn-ghost",
-      style: { width: "100%", fontSize: "0.8rem", marginTop: "8px" },
-    }, ["Hendingslogg"]);
+    const historyLink = el(
+      "button",
+      {
+        className: "btn btn-ghost",
+        style: { width: "100%", fontSize: "0.8rem", marginTop: "8px" },
+      },
+      ["Hendingslogg"],
+    );
     historyLink.addEventListener("click", () => {
       close();
       window.location.hash = `#/events?domainId=${entry.domain_id}`;
@@ -583,7 +585,11 @@ function showDiaperEditModal(entry: DiaperLogRow, container: HTMLElement): void 
     );
     if (confirmed) {
       await postEvents([
-        { type: "diaper.deleted", payload: { diaperDomainId: entry.domain_id }, clientId: getClientId() },
+        {
+          type: "diaper.deleted",
+          payload: { diaperDomainId: entry.domain_id },
+          clientId: getClientId(),
+        },
       ]);
       close();
       await refreshState();
@@ -605,10 +611,14 @@ function showDiaperEditModal(entry: DiaperLogRow, container: HTMLElement): void 
 
   // Entity history link
   if (entry.domain_id) {
-    const historyLink = el("button", {
-      className: "btn btn-ghost",
-      style: { width: "100%", fontSize: "0.8rem", marginTop: "8px" },
-    }, ["Hendingslogg"]);
+    const historyLink = el(
+      "button",
+      {
+        className: "btn btn-ghost",
+        style: { width: "100%", fontSize: "0.8rem", marginTop: "8px" },
+      },
+      ["Hendingslogg"],
+    );
     historyLink.addEventListener("click", () => {
       close();
       window.location.hash = `#/events?domainId=${entry.domain_id}`;

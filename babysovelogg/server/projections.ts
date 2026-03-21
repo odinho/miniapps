@@ -45,7 +45,13 @@ export function applyEvent(event: AppEvent): void {
     case "sleep.started":
       db.prepare(
         "INSERT INTO sleep_log (baby_id, start_time, type, domain_id, created_by_event_id) VALUES (?, ?, ?, ?, ?)",
-      ).run(payload.babyId, payload.startTime, payload.type || "nap", payload.sleepDomainId, eventId);
+      ).run(
+        payload.babyId,
+        payload.startTime,
+        payload.type || "nap",
+        payload.sleepDomainId,
+        eventId,
+      );
       break;
 
     case "sleep.ended": {
@@ -185,7 +191,9 @@ export function applyEvent(event: AppEvent): void {
         )
         .run(payload.resumeTime, sleep.id);
       if (result.changes === 0) {
-        throw new Error(`sleep.resumed: no open pause found for domain_id ${payload.sleepDomainId}`);
+        throw new Error(
+          `sleep.resumed: no open pause found for domain_id ${payload.sleepDomainId}`,
+        );
       }
       break;
     }
@@ -305,7 +313,9 @@ export function rebuildAll(): RebuildReport {
     db.prepare("DELETE FROM day_start").run();
     db.prepare("DELETE FROM baby").run();
     // Reset autoincrement so replayed baby IDs match original payload references
-    db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('baby', 'sleep_log', 'diaper_log', 'sleep_pauses', 'day_start')").run();
+    db.prepare(
+      "DELETE FROM sqlite_sequence WHERE name IN ('baby', 'sleep_log', 'diaper_log', 'sleep_pauses', 'day_start')",
+    ).run();
     for (const row of events) {
       applyEvent({ ...row, payload: JSON.parse(row.payload) } as unknown as AppEvent);
     }

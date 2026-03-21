@@ -26,7 +26,9 @@ const isoDateTime = v.pipe(
 const domainId = v.pipe(
   v.string(),
   v.check(
-    (s) => /^(slp|dip|evt|cli)_[0-9a-z]+[A-Za-z0-9]+$/.test(s) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s),
+    (s) =>
+      /^(slp|dip|evt|cli)_[0-9a-z]+[A-Za-z0-9]+$/.test(s) ||
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s),
     "Invalid domain ID format",
   ),
 );
@@ -117,16 +119,21 @@ const payloadSchemas: Record<string, v.BaseSchema<unknown, unknown, v.BaseIssue<
 };
 
 function summarizeIssues(issues: v.BaseIssue<unknown>[]): string {
-  return issues.map((i) => `${i.path?.map((p) => p.key).join(".") || "root"}: ${i.message}`).join("; ");
+  return issues
+    .map((i) => `${i.path?.map((p) => p.key).join(".") || "root"}: ${i.message}`)
+    .join("; ");
 }
 
 /** Validate the entire POST body (envelope + payloads). Returns all errors or ok. */
-export function validateBatch(
-  body: unknown,
-):
+export function validateBatch(body: unknown):
   | {
       ok: true;
-      events: { type: string; payload: Record<string, unknown>; clientId: string; clientEventId: string }[];
+      events: {
+        type: string;
+        payload: Record<string, unknown>;
+        clientId: string;
+        clientEventId: string;
+      }[];
     }
   | { ok: false; errors: string[] } {
   // Level 1: validate body shape

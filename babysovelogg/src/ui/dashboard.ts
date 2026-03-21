@@ -176,7 +176,10 @@ export function renderDashboard(container: HTMLElement): void {
       const sleepSnapshot = currentState?.activeSleep
         ? { ...currentState.activeSleep }
         : { ...activeSleep };
-      await sendEvent("sleep.ended", { sleepDomainId: activeSleep.domain_id, endTime: new Date().toISOString() });
+      await sendEvent("sleep.ended", {
+        sleepDomainId: activeSleep.domain_id,
+        endTime: new Date().toISOString(),
+      });
       renderDashboard(container);
       showWakeUpSheet(activeSleep.domain_id, sleepSnapshot, container);
     } else {
@@ -898,7 +901,11 @@ function showTagSheet(sleepDomainId: string, container: HTMLElement): void {
   }
 }
 
-function showWakeUpSheet(sleepDomainId: string, sleepData: SleepLogRow, container: HTMLElement): void {
+function showWakeUpSheet(
+  sleepDomainId: string,
+  sleepData: SleepLogRow,
+  container: HTMLElement,
+): void {
   const overlay = el("div", { className: "modal-overlay", "data-testid": "modal-overlay" });
   const modal = el("div", { className: "modal tag-sheet" });
 

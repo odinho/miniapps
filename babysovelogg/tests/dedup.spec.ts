@@ -1,4 +1,13 @@
-import { test, expect, createBaby, setWakeUpTime, forceMorning, getDb, generateId, generateSleepId } from "./fixtures";
+import {
+  test,
+  expect,
+  createBaby,
+  setWakeUpTime,
+  forceMorning,
+  getDb,
+  generateId,
+  generateSleepId,
+} from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await forceMorning(page);
@@ -101,7 +110,12 @@ test("Batch with mix of new and duplicate events", async ({ page }) => {
       events: [
         {
           type: "sleep.started",
-          payload: { babyId, startTime: new Date().toISOString(), type: "nap", sleepDomainId: did1 },
+          payload: {
+            babyId,
+            startTime: new Date().toISOString(),
+            type: "nap",
+            sleepDomainId: did1,
+          },
           clientId,
           clientEventId: eid1,
         },
@@ -116,7 +130,12 @@ test("Batch with mix of new and duplicate events", async ({ page }) => {
       events: [
         {
           type: "sleep.started",
-          payload: { babyId, startTime: new Date().toISOString(), type: "nap", sleepDomainId: did1 },
+          payload: {
+            babyId,
+            startTime: new Date().toISOString(),
+            type: "nap",
+            sleepDomainId: did1,
+          },
           clientId,
           clientEventId: eid1,
         },
@@ -137,7 +156,11 @@ test("Batch with mix of new and duplicate events", async ({ page }) => {
 
 test("Verify envelope columns exist", async () => {
   const db = getDb();
-  const row = db.prepare("SELECT schema_version, correlation_id, caused_by_event_id, domain_id FROM events LIMIT 0").all();
+  const row = db
+    .prepare(
+      "SELECT schema_version, correlation_id, caused_by_event_id, domain_id FROM events LIMIT 0",
+    )
+    .all();
   expect(row).toBeDefined();
   db.close();
 });
