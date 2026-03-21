@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   parseTextDate,
   parseNumericDate,
-  parseNorwegianDate,
   containsDate,
   extractDateFromLine,
   formatDateNynorsk,

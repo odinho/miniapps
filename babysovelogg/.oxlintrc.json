@@ -3,8 +3,8 @@
   "plugins": null,
   "categories": {
     "correctness": "error",
-    "suspicious": "warn",
-    "perf": "warn"
+    "suspicious": "error",
+    "perf": "error"
   },
   "rules": {
     "@typescript-eslint/no-explicit-any": "error",

@@ -17,11 +17,6 @@ const MONTHS = {
   'desember': 11
 };
 
-const MONTHS_NYNORSK = {
-  ...MONTHS,
-  // Some nynorsk variations if needed
-};
-
 /**
  * Parse Norwegian text date like "1. januar 2026" or "1. januar"
  */
@@ -108,7 +103,7 @@ const WEEKDAYS = ['måndag', 'tysdag', 'onsdag', 'torsdag', 'fredag', 'laurdag',
  *   "21.01 - 26.01.2026 Phuket" -> { date: startDate, endDate, location: "Phuket", isRange: true }
  * Returns single object with range information
  */
-export function extractDateRangeFromLine(text, defaultYear = new Date().getFullYear()) {
+export function extractDateRangeFromLine(text, _defaultYear = new Date().getFullYear()) {
   const trimmed = text.trim();
 
   // Pattern: "21.01.2026 - 26.01.2026 Location" or "21.01 - 26.01.2026 Location"

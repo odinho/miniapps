@@ -4,8 +4,6 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import { createWriteStream } from 'fs';
-import { pipeline } from 'stream/promises';
 import { load } from 'cheerio';
 import crypto from 'crypto';
 

@@ -239,8 +239,6 @@ export function cleanHtml(html) {
   // Remove Google-specific classes
   $('[class]').each((i, el) => {
     const $el = $(el);
-    const classes = $el.attr('class');
-    // Keep only semantically meaningful classes if any
     $el.removeAttr('class');
   });
 
