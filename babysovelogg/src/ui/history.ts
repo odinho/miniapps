@@ -6,8 +6,9 @@ import { showConfirm } from './toast.js';
 
 const MOOD_EMOJI: Record<string, string> = { happy: '😊', normal: '😐', upset: '😢', fighting: '😤' };
 const METHOD_EMOJI: Record<string, string> = { bed: '🛏️', nursing: '🤱', held: '🤗', stroller: '🚼', car: '🚗', bottle: '🍼' };
-const DIAPER_ICONS: Record<string, string> = { wet: '💧', dirty: '💩', both: '💧💩', dry: '✨' };
-const DIAPER_LABELS: Record<string, string> = { wet: 'Våt', dirty: 'Skitten', both: 'Våt + skitten', dry: 'Tørr' };
+const DIAPER_ICONS: Record<string, string> = { wet: '💧', dirty: '💩', both: '💧💩', dry: '✨', potty_wet: '🚽', potty_dirty: '🚽', potty_nothing: '🚽', diaper_only: '🧷' };
+const DIAPER_LABELS: Record<string, string> = { wet: 'Våt', dirty: 'Skitten', both: 'Våt + skitten', dry: 'Tørr', potty_wet: 'Tiss på do', potty_dirty: 'Bæsj på do', potty_nothing: 'Ingenting på do', diaper_only: 'Berre bleie' };
+const DIAPER_STATUS_LABELS: Record<string, string> = { dry: 'Tørr bleie', damp: 'Litt våt bleie', wet: 'Våt bleie' };
 
 export async function renderHistory(container: HTMLElement): Promise<void> {
   container.innerHTML = '';
@@ -119,7 +120,15 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
         log.appendChild(item);
       } else {
         const icon = DIAPER_ICONS[entry.type] || '💩';
-        const meta = [DIAPER_LABELS[entry.type] || entry.type, entry.amount].filter(Boolean).join(' · ');
+        const isPotty = entry.type.startsWith('potty_') || entry.type === 'diaper_only';
+        const metaParts = [DIAPER_LABELS[entry.type] || entry.type];
+        if (isPotty && entry.amount && DIAPER_STATUS_LABELS[entry.amount]) {
+          metaParts.push(DIAPER_STATUS_LABELS[entry.amount]);
+        } else if (!isPotty && entry.amount) {
+          metaParts.push(entry.amount);
+        }
+        const meta = metaParts.join(' · ');
+        const categoryLabel = isPotty ? 'Do' : 'Bleie';
 
         const item = el('div', { className: 'sleep-log-item diaper-log-item' }, [
           el('span', { className: 'log-icon' }, [icon]),
@@ -127,7 +136,7 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
             el('div', { className: 'log-times' }, [formatTime(entry.time)]),
             el('div', { className: 'log-meta' }, [meta]),
           ]),
-          el('span', { className: 'log-duration' }, ['Bleie']),
+          el('span', { className: 'log-duration' }, [categoryLabel]),
         ]);
         item.addEventListener('click', () => showDiaperEditModal(entry, container));
         log.appendChild(item);

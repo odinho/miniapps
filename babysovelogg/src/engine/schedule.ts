@@ -46,15 +46,21 @@ export interface PredictedNap {
   endTime: string;
 }
 
+/** Get expected nap count, using custom override if set. */
+export function getExpectedNapCount(ageMonths: number, customNapCount?: number | null): number {
+  if (customNapCount != null) return customNapCount;
+  return findByAge(NAP_COUNTS, ageMonths).naps;
+}
+
 /** Predict all naps for the day based on wake-up time and recent sleep patterns. */
 export function predictDayNaps(
   wakeUpTime: string,
   ageMonths: number,
-  recentSleeps?: SleepEntry[]
+  recentSleeps?: SleepEntry[],
+  customNapCount?: number | null
 ): PredictedNap[] {
-  const napCount = findByAge(NAP_COUNTS, ageMonths);
   const ww = getWakeWindow(ageMonths, recentSleeps);
-  const expectedNaps = napCount.naps;
+  const expectedNaps = getExpectedNapCount(ageMonths, customNapCount);
   
   const predictions: PredictedNap[] = [];
   let currentWake = new Date(wakeUpTime);
@@ -79,8 +85,8 @@ export function predictDayNaps(
 }
 
 /** Recommend bedtime based on today's sleeps and age. */
-export function recommendBedtime(todaySleeps: SleepEntry[], ageMonths: number): string {
-  const napCount = findByAge(NAP_COUNTS, ageMonths);
+export function recommendBedtime(todaySleeps: SleepEntry[], ageMonths: number, customNapCount?: number | null): string {
+  const targetNaps = getExpectedNapCount(ageMonths, customNapCount);
 
   // If baby has had enough naps, recommend bedtime after last wake window
   const lastSleep = [...todaySleeps]
@@ -96,7 +102,7 @@ export function recommendBedtime(todaySleeps: SleepEntry[], ageMonths: number): 
 
   const ww = getWakeWindow(ageMonths);
   // Last wake window of the day is typically longer
-  const lastWWMultiplier = todaySleeps.length >= napCount.naps ? 1.15 : 1.0;
+  const lastWWMultiplier = todaySleeps.length >= targetNaps ? 1.15 : 1.0;
   const bedtime = new Date(
     new Date(lastSleep.end_time).getTime() + ww * lastWWMultiplier * 60 * 1000
   );

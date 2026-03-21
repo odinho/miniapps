@@ -5,6 +5,7 @@ interface SleepBubble {
   endTime: Date | null;
   type: 'nap' | 'night';
   status: 'completed' | 'active' | 'predicted';
+  predictionIndex?: number;
 }
 
 interface ArcConfig {
@@ -73,9 +74,12 @@ export interface ArcInput {
   prediction: { nextNap: string; bedtime?: string; predictedNaps?: Array<{ startTime: string; endTime: string }> } | null;
   isNightMode: boolean;
   wakeUpTime?: string | null;
+  startTimeLabel?: string | null;
+  endTimeLabel?: string | null;
   onStartClick?: () => void;
   onEndClick?: () => void;
   onSleepClick?: (index: number) => void;
+  onPredictedNapClick?: (index: number) => void;
 }
 
 export function renderArc(input: ArcInput): SVGElement {
@@ -123,10 +127,10 @@ export function renderArc(input: ArcInput): SVGElement {
   const startIcon = isNight ? '🌙' : '☀️';
   const endIcon = isNight ? '☀️' : '🌙';
 
-  for (const [pt, icon, handler] of [
-    [startPt, startIcon, input.onStartClick],
-    [endPt, endIcon, input.onEndClick],
-  ] as [{ x: number; y: number }, string, (() => void) | undefined][]) {
+  for (const [pt, icon, handler, timeLabel] of [
+    [startPt, startIcon, input.onStartClick, input.startTimeLabel],
+    [endPt, endIcon, input.onEndClick, input.endTimeLabel],
+  ] as [{ x: number; y: number }, string, (() => void) | undefined, string | null | undefined][]) {
     const g = document.createElementNS(ns, 'g');
     g.setAttribute('class', 'arc-endpoint-icon');
     // Glow circle behind icon
@@ -143,6 +147,17 @@ export function renderArc(input: ArcInput): SVGElement {
     txt.setAttribute('dominant-baseline', 'middle');
     txt.textContent = icon;
     g.appendChild(txt);
+    // Time label below icon
+    if (timeLabel) {
+      const timeTxt = document.createElementNS(ns, 'text');
+      timeTxt.setAttribute('x', String(pt.x)); timeTxt.setAttribute('y', String(pt.y + 18));
+      timeTxt.setAttribute('font-size', '9');
+      timeTxt.setAttribute('text-anchor', 'middle');
+      timeTxt.setAttribute('fill', 'var(--text-light)');
+      timeTxt.setAttribute('font-family', 'var(--font)');
+      timeTxt.textContent = timeLabel;
+      g.appendChild(timeTxt);
+    }
     // Transparent tap target
     const tap = document.createElementNS(ns, 'circle');
     tap.setAttribute('cx', String(pt.x)); tap.setAttribute('cy', String(pt.y));
@@ -184,9 +199,9 @@ export function renderArc(input: ArcInput): SVGElement {
   }
 
   if (input.prediction?.predictedNaps && !input.activeSleep) {
-    for (const pred of input.prediction.predictedNaps) {
-      bubbles.push({ startTime: new Date(pred.startTime), endTime: new Date(pred.endTime), type: 'nap', status: 'predicted' });
-    }
+    input.prediction.predictedNaps.forEach((pred, idx) => {
+      bubbles.push({ startTime: new Date(pred.startTime), endTime: new Date(pred.endTime), type: 'nap', status: 'predicted', predictionIndex: idx });
+    });
   } else if (input.prediction?.nextNap && !input.activeSleep) {
     const predTime = new Date(input.prediction.nextNap);
     bubbles.push({ startTime: predTime, endTime: new Date(predTime.getTime() + 45 * 60000), type: 'nap', status: 'predicted' });
@@ -244,6 +259,19 @@ export function renderArc(input: ArcInput): SVGElement {
       tapPath.setAttribute('style', 'cursor:pointer');
       const idx = bubble.sleepIndex;
       tapPath.addEventListener('click', () => input.onSleepClick!(idx));
+      g.appendChild(tapPath);
+    }
+
+    // Tap target for predicted nap bubbles
+    if (bubble.status === 'predicted' && input.onPredictedNapClick && bubble.predictionIndex != null) {
+      const tapPath = document.createElementNS(ns, 'path');
+      tapPath.setAttribute('d', describeArc(cx, cy, r, startFrac, endFrac));
+      tapPath.setAttribute('fill', 'none');
+      tapPath.setAttribute('stroke', 'transparent');
+      tapPath.setAttribute('stroke-width', String(trackWidth + 16));
+      tapPath.setAttribute('style', 'cursor:pointer');
+      const predIdx = bubble.predictionIndex;
+      tapPath.addEventListener('click', () => input.onPredictedNapClick!(predIdx));
       g.appendChild(tapPath);
     }
 

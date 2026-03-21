@@ -73,6 +73,8 @@ try { db.exec('ALTER TABLE sleep_log ADD COLUMN method TEXT'); } catch {}
 try { db.exec('ALTER TABLE sleep_log ADD COLUMN fall_asleep_time TEXT'); } catch {}
 try { db.exec('ALTER TABLE sleep_log ADD COLUMN woke_by TEXT'); } catch {}
 try { db.exec('ALTER TABLE sleep_log ADD COLUMN wake_notes TEXT'); } catch {}
+try { db.exec('ALTER TABLE baby ADD COLUMN custom_nap_count INTEGER'); } catch {}
+try { db.exec('ALTER TABLE baby ADD COLUMN potty_mode INTEGER DEFAULT 0'); } catch {}
 
 /** Clean shutdown. Called on process exit. */
 export function closeDb() {

@@ -1,7 +1,7 @@
 import { getAppState, refreshState, setAppState } from '../main.js';
 import { postEvents } from '../api.js';
 import { queueEvent, getClientId } from '../sync.js';
-import { calculateAgeMonths, predictNextNap, NAP_COUNTS, findByAge } from '../engine/schedule.js';
+import { calculateAgeMonths, predictNextNap, NAP_COUNTS, findByAge, getExpectedNapCount } from '../engine/schedule.js';
 import { el, formatAge, formatDuration, formatDurationLong, renderTimer, renderTimerWithPauses, renderCountdown, formatTime } from './components.js';
 import { showToast } from './toast.js';
 import { renderArc } from './arc.js';
@@ -27,7 +27,7 @@ function classifySleepTypeByHour(): 'nap' | 'night' {
 }
 
 /** Smart classification: considers time-of-day, nap count, and last wake time. */
-function classifySleepType(todaySleeps: any[], ageMonths?: number): 'nap' | 'night' {
+function classifySleepType(todaySleeps: any[], ageMonths?: number, customNapCount?: number | null): 'nap' | 'night' {
   const hour = new Date().getHours();
   // Clear night (before 6am or after 8pm)
   if (hour < 6 || hour >= 20) return 'night';
@@ -35,9 +35,9 @@ function classifySleepType(todaySleeps: any[], ageMonths?: number): 'nap' | 'nig
   if (hour < 16) return 'nap';
   // Ambiguous zone (16:00–19:59): check if naps are done for the day
   if (ageMonths != null) {
-    const napCount = findByAge(NAP_COUNTS, ageMonths);
+    const expectedNaps = getExpectedNapCount(ageMonths, customNapCount);
     const completedNaps = todaySleeps.filter((s: any) => s.type === 'nap' && s.end_time).length;
-    if (completedNaps >= napCount.naps) return 'night';
+    if (completedNaps >= expectedNaps) return 'night';
   }
   // In the 16–18 range, if we haven't met nap count, still likely a nap
   if (hour < 18) return 'nap';
@@ -55,6 +55,28 @@ function calcPauseMs(pauses: any[]): number {
 }
 
 let cleanups: (() => void)[] = [];
+
+// Track dismissed predicted naps (resets daily)
+const DISMISSED_KEY = 'babysovelogg_dismissed_predictions';
+
+function getDismissedPredictions(): Set<number> {
+  try {
+    const stored = localStorage.getItem(DISMISSED_KEY);
+    if (!stored) return new Set();
+    const { date, indices } = JSON.parse(stored);
+    if (date !== new Date().toISOString().slice(0, 10)) return new Set();
+    return new Set(indices);
+  } catch { return new Set(); }
+}
+
+function dismissPrediction(index: number): void {
+  const dismissed = getDismissedPredictions();
+  dismissed.add(index);
+  localStorage.setItem(DISMISSED_KEY, JSON.stringify({
+    date: new Date().toISOString().slice(0, 10),
+    indices: [...dismissed],
+  }));
+}
 
 export function cleanupDashboard() {
   cleanups.forEach(fn => fn());
@@ -123,7 +145,7 @@ export function renderDashboard(container: HTMLElement): void {
       showWakeUpSheet(sleepId, sleepSnapshot, container);
     } else {
       // Start sleep — then show bedtime tag sheet
-      const type = classifySleepType(todaySleeps, ageMonths);
+      const type = classifySleepType(todaySleeps, ageMonths, baby.custom_nap_count);
       await sendEvent('sleep.started', { babyId: baby.id, startTime: new Date().toISOString(), type });
       renderDashboard(container);
       // Get the new active sleep ID from state
@@ -152,20 +174,34 @@ export function renderDashboard(container: HTMLElement): void {
 
   // 12-hour arc visualization
   const isNightMode = document.documentElement.getAttribute('data-theme') === 'night';
+
+  // Filter out dismissed predicted naps
+  const dismissed = getDismissedPredictions();
+  const filteredPrediction = prediction ? {
+    ...prediction,
+    predictedNaps: prediction.predictedNaps?.filter((_: any, i: number) => !dismissed.has(i)),
+  } : null;
+  // Keep the original prediction array for index mapping
+  const originalPredictedNaps = prediction?.predictedNaps || [];
+
   const arcSvg = renderArc({
     todaySleeps: todaySleeps.map((s: any) => ({ start_time: s.start_time, end_time: s.end_time, type: s.type })),
     activeSleep: activeSleep ? { start_time: activeSleep.start_time, type: activeSleep.type } : null,
-    prediction,
+    prediction: filteredPrediction,
     isNightMode,
     wakeUpTime: todayWakeUp?.wake_time,
+    startTimeLabel: isNightMode ? null : (todayWakeUp?.wake_time ? formatTime(todayWakeUp.wake_time) : null),
+    endTimeLabel: isNightMode ? null : (prediction?.bedtime ? '~' + formatTime(prediction.bedtime) : null),
     onSleepClick: (index: number) => {
       const sleep = todaySleeps[index];
       if (sleep) showEditModal(sleep, container);
     },
     onStartClick: () => {
       if (isNightMode) {
-        // Night start = bedtime was set, show details
-        showToast('Starten av natta', 'info');
+        // Night start = find the night sleep entry
+        const nightSleep = todaySleeps.find((s: any) => s.type === 'night');
+        if (nightSleep) showEditModal(nightSleep, container);
+        else showWakeUpPanel(baby, container);
       } else {
         // Day start = wake-up time, allow editing
         showWakeUpPanel(baby, container);
@@ -176,11 +212,22 @@ export function renderDashboard(container: HTMLElement): void {
         // Night end = morning wake-up
         showWakeUpPanel(baby, container);
       } else {
-        // Day end = bedtime info
-        if (prediction?.bedtime) {
-          showToast(`Leggetid: ${formatTime(prediction.bedtime)}`, 'info');
+        // Day end = bedtime. Show the night sleep entry if exists
+        const nightSleep = todaySleeps.find((s: any) => s.type === 'night');
+        if (nightSleep) {
+          showEditModal(nightSleep, container);
+        } else if (prediction?.bedtime) {
+          showToast(`Leggetid: ~${formatTime(prediction.bedtime)}`, 'info');
         }
       }
+    },
+    onPredictedNapClick: (filteredIndex: number) => {
+      // Map filtered index back to original prediction index
+      const filteredNaps = filteredPrediction?.predictedNaps || [];
+      const clickedNap = filteredNaps[filteredIndex];
+      if (!clickedNap) return;
+      const origIndex = originalPredictedNaps.findIndex((p: any) => p.startTime === clickedNap.startTime);
+      if (origIndex >= 0) showPredictedNapSheet(origIndex, clickedNap, baby, container);
     },
   });
   const arcContainer = el('div', { className: 'arc-container' });
@@ -302,8 +349,9 @@ export function renderDashboard(container: HTMLElement): void {
         await sendEvent('sleep.started', { babyId: baby.id, startTime: new Date().toISOString(), type: 'nap' });
         renderDashboard(container);
       });
-      const diaperBtn = el('button', { className: 'arc-action-btn diaper' }, ['🧷 Bleie']);
-      diaperBtn.addEventListener('click', () => showDiaperModal(baby, container));
+      const isPottyMode = baby.potty_mode === 1;
+      const diaperBtn = el('button', { className: 'arc-action-btn diaper' }, [isPottyMode ? '🚽 Do' : '🧷 Bleie']);
+      diaperBtn.addEventListener('click', () => isPottyMode ? showPottyModal(baby, container) : showDiaperModal(baby, container));
       arcActions.appendChild(napBtn);
       arcActions.appendChild(diaperBtn);
     }
@@ -588,14 +636,15 @@ function showTagSheet(sleepId: number, container: HTMLElement): void {
   const lastDiaper = appState?.lastDiaperTime;
   const twoHoursAgo = Date.now() - 2 * 3600000;
   if (!lastDiaper || new Date(lastDiaper).getTime() < twoHoursAgo) {
+    const isPotty = appState?.baby?.potty_mode === 1;
     const nudge = el('div', { className: 'diaper-nudge', style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px', padding: '10px 12px', background: 'var(--lavender)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', color: 'var(--text-light)', marginBottom: '12px' } }, [
-      '🧷 Inga bleie dei siste 2 timane',
+      isPotty ? '🚽 Ikkje vore på do dei siste 2 timane' : '🧷 Inga bleie dei siste 2 timane',
     ]);
-    const logDiaperBtn = el('button', { className: 'btn btn-ghost', style: { fontSize: '0.8rem', padding: '2px 10px' } }, ['Logg bleie']);
+    const logDiaperBtn = el('button', { className: 'btn btn-ghost', style: { fontSize: '0.8rem', padding: '2px 10px' } }, [isPotty ? 'Logg do' : 'Logg bleie']);
     logDiaperBtn.addEventListener('click', () => {
       close();
       const baby = appState?.baby;
-      if (baby) showDiaperModal(baby, container);
+      if (baby) isPotty ? showPottyModal(baby, container) : showDiaperModal(baby, container);
     });
     nudge.appendChild(logDiaperBtn);
     modal.appendChild(nudge);
@@ -824,6 +873,123 @@ function showDiaperModal(baby: any, container: HTMLElement): void {
       }]);
       setAppState(result.state);
       showToast('Bleie logga', 'success');
+      close();
+      renderDashboard(container);
+    } catch {
+      showToast('Klarte ikkje lagra', 'error');
+    }
+  });
+
+  cancelBtn.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  modal.appendChild(el('div', { className: 'btn-row' }, [cancelBtn, saveBtn]));
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  function close() { overlay.remove(); }
+}
+
+function showPredictedNapSheet(predIndex: number, pred: { startTime: string; endTime: string }, baby: any, container: HTMLElement): void {
+  const overlay = el('div', { className: 'modal-overlay', 'data-testid': 'modal-overlay' });
+  const modal = el('div', { className: 'modal tag-sheet' });
+
+  modal.appendChild(el('h2', null, ['Forventa lur']));
+  modal.appendChild(el('p', { style: { color: 'var(--text-light)', marginBottom: '16px' } }, [
+    `${formatTime(pred.startTime)} – ${formatTime(pred.endTime)}`,
+  ]));
+
+  const startBtn = el('button', { className: 'btn btn-primary' }, ['😴 Start no']);
+  const skipBtn = el('button', { className: 'btn btn-ghost' }, ['Skjer ikkje']);
+
+  startBtn.addEventListener('click', async () => {
+    close();
+    await sendEvent('sleep.started', { babyId: baby.id, startTime: new Date().toISOString(), type: 'nap' });
+    renderDashboard(container);
+    const newState = getAppState();
+    if (newState?.activeSleep?.id) showTagSheet(newState.activeSleep.id, container);
+  });
+
+  skipBtn.addEventListener('click', () => {
+    dismissPrediction(predIndex);
+    close();
+    renderDashboard(container);
+  });
+
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  modal.appendChild(el('div', { className: 'btn-row' }, [skipBtn, startBtn]));
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  function close() { overlay.remove(); }
+}
+
+function showPottyModal(baby: any, container: HTMLElement): void {
+  const overlay = el('div', { className: 'modal-overlay', 'data-testid': 'modal-overlay' });
+  const modal = el('div', { className: 'modal' });
+
+  let selectedResult = 'potty_wet';
+  const results = [
+    { value: 'potty_wet', label: '💧 Tiss' },
+    { value: 'potty_dirty', label: '💩 Bæsj' },
+    { value: 'potty_nothing', label: '∅ Ingenting' },
+    { value: 'diaper_only', label: '🧷 Ingen do' },
+  ];
+  const resultPills = results.map(r => {
+    const pill = el('button', { className: `type-pill ${selectedResult === r.value ? 'active' : ''}`, 'data-potty': r.value }, [r.label]);
+    pill.addEventListener('click', () => {
+      selectedResult = r.value;
+      resultPills.forEach((p, i) => p.className = `type-pill ${selectedResult === results[i].value ? 'active' : ''}`);
+      diaperStatusGroup.style.display = selectedResult === 'diaper_only' ? 'none' : '';
+    });
+    return pill;
+  });
+
+  let selectedDiaperStatus = 'dry';
+  const statuses = [
+    { value: 'dry', label: 'Tørr ✨' },
+    { value: 'damp', label: 'Litt 💧' },
+    { value: 'wet', label: 'Våt 💧💧' },
+  ];
+  const statusPills = statuses.map(s => {
+    const pill = el('button', { className: `type-pill ${selectedDiaperStatus === s.value ? 'active' : ''}` }, [s.label]);
+    pill.addEventListener('click', () => {
+      selectedDiaperStatus = s.value;
+      statusPills.forEach((p, i) => p.className = `type-pill ${selectedDiaperStatus === statuses[i].value ? 'active' : ''}`);
+    });
+    return pill;
+  });
+
+  const noteInput = el('input', { type: 'text', placeholder: 'Valfritt notat...' }) as HTMLInputElement;
+
+  modal.appendChild(el('h2', null, ['Logg dobesøk']));
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Resultat']), el('div', { className: 'type-pills diaper-type-pills' }, resultPills)]));
+
+  const diaperStatusGroup = el('div', { className: 'form-group' }, [
+    el('label', null, ['Bleie']),
+    el('div', { className: 'type-pills' }, statusPills),
+  ]);
+  modal.appendChild(diaperStatusGroup);
+  modal.appendChild(el('div', { className: 'form-group' }, [el('label', null, ['Notat']), noteInput]));
+
+  const saveBtn = el('button', { className: 'btn btn-primary' }, ['Lagra']);
+  const cancelBtn = el('button', { className: 'btn btn-ghost' }, ['Avbryt']);
+
+  saveBtn.addEventListener('click', async () => {
+    try {
+      const result = await postEvents([{
+        type: 'diaper.logged',
+        payload: {
+          babyId: baby.id,
+          time: new Date().toISOString(),
+          type: selectedResult,
+          amount: selectedResult === 'diaper_only' ? null : selectedDiaperStatus,
+          note: noteInput.value || undefined,
+        },
+        clientId: getClientId(),
+      }]);
+      setAppState(result.state);
+      showToast('Dobesøk logga', 'success');
       close();
       renderDashboard(container);
     } catch {

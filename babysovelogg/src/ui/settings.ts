@@ -32,6 +32,53 @@ export function renderSettings(container: HTMLElement, opts?: { onboarding?: boo
     el('div', { style: { fontSize: '0.75rem', color: 'var(--text-light)', marginTop: '4px' } }, ['Brukt for å rekna ut søvnbehov etter alder']),
   ]));
 
+  // Custom nap count pills (only when baby exists)
+  let selectedNapCount: number | null = baby?.custom_nap_count ?? null;
+  if (baby) {
+    const napOptions = [
+      { value: null, label: 'Auto' },
+      { value: 0, label: '0' },
+      { value: 1, label: '1' },
+      { value: 2, label: '2' },
+      { value: 3, label: '3' },
+      { value: 4, label: '4' },
+    ];
+    const napPills = napOptions.map(o => {
+      const pill = el('button', { className: `type-pill ${selectedNapCount === o.value ? 'active' : ''}` }, [o.label]);
+      pill.addEventListener('click', () => {
+        selectedNapCount = o.value;
+        napPills.forEach((p, i) => p.className = `type-pill ${selectedNapCount === napOptions[i].value ? 'active' : ''}`);
+      });
+      return pill;
+    });
+    form.appendChild(el('div', { className: 'form-group' }, [
+      el('label', null, ['Tal lurar per dag']),
+      el('div', { style: { fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '8px' } }, ['Overstyrer aldersbasert tal. Auto brukar standard for alderen.']),
+      el('div', { className: 'type-pills' }, napPills),
+    ]));
+  }
+
+  // Potty mode toggle (only when baby exists)
+  let pottyEnabled = baby?.potty_mode === 1;
+  if (baby) {
+    const pottyOptions = [
+      { value: false, label: '🧷 Bleie' },
+      { value: true, label: '🚽 Pottetrening' },
+    ];
+    const pottyPills = pottyOptions.map(o => {
+      const pill = el('button', { className: `type-pill ${pottyEnabled === o.value ? 'active' : ''}` }, [o.label]);
+      pill.addEventListener('click', () => {
+        pottyEnabled = o.value;
+        pottyPills.forEach((p, i) => p.className = `type-pill ${pottyEnabled === pottyOptions[i].value ? 'active' : ''}`);
+      });
+      return pill;
+    });
+    form.appendChild(el('div', { className: 'form-group' }, [
+      el('label', null, ['Bleie / potte']),
+      el('div', { className: 'type-pills' }, pottyPills),
+    ]));
+  }
+
   const saveBtn = el('button', { className: 'btn btn-primary' }, [isOnboarding ? 'Kom i gang ✨' : 'Lagra']);
 
   saveBtn.addEventListener('click', async () => {
@@ -45,7 +92,11 @@ export function renderSettings(container: HTMLElement, opts?: { onboarding?: boo
     }
 
     const eventType = baby ? 'baby.updated' : 'baby.created';
-    const payload = { name, birthdate };
+    const payload: any = { name, birthdate };
+    if (baby) {
+      payload.customNapCount = selectedNapCount;
+      payload.pottyMode = pottyEnabled;
+    }
 
     try {
       await postEvents([{ type: eventType, payload, clientId: getClientId() }]);

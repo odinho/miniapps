@@ -107,12 +107,13 @@ function getState() {
     const wakeTimeForPrediction = lastCompleted?.end_time || todayWakeUp?.wake_time;
     
     if (wakeTimeForPrediction) {
-      const bedtime = recommendBedtime(todaySleeps.map((s: any) => ({ start_time: s.start_time, end_time: s.end_time, type: s.type })), ageMonths);
-      
+      const customNaps = baby.custom_nap_count ?? null;
+      const bedtime = recommendBedtime(todaySleeps.map((s: any) => ({ start_time: s.start_time, end_time: s.end_time, type: s.type })), ageMonths, customNaps);
+
       // If no sleeps yet today and we have wake-up time, predict all naps for the day
       let predictedNaps = null;
       if (todaySleeps.length === 0 && todayWakeUp) {
-        predictedNaps = predictDayNaps(todayWakeUp.wake_time, ageMonths, recentSleeps.map((s: any) => ({ start_time: s.start_time, end_time: s.end_time, type: s.type })));
+        predictedNaps = predictDayNaps(todayWakeUp.wake_time, ageMonths, recentSleeps.map((s: any) => ({ start_time: s.start_time, end_time: s.end_time, type: s.type })), customNaps);
       }
       
       prediction = {

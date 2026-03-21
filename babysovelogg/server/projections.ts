@@ -18,6 +18,10 @@ export function applyEvent(event: AppEvent): void {
         db.prepare('UPDATE baby SET name = ? WHERE id = ?').run(payload.name, baby.id);
       if (payload.birthdate !== undefined)
         db.prepare('UPDATE baby SET birthdate = ? WHERE id = ?').run(payload.birthdate, baby.id);
+      if (payload.customNapCount !== undefined)
+        db.prepare('UPDATE baby SET custom_nap_count = ? WHERE id = ?').run(payload.customNapCount, baby.id);
+      if (payload.pottyMode !== undefined)
+        db.prepare('UPDATE baby SET potty_mode = ? WHERE id = ?').run(payload.pottyMode ? 1 : 0, baby.id);
       break;
     }
     
