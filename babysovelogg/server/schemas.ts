@@ -22,7 +22,14 @@ const isoDateTime = v.pipe(
     "Invalid ISO datetime string",
   ),
 );
-const uuid = v.pipe(v.string(), v.uuid());
+// Accept both new prefixed short IDs (slp_xxx, dip_xxx) and legacy UUIDs for replay
+const domainId = v.pipe(
+  v.string(),
+  v.check(
+    (s) => /^(slp|dip|evt|cli)_[0-9a-z]+[A-Za-z0-9]+$/.test(s) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s),
+    "Invalid domain ID format",
+  ),
+);
 
 // v.nullish allows both undefined and null — the client sends null for unset optional fields
 const optStr = v.nullish(v.string());
@@ -43,14 +50,14 @@ const payloadSchemas: Record<string, v.BaseSchema<unknown, unknown, v.BaseIssue<
     babyId: v.number(),
     startTime: isoDateTime,
     type: v.nullish(v.picklist(["nap", "night"])),
-    sleepDomainId: uuid,
+    sleepDomainId: domainId,
   }),
   "sleep.ended": v.object({
-    sleepDomainId: uuid,
+    sleepDomainId: domainId,
     endTime: isoDateTime,
   }),
   "sleep.updated": v.object({
-    sleepDomainId: uuid,
+    sleepDomainId: domainId,
     startTime: v.nullish(isoDateTime),
     endTime: v.nullish(isoDateTime),
     type: v.nullish(v.picklist(["nap", "night"])),
@@ -66,42 +73,42 @@ const payloadSchemas: Record<string, v.BaseSchema<unknown, unknown, v.BaseIssue<
     startTime: isoDateTime,
     endTime: isoDateTime,
     type: v.nullish(v.picklist(["nap", "night"])),
-    sleepDomainId: uuid,
+    sleepDomainId: domainId,
   }),
   "sleep.deleted": v.object({
-    sleepDomainId: uuid,
+    sleepDomainId: domainId,
   }),
   "sleep.tagged": v.object({
-    sleepDomainId: uuid,
+    sleepDomainId: domainId,
     mood: optStr,
     method: optStr,
     fallAsleepTime: optStr,
     notes: optStr,
   }),
   "sleep.paused": v.object({
-    sleepDomainId: uuid,
+    sleepDomainId: domainId,
     pauseTime: isoDateTime,
   }),
   "sleep.resumed": v.object({
-    sleepDomainId: uuid,
+    sleepDomainId: domainId,
     resumeTime: isoDateTime,
   }),
   "diaper.logged": v.object({
     babyId: v.number(),
     time: isoDateTime,
     type: v.string(),
-    diaperDomainId: uuid,
+    diaperDomainId: domainId,
     amount: optStr,
     note: optStr,
   }),
   "diaper.updated": v.object({
-    diaperDomainId: uuid,
+    diaperDomainId: domainId,
     type: optStr,
     amount: optStr,
     note: optStr,
   }),
   "diaper.deleted": v.object({
-    diaperDomainId: uuid,
+    diaperDomainId: domainId,
   }),
   "day.started": v.object({
     babyId: v.number(),

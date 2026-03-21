@@ -1,6 +1,7 @@
 import { getAppState, setAppState } from "../main.js";
 import { postEvents } from "../api.js";
-import { queueEvent, getClientId, generateId } from "../sync.js";
+import { queueEvent, getClientId } from "../sync.js";
+import { generateSleepId, generateDiaperId } from "../identity.js";
 import { getExpectedNapCount } from "../engine/schedule.js";
 import {
   el,
@@ -181,7 +182,7 @@ export function renderDashboard(container: HTMLElement): void {
     } else {
       // Start sleep — then show bedtime tag sheet
       const type = classifySleepType(todaySleeps, ageMonths, baby.custom_nap_count);
-      const sleepDomainId = generateId();
+      const sleepDomainId = generateSleepId();
       await sendEvent("sleep.started", {
         babyId: baby.id,
         startTime: new Date().toISOString(),
@@ -427,7 +428,7 @@ export function renderDashboard(container: HTMLElement): void {
           babyId: baby.id,
           startTime: new Date().toISOString(),
           type: "night",
-          sleepDomainId: generateId(),
+          sleepDomainId: generateSleepId(),
         });
         renderDashboard(container);
       });
@@ -459,7 +460,7 @@ export function renderDashboard(container: HTMLElement): void {
           babyId: baby.id,
           startTime: new Date().toISOString(),
           type: "nap",
-          sleepDomainId: generateId(),
+          sleepDomainId: generateSleepId(),
         });
         renderDashboard(container);
       });
@@ -1188,7 +1189,7 @@ function showDiaperModal(baby: Baby, container: HTMLElement): void {
             type: selectedType,
             amount: selectedAmount,
             note: noteInput.value || undefined,
-            diaperDomainId: generateId(),
+            diaperDomainId: generateDiaperId(),
           },
           clientId: getClientId(),
         },
@@ -1237,7 +1238,7 @@ function showPredictedNapSheet(
 
   startBtn.addEventListener("click", async () => {
     close();
-    const sleepDomainId = generateId();
+    const sleepDomainId = generateSleepId();
     await sendEvent("sleep.started", {
       babyId: baby.id,
       startTime: new Date().toISOString(),
@@ -1355,7 +1356,7 @@ function showPottyModal(baby: Baby, container: HTMLElement): void {
             type: selectedResult,
             amount: selectedResult === "diaper_only" ? null : selectedDiaperStatus,
             note: noteInput.value || undefined,
-            diaperDomainId: generateId(),
+            diaperDomainId: generateDiaperId(),
           },
           clientId: getClientId(),
         },
