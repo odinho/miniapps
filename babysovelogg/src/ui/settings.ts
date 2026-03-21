@@ -16,7 +16,7 @@ export function renderSettings(container: HTMLElement, opts?: { onboarding?: boo
 
   if (isOnboarding) {
     form.appendChild(el('div', { className: 'onboarding-icon' }, ['👶']));
-    form.appendChild(el('h1', null, ['Velkomen til Napper']));
+    form.appendChild(el('h1', null, ['Velkomen til Babysovelogg']));
     form.appendChild(el('p', { style: { color: 'var(--text-light)', marginBottom: '24px' } }, ['Fortel oss om den vesle, så kjem me i gang.']));
   } else {
     form.appendChild(el('h1', null, ['Innstillingar']));
@@ -73,7 +73,7 @@ export function renderSettings(container: HTMLElement, opts?: { onboarding?: boo
 
   // App info
   form.appendChild(el('div', { style: { marginTop: '32px', textAlign: 'center', color: 'var(--text-light)', fontSize: '0.75rem' } }, [
-    el('div', null, ['Napper v0.2']),
+    el('div', null, ['Babysovelogg v0.2']),
     el('div', { style: { marginTop: '4px' } }, ['Søvnsporing for den vesle']),
   ]));
 

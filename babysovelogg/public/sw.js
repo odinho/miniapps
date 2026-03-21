@@ -1,4 +1,4 @@
-const CACHE = 'napper-v1';
+const CACHE = 'babysovelogg-v1';
 const ASSETS = ['/', '/bundle.js', '/manifest.json'];
 
 self.addEventListener('install', e => {

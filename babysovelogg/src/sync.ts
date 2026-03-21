@@ -1,8 +1,8 @@
 import { postEvents, type AppState } from './api.js';
 
-const QUEUE_KEY = 'napper_event_queue';
-const CLIENT_ID_KEY = 'napper_client_id';
-const STATE_CACHE_KEY = 'napper_cached_state';
+const QUEUE_KEY = 'babysovelogg_event_queue';
+const CLIENT_ID_KEY = 'babysovelogg_client_id';
+const STATE_CACHE_KEY = 'babysovelogg_cached_state';
 
 function generateId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {

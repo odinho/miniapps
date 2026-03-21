@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
 test('Get Started button creates baby and navigates to dashboard', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { name: 'Velkomen til Napper' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Velkomen til Babysovelogg' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Kom i gang ✨' })).toBeVisible();
 
   await page.locator('input[type="text"]').fill('Halldis');
@@ -27,11 +27,11 @@ test('Get Started validates required fields', async ({ page }) => {
   await page.goto('/');
 
   await page.getByRole('button', { name: 'Kom i gang ✨' }).click();
-  await expect(page.getByRole('heading', { name: 'Velkomen til Napper' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Velkomen til Babysovelogg' })).toBeVisible();
 
   await page.locator('input[type="text"]').fill('Halldis');
   await page.getByRole('button', { name: 'Kom i gang ✨' }).click();
-  await expect(page.getByRole('heading', { name: 'Velkomen til Napper' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Velkomen til Babysovelogg' })).toBeVisible();
 
   await page.locator('input[type="date"]').fill('2025-06-12');
   await page.getByRole('button', { name: 'Kom i gang ✨' }).click();

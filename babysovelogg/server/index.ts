@@ -6,7 +6,7 @@ const PORT = parseInt(process.env.PORT || '3200');
 
 const server = createServer(handleRequest);
 server.listen(PORT, () => {
-  console.log(`🍼 Babysovelogg server running on http://localhost:${PORT}`);
+  console.log(`🍼 Babysovelogg running on http://localhost:${PORT}`);
 });
 
 // Graceful shutdown: close DB cleanly before exit

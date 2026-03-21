@@ -1,7 +1,7 @@
 import db from './db.js';
-import type { NapperEvent } from './events.js';
+import type { AppEvent } from './events.js';
 
-export function applyEvent(event: NapperEvent): void {
+export function applyEvent(event: AppEvent): void {
   const { type, payload } = event;
   
   switch (type) {

@@ -1,6 +1,6 @@
 {
-  "name": "Napper",
-  "short_name": "Napper",
+  "name": "Babysovelogg",
+  "short_name": "Babysovelogg",
   "description": "Baby sleep tracker",
   "start_url": "/",
   "display": "standalone",

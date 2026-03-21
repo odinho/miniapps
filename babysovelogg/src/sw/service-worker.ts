@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 declare const self: ServiceWorkerGlobalScope;
 
-const CACHE_NAME = "napper-v1";
+const CACHE_NAME = "babysovelogg-v1";
 const SHELL_ASSETS = [
   "/",
   "/index.html",

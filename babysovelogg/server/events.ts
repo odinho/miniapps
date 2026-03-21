@@ -1,6 +1,6 @@
 import db from './db.js';
 
-export interface NapperEvent {
+export interface AppEvent {
   id: number;
   type: string;
   payload: any;
@@ -20,7 +20,7 @@ const getAllEventsStmt = db.prepare(
   'SELECT * FROM events ORDER BY id ASC'
 );
 
-export function appendEvent(type: string, payload: any, clientId?: string): NapperEvent {
+export function appendEvent(type: string, payload: any, clientId?: string): AppEvent {
   const result = insertStmt.run(type, JSON.stringify(payload), clientId ?? null);
   return {
     id: result.lastInsertRowid as number,
@@ -31,7 +31,7 @@ export function appendEvent(type: string, payload: any, clientId?: string): Napp
   };
 }
 
-export function getEvents(since?: number): NapperEvent[] {
+export function getEvents(since?: number): AppEvent[] {
   const rows = since != null
     ? getEventsSinceStmt.all(since)
     : getAllEventsStmt.all();

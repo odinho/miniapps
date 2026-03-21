@@ -95,5 +95,5 @@ test('Pluralization: 2 naps shows "2 lurar"', async ({ page }) => {
 
 test('Redirects to settings when no baby exists', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Velkomen til Napper' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Velkomen til Babysovelogg' })).toBeVisible();
 });
