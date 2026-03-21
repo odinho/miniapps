@@ -1,7 +1,7 @@
 export function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
-  props?: Record<string, any> | null,
-  children?: (Node | string)[]
+  props?: Record<string, unknown> | null,
+  children?: (Node | string)[],
 ): HTMLElementTagNameMap[K] {
   const elem = document.createElement(tag);
   if (props) {
@@ -10,7 +10,7 @@ export function el<K extends keyof HTMLElementTagNameMap>(
       else if (k === "style" && typeof v === "object") Object.assign(elem.style, v);
       else if (k.startsWith("on") && typeof v === "function")
         elem.addEventListener(k.slice(2).toLowerCase(), v);
-      else if (k === "htmlFor") (elem as any).htmlFor = v;
+      else if (k === "htmlFor") (elem as HTMLLabelElement).htmlFor = String(v);
       else elem.setAttribute(k, String(v));
     }
   }
@@ -31,15 +31,16 @@ export function formatDuration(ms: number): string {
   return `${m}m`;
 }
 
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
 export function formatDurationLong(ms: number): string {
   if (ms < 0) ms = 0;
   const totalSec = Math.floor(ms / 1000);
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
-  return `${pad(m)}:${pad(s)}`;
+  if (h > 0) return `${h}:${pad2(m)}:${pad2(s)}`;
+  return `${pad2(m)}:${pad2(s)}`;
 }
 
 export function formatTime(date: Date | string): string {
@@ -61,7 +62,10 @@ export function formatAge(birthdate: string): string {
 }
 
 /** Returns a span that updates every second showing elapsed time from startTime. */
-export function renderTimer(startTime: string | Date): { element: HTMLSpanElement; stop: () => void } {
+export function renderTimer(startTime: string | Date): {
+  element: HTMLSpanElement;
+  stop: () => void;
+} {
   const start = typeof startTime === "string" ? new Date(startTime).getTime() : startTime.getTime();
   const span = el("span", { className: "countdown-value" });
 
@@ -75,7 +79,11 @@ export function renderTimer(startTime: string | Date): { element: HTMLSpanElemen
 }
 
 /** Returns a timer that subtracts pauseMs from elapsed, and freezes if currently paused. */
-export function renderTimerWithPauses(startTime: string | Date, getPauseMs: () => number, isPaused: boolean): { element: HTMLSpanElement; stop: () => void } {
+export function renderTimerWithPauses(
+  startTime: string | Date,
+  getPauseMs: () => number,
+  _isPaused: boolean,
+): { element: HTMLSpanElement; stop: () => void } {
   const start = typeof startTime === "string" ? new Date(startTime).getTime() : startTime.getTime();
   const span = el("span", { className: "countdown-value" });
 
@@ -90,8 +98,12 @@ export function renderTimerWithPauses(startTime: string | Date, getPauseMs: () =
 }
 
 /** Returns a span counting down to targetTime, updating every second. */
-export function renderCountdown(targetTime: string | Date): { element: HTMLSpanElement; stop: () => void } {
-  const target = typeof targetTime === "string" ? new Date(targetTime).getTime() : targetTime.getTime();
+export function renderCountdown(targetTime: string | Date): {
+  element: HTMLSpanElement;
+  stop: () => void;
+} {
+  const target =
+    typeof targetTime === "string" ? new Date(targetTime).getTime() : targetTime.getTime();
   const span = el("span", { className: "countdown-value" });
 
   const update = () => {

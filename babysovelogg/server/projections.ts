@@ -1,132 +1,199 @@
-import db from './db.js';
-import type { AppEvent } from './events.js';
+import db from "./db.js";
+import type { AppEvent } from "./events.js";
+import type { EventRow } from "../types.js";
 
 export function applyEvent(event: AppEvent): void {
   const { type, payload } = event;
-  
+
   switch (type) {
-    case 'baby.created':
+    case "baby.created":
       db.prepare(
-        `INSERT INTO baby (name, birthdate, created_at) VALUES (?, ?, datetime('now'))`
+        `INSERT INTO baby (name, birthdate, created_at) VALUES (?, ?, datetime('now'))`,
       ).run(payload.name, payload.birthdate);
       break;
-      
-    case 'baby.updated': {
-      const baby = db.prepare('SELECT * FROM baby ORDER BY id DESC LIMIT 1').get() as any;
+
+    case "baby.updated": {
+      const baby = db.prepare("SELECT id FROM baby ORDER BY id DESC LIMIT 1").get() as
+        | { id: number }
+        | undefined;
       if (!baby) break;
       if (payload.name !== undefined)
-        db.prepare('UPDATE baby SET name = ? WHERE id = ?').run(payload.name, baby.id);
+        db.prepare("UPDATE baby SET name = ? WHERE id = ?").run(payload.name, baby.id);
       if (payload.birthdate !== undefined)
-        db.prepare('UPDATE baby SET birthdate = ? WHERE id = ?').run(payload.birthdate, baby.id);
+        db.prepare("UPDATE baby SET birthdate = ? WHERE id = ?").run(payload.birthdate, baby.id);
       if (payload.customNapCount !== undefined)
-        db.prepare('UPDATE baby SET custom_nap_count = ? WHERE id = ?').run(payload.customNapCount, baby.id);
+        db.prepare("UPDATE baby SET custom_nap_count = ? WHERE id = ?").run(
+          payload.customNapCount,
+          baby.id,
+        );
       if (payload.pottyMode !== undefined)
-        db.prepare('UPDATE baby SET potty_mode = ? WHERE id = ?').run(payload.pottyMode ? 1 : 0, baby.id);
+        db.prepare("UPDATE baby SET potty_mode = ? WHERE id = ?").run(
+          payload.pottyMode ? 1 : 0,
+          baby.id,
+        );
       break;
     }
-    
-    case 'sleep.started':
-      db.prepare(
-        'INSERT INTO sleep_log (baby_id, start_time, type) VALUES (?, ?, ?)'
-      ).run(payload.babyId, payload.startTime, payload.type || 'nap');
+
+    case "sleep.started":
+      db.prepare("INSERT INTO sleep_log (baby_id, start_time, type) VALUES (?, ?, ?)").run(
+        payload.babyId,
+        payload.startTime,
+        payload.type || "nap",
+      );
       break;
-      
-    case 'sleep.ended': {
-      db.prepare(
-        'UPDATE sleep_log SET end_time = ? WHERE id = ?'
-      ).run(payload.endTime, payload.sleepId);
+
+    case "sleep.ended": {
+      db.prepare("UPDATE sleep_log SET end_time = ? WHERE id = ?").run(
+        payload.endTime,
+        payload.sleepId,
+      );
       break;
     }
-    
-    case 'sleep.updated': {
+
+    case "sleep.updated": {
       const sets: string[] = [];
-      const vals: any[] = [];
-      if (payload.startTime !== undefined) { sets.push('start_time = ?'); vals.push(payload.startTime); }
-      if (payload.endTime !== undefined) { sets.push('end_time = ?'); vals.push(payload.endTime); }
-      if (payload.type !== undefined) { sets.push('type = ?'); vals.push(payload.type); }
-      if (payload.notes !== undefined) { sets.push('notes = ?'); vals.push(payload.notes); }
-      if (payload.mood !== undefined) { sets.push('mood = ?'); vals.push(payload.mood); }
-      if (payload.method !== undefined) { sets.push('method = ?'); vals.push(payload.method); }
-      if (payload.fallAsleepTime !== undefined) { sets.push('fall_asleep_time = ?'); vals.push(payload.fallAsleepTime); }
-      if (payload.wokeBy !== undefined) { sets.push('woke_by = ?'); vals.push(payload.wokeBy); }
-      if (payload.wakeNotes !== undefined) { sets.push('wake_notes = ?'); vals.push(payload.wakeNotes); }
+      const vals: (string | number | null | undefined | unknown)[] = [];
+      if (payload.startTime !== undefined) {
+        sets.push("start_time = ?");
+        vals.push(payload.startTime);
+      }
+      if (payload.endTime !== undefined) {
+        sets.push("end_time = ?");
+        vals.push(payload.endTime);
+      }
+      if (payload.type !== undefined) {
+        sets.push("type = ?");
+        vals.push(payload.type);
+      }
+      if (payload.notes !== undefined) {
+        sets.push("notes = ?");
+        vals.push(payload.notes);
+      }
+      if (payload.mood !== undefined) {
+        sets.push("mood = ?");
+        vals.push(payload.mood);
+      }
+      if (payload.method !== undefined) {
+        sets.push("method = ?");
+        vals.push(payload.method);
+      }
+      if (payload.fallAsleepTime !== undefined) {
+        sets.push("fall_asleep_time = ?");
+        vals.push(payload.fallAsleepTime);
+      }
+      if (payload.wokeBy !== undefined) {
+        sets.push("woke_by = ?");
+        vals.push(payload.wokeBy);
+      }
+      if (payload.wakeNotes !== undefined) {
+        sets.push("wake_notes = ?");
+        vals.push(payload.wakeNotes);
+      }
       if (sets.length > 0) {
         vals.push(payload.sleepId);
-        db.prepare(`UPDATE sleep_log SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+        db.prepare(`UPDATE sleep_log SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
       }
       break;
     }
 
-    case 'sleep.manual':
+    case "sleep.manual":
       db.prepare(
-        'INSERT INTO sleep_log (baby_id, start_time, end_time, type) VALUES (?, ?, ?, ?)'
-      ).run(payload.babyId, payload.startTime, payload.endTime, payload.type || 'nap');
-      break;
-      
-    case 'sleep.deleted':
-      db.prepare('UPDATE sleep_log SET deleted = 1 WHERE id = ?').run(payload.sleepId);
+        "INSERT INTO sleep_log (baby_id, start_time, end_time, type) VALUES (?, ?, ?, ?)",
+      ).run(payload.babyId, payload.startTime, payload.endTime, payload.type || "nap");
       break;
 
-    case 'sleep.tagged': {
+    case "sleep.deleted":
+      db.prepare("UPDATE sleep_log SET deleted = 1 WHERE id = ?").run(payload.sleepId);
+      break;
+
+    case "sleep.tagged": {
       const sets: string[] = [];
-      const vals: any[] = [];
-      if (payload.mood !== undefined) { sets.push('mood = ?'); vals.push(payload.mood); }
-      if (payload.method !== undefined) { sets.push('method = ?'); vals.push(payload.method); }
-      if (payload.fallAsleepTime !== undefined) { sets.push('fall_asleep_time = ?'); vals.push(payload.fallAsleepTime); }
-      if (payload.notes !== undefined) { sets.push('notes = ?'); vals.push(payload.notes); }
+      const vals: (string | number | null | undefined | unknown)[] = [];
+      if (payload.mood !== undefined) {
+        sets.push("mood = ?");
+        vals.push(payload.mood);
+      }
+      if (payload.method !== undefined) {
+        sets.push("method = ?");
+        vals.push(payload.method);
+      }
+      if (payload.fallAsleepTime !== undefined) {
+        sets.push("fall_asleep_time = ?");
+        vals.push(payload.fallAsleepTime);
+      }
+      if (payload.notes !== undefined) {
+        sets.push("notes = ?");
+        vals.push(payload.notes);
+      }
       if (sets.length > 0) {
         vals.push(payload.sleepId);
-        db.prepare(`UPDATE sleep_log SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+        db.prepare(`UPDATE sleep_log SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
       }
       break;
     }
 
-    case 'sleep.paused': {
-      db.prepare(
-        'INSERT INTO sleep_pauses (sleep_id, pause_time) VALUES (?, ?)'
-      ).run(payload.sleepId, payload.pauseTime);
+    case "sleep.paused": {
+      db.prepare("INSERT INTO sleep_pauses (sleep_id, pause_time) VALUES (?, ?)").run(
+        payload.sleepId,
+        payload.pauseTime,
+      );
       break;
     }
 
-    case 'sleep.resumed': {
+    case "sleep.resumed": {
       db.prepare(
-        'UPDATE sleep_pauses SET resume_time = ? WHERE sleep_id = ? AND resume_time IS NULL'
+        "UPDATE sleep_pauses SET resume_time = ? WHERE sleep_id = ? AND resume_time IS NULL",
       ).run(payload.resumeTime, payload.sleepId);
       break;
     }
 
-    case 'diaper.logged':
+    case "diaper.logged":
       db.prepare(
-        'INSERT INTO diaper_log (baby_id, time, type, amount, note) VALUES (?, ?, ?, ?, ?)'
-      ).run(payload.babyId, payload.time, payload.type, payload.amount ?? null, payload.note ?? null);
+        "INSERT INTO diaper_log (baby_id, time, type, amount, note) VALUES (?, ?, ?, ?, ?)",
+      ).run(
+        payload.babyId,
+        payload.time,
+        payload.type,
+        payload.amount ?? null,
+        payload.note ?? null,
+      );
       break;
 
-    case 'diaper.updated': {
+    case "diaper.updated": {
       const sets: string[] = [];
-      const vals: any[] = [];
-      if (payload.type !== undefined) { sets.push('type = ?'); vals.push(payload.type); }
-      if (payload.amount !== undefined) { sets.push('amount = ?'); vals.push(payload.amount); }
-      if (payload.note !== undefined) { sets.push('note = ?'); vals.push(payload.note); }
+      const vals: (string | number | null | undefined | unknown)[] = [];
+      if (payload.type !== undefined) {
+        sets.push("type = ?");
+        vals.push(payload.type);
+      }
+      if (payload.amount !== undefined) {
+        sets.push("amount = ?");
+        vals.push(payload.amount);
+      }
+      if (payload.note !== undefined) {
+        sets.push("note = ?");
+        vals.push(payload.note);
+      }
       if (sets.length > 0) {
         vals.push(payload.diaperId);
-        db.prepare(`UPDATE diaper_log SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+        db.prepare(`UPDATE diaper_log SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
       }
       break;
     }
 
-    case 'diaper.deleted':
-      db.prepare('UPDATE diaper_log SET deleted = 1 WHERE id = ?').run(payload.diaperId);
+    case "diaper.deleted":
+      db.prepare("UPDATE diaper_log SET deleted = 1 WHERE id = ?").run(payload.diaperId);
       break;
 
-    case 'day.started': {
+    case "day.started": {
       // Use local date (not UTC) to determine the day
-      const wakeDate = new Date(payload.wakeTime);
+      const wakeDate = new Date(payload.wakeTime as string);
       const year = wakeDate.getFullYear();
-      const month = String(wakeDate.getMonth() + 1).padStart(2, '0');
-      const day = String(wakeDate.getDate()).padStart(2, '0');
+      const month = String(wakeDate.getMonth() + 1).padStart(2, "0");
+      const day = String(wakeDate.getDate()).padStart(2, "0");
       const dateStr = `${year}-${month}-${day}`;
       db.prepare(
-        'INSERT OR REPLACE INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)'
+        "INSERT OR REPLACE INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)",
       ).run(payload.babyId, dateStr, payload.wakeTime);
       break;
     }
@@ -134,12 +201,12 @@ export function applyEvent(event: AppEvent): void {
 }
 
 export function rebuildAll(): void {
-  db.prepare('DELETE FROM sleep_pauses').run();
-  db.prepare('DELETE FROM diaper_log').run();
-  db.prepare('DELETE FROM sleep_log').run();
-  db.prepare('DELETE FROM day_start').run();
-  db.prepare('DELETE FROM baby').run();
-  const events = db.prepare('SELECT * FROM events ORDER BY id ASC').all() as any[];
+  db.prepare("DELETE FROM sleep_pauses").run();
+  db.prepare("DELETE FROM diaper_log").run();
+  db.prepare("DELETE FROM sleep_log").run();
+  db.prepare("DELETE FROM day_start").run();
+  db.prepare("DELETE FROM baby").run();
+  const events = db.prepare("SELECT * FROM events ORDER BY id ASC").all() as EventRow[];
   for (const row of events) {
     applyEvent({ ...row, payload: JSON.parse(row.payload) });
   }

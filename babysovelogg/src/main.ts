@@ -1,11 +1,11 @@
-import { getState, setMutationHook, type AppState } from './api.js';
-import { flushQueue, cacheState, getCachedState, connectSSE, markLocalMutation } from './sync.js';
-import { injectStyles } from './ui/styles.js';
-import { renderDashboard, cleanupDashboard } from './ui/dashboard.js';
-import { renderHistory } from './ui/history.js';
-import { renderSettings } from './ui/settings.js';
-import { renderStats } from './ui/stats.js';
-import { el } from './ui/components.js';
+import { getState, setMutationHook, type AppState } from "./api.js";
+import { flushQueue, cacheState, getCachedState, connectSSE, markLocalMutation } from "./sync.js";
+import { injectStyles } from "./ui/styles.js";
+import { renderDashboard, cleanupDashboard } from "./ui/dashboard.js";
+import { renderHistory } from "./ui/history.js";
+import { renderSettings } from "./ui/settings.js";
+import { renderStats } from "./ui/stats.js";
+import { el } from "./ui/components.js";
 
 let currentState: AppState | null = null;
 
@@ -37,33 +37,47 @@ export function navigateTo(hash: string): void {
 async function main() {
   setMutationHook(markLocalMutation);
   injectStyles();
-  
-  const app = document.getElementById('app')!;
-  const content = el('div', { id: 'content', style: { flex: '1', overflow: 'hidden', display: 'flex', flexDirection: 'column' } });
+
+  const app = document.getElementById("app")!;
+  const content = el("div", {
+    id: "content",
+    style: { flex: "1", overflow: "hidden", display: "flex", flexDirection: "column" },
+  });
   app.appendChild(content);
 
   // Bottom nav
-  const nav = el('nav', { className: 'nav-bar' });
+  const nav = el("nav", { className: "nav-bar" });
   const tabs = [
-    { icon: '🏠', label: 'Heim', hash: '#/' },
-    { icon: '📋', label: 'Logg', hash: '#/history' },
-    { icon: '📊', label: 'Statistikk', hash: '#/stats' },
-    { icon: '⚙️', label: 'Innstillingar', hash: '#/settings' },
+    { icon: "🏠", label: "Heim", hash: "#/" },
+    { icon: "📋", label: "Logg", hash: "#/history" },
+    { icon: "📊", label: "Statistikk", hash: "#/stats" },
+    { icon: "⚙️", label: "Innstillingar", hash: "#/settings" },
   ];
   const tabButtons: HTMLButtonElement[] = [];
   for (const tab of tabs) {
-    const btn = el('button', { className: 'nav-tab' }, [
-      el('span', { className: 'nav-icon' }, [tab.icon]),
-      el('span', null, [tab.label]),
+    const btn = el("button", { className: "nav-tab" }, [
+      el("span", { className: "nav-icon" }, [tab.icon]),
+      el("span", null, [tab.label]),
     ]);
-    btn.addEventListener('click', () => { window.location.hash = tab.hash; });
+    btn.addEventListener("click", () => {
+      window.location.hash = tab.hash;
+    });
     tabButtons.push(btn);
     nav.appendChild(btn);
   }
   // Sync indicator dot (subtle, inside the nav)
-  const syncDot = el('span', { id: 'sync-dot' });
-  Object.assign(syncDot.style, { width: '6px', height: '6px', borderRadius: '50%', background: 'var(--success)', position: 'absolute', top: '8px', right: '8px', opacity: '0.6' });
-  nav.style.position = 'relative';
+  const syncDot = el("span", { id: "sync-dot" });
+  Object.assign(syncDot.style, {
+    width: "6px",
+    height: "6px",
+    borderRadius: "50%",
+    background: "var(--success)",
+    position: "absolute",
+    top: "8px",
+    right: "8px",
+    opacity: "0.6",
+  });
+  nav.style.position = "relative";
   nav.appendChild(syncDot);
   app.appendChild(nav);
 
@@ -75,23 +89,23 @@ async function main() {
   async function route() {
     const seq = ++routeSeq;
     cleanupDashboard(); // Stop any running timers/intervals from dashboard
-    const hash = window.location.hash || '#/';
-    if (!currentState?.baby && hash !== '#/settings') {
-      window.location.hash = '#/settings';
+    const hash = window.location.hash || "#/";
+    if (!currentState?.baby && hash !== "#/settings") {
+      window.location.hash = "#/settings";
       return;
     }
     tabButtons.forEach((btn, i) => {
-      btn.classList.toggle('active', hash === tabs[i].hash);
+      btn.classList.toggle("active", hash === tabs[i].hash);
     });
 
     switch (hash) {
-      case '#/history':
+      case "#/history":
         await renderHistory(content);
         break;
-      case '#/stats':
+      case "#/stats":
         await renderStats(content);
         break;
-      case '#/settings':
+      case "#/settings":
         renderSettings(content, { onboarding: !currentState?.baby });
         break;
       default:
@@ -100,18 +114,18 @@ async function main() {
 
     // Only animate if this is still the latest route
     if (seq === routeSeq) {
-      content.classList.remove('view-fade-in');
+      content.classList.remove("view-fade-in");
       // Force reflow to restart animation
       void content.offsetWidth;
-      content.classList.add('view-fade-in');
+      content.classList.add("view-fade-in");
     }
   }
 
-  window.addEventListener('hashchange', route);
+  window.addEventListener("hashchange", route);
   route();
 
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
   }
 
   // Real-time sync via SSE

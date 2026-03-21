@@ -1,15 +1,14 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import Database from "better-sqlite3";
+import path from "path";
 
-const dbPath = path.join(process.cwd(), 'db.sqlite');
+const dbPath = path.join(process.cwd(), "db.sqlite");
 
 const db = new Database(dbPath);
 // DELETE journal mode (SQLite default): writes go straight to the .db file.
 // No -wal/-shm files to manage, backup = copy one file.
 // WAL is pointless here — single server, 2-3 writes/day, no concurrent write pressure.
-db.pragma('journal_mode = DELETE');
-db.pragma('foreign_keys = ON');
+db.pragma("journal_mode = DELETE");
+db.pragma("foreign_keys = ON");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS events (
@@ -68,17 +67,33 @@ db.exec(`
 `);
 
 // Migrate: add columns if missing
-try { db.exec('ALTER TABLE sleep_log ADD COLUMN mood TEXT'); } catch {}
-try { db.exec('ALTER TABLE sleep_log ADD COLUMN method TEXT'); } catch {}
-try { db.exec('ALTER TABLE sleep_log ADD COLUMN fall_asleep_time TEXT'); } catch {}
-try { db.exec('ALTER TABLE sleep_log ADD COLUMN woke_by TEXT'); } catch {}
-try { db.exec('ALTER TABLE sleep_log ADD COLUMN wake_notes TEXT'); } catch {}
-try { db.exec('ALTER TABLE baby ADD COLUMN custom_nap_count INTEGER'); } catch {}
-try { db.exec('ALTER TABLE baby ADD COLUMN potty_mode INTEGER DEFAULT 0'); } catch {}
+try {
+  db.exec("ALTER TABLE sleep_log ADD COLUMN mood TEXT");
+} catch {}
+try {
+  db.exec("ALTER TABLE sleep_log ADD COLUMN method TEXT");
+} catch {}
+try {
+  db.exec("ALTER TABLE sleep_log ADD COLUMN fall_asleep_time TEXT");
+} catch {}
+try {
+  db.exec("ALTER TABLE sleep_log ADD COLUMN woke_by TEXT");
+} catch {}
+try {
+  db.exec("ALTER TABLE sleep_log ADD COLUMN wake_notes TEXT");
+} catch {}
+try {
+  db.exec("ALTER TABLE baby ADD COLUMN custom_nap_count INTEGER");
+} catch {}
+try {
+  db.exec("ALTER TABLE baby ADD COLUMN potty_mode INTEGER DEFAULT 0");
+} catch {}
 
 /** Clean shutdown. Called on process exit. */
 export function closeDb() {
-  try { db.close(); } catch {}
+  try {
+    db.close();
+  } catch {}
 }
 
 export default db;

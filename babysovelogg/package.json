@@ -7,7 +7,11 @@
     "start": "node dist/server.js",
     "build": "node esbuild.config.mjs",
     "dev": "concurrently \"tsx watch server/index.ts\" \"node esbuild.config.mjs --watch\"",
-    "test": "npx playwright test"
+    "test": "npx playwright test",
+    "lint": "oxlint src/ server/ tests/",
+    "fmt": "oxfmt --write src/ server/ tests/ types.ts",
+    "fmt:check": "oxfmt --check src/ server/ tests/ types.ts",
+    "check": "oxlint src/ server/ tests/ && oxfmt --check src/ server/ tests/ types.ts"
   },
   "dependencies": {
     "better-sqlite3": "^11.0.0"
@@ -17,6 +21,8 @@
     "@types/better-sqlite3": "^7.6.0",
     "concurrently": "^9.0.0",
     "esbuild": "^0.24.0",
+    "oxfmt": "^0.41.0",
+    "oxlint": "^1.56.0",
     "tsx": "^4.0.0",
     "typescript": "^5.7.0"
   }

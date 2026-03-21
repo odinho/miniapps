@@ -80,14 +80,16 @@ export function getWeekStats(sleeps: SleepEntry[]): WeekStats {
   }
 
   const days = [...byDate.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
+    .toSorted(([a], [b]) => a.localeCompare(b))
     .map(([date, daySleeps]) => ({ date, stats: getTodayStats(daySleeps) }));
 
   const count = days.length || 1;
-  const avgNapMinutesPerDay =
-    Math.round(days.reduce((sum, d) => sum + d.stats.totalNapMinutes, 0) / count);
-  const avgNightMinutesPerDay =
-    Math.round(days.reduce((sum, d) => sum + d.stats.totalNightMinutes, 0) / count);
+  const avgNapMinutesPerDay = Math.round(
+    days.reduce((sum, d) => sum + d.stats.totalNapMinutes, 0) / count,
+  );
+  const avgNightMinutesPerDay = Math.round(
+    days.reduce((sum, d) => sum + d.stats.totalNightMinutes, 0) / count,
+  );
   const avgNapsPerDay =
     Math.round((days.reduce((sum, d) => sum + d.stats.napCount, 0) / count) * 10) / 10;
 
@@ -98,7 +100,7 @@ export function getWeekStats(sleeps: SleepEntry[]): WeekStats {
 export function getAverageWakeWindow(sleeps: SleepEntry[]): number | null {
   const sorted = [...sleeps]
     .filter((s) => s.end_time)
-    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+    .toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
   if (sorted.length < 2) return null;
 

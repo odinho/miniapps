@@ -7,10 +7,10 @@ export function injectStyles(): void {
   setInterval(applyTheme, 60000);
 }
 
-export function applyTheme(forceMode?: 'day' | 'night'): void {
+export function applyTheme(forceMode?: "day" | "night"): void {
   const hour = new Date().getHours();
-  const mode = forceMode ?? (hour >= 6 && hour < 18 ? 'day' : 'night');
-  document.documentElement.setAttribute('data-theme', mode);
+  const mode = forceMode ?? (hour >= 6 && hour < 18 ? "day" : "night");
+  document.documentElement.setAttribute("data-theme", mode);
 }
 
 const CSS = `

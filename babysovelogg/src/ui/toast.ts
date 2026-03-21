@@ -35,22 +35,25 @@ let stylesInjected = false;
 
 function ensureContainer(): HTMLElement {
   if (!stylesInjected) {
-    const style = document.createElement('style');
+    const style = document.createElement("style");
     style.textContent = TOAST_STYLES;
     document.head.appendChild(style);
     stylesInjected = true;
   }
   if (!container || !document.body.contains(container)) {
-    container = document.createElement('div');
-    container.className = 'toast-container';
+    container = document.createElement("div");
+    container.className = "toast-container";
     document.body.appendChild(container);
   }
   return container;
 }
 
-export function showToast(message: string, type: 'error' | 'warning' | 'success' | 'info' = 'info'): void {
+export function showToast(
+  message: string,
+  type: "error" | "warning" | "success" | "info" = "info",
+): void {
   const c = ensureContainer();
-  const toast = document.createElement('div');
+  const toast = document.createElement("div");
   toast.className = `toast ${type}`;
   toast.textContent = message;
   c.appendChild(toast);
@@ -58,36 +61,40 @@ export function showToast(message: string, type: 'error' | 'warning' | 'success'
 }
 
 /** Styled confirm dialog replacement for native confirm(). Returns a Promise<boolean>. */
-export function showConfirm(message: string, confirmLabel = 'Delete', cancelLabel = 'Cancel'): Promise<boolean> {
+export function showConfirm(
+  message: string,
+  confirmLabel = "Delete",
+  cancelLabel = "Cancel",
+): Promise<boolean> {
   return new Promise((resolve) => {
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.style.alignItems = 'center';
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.style.borderRadius = '16px';
-    modal.style.maxWidth = '340px';
-    modal.style.textAlign = 'center';
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.style.alignItems = "center";
+    const modal = document.createElement("div");
+    modal.className = "modal";
+    modal.style.borderRadius = "16px";
+    modal.style.maxWidth = "340px";
+    modal.style.textAlign = "center";
 
-    const msg = document.createElement('p');
+    const msg = document.createElement("p");
     msg.textContent = message;
-    msg.style.fontSize = '1rem';
-    msg.style.marginBottom = '20px';
-    msg.style.lineHeight = '1.5';
+    msg.style.fontSize = "1rem";
+    msg.style.marginBottom = "20px";
+    msg.style.lineHeight = "1.5";
     modal.appendChild(msg);
 
-    const btnRow = document.createElement('div');
-    btnRow.className = 'btn-row';
+    const btnRow = document.createElement("div");
+    btnRow.className = "btn-row";
 
-    const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'btn btn-ghost';
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "btn btn-ghost";
     cancelBtn.textContent = cancelLabel;
-    cancelBtn.style.flex = '1';
+    cancelBtn.style.flex = "1";
 
-    const confirmBtn = document.createElement('button');
-    confirmBtn.className = 'btn btn-danger';
+    const confirmBtn = document.createElement("button");
+    confirmBtn.className = "btn btn-danger";
     confirmBtn.textContent = confirmLabel;
-    confirmBtn.style.flex = '1';
+    confirmBtn.style.flex = "1";
 
     btnRow.appendChild(cancelBtn);
     btnRow.appendChild(confirmBtn);
@@ -99,11 +106,16 @@ export function showConfirm(message: string, confirmLabel = 'Delete', cancelLabe
       overlay.remove();
       resolve(result);
     }
-    cancelBtn.addEventListener('click', () => close(false));
-    confirmBtn.addEventListener('click', () => close(true));
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(false); });
-    document.addEventListener('keydown', function handler(e) {
-      if (e.key === 'Escape') { close(false); document.removeEventListener('keydown', handler); }
+    cancelBtn.addEventListener("click", () => close(false));
+    confirmBtn.addEventListener("click", () => close(true));
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) close(false);
+    });
+    document.addEventListener("keydown", function handler(e) {
+      if (e.key === "Escape") {
+        close(false);
+        document.removeEventListener("keydown", handler);
+      }
     });
   });
 }

@@ -54,7 +54,7 @@ export const SLEEP_NEEDS: SleepNeed[] = [
 /** Find the matching range for a given age in months. */
 export function findByAge<T extends { minMonths: number; maxMonths: number }>(
   ranges: T[],
-  ageMonths: number
+  ageMonths: number,
 ): T {
   const match = ranges.find((r) => ageMonths >= r.minMonths && ageMonths < r.maxMonths);
   // Fallback to last range if older than defined

@@ -1,77 +1,96 @@
-import { test, expect, createBaby, setWakeUpTime, addCompletedSleep, getDb, forceHour, dismissSheet } from './fixtures';
+import {
+  test,
+  expect,
+  createBaby,
+  setWakeUpTime,
+  addCompletedSleep,
+  getDb,
+  forceHour,
+} from "./fixtures";
+import type { SleepLogRow } from "../types";
 
-test('After 20:00, sleep is classified as night', async ({ page }) => {
+test("After 20:00, sleep is classified as night", async ({ page }) => {
   await forceHour(page, 21);
-  const babyId = createBaby('Testa', '2025-06-12');
+  const babyId = createBaby("Testa", "2025-06-12");
   setWakeUpTime(babyId);
-  await page.goto('/');
+  await page.goto("/");
 
   // Start sleep at forced hour 21
-  await page.getByTestId('sleep-button').click();
-  await expect(page.getByTestId('sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
+  await page.getByTestId("sleep-button").click();
+  await expect(page.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 5000 });
 
   const db = getDb();
-  const sleep = db.prepare('SELECT * FROM sleep_log WHERE baby_id = ? ORDER BY id DESC LIMIT 1').get(babyId) as any;
-  expect(sleep.type).toBe('night');
+  const sleep = db
+    .prepare("SELECT * FROM sleep_log WHERE baby_id = ? ORDER BY id DESC LIMIT 1")
+    .get(babyId) as SleepLogRow;
+  expect(sleep.type).toBe("night");
   db.close();
 });
 
-test('Before 16:00, sleep is classified as nap', async ({ page }) => {
+test("Before 16:00, sleep is classified as nap", async ({ page }) => {
   await forceHour(page, 10);
-  const babyId = createBaby('Testa', '2025-06-12');
+  const babyId = createBaby("Testa", "2025-06-12");
   setWakeUpTime(babyId);
-  await page.goto('/');
+  await page.goto("/");
 
-  await page.getByTestId('sleep-button').click();
-  await expect(page.getByTestId('sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
+  await page.getByTestId("sleep-button").click();
+  await expect(page.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 5000 });
 
   const db = getDb();
-  const sleep = db.prepare('SELECT * FROM sleep_log WHERE baby_id = ? ORDER BY id DESC LIMIT 1').get(babyId) as any;
-  expect(sleep.type).toBe('nap');
+  const sleep = db
+    .prepare("SELECT * FROM sleep_log WHERE baby_id = ? ORDER BY id DESC LIMIT 1")
+    .get(babyId) as SleepLogRow;
+  expect(sleep.type).toBe("nap");
   db.close();
 });
 
-test('At 17:45 with nap quota met, sleep is classified as night', async ({ page }) => {
+test("At 17:45 with nap quota met, sleep is classified as night", async ({ page }) => {
   await forceHour(page, 17);
   // 9-month baby has 2 expected naps
-  const babyId = createBaby('Testa', '2025-06-12');
+  const babyId = createBaby("Testa", "2025-06-12");
   setWakeUpTime(babyId);
 
   // Add 2 completed naps to meet quota
   const now = new Date();
-  addCompletedSleep(babyId,
+  addCompletedSleep(
+    babyId,
     new Date(now.getTime() - 6 * 3600000).toISOString(),
     new Date(now.getTime() - 5 * 3600000).toISOString(),
-    'nap'
+    "nap",
   );
-  addCompletedSleep(babyId,
+  addCompletedSleep(
+    babyId,
     new Date(now.getTime() - 3 * 3600000).toISOString(),
     new Date(now.getTime() - 2 * 3600000).toISOString(),
-    'nap'
+    "nap",
   );
 
-  await page.goto('/');
-  await page.getByTestId('sleep-button').click();
-  await expect(page.getByTestId('sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
+  await page.goto("/");
+  await page.getByTestId("sleep-button").click();
+  await expect(page.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 5000 });
 
   const db = getDb();
-  const sleep = db.prepare('SELECT * FROM sleep_log WHERE baby_id = ? ORDER BY id DESC LIMIT 1').get(babyId) as any;
-  expect(sleep.type).toBe('night');
+  const sleep = db
+    .prepare("SELECT * FROM sleep_log WHERE baby_id = ? ORDER BY id DESC LIMIT 1")
+    .get(babyId) as SleepLogRow;
+  expect(sleep.type).toBe("night");
   db.close();
 });
 
-test('At 17:00 with nap quota NOT met, sleep is classified as nap', async ({ page }) => {
+test("At 17:00 with nap quota NOT met, sleep is classified as nap", async ({ page }) => {
   await forceHour(page, 17);
   // 9-month baby has 2 expected naps, 0 completed
-  const babyId = createBaby('Testa', '2025-06-12');
+  const babyId = createBaby("Testa", "2025-06-12");
   setWakeUpTime(babyId);
 
-  await page.goto('/');
-  await page.getByTestId('sleep-button').click();
-  await expect(page.getByTestId('sleep-button')).toHaveClass(/sleeping/, { timeout: 5000 });
+  await page.goto("/");
+  await page.getByTestId("sleep-button").click();
+  await expect(page.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 5000 });
 
   const db = getDb();
-  const sleep = db.prepare('SELECT * FROM sleep_log WHERE baby_id = ? ORDER BY id DESC LIMIT 1').get(babyId) as any;
-  expect(sleep.type).toBe('nap');
+  const sleep = db
+    .prepare("SELECT * FROM sleep_log WHERE baby_id = ? ORDER BY id DESC LIMIT 1")
+    .get(babyId) as SleepLogRow;
+  expect(sleep.type).toBe("nap");
   db.close();
 });

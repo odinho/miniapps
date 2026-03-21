@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": null,
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "perf": "warn"
+  },
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "error",
+    "oxc/no-map-spread": "off",
+    "no-extend-native": "off",
+    "no-empty-pattern": "off"
+  },
+  "ignorePatterns": ["dist/", "node_modules/"]
+}

@@ -1,26 +1,25 @@
-import db from './db.js';
+import db from "./db.js";
+import type { EventRow } from "../types.js";
 
 export interface AppEvent {
   id: number;
   type: string;
-  payload: any;
+  payload: Record<string, unknown>;
   client_id: string | null;
   timestamp: string;
 }
 
-const insertStmt = db.prepare(
-  'INSERT INTO events (type, payload, client_id) VALUES (?, ?, ?)'
-);
+const insertStmt = db.prepare("INSERT INTO events (type, payload, client_id) VALUES (?, ?, ?)");
 
-const getEventsSinceStmt = db.prepare(
-  'SELECT * FROM events WHERE id > ? ORDER BY id ASC'
-);
+const getEventsSinceStmt = db.prepare("SELECT * FROM events WHERE id > ? ORDER BY id ASC");
 
-const getAllEventsStmt = db.prepare(
-  'SELECT * FROM events ORDER BY id ASC'
-);
+const getAllEventsStmt = db.prepare("SELECT * FROM events ORDER BY id ASC");
 
-export function appendEvent(type: string, payload: any, clientId?: string): AppEvent {
+export function appendEvent(
+  type: string,
+  payload: Record<string, unknown>,
+  clientId?: string,
+): AppEvent {
   const result = insertStmt.run(type, JSON.stringify(payload), clientId ?? null);
   return {
     id: result.lastInsertRowid as number,
@@ -32,11 +31,8 @@ export function appendEvent(type: string, payload: any, clientId?: string): AppE
 }
 
 export function getEvents(since?: number): AppEvent[] {
-  const rows = since != null
-    ? getEventsSinceStmt.all(since)
-    : getAllEventsStmt.all();
-  return (rows as any[]).map(r => ({
-    ...r,
-    payload: JSON.parse(r.payload),
-  }));
+  const rows = since != null ? getEventsSinceStmt.all(since) : getAllEventsStmt.all();
+  return (rows as EventRow[]).map(
+    (r) => Object.assign(r, { payload: JSON.parse(r.payload) }) as unknown as AppEvent,
+  );
 }

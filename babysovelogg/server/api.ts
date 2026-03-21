@@ -1,38 +1,49 @@
-import { IncomingMessage, ServerResponse } from 'node:http';
-import { readFile } from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import db from './db.js';
-import { appendEvent, getEvents } from './events.js';
-import { applyEvent } from './projections.js';
-import { calculateAgeMonths, predictNextNap, recommendBedtime, predictDayNaps } from '../src/engine/schedule.js';
-import { getTodayStats } from '../src/engine/stats.js';
+import { IncomingMessage, ServerResponse } from "node:http";
+import { readFile } from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
+import db from "./db.js";
+import { appendEvent, getEvents } from "./events.js";
+import { applyEvent } from "./projections.js";
+import {
+  calculateAgeMonths,
+  predictNextNap,
+  recommendBedtime,
+  predictDayNaps,
+} from "../src/engine/schedule.js";
+import { getTodayStats } from "../src/engine/stats.js";
+import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow } from "../types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // SSE connected clients
 const sseClients = new Set<ServerResponse>();
 
-function broadcast(eventType: string, data: any) {
+function broadcast(eventType: string, data: Record<string, unknown>) {
   const msg = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const client of sseClients) {
-    try { client.write(msg); } catch { sseClients.delete(client); }
+    try {
+      client.write(msg);
+    } catch {
+      sseClients.delete(client);
+    }
   }
 }
-const distDir = process.env.NODE_ENV === 'production' ? __dirname : path.join(__dirname, '..', 'dist');
+const distDir =
+  process.env.NODE_ENV === "production" ? __dirname : path.join(__dirname, "..", "dist");
 
 const MIME: Record<string, string> = {
-  '.html': 'text/html',
-  '.js': 'text/javascript',
-  '.css': 'text/css',
-  '.json': 'application/json',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
+  ".html": "text/html",
+  ".js": "text/javascript",
+  ".css": "text/css",
+  ".json": "application/json",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
 };
 
-function json(res: ServerResponse, data: any, status = 200) {
-  res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+function json(res: ServerResponse, data: unknown, status = 200) {
+  res.writeHead(status, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
   res.end(JSON.stringify(data));
 }
 
@@ -40,148 +51,199 @@ async function serveStatic(res: ServerResponse, filePath: string) {
   try {
     const data = await readFile(filePath);
     const ext = path.extname(filePath);
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+    res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream" });
     res.end(data);
   } catch {
     res.writeHead(404);
-    res.end('Not found');
+    res.end("Not found");
   }
 }
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    req.on('data', c => chunks.push(c));
-    req.on('end', () => resolve(Buffer.concat(chunks).toString()));
-    req.on('error', reject);
+    req.on("data", (c) => chunks.push(c));
+    req.on("end", () => resolve(Buffer.concat(chunks).toString()));
+    req.on("error", reject);
   });
 }
 
 function getState() {
-  const baby = db.prepare('SELECT * FROM baby ORDER BY id DESC LIMIT 1').get() as any;
-  if (!baby) return { baby: null, activeSleep: null, todaySleeps: [], stats: null, prediction: null };
-  
-  let activeSleep = db.prepare(
-    'SELECT * FROM sleep_log WHERE baby_id = ? AND end_time IS NULL AND deleted = 0 ORDER BY id DESC LIMIT 1'
-  ).get(baby.id) as any;
-  
+  const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby | undefined;
+  if (!baby)
+    return { baby: null, activeSleep: null, todaySleeps: [], stats: null, prediction: null };
+
+  let activeSleep = db
+    .prepare(
+      "SELECT * FROM sleep_log WHERE baby_id = ? AND end_time IS NULL AND deleted = 0 ORDER BY id DESC LIMIT 1",
+    )
+    .get(baby.id) as SleepLogRow | undefined;
+
   if (activeSleep) {
-    const pauses = db.prepare(
-      'SELECT * FROM sleep_pauses WHERE sleep_id = ? ORDER BY pause_time ASC'
-    ).all(activeSleep.id) as any[];
+    const pauses = db
+      .prepare("SELECT * FROM sleep_pauses WHERE sleep_id = ? ORDER BY pause_time ASC")
+      .all(activeSleep.id) as SleepPauseRow[];
     activeSleep = { ...activeSleep, pauses };
   }
-  
+
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   // Use local date to match the projection logic
   const year = todayStart.getFullYear();
-  const month = String(todayStart.getMonth() + 1).padStart(2, '0');
-  const day = String(todayStart.getDate()).padStart(2, '0');
+  const month = String(todayStart.getMonth() + 1).padStart(2, "0");
+  const day = String(todayStart.getDate()).padStart(2, "0");
   const todayDateStr = `${year}-${month}-${day}`;
-  
-  const todaySleeps = db.prepare(
-    'SELECT * FROM sleep_log WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time DESC'
-  ).all(baby.id, todayStart.toISOString()) as any[];
-  
-  const todayWakeUp = db.prepare(
-    'SELECT * FROM day_start WHERE baby_id = ? AND date = ?'
-  ).get(baby.id, todayDateStr) as any;
-  
+
+  const todaySleeps = db
+    .prepare(
+      "SELECT * FROM sleep_log WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time DESC",
+    )
+    .all(baby.id, todayStart.toISOString()) as SleepLogRow[];
+
+  const todayWakeUp = db
+    .prepare("SELECT * FROM day_start WHERE baby_id = ? AND date = ?")
+    .get(baby.id, todayDateStr) as DayStartRow | undefined;
+
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
-  const recentSleeps = db.prepare(
-    'SELECT * FROM sleep_log WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time DESC'
-  ).all(baby.id, weekAgo) as any[];
-  
+  const recentSleeps = db
+    .prepare(
+      "SELECT * FROM sleep_log WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time DESC",
+    )
+    .all(baby.id, weekAgo) as SleepLogRow[];
+
   const ageMonths = calculateAgeMonths(baby.birthdate);
   // Include pauses in stats so pause time is subtracted from sleep duration
-  const todaySleepsWithPauses = todaySleeps.map((s: any) => {
-    const pauses = db.prepare('SELECT * FROM sleep_pauses WHERE sleep_id = ? ORDER BY pause_time ASC').all(s.id);
+  const todaySleepsWithPauses = todaySleeps.map((s) => {
+    const pauses = db
+      .prepare("SELECT * FROM sleep_pauses WHERE sleep_id = ? ORDER BY pause_time ASC")
+      .all(s.id) as SleepPauseRow[];
     return { start_time: s.start_time, end_time: s.end_time, type: s.type, pauses };
   });
   const stats = getTodayStats(todaySleepsWithPauses);
-  
+
   let prediction = null;
   if (!activeSleep) {
-    const lastCompleted = todaySleeps.find((s: any) => s.end_time);
+    const lastCompleted = todaySleeps.find((s) => s.end_time);
     const wakeTimeForPrediction = lastCompleted?.end_time || todayWakeUp?.wake_time;
-    
+
     if (wakeTimeForPrediction) {
       const customNaps = baby.custom_nap_count ?? null;
-      const bedtime = recommendBedtime(todaySleeps.map((s: any) => ({ start_time: s.start_time, end_time: s.end_time, type: s.type })), ageMonths, customNaps);
+      const bedtime = recommendBedtime(
+        todaySleeps.map((s) => ({ start_time: s.start_time, end_time: s.end_time, type: s.type })),
+        ageMonths,
+        customNaps,
+      );
 
       // If no sleeps yet today and we have wake-up time, predict all naps for the day
       let predictedNaps = null;
       if (todaySleeps.length === 0 && todayWakeUp) {
-        predictedNaps = predictDayNaps(todayWakeUp.wake_time, ageMonths, recentSleeps.map((s: any) => ({ start_time: s.start_time, end_time: s.end_time, type: s.type })), customNaps);
+        predictedNaps = predictDayNaps(
+          todayWakeUp.wake_time,
+          ageMonths,
+          recentSleeps.map((s) => ({
+            start_time: s.start_time,
+            end_time: s.end_time,
+            type: s.type,
+          })),
+          customNaps,
+        );
       }
-      
+
       prediction = {
-        nextNap: predictNextNap(wakeTimeForPrediction, ageMonths, recentSleeps.map((s: any) => ({ start_time: s.start_time, end_time: s.end_time, type: s.type }))),
+        nextNap: predictNextNap(
+          wakeTimeForPrediction,
+          ageMonths,
+          recentSleeps.map((s) => ({
+            start_time: s.start_time,
+            end_time: s.end_time,
+            type: s.type,
+          })),
+        ),
         bedtime,
         predictedNaps,
       };
     }
   }
-  
-  const todayDiapers = db.prepare(
-    'SELECT COUNT(*) as count FROM diaper_log WHERE baby_id = ? AND time >= ? AND deleted = 0'
-  ).get(baby.id, todayStart.toISOString()) as any;
+
+  const todayDiapers = db
+    .prepare(
+      "SELECT COUNT(*) as count FROM diaper_log WHERE baby_id = ? AND time >= ? AND deleted = 0",
+    )
+    .get(baby.id, todayStart.toISOString()) as { count: number } | undefined;
   const diaperCount = todayDiapers?.count ?? 0;
 
-  const lastDiaper = db.prepare(
-    'SELECT time FROM diaper_log WHERE baby_id = ? AND deleted = 0 ORDER BY time DESC LIMIT 1'
-  ).get(baby.id) as any;
+  const lastDiaper = db
+    .prepare(
+      "SELECT time FROM diaper_log WHERE baby_id = ? AND deleted = 0 ORDER BY time DESC LIMIT 1",
+    )
+    .get(baby.id) as { time: string } | undefined;
   const lastDiaperTime = lastDiaper?.time ?? null;
 
-  return { baby, activeSleep, todaySleeps, stats, prediction, ageMonths, diaperCount, lastDiaperTime, todayWakeUp };
+  return {
+    baby,
+    activeSleep,
+    todaySleeps,
+    stats,
+    prediction,
+    ageMonths,
+    diaperCount,
+    lastDiaperTime,
+    todayWakeUp,
+  };
 }
 
 export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
-  const url = new URL(req.url || '/', `http://${req.headers.host}`);
-  const method = req.method || 'GET';
-  
-  if (url.pathname.startsWith('/api/')) {
+  const url = new URL(req.url || "/", `http://${req.headers.host}`);
+  const method = req.method || "GET";
+
+  if (url.pathname.startsWith("/api/")) {
     console.log(`[${new Date().toISOString()}] ${method} ${url.pathname}`);
   }
-  
+
   // CORS preflight
-  if (method === 'OPTIONS') {
+  if (method === "OPTIONS") {
     res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
     });
     res.end();
     return;
   }
-  
+
   // SSE stream
-  if (url.pathname === '/api/stream' && method === 'GET') {
+  if (url.pathname === "/api/stream" && method === "GET") {
     res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "Access-Control-Allow-Origin": "*",
     });
     res.flushHeaders();
     sseClients.add(res);
-    const heartbeat = setInterval(() => { try { res.write(':\n\n'); } catch {} }, 30000);
-    req.on('close', () => { sseClients.delete(res); clearInterval(heartbeat); });
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(":\n\n");
+      } catch {}
+    }, 30000);
+    req.on("close", () => {
+      sseClients.delete(res);
+      clearInterval(heartbeat);
+    });
     return;
   }
 
   // API routes
-  if (url.pathname === '/api/state' && method === 'GET') {
+  if (url.pathname === "/api/state" && method === "GET") {
     return json(res, getState());
   }
-  
-  if (url.pathname === '/api/events' && method === 'GET') {
-    const since = url.searchParams.get('since');
+
+  if (url.pathname === "/api/events" && method === "GET") {
+    const since = url.searchParams.get("since");
     return json(res, getEvents(since ? parseInt(since) : undefined));
   }
-  
-  if (url.pathname === '/api/events' && method === 'POST') {
+
+  if (url.pathname === "/api/events" && method === "POST") {
     try {
       const body = JSON.parse(await readBody(req));
       const results = [];
@@ -191,51 +253,64 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
         results.push(event);
       }
       const state = getState();
-      broadcast('update', { state });
+      broadcast("update", { state });
       return json(res, { events: results, state });
-    } catch (err: any) {
-      console.error(`[ERROR] POST /api/events:`, err.message);
-      return json(res, { error: err.message }, 500);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[ERROR] POST /api/events:`, message);
+      return json(res, { error: message }, 500);
     }
   }
-  
-  if (url.pathname === '/api/sleeps' && method === 'GET') {
-    const baby = db.prepare('SELECT * FROM baby ORDER BY id DESC LIMIT 1').get() as any;
+
+  if (url.pathname === "/api/sleeps" && method === "GET") {
+    const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as
+      | Baby
+      | undefined;
     if (!baby) return json(res, []);
-    const from = url.searchParams.get('from');
-    const to = url.searchParams.get('to');
-    const limit = url.searchParams.get('limit') || '50';
-    let sql = 'SELECT * FROM sleep_log WHERE baby_id = ? AND deleted = 0';
-    const params: any[] = [baby.id];
-    if (from) { sql += ' AND start_time >= ?'; params.push(from); }
-    if (to) { sql += ' AND start_time <= ?'; params.push(to); }
-    sql += ' ORDER BY start_time DESC LIMIT ?';
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
+    const limit = url.searchParams.get("limit") || "50";
+    let sql = "SELECT * FROM sleep_log WHERE baby_id = ? AND deleted = 0";
+    const params: (string | number)[] = [baby.id];
+    if (from) {
+      sql += " AND start_time >= ?";
+      params.push(from);
+    }
+    if (to) {
+      sql += " AND start_time <= ?";
+      params.push(to);
+    }
+    sql += " ORDER BY start_time DESC LIMIT ?";
     params.push(parseInt(limit));
-    const sleeps = db.prepare(sql).all(...params) as any[];
+    const sleeps = db.prepare(sql).all(...params) as SleepLogRow[];
     for (const s of sleeps) {
-      s.pauses = db.prepare('SELECT * FROM sleep_pauses WHERE sleep_id = ? ORDER BY pause_time ASC').all(s.id);
+      s.pauses = db
+        .prepare("SELECT * FROM sleep_pauses WHERE sleep_id = ? ORDER BY pause_time ASC")
+        .all(s.id) as SleepPauseRow[];
     }
     return json(res, sleeps);
   }
-  
-  if (url.pathname === '/api/diapers' && method === 'GET') {
-    const baby = db.prepare('SELECT * FROM baby ORDER BY id DESC LIMIT 1').get() as any;
+
+  if (url.pathname === "/api/diapers" && method === "GET") {
+    const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as
+      | Baby
+      | undefined;
     if (!baby) return json(res, []);
-    const limit = url.searchParams.get('limit') || '50';
-    let sql = 'SELECT * FROM diaper_log WHERE baby_id = ? AND deleted = 0';
-    const params: any[] = [baby.id];
-    sql += ' ORDER BY time DESC LIMIT ?';
+    const limit = url.searchParams.get("limit") || "50";
+    let sql = "SELECT * FROM diaper_log WHERE baby_id = ? AND deleted = 0";
+    const params: (string | number)[] = [baby.id];
+    sql += " ORDER BY time DESC LIMIT ?";
     params.push(parseInt(limit));
     return json(res, db.prepare(sql).all(...params));
   }
 
   // Static files
   let filePath: string;
-  if (url.pathname === '/' || url.pathname === '/index.html') {
-    filePath = path.join(distDir, 'index.html');
+  if (url.pathname === "/" || url.pathname === "/index.html") {
+    filePath = path.join(distDir, "index.html");
   } else {
     filePath = path.join(distDir, url.pathname);
   }
-  
+
   return serveStatic(res, filePath);
 }

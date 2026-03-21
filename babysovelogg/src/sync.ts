@@ -1,17 +1,24 @@
-import { postEvents, type AppState } from './api.js';
+import { postEvents, type AppState } from "./api.js";
 
-const QUEUE_KEY = 'babysovelogg_event_queue';
-const CLIENT_ID_KEY = 'babysovelogg_client_id';
-const STATE_CACHE_KEY = 'babysovelogg_cached_state';
+const QUEUE_KEY = "babysovelogg_event_queue";
+const CLIENT_ID_KEY = "babysovelogg_client_id";
+const STATE_CACHE_KEY = "babysovelogg_cached_state";
+
+interface QueuedEvent {
+  type: string;
+  payload: Record<string, unknown>;
+  clientId: string;
+  timestamp: string;
+}
 
 function generateId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
   // Fallback for non-secure contexts (HTTP)
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
-    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
   });
 }
 
@@ -24,60 +31,74 @@ export function getClientId(): string {
   return id;
 }
 
-export function queueEvent(type: string, payload: any): void {
+export function queueEvent(type: string, payload: Record<string, unknown>): void {
   const queue = getQueue();
   queue.push({ type, payload, clientId: getClientId(), timestamp: new Date().toISOString() });
   localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
 }
 
-function getQueue(): any[] {
+function getQueue(): QueuedEvent[] {
   try {
-    return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
-  } catch { return []; }
+    return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]");
+  } catch {
+    return [];
+  }
 }
 
-export async function flushQueue(): Promise<any> {
+export async function flushQueue(): Promise<{ events: unknown[]; state: AppState } | null> {
   const queue = getQueue();
   if (queue.length === 0) return null;
   try {
     const result = await postEvents(queue);
-    localStorage.setItem(QUEUE_KEY, '[]');
+    localStorage.setItem(QUEUE_KEY, "[]");
     cacheState(result.state);
     return result;
   } catch {
-    return null;  // Still offline, keep queue
+    return null; // Still offline, keep queue
   }
 }
 
-export function cacheState(state: any): void {
+export function cacheState(state: AppState): void {
   localStorage.setItem(STATE_CACHE_KEY, JSON.stringify(state));
 }
 
-export function getCachedState(): any | null {
+export function getCachedState(): AppState | null {
   try {
-    return JSON.parse(localStorage.getItem(STATE_CACHE_KEY) || 'null');
-  } catch { return null; }
+    return JSON.parse(localStorage.getItem(STATE_CACHE_KEY) || "null");
+  } catch {
+    return null;
+  }
 }
 
 export function hasPendingEvents(): boolean {
   return getQueue().length > 0;
 }
 
-export type SSEStatus = 'connected' | 'reconnecting' | 'disconnected';
+export type SSEStatus = "connected" | "reconnecting" | "disconnected";
 
-let sseStatus: SSEStatus = 'disconnected';
-export function getSSEStatus(): SSEStatus { return sseStatus; }
+let sseStatus: SSEStatus = "disconnected";
+export function getSSEStatus(): SSEStatus {
+  return sseStatus;
+}
 
 // Suppress SSE re-renders briefly after local mutations
 let lastMutationTime = 0;
 const SSE_SUPPRESS_MS = 1000;
-export function markLocalMutation() { lastMutationTime = Date.now(); }
+export function markLocalMutation() {
+  lastMutationTime = Date.now();
+}
 
 export function connectSSE(onUpdate: (state: AppState) => void): () => void {
-  const es = new EventSource('/api/stream');
-  es.addEventListener('open', () => { sseStatus = 'connected'; updateSyncDot(); });
-  es.addEventListener('error', () => { sseStatus = 'reconnecting'; updateSyncDot(); });
-  es.addEventListener('update', (e: MessageEvent) => {
+  const es = new EventSource("/api/stream");
+  es.addEventListener("open", () => {
+    sseStatus = "connected";
+    updateSyncDot();
+  });
+  es.addEventListener("error", () => {
+    sseStatus = "reconnecting";
+    updateSyncDot();
+  });
+  es.addEventListener("update", (e: MessageEvent) => {
     try {
       const { state } = JSON.parse(e.data);
       if (!state) return;
@@ -86,16 +107,19 @@ export function connectSSE(onUpdate: (state: AppState) => void): () => void {
       onUpdate(state);
     } catch {}
   });
-  return () => { es.close(); sseStatus = 'disconnected'; };
+  return () => {
+    es.close();
+    sseStatus = "disconnected";
+  };
 }
 
 function updateSyncDot() {
-  const dot = document.getElementById('sync-dot');
+  const dot = document.getElementById("sync-dot");
   if (!dot) return;
-  if (sseStatus === 'connected') {
-    dot.style.display = 'none';
+  if (sseStatus === "connected") {
+    dot.style.display = "none";
   } else {
-    dot.style.display = 'block';
-    dot.style.background = sseStatus === 'reconnecting' ? '#ff9800' : '#999';
+    dot.style.display = "block";
+    dot.style.background = sseStatus === "reconnecting" ? "#ff9800" : "#999";
   }
 }

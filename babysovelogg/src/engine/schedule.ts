@@ -34,7 +34,7 @@ export function getWakeWindow(ageMonths: number, recentSleeps?: SleepEntry[]): n
 export function predictNextNap(
   lastWakeTime: string,
   ageMonths: number,
-  recentSleeps?: SleepEntry[]
+  recentSleeps?: SleepEntry[],
 ): string {
   const ww = getWakeWindow(ageMonths, recentSleeps);
   const wake = new Date(lastWakeTime);
@@ -57,41 +57,45 @@ export function predictDayNaps(
   wakeUpTime: string,
   ageMonths: number,
   recentSleeps?: SleepEntry[],
-  customNapCount?: number | null
+  customNapCount?: number | null,
 ): PredictedNap[] {
   const ww = getWakeWindow(ageMonths, recentSleeps);
   const expectedNaps = getExpectedNapCount(ageMonths, customNapCount);
-  
+
   const predictions: PredictedNap[] = [];
   let currentWake = new Date(wakeUpTime);
-  
+
   // Estimate nap duration based on age (younger babies = longer naps)
   const napDurationMinutes = ageMonths < 6 ? 60 : ageMonths < 12 ? 45 : 30;
-  
+
   for (let i = 0; i < expectedNaps; i++) {
     const napStart = new Date(currentWake.getTime() + ww * 60 * 1000);
     const napEnd = new Date(napStart.getTime() + napDurationMinutes * 60 * 1000);
-    
+
     predictions.push({
       startTime: napStart.toISOString(),
       endTime: napEnd.toISOString(),
     });
-    
+
     // Next wake window starts after this nap ends
     currentWake = napEnd;
   }
-  
+
   return predictions;
 }
 
 /** Recommend bedtime based on today's sleeps and age. */
-export function recommendBedtime(todaySleeps: SleepEntry[], ageMonths: number, customNapCount?: number | null): string {
+export function recommendBedtime(
+  todaySleeps: SleepEntry[],
+  ageMonths: number,
+  customNapCount?: number | null,
+): string {
   const targetNaps = getExpectedNapCount(ageMonths, customNapCount);
 
   // If baby has had enough naps, recommend bedtime after last wake window
   const lastSleep = [...todaySleeps]
     .filter((s) => s.end_time)
-    .sort((a, b) => new Date(b.end_time!).getTime() - new Date(a.end_time!).getTime())[0];
+    .toSorted((a, b) => new Date(b.end_time!).getTime() - new Date(a.end_time!).getTime())[0];
 
   if (!lastSleep?.end_time) {
     // Default: 19:00 today
@@ -104,7 +108,7 @@ export function recommendBedtime(todaySleeps: SleepEntry[], ageMonths: number, c
   // Last wake window of the day is typically longer
   const lastWWMultiplier = todaySleeps.length >= targetNaps ? 1.15 : 1.0;
   const bedtime = new Date(
-    new Date(lastSleep.end_time).getTime() + ww * lastWWMultiplier * 60 * 1000
+    new Date(lastSleep.end_time).getTime() + ww * lastWWMultiplier * 60 * 1000,
   );
 
   // Clamp bedtime between 18:00 and 20:30
@@ -117,12 +121,12 @@ export function recommendBedtime(todaySleeps: SleepEntry[], ageMonths: number, c
 
 /** Detect if baby is transitioning to fewer naps. Returns suggested new nap count or null. */
 export function detectNapTransition(
-  recentDaysSleeps: SleepEntry[][]
+  recentDaysSleeps: SleepEntry[][],
 ): { dropping: boolean; currentAvgNaps: number; suggestedNaps: number } | null {
   if (recentDaysSleeps.length < 5) return null;
 
   const napCounts = recentDaysSleeps.map(
-    (day) => day.filter((s) => s.type === "nap" && s.end_time).length
+    (day) => day.filter((s) => s.type === "nap" && s.end_time).length,
   );
   const avgNaps = napCounts.reduce((a, b) => a + b, 0) / napCounts.length;
 
@@ -140,14 +144,18 @@ export function detectNapTransition(
     };
   }
 
-  return { dropping: false, currentAvgNaps: Math.round(avgNaps * 10) / 10, suggestedNaps: Math.round(avgNaps) };
+  return {
+    dropping: false,
+    currentAvgNaps: Math.round(avgNaps * 10) / 10,
+    suggestedNaps: Math.round(avgNaps),
+  };
 }
 
 /** Helper: compute average wake window from a list of sleeps (in minutes). */
 function getAverageWakeWindowFromSleeps(sleeps: SleepEntry[]): number | null {
   const sorted = [...sleeps]
     .filter((s) => s.end_time)
-    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+    .toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
   if (sorted.length < 2) return null;
 
