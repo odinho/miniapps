@@ -33,11 +33,22 @@ export function resetDb() {
   db.close();
 }
 
-function generateId(): string {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
-  });
+const EPOCH = new Date("2026-01-01T00:00:00Z").getTime();
+const BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+function generateId(prefix = "evt"): string {
+  const timePart = Math.abs(Math.floor((Date.now() - EPOCH) / 1000)).toString(36);
+  let random = "";
+  for (let i = 0; i < 6; i++) random += BASE62[Math.floor(Math.random() * 62)];
+  return `${prefix}_${timePart}${random}`;
+}
+
+function generateSleepId(): string {
+  return generateId("slp");
+}
+
+function generateDiaperId(): string {
+  return generateId("dip");
 }
 
 export function createBaby(name = "Testa", birthdate = "2025-06-12"): number {
@@ -73,7 +84,7 @@ export function addCompletedSleep(
   domainId?: string,
 ) {
   const db = getDb();
-  const did = domainId || generateId();
+  const did = domainId || generateSleepId();
   db.prepare(
     "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, ?, ?)",
   ).run(babyId, startTime, endTime, type, did);
@@ -83,7 +94,7 @@ export function addCompletedSleep(
 
 export function addActiveSleep(babyId: number, startTime: string, type = "nap", domainId?: string) {
   const db = getDb();
-  const did = domainId || generateId();
+  const did = domainId || generateSleepId();
   db.prepare("INSERT INTO sleep_log (baby_id, start_time, type, domain_id) VALUES (?, ?, ?, ?)").run(
     babyId,
     startTime,
@@ -102,7 +113,7 @@ export function addDiaper(
   domainId?: string,
 ) {
   const db = getDb();
-  const did = domainId || generateId();
+  const did = domainId || generateDiaperId();
   db.prepare(
     "INSERT INTO diaper_log (baby_id, time, type, amount, domain_id) VALUES (?, ?, ?, ?, ?)",
   ).run(babyId, time, type, amount, did);
@@ -122,7 +133,7 @@ export function seedBabyWithSleep() {
   const now = new Date();
   const start = new Date(now.getTime() - 3600000).toISOString();
   const end = now.toISOString();
-  const domainId = generateId();
+  const domainId = generateSleepId();
   db.prepare(
     "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, 'nap', ?)",
   ).run(babyId.id, start, end, domainId);
@@ -171,7 +182,7 @@ export async function dismissSheet(page: Page) {
   }
 }
 
-/** Helper to generate a UUID for tests */
-export { generateId };
+/** Helper to generate IDs for tests */
+export { generateId, generateSleepId, generateDiaperId };
 
 export { expect };

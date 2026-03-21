@@ -1,4 +1,4 @@
-import { test, expect, createBaby, setWakeUpTime, forceMorning, getDb, generateId } from "./fixtures";
+import { test, expect, createBaby, setWakeUpTime, forceMorning, getDb, generateId, generateSleepId, generateDiaperId } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await forceMorning(page);
@@ -15,7 +15,7 @@ function makeEvent(type: string, payload: Record<string, unknown>) {
 test("Rebuild on clean data produces identical row counts", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
-  const did = generateId();
+  const did = generateSleepId();
 
   await postEvent(page, [
     makeEvent("sleep.started", { babyId, startTime: new Date(Date.now() - 3600000).toISOString(), sleepDomainId: did }),
@@ -35,8 +35,8 @@ test("Rebuild on clean data produces identical row counts", async ({ page }) => 
 test("Rebuild after manual DB corruption restores data", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
-  const did = generateId();
-  const diaperDid = generateId();
+  const did = generateSleepId();
+  const diaperDid = generateDiaperId();
 
   await postEvent(page, [
     makeEvent("sleep.started", { babyId, startTime: new Date(Date.now() - 3600000).toISOString(), sleepDomainId: did }),
@@ -67,7 +67,7 @@ test("Rebuild report includes correct event count and timing", async ({ page }) 
   setWakeUpTime(babyId);
 
   await postEvent(page, [
-    makeEvent("diaper.logged", { babyId, time: new Date().toISOString(), type: "wet", diaperDomainId: generateId() }),
+    makeEvent("diaper.logged", { babyId, time: new Date().toISOString(), type: "wet", diaperDomainId: generateDiaperId() }),
   ]);
 
   const res = await page.request.post("/api/admin/rebuild");
@@ -80,8 +80,8 @@ test("Rebuild report includes correct event count and timing", async ({ page }) 
 
 test("After rebuild, all domain_ids are preserved", async ({ page }) => {
   const babyId = createBaby("Testa");
-  const did1 = generateId();
-  const did2 = generateId();
+  const did1 = generateSleepId();
+  const did2 = generateDiaperId();
 
   await postEvent(page, [
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did1 }),
@@ -103,7 +103,7 @@ test("After rebuild, all domain_ids are preserved", async ({ page }) => {
 test("After rebuild, GET /api/state returns correct current state", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
-  const did = generateId();
+  const did = generateDiaperId();
 
   await postEvent(page, [
     makeEvent("diaper.logged", { babyId, time: new Date().toISOString(), type: "wet", diaperDomainId: did }),

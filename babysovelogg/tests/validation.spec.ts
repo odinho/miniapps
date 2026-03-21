@@ -1,4 +1,4 @@
-import { test, expect, createBaby, setWakeUpTime, forceMorning, getDb, generateId } from "./fixtures";
+import { test, expect, createBaby, setWakeUpTime, forceMorning, getDb, generateId, generateSleepId, generateDiaperId } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await forceMorning(page);
@@ -77,7 +77,7 @@ test("POST with missing required field returns 400", async ({ page }) => {
       events: [
         {
           type: "sleep.started",
-          payload: { startTime: new Date().toISOString(), sleepDomainId: generateId() },
+          payload: { startTime: new Date().toISOString(), sleepDomainId: generateSleepId() },
           clientId: "c",
           clientEventId: generateId(),
         },
@@ -98,7 +98,7 @@ test("POST with wrong field type returns 400", async ({ page }) => {
           payload: {
             babyId: "abc",
             startTime: new Date().toISOString(),
-            sleepDomainId: generateId(),
+            sleepDomainId: generateSleepId(),
           },
           clientId: "c",
           clientEventId: generateId(),
@@ -145,7 +145,7 @@ test("POST batch where one event is invalid returns 400, nothing written", async
       events: [
         {
           type: "sleep.started",
-          payload: { babyId, startTime: new Date().toISOString(), sleepDomainId: generateId() },
+          payload: { babyId, startTime: new Date().toISOString(), sleepDomainId: generateSleepId() },
           clientId: "c",
           clientEventId: generateId(),
         },
@@ -180,13 +180,13 @@ test("POST batch where projection fails midway returns 500, nothing written", as
       events: [
         {
           type: "sleep.started",
-          payload: { babyId, startTime: new Date().toISOString(), sleepDomainId: generateId() },
+          payload: { babyId, startTime: new Date().toISOString(), sleepDomainId: generateSleepId() },
           clientId: "c",
           clientEventId: generateId(),
         },
         {
           type: "sleep.ended",
-          payload: { sleepDomainId: generateId(), endTime: new Date().toISOString() },
+          payload: { sleepDomainId: generateSleepId(), endTime: new Date().toISOString() },
           clientId: "c",
           clientEventId: generateId(),
         },
@@ -205,9 +205,9 @@ test("POST batch of 3 valid events returns all 3", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
 
-  const did1 = generateId();
-  const did2 = generateId();
-  const did3 = generateId();
+  const did1 = generateDiaperId();
+  const did2 = generateDiaperId();
+  const did3 = generateDiaperId();
 
   const res = await page.request.post("/api/events", {
     data: {

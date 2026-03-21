@@ -1,4 +1,4 @@
-import { test, expect, createBaby, setWakeUpTime, forceMorning, getDb, generateId } from "./fixtures";
+import { test, expect, createBaby, setWakeUpTime, forceMorning, getDb, generateId, generateSleepId } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await forceMorning(page);
@@ -10,7 +10,7 @@ test("Duplicate events with same clientId+clientEventId are ignored", async ({ p
 
   const clientId = "test-client";
   const clientEventId = "test-dedup-" + Date.now();
-  const sleepDomainId = generateId();
+  const sleepDomainId = generateSleepId();
   const eventPayload = {
     events: [
       {
@@ -65,7 +65,7 @@ test("Duplicate POST does NOT trigger SSE broadcast", async ({ page }) => {
 
   const clientId = "test-client";
   const clientEventId = generateId();
-  const sleepDomainId = generateId();
+  const sleepDomainId = generateSleepId();
   const eventPayload = {
     events: [
       {
@@ -93,7 +93,7 @@ test("Batch with mix of new and duplicate events", async ({ page }) => {
 
   const clientId = "test-client";
   const eid1 = generateId();
-  const did1 = generateId();
+  const did1 = generateSleepId();
 
   // First: create a sleep
   await page.request.post("/api/events", {

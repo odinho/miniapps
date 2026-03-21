@@ -1,4 +1,4 @@
-import { test, expect, createBaby, setWakeUpTime, forceMorning, getDb, generateId } from "./fixtures";
+import { test, expect, createBaby, setWakeUpTime, forceMorning, getDb, generateId, generateSleepId, generateDiaperId } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await forceMorning(page);
@@ -15,7 +15,7 @@ function makeEvent(type: string, payload: Record<string, unknown>) {
 test("After sleep.started, sleep_log row has created_by_event_id", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
-  const did = generateId();
+  const did = generateSleepId();
 
   const res = await postEvent(page, [
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
@@ -32,7 +32,7 @@ test("After sleep.started, sleep_log row has created_by_event_id", async ({ page
 test("After sleep.tagged, sleep_log row has updated_by_event_id", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
-  const did = generateId();
+  const did = generateSleepId();
 
   await postEvent(page, [
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
@@ -52,7 +52,7 @@ test("After sleep.tagged, sleep_log row has updated_by_event_id", async ({ page 
 
 test("After diaper.logged, diaper_log row has created_by_event_id", async ({ page }) => {
   const babyId = createBaby("Testa");
-  const did = generateId();
+  const did = generateDiaperId();
 
   const res = await postEvent(page, [
     makeEvent("diaper.logged", { babyId, time: new Date().toISOString(), type: "wet", diaperDomainId: did }),
@@ -69,7 +69,7 @@ test("After diaper.logged, diaper_log row has created_by_event_id", async ({ pag
 test("After rebuild, traceability columns are correct", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
-  const did = generateId();
+  const did = generateSleepId();
 
   const createRes = await postEvent(page, [
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
@@ -99,7 +99,7 @@ test("After rebuild, traceability columns are correct", async ({ page }) => {
 test("GET /api/sleeps returns rows with traceability fields", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
-  const did = generateId();
+  const did = generateSleepId();
 
   await postEvent(page, [
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
