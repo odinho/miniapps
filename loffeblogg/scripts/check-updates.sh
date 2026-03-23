@@ -19,7 +19,7 @@ EXIT_CODE=$?
 
 if [[ $EXIT_CODE -eq 0 ]]; then
   echo "Rebuilding..."
-  node src/build.js --force && npx @11ty/eleventy
+  NODE_OPTIONS="--max-old-space-size=2500" node src/build.js && npx @11ty/eleventy
 elif [[ $EXIT_CODE -eq 2 ]]; then
   exit 2
 else
