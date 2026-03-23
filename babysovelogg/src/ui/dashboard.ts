@@ -181,7 +181,8 @@ export function renderDashboard(container: HTMLElement): void {
     return;
   }
 
-  const { baby, activeSleep, todaySleeps, stats, prediction, ageMonths, todayWakeUp } = state;
+  const { baby, activeSleep, todaySleeps, stats, prediction, ageMonths, diaperCount, todayWakeUp } =
+    state;
 
   // Show morning prompt if no wake-up time set and no sleeps today
   // But only during morning hours (5-11), not in the middle of the night
@@ -660,13 +661,34 @@ export function renderDashboard(container: HTMLElement): void {
     cleanups.push(() => observer.disconnect());
     updateNapLabel();
 
-    const summaryRow = el("div", { className: "summary-row" }, [
+    const summaryChildren: (Node | string)[] = [
       el("span", null, [napCountEl, napLabel]),
       el("span", { className: "summary-sep" }, ["·"]),
       el("span", null, [napTimeEl, el("span", { className: "summary-label" }, [" lurtid"])]),
       totalSep,
       totalSpan,
-    ]);
+    ];
+
+    // Diaper/potty count
+    const dc = diaperCount ?? 0;
+    if (dc > 0) {
+      const diaperLabel = isPottyMode
+        ? dc === 1
+          ? " dobesøk"
+          : " dobesøk"
+        : dc === 1
+          ? " bleie"
+          : " bleier";
+      summaryChildren.push(el("span", { className: "summary-sep" }, ["·"]));
+      summaryChildren.push(
+        el("span", null, [
+          el("div", { className: "stat-value", style: { display: "inline" } }, [String(dc)]),
+          el("span", { className: "summary-label" }, [diaperLabel]),
+        ]),
+      );
+    }
+
+    const summaryRow = el("div", { className: "summary-row" }, summaryChildren);
     dash.appendChild(summaryRow);
   }
 

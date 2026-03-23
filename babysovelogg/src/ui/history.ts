@@ -209,7 +209,9 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
           ]),
           el("span", { className: "log-duration" }, [categoryLabel]),
         ]);
-        item.addEventListener("click", () => showDiaperEditModal(entry, container));
+        item.addEventListener("click", () =>
+          isPotty ? showPottyEditModal(entry, container) : showDiaperEditModal(entry, container),
+        );
         log.appendChild(item);
       }
     }
@@ -606,6 +608,166 @@ function showDiaperEditModal(entry: DiaperLogRow, container: HTMLElement): void 
   modal.appendChild(el("div", { className: "btn-row" }, [deleteBtn, saveBtn]));
 
   // Entity history link
+  if (entry.domain_id) {
+    const historyLink = el(
+      "button",
+      {
+        className: "btn btn-ghost",
+        style: { width: "100%", fontSize: "0.8rem", marginTop: "8px" },
+      },
+      ["Hendingslogg"],
+    );
+    historyLink.addEventListener("click", () => {
+      close();
+      window.location.hash = `#/events?domainId=${entry.domain_id}`;
+    });
+    modal.appendChild(historyLink);
+  }
+
+  modal.appendChild(el("div", { style: { textAlign: "center", marginTop: "12px" } }, [cancelBtn]));
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  function close() {
+    overlay.remove();
+    document.removeEventListener("keydown", escHandler);
+  }
+}
+
+function showPottyEditModal(entry: DiaperLogRow, container: HTMLElement): void {
+  const overlay = el("div", { className: "modal-overlay", "data-testid": "modal-overlay" });
+  const modal = el("div", { className: "modal" });
+
+  modal.appendChild(el("h2", null, ["Dobesøk"]));
+
+  let selectedType = entry.type;
+  const results = [
+    { value: "potty_wet", label: "💧 Tiss" },
+    { value: "potty_dirty", label: "💩 Bæsj" },
+    { value: "potty_nothing", label: "∅ Ingenting" },
+    { value: "diaper_only", label: "🧷 Berre bleie" },
+  ];
+  const resultPills = results.map((r) => {
+    const pill = el(
+      "button",
+      {
+        className: `type-pill ${selectedType === r.value ? "active" : ""}`,
+        "data-potty": r.value,
+      },
+      [r.label],
+    );
+    pill.addEventListener("click", () => {
+      selectedType = r.value;
+      resultPills.forEach(
+        (p, i) => (p.className = `type-pill ${selectedType === results[i].value ? "active" : ""}`),
+      );
+    });
+    return pill;
+  });
+  modal.appendChild(
+    el("div", { className: "form-group" }, [
+      el("label", null, ["Resultat"]),
+      el("div", { className: "type-pills diaper-type-pills" }, resultPills),
+    ]),
+  );
+
+  let selectedStatus = entry.amount || "dry";
+  const statuses = [
+    { value: "dry", label: "Tørr ✨" },
+    { value: "damp", label: "Litt 💧" },
+    { value: "wet", label: "Våt 💧💧" },
+    { value: "dirty", label: "💩 Bæsj" },
+  ];
+  const statusPills = statuses.map((s) => {
+    const pill = el(
+      "button",
+      { className: `type-pill ${selectedStatus === s.value ? "active" : ""}` },
+      [s.label],
+    );
+    pill.addEventListener("click", () => {
+      selectedStatus = s.value;
+      statusPills.forEach(
+        (p, i) =>
+          (p.className = `type-pill ${selectedStatus === statuses[i].value ? "active" : ""}`),
+      );
+    });
+    return pill;
+  });
+  modal.appendChild(
+    el("div", { className: "form-group" }, [
+      el("label", null, ["Bleie"]),
+      el("div", { className: "type-pills" }, statusPills),
+    ]),
+  );
+
+  const noteInput = el("input", {
+    type: "text",
+    placeholder: "Valfritt notat...",
+    value: entry.note || "",
+  }) as HTMLInputElement;
+  modal.appendChild(
+    el("div", { className: "form-group" }, [el("label", null, ["Notat"]), noteInput]),
+  );
+
+  modal.appendChild(
+    el(
+      "div",
+      { style: { color: "var(--text-light)", fontSize: "0.85rem", marginBottom: "16px" } },
+      [`Logga kl. ${formatTime(entry.time)}`],
+    ),
+  );
+
+  const saveBtn = el("button", { className: "btn btn-primary" }, ["Lagra"]);
+  const deleteBtn = el("button", { className: "btn btn-danger" }, ["Slett"]);
+  const cancelBtn = el("button", { className: "btn btn-ghost" }, ["Avbryt"]);
+
+  saveBtn.addEventListener("click", async () => {
+    await sendEventWithOfflineFallback(
+      "diaper.updated",
+      {
+        diaperDomainId: entry.domain_id,
+        type: selectedType,
+        amount: selectedStatus,
+        note: noteInput.value.trim() || undefined,
+      },
+      getAppState,
+      setAppState,
+    );
+    close();
+    await refreshState();
+    renderHistory(container);
+  });
+
+  deleteBtn.addEventListener("click", async () => {
+    const confirmed = await showConfirm(
+      "Sletta dette dobesøket? Dette kan ikkje angrast.",
+      "Slett",
+      "Avbryt",
+    );
+    if (confirmed) {
+      await sendEventWithOfflineFallback(
+        "diaper.deleted",
+        { diaperDomainId: entry.domain_id },
+        getAppState,
+        setAppState,
+      );
+      close();
+      await refreshState();
+      renderHistory(container);
+    }
+  });
+
+  cancelBtn.addEventListener("click", close);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) close();
+  });
+  const escHandler = (e: KeyboardEvent) => {
+    if (e.key === "Escape") close();
+  };
+  document.addEventListener("keydown", escHandler);
+
+  modal.appendChild(el("div", { className: "btn-row" }, [deleteBtn, saveBtn]));
+
   if (entry.domain_id) {
     const historyLink = el(
       "button",
