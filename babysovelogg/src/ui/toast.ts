@@ -60,6 +60,56 @@ export function showToast(
   setTimeout(() => toast.remove(), 3000);
 }
 
+/** Toast with "Angre" button. Returns cleanup fn. Auto-dismisses after duration. */
+export function showUndoToast(
+  message: string,
+  undoFn: () => Promise<void>,
+  durationMs = 8000,
+): () => void {
+  const c = ensureContainer();
+  const toast = document.createElement("div");
+  toast.className = "toast info";
+  toast.style.display = "flex";
+  toast.style.alignItems = "center";
+  toast.style.gap = "12px";
+  toast.style.animation = "toast-in 0.3s ease";
+
+  const msg = document.createElement("span");
+  msg.textContent = message;
+  msg.style.flex = "1";
+
+  const btn = document.createElement("button");
+  btn.textContent = "Angre";
+  btn.style.cssText =
+    "background:rgba(255,255,255,0.25);border:none;color:white;padding:4px 12px;border-radius:8px;font-weight:600;cursor:pointer;font-size:0.85rem;white-space:nowrap";
+
+  toast.appendChild(msg);
+  toast.appendChild(btn);
+  c.appendChild(toast);
+
+  let dismissed = false;
+  const dismiss = () => {
+    if (dismissed) return;
+    dismissed = true;
+    toast.style.animation = "toast-out 0.3s ease forwards";
+    setTimeout(() => toast.remove(), 300);
+  };
+
+  const timer = setTimeout(dismiss, durationMs);
+
+  btn.addEventListener("click", async () => {
+    clearTimeout(timer);
+    dismissed = true;
+    toast.remove();
+    await undoFn();
+  });
+
+  return () => {
+    clearTimeout(timer);
+    dismiss();
+  };
+}
+
 /** Styled confirm dialog replacement for native confirm(). Returns a Promise<boolean>. */
 export function showConfirm(
   message: string,

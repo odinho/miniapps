@@ -20,7 +20,7 @@ import {
   formatTime,
   haptic,
 } from "./components.js";
-import { showToast } from "./toast.js";
+import { showToast, showUndoToast } from "./toast.js";
 import { renderArc } from "./arc.js";
 import { showEditModal } from "./history.js";
 import {
@@ -247,6 +247,11 @@ export function renderDashboard(container: HTMLElement): void {
       });
       renderDashboard(container);
       showWakeUpSheet(activeSleep.domain_id, sleepSnapshot, endTimeIso, container);
+      const domainId = activeSleep.domain_id;
+      showUndoToast("Søvn avslutta", async () => {
+        await sendEvent("sleep.updated", { sleepDomainId: domainId, endTime: null });
+        renderDashboard(container);
+      });
     } else {
       // Start sleep — then show bedtime tag sheet
       const type = classifySleepType(todaySleeps, ageMonths, baby.custom_nap_count);
@@ -261,6 +266,10 @@ export function renderDashboard(container: HTMLElement): void {
       renderDashboard(container);
       // Show tag sheet using the domain ID we just generated
       showTagSheet(sleepDomainId, startTimeIso, container);
+      showUndoToast("Søvn starta", async () => {
+        await sendEvent("sleep.deleted", { sleepDomainId });
+        renderDashboard(container);
+      });
     }
   });
 
@@ -1459,17 +1468,23 @@ function showDiaperModal(baby: Baby, container: HTMLElement): void {
       showToast("Ugyldig tid", "warning");
       return;
     }
+    const diaperDomainId = generateDiaperId();
     const online = await sendEvent("diaper.logged", {
       babyId: baby.id,
       time: time.toISOString(),
       type: selectedType,
       amount: selectedAmount,
       note: noteInput.value || undefined,
-      diaperDomainId: generateDiaperId(),
+      diaperDomainId,
     });
-    if (online) showToast("Bleie logga", "success");
     close();
     renderDashboard(container);
+    if (online) {
+      showUndoToast("Bleie logga", async () => {
+        await sendEvent("diaper.deleted", { diaperDomainId });
+        renderDashboard(container);
+      });
+    }
   });
 
   cancelBtn.addEventListener("click", close);
@@ -1633,17 +1648,23 @@ function showPottyModal(baby: Baby, container: HTMLElement): void {
       showToast("Ugyldig tid", "warning");
       return;
     }
+    const diaperDomainId = generateDiaperId();
     const online = await sendEvent("diaper.logged", {
       babyId: baby.id,
       time: time.toISOString(),
       type: selectedResult,
       amount: selectedDiaperStatus,
       note: noteInput.value || undefined,
-      diaperDomainId: generateDiaperId(),
+      diaperDomainId,
     });
-    if (online) showToast("Dobesøk logga", "success");
     close();
     renderDashboard(container);
+    if (online) {
+      showUndoToast("Dobesøk logga", async () => {
+        await sendEvent("diaper.deleted", { diaperDomainId });
+        renderDashboard(container);
+      });
+    }
   });
 
   cancelBtn.addEventListener("click", close);
