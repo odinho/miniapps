@@ -1,16 +1,16 @@
 # baby CLI
 
-Command-line interface for the babysovelogg sleep tracker. Designed to be used
-by both humans and AI agents. Reads and writes go through the event-sourced
-database directly — the web server does not need to be running.
+Command-line interface for the babysovelogg sleep tracker. Designed for both
+humans and AI agents. Reads and writes go through the event-sourced database
+directly — the web server does not need to be running.
 
 ## Setup
 
 From the project directory:
 
 ```bash
-pnpm baby status        # via package script
-tsx cli/baby.ts status  # directly
+pnpm baby                # via package script
+tsx cli/baby.ts          # directly
 
 # Optional: shell alias for convenience
 alias baby='tsx /path/to/babysovelogg/cli/baby.ts'
@@ -19,9 +19,10 @@ alias baby='tsx /path/to/babysovelogg/cli/baby.ts'
 ## Quick reference
 
 ```bash
-baby                    # current status (default command)
-baby --help             # full command list
+baby                    # quick status + what you can do
+baby status             # full status with predictions
 baby <command> --help   # detailed options for a command
+baby --help             # all commands
 baby <command> --json   # JSON output (for scripts/AI)
 ```
 
@@ -30,28 +31,34 @@ baby <command> --json   # JSON output (for scripts/AI)
 ```bash
 # Status and history
 baby                              # what's happening now?
+baby status                       # full details + predictions
 baby sleeps                       # last 7 days of sleeps
 baby sleeps --days 30             # last month
 baby stats                        # 7-day averages
 
-# Recording sleep
-baby start-nap                    # start nap now
-baby start-nap --at 14:30         # nap started at 14:30
-baby start-nap --at -5m           # started 5 min ago
-baby end                          # end sleep now
-baby end --at 15:15 --mood happy  # ended at 15:15, woke up happy
-baby start-night --at 19:30       # night sleep at 19:30
+# Daily flow
+baby up --at 07:30                # baby woke up at 07:30
+baby nap                          # start nap now
+baby nap --at 14:30               # nap started at 14:30
+baby nap --at -5m                 # started 5 min ago
+baby up                           # baby woke up now
+baby up --mood happy --method self  # woke up happy, fell asleep on own
+baby bed --at 19:30               # night sleep at 19:30
+
+# The "up" command is smart:
+#   - If napping: ends the nap
+#   - If night sleeping: ends sleep + logs day start
+#   - If already awake: logs day start (morning wake-up)
 
 # Pausing (baby stirs mid-nap)
 baby pause                        # pause now
 baby resume --at 14:55            # resumed at 14:55
 
-# Morning
-baby wake --at 07:30              # log wake-up (anchors predictions)
-
-# Diapers
-baby diaper --type wet            # wet diaper now
-baby diaper --type dirty --at 14:00 --note "After feeding"
+# Potty/Diaper (adapts to baby's potty_mode setting)
+baby potty --type pee             # pee on potty
+baby potty --type poo --at 14:00  # poo at 14:00
+baby potty --type nothing         # sat on potty, nothing happened
+baby diaper --type wet            # wet diaper (works in any mode)
 
 # Ad-hoc queries
 baby query "SELECT count(*) as total FROM sleep_log WHERE deleted=0"
@@ -86,7 +93,7 @@ For the `query` command, these tables are available (all read-only via CLI):
 
 - **sleep_log** — sleep sessions (start_time, end_time, type, mood, method, notes, ...)
 - **sleep_pauses** — pause/resume within a sleep
-- **diaper_log** — diaper changes (time, type, amount, note)
+- **diaper_log** — diaper/potty log (time, type, amount, note)
 - **day_start** — daily wake-up anchor times
 - **baby** — baby profile
 - **events** — raw event log (append-only)

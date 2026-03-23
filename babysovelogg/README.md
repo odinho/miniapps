@@ -7,18 +7,20 @@ One deploy per family — all clients share the same SQLite database. No auth ne
 ## Quick Start
 
 ```bash
-npm install
-npm run build
+pnpm install
+pnpm build
 PORT=3200 node dist/server.js
 ```
 
 Open `http://localhost:3200` in a browser. On first visit you'll be prompted to add a baby.
 
+There's also a CLI for scripting and AI agents: `pnpm baby` — see [cli/README.md](cli/README.md).
+
 ### Development
 
 ```bash
-npm run dev    # Watches both server (tsx) and client (esbuild)
-npm test       # Playwright e2e tests
+pnpm dev       # Watches both server (tsx) and client (esbuild)
+pnpm test      # Playwright e2e tests
 ```
 
 ## Features

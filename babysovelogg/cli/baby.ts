@@ -69,7 +69,7 @@ for (let i = 0; i < rawArgs.length; i++) {
   }
 }
 
-const command = positional[0] || "status";
+const command = positional[0];
 const jsonOut = flags.json === true;
 
 // ── Time parsing ──
@@ -131,7 +131,7 @@ function fmtAgo(iso: string): string {
   return m > 0 ? `${h}h ${m}m ago` : `${h}h ago`;
 }
 
-function sleepDuration(s: SleepLogRow): number {
+function calcSleepDuration(s: SleepLogRow): number {
   const endMs = s.end_time ? new Date(s.end_time).getTime() : Date.now();
   const total = (endMs - new Date(s.start_time).getTime()) / 60000;
   if (!s.pauses) return total;
@@ -164,6 +164,19 @@ function formatTable(rows: Record<string, unknown>[]): string {
     .join("\n");
   return `${header}\n${sep}\n${body}`;
 }
+
+/** Label for potty/diaper depending on baby's potty_mode */
+function pottyLabel(baby: Baby): string {
+  return baby.potty_mode ? "Potty" : "Diapers";
+}
+
+/** Map short potty type names to event type values */
+const POTTY_TYPES: Record<string, string> = {
+  pee: "potty_wet",
+  poo: "potty_dirty",
+  nothing: "potty_nothing",
+  "diaper-only": "diaper_only",
+};
 
 // ── Data access ──
 
@@ -224,6 +237,18 @@ function getTodayWakeUp(babyId: number): DayStartRow | undefined {
     .get(babyId, dateStr) as DayStartRow | undefined;
 }
 
+function getTodayDiaperCount(babyId: number): number {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  return (
+    db
+      .prepare(
+        "SELECT COUNT(*) as count FROM diaper_log WHERE baby_id = ? AND time >= ? AND deleted = 0",
+      )
+      .get(babyId, todayStart.toISOString()) as { count: number }
+  ).count;
+}
+
 // ── Event helpers ──
 
 function postEvent(type: string, payload: Record<string, unknown>) {
@@ -232,6 +257,93 @@ function postEvent(type: string, payload: Record<string, unknown>) {
 
 // ── Commands ──
 
+/** Brief overview shown when running just `baby` with no subcommand */
+function cmdDefault() {
+  const baby = getBaby();
+  const ageMonths = calculateAgeMonths(baby.birthdate);
+  const active = getActiveSleep(baby.id);
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todaySleeps = db
+    .prepare(
+      "SELECT * FROM sleep_log WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time ASC",
+    )
+    .all(baby.id, todayStart.toISOString()) as SleepLogRow[];
+  attachPauses(todaySleeps);
+
+  const wakeUp = getTodayWakeUp(baby.id);
+  const stats = getTodayStats(todaySleeps.map(toSleepEntry));
+  const diaperCount = getTodayDiaperCount(baby.id);
+
+  if (jsonOut) {
+    // JSON mode gets the full status
+    cmdStatus();
+    return;
+  }
+
+  // Line 1: name + age + current state
+  const age = ageMonths < 1 ? "newborn" : `${ageMonths}mo`;
+  let stateStr: string;
+  if (active) {
+    const typeLabel = active.type === "night" ? "Night sleep" : "Napping";
+    const dur = fmtDuration(calcSleepDuration(active));
+    const isPaused =
+      active.pauses.length > 0 && !active.pauses[active.pauses.length - 1].resume_time;
+    stateStr = `${typeLabel} since ${fmtTime(active.start_time)} (${dur})${isPaused ? " [PAUSED]" : ""}`;
+  } else {
+    const lastSleep = todaySleeps.toReversed().find((s) => s.end_time);
+    const wakeTime = lastSleep?.end_time || wakeUp?.wake_time;
+    stateStr = wakeTime ? `Awake since ${fmtTime(wakeTime)} (${fmtAgo(wakeTime)})` : "Awake";
+  }
+  console.log(`${baby.name} (${age}) — ${stateStr}`);
+
+  // Line 2: today summary
+  const parts: string[] = [];
+  if (stats.napCount > 0) {
+    parts.push(
+      `${stats.napCount} nap${stats.napCount !== 1 ? "s" : ""}, ${fmtDuration(stats.totalNapMinutes)}`,
+    );
+  } else {
+    parts.push("No naps yet");
+  }
+  parts.push(`${pottyLabel(baby)}: ${diaperCount}`);
+
+  // Add prediction if available
+  if (!active) {
+    const lastCompleted = todaySleeps.toReversed().find((s) => s.end_time);
+    const wakeTime = lastCompleted?.end_time || wakeUp?.wake_time;
+    if (wakeTime) {
+      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+      const recentSleeps = db
+        .prepare(
+          "SELECT * FROM sleep_log WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time DESC",
+        )
+        .all(baby.id, weekAgo) as SleepLogRow[];
+      attachPauses(recentSleeps);
+      const nextNap = predictNextNap(wakeTime, ageMonths, recentSleeps.map(toSleepEntry));
+      parts.push(`Next nap: ~${fmtTime(nextNap)}`);
+    }
+  }
+  console.log(`Today: ${parts.join(" | ")}`);
+
+  // Contextual suggestions
+  const pottyCmd = baby.potty_mode ? "potty" : "diaper";
+  const pottyExample = baby.potty_mode ? "potty --type pee" : "diaper --type wet";
+  console.log();
+  if (active) {
+    console.log(`  baby up                     Baby woke up`);
+    console.log(`  baby pause                  Pause sleep`);
+    console.log(`  baby ${pottyExample.padEnd(21)} Log ${pottyCmd}`);
+  } else {
+    console.log(`  baby nap                    Start a nap`);
+    console.log(`  baby bed                    Start night sleep`);
+    console.log(`  baby ${pottyExample.padEnd(21)} Log ${pottyCmd}`);
+  }
+  console.log(`  baby status                 Full status with predictions`);
+  console.log(`  baby --help                 All commands`);
+}
+
+/** Full detailed status */
 function cmdStatus() {
   const baby = getBaby();
   const ageMonths = calculateAgeMonths(baby.birthdate);
@@ -276,14 +388,8 @@ function cmdStatus() {
     }
   }
 
-  // Diapers
-  const diaperCount = (
-    db
-      .prepare(
-        "SELECT COUNT(*) as count FROM diaper_log WHERE baby_id = ? AND time >= ? AND deleted = 0",
-      )
-      .get(baby.id, todayStart.toISOString()) as { count: number }
-  ).count;
+  // Diapers/Potty
+  const diaperCount = getTodayDiaperCount(baby.id);
   const lastDiaper = db
     .prepare(
       "SELECT time FROM diaper_log WHERE baby_id = ? AND deleted = 0 ORDER BY time DESC LIMIT 1",
@@ -318,7 +424,7 @@ function cmdStatus() {
 
   if (active) {
     const typeLabel = active.type === "night" ? "Night sleep" : "Napping";
-    const dur = fmtDuration(sleepDuration(active));
+    const dur = fmtDuration(calcSleepDuration(active));
     const isPaused =
       active.pauses.length > 0 && !active.pauses[active.pauses.length - 1].resume_time;
     const pauseNote = isPaused ? " [PAUSED]" : "";
@@ -345,7 +451,7 @@ function cmdStatus() {
     for (const s of todaySleeps) {
       const label = s.type === "night" ? "Night" : `Nap ${++napIdx}`;
       const end = s.end_time ? fmtTime(s.end_time) : "...";
-      const dur = fmtDuration(sleepDuration(s));
+      const dur = fmtDuration(calcSleepDuration(s));
       const meta = [s.mood, s.method].filter(Boolean).join(", ");
       console.log(`  ${label.padEnd(8)} ${fmtTime(s.start_time)}-${end}  ${dur.padEnd(8)}${meta}`);
     }
@@ -370,10 +476,11 @@ function cmdStatus() {
     }
   }
 
-  // Diapers
+  // Diapers/Potty
+  const label = pottyLabel(baby);
   if (diaperCount > 0 || lastDiaper) {
     const lastStr = lastDiaper ? ` (last at ${fmtTime(lastDiaper.time)})` : "";
-    console.log(`\nDiapers: ${diaperCount} today${lastStr}`);
+    console.log(`\n${label}: ${diaperCount} today${lastStr}`);
   }
 
   if (wakeUp) {
@@ -401,7 +508,7 @@ function cmdSleeps() {
   console.log("----------  -----  -----  -----  --------  -----------");
   for (const s of sleeps) {
     const end = s.end_time ? fmtTime(s.end_time) : "...  ";
-    const dur = fmtDuration(sleepDuration(s));
+    const dur = fmtDuration(calcSleepDuration(s));
     const meta = [s.mood, s.method].filter(Boolean).join(", ");
     console.log(
       `${fmtDate(s.start_time)}  ${s.type.padEnd(5)}  ${fmtTime(s.start_time)}  ${end}  ${dur.padEnd(8)}  ${meta}`,
@@ -443,12 +550,12 @@ function cmdStats() {
   }
 }
 
-function cmdStartNap() {
+function cmdNap() {
   const baby = getBaby();
   const active = getActiveSleep(baby.id);
   if (active) {
     console.error(
-      `Already sleeping (${active.type} started at ${fmtTime(active.start_time)}). End the current sleep first.`,
+      `Already sleeping (${active.type} started at ${fmtTime(active.start_time)}). Run "baby up" first.`,
     );
     process.exit(1);
   }
@@ -463,12 +570,12 @@ function cmdStartNap() {
   }
 }
 
-function cmdStartNight() {
+function cmdBed() {
   const baby = getBaby();
   const active = getActiveSleep(baby.id);
   if (active) {
     console.error(
-      `Already sleeping (${active.type} started at ${fmtTime(active.start_time)}). End the current sleep first.`,
+      `Already sleeping (${active.type} started at ${fmtTime(active.start_time)}). Run "baby up" first.`,
     );
     process.exit(1);
   }
@@ -483,58 +590,89 @@ function cmdStartNight() {
   }
 }
 
-function cmdEnd() {
+function cmdUp() {
   const baby = getBaby();
   const active = getActiveSleep(baby.id);
-  if (!active) {
-    console.error("No active sleep to end.");
-    process.exit(1);
+  const upTime = parseTime(flags.at);
+
+  // Time validation: end can't be before start
+  if (active) {
+    const startMs = new Date(active.start_time).getTime();
+    const endMs = new Date(upTime).getTime();
+    if (endMs < startMs) {
+      console.error(
+        `End time (${fmtTime(upTime)}) is before sleep start (${fmtTime(active.start_time)}). Check your --at value.`,
+      );
+      process.exit(1);
+    }
   }
-  const endTime = parseTime(flags.at);
 
-  // End the sleep
-  postEvent("sleep.ended", { sleepDomainId: active.domain_id, endTime });
-
-  // Tag with metadata if provided
+  // Read metadata flags
   const mood = typeof flags.mood === "string" ? flags.mood : undefined;
   const method = typeof flags.method === "string" ? flags.method : undefined;
   const notes = typeof flags.notes === "string" ? flags.notes : undefined;
   const wokeBy = typeof flags["woke-by"] === "string" ? flags["woke-by"] : undefined;
   const wakeNotes = typeof flags["wake-notes"] === "string" ? flags["wake-notes"] : undefined;
 
-  if (mood || method || notes) {
-    postEvent("sleep.tagged", {
-      sleepDomainId: active.domain_id,
-      mood: mood ?? null,
-      method: method ?? null,
-      notes: notes ?? null,
-      fallAsleepTime: null,
-    });
-  }
-  if (wokeBy || wakeNotes) {
-    postEvent("sleep.updated", {
-      sleepDomainId: active.domain_id,
-      wokeBy: wokeBy ?? null,
-      wakeNotes: wakeNotes ?? null,
-    });
-  }
+  const actions: string[] = [];
 
-  const dur = (new Date(endTime).getTime() - new Date(active.start_time).getTime()) / 60000;
+  if (active) {
+    // End the active sleep
+    postEvent("sleep.ended", { sleepDomainId: active.domain_id, endTime: upTime });
+
+    // Tag with metadata if provided
+    if (mood || method || notes) {
+      postEvent("sleep.tagged", {
+        sleepDomainId: active.domain_id,
+        mood: mood ?? null,
+        method: method ?? null,
+        notes: notes ?? null,
+        fallAsleepTime: null,
+      });
+    }
+    if (wokeBy || wakeNotes) {
+      postEvent("sleep.updated", {
+        sleepDomainId: active.domain_id,
+        wokeBy: wokeBy ?? null,
+        wakeNotes: wakeNotes ?? null,
+      });
+    }
+
+    const dur = (new Date(upTime).getTime() - new Date(active.start_time).getTime()) / 60000;
+    actions.push(
+      `Ended ${active.type}: ${fmtDuration(dur)} (${fmtTime(active.start_time)}-${fmtTime(upTime)})`,
+    );
+
+    // Auto-log day start when waking from night sleep
+    if (active.type === "night") {
+      postEvent("day.started", { babyId: baby.id, wakeTime: upTime });
+      actions.push("Logged day start");
+    }
+  } else {
+    // No active sleep — just log day start
+    postEvent("day.started", { babyId: baby.id, wakeTime: upTime });
+    actions.push(`Logged wake-up at ${fmtTime(upTime)}`);
+  }
 
   if (jsonOut) {
     console.log(
       JSON.stringify({
         ok: true,
-        type: active.type,
-        startTime: active.start_time,
-        endTime,
-        durationMinutes: Math.round(dur),
+        upTime,
+        endedSleep: active
+          ? {
+              type: active.type,
+              startTime: active.start_time,
+              durationMinutes: Math.round(
+                (new Date(upTime).getTime() - new Date(active.start_time).getTime()) / 60000,
+              ),
+            }
+          : null,
+        loggedDayStart: !active || active.type === "night",
       }),
     );
   } else {
-    console.log(
-      `Ended ${active.type}. Duration: ${fmtDuration(dur)} (${fmtTime(active.start_time)}-${fmtTime(endTime)}).`,
-    );
+    for (const a of actions) console.log(a);
   }
 }
 
@@ -582,25 +720,23 @@ function cmdResume() {
   }
 }
 
-function cmdWake() {
+function cmdPotty() {
   const baby = getBaby();
-  const wakeTime = parseTime(flags.at);
-  postEvent("day.started", { babyId: baby.id, wakeTime });
+  const isPottyMode = !!baby.potty_mode;
+  const rawType = typeof flags.type === "string" ? flags.type : undefined;
 
-  if (jsonOut) {
-    console.log(JSON.stringify({ ok: true, wakeTime }));
-  } else {
-    console.log(`Logged wake-up at ${fmtTime(wakeTime)}.`);
-  }
-}
-
-function cmdDiaper() {
-  const baby = getBaby();
-  const type = typeof flags.type === "string" ? flags.type : undefined;
-  if (!type) {
-    console.error("--type is required. Values: wet, dirty, both, dry");
+  if (!rawType) {
+    if (isPottyMode) {
+      console.error("--type is required. Values: pee, poo, nothing, diaper-only");
+    } else {
+      console.error("--type is required. Values: wet, dirty, both, dry");
+    }
     process.exit(1);
   }
+
+  // In potty mode, map short names to event values
+  const type = isPottyMode ? (POTTY_TYPES[rawType] ?? rawType) : rawType;
+
   const time = parseTime(flags.at);
   const diaperDomainId = genId("dip");
   const amount = typeof flags.amount === "string" ? flags.amount : null;
@@ -608,10 +744,11 @@ function cmdDiaper() {
 
   postEvent("diaper.logged", { babyId: baby.id, time, type, diaperDomainId, amount, note });
 
+  const label = isPottyMode ? "potty" : "diaper";
   if (jsonOut) {
     console.log(JSON.stringify({ ok: true, type, time, diaperDomainId }));
   } else {
-    console.log(`Logged ${type} diaper at ${fmtTime(time)}.`);
+    console.log(`Logged ${rawType} ${label} at ${fmtTime(time)}.`);
   }
 }
 
@@ -657,57 +794,61 @@ USAGE
   baby [command] [options]
 
 COMMANDS
-  status          Current state, today's sleeps, predictions (default)
+  status          Full status: today's sleeps, predictions, details
   sleeps          Recent sleep history
   stats           Sleep statistics
-  start-nap       Start a nap
-  start-night     Start night sleep
-  end             End the current sleep
-  pause           Pause current sleep
+  nap             Start a nap
+  bed             Start night sleep
+  up              Baby woke up (ends active sleep, logs day start)
+  pause           Pause current sleep (baby stirring)
   resume          Resume paused sleep
-  wake            Log morning wake-up (day start)
-  diaper          Log a diaper change
+  potty           Log potty visit (or "diaper" when not in potty mode)
   query <sql>     Run a read-only SQL query
 
 FLAGS
   --json          Output as JSON (for programmatic use)
   --help, -h      Show help (use with a command for full options)
 
+TIME FORMAT (for --at flag)
+  14:30                     Today at 14:30
+  2026-03-23T14:30          Specific date and time
+  -10m                      10 minutes ago
+  -1h                       1 hour ago
+
 EXAMPLES
-  baby                                  Current status
-  baby --json                           Status as JSON
-  baby start-nap                        Start nap now
-  baby start-nap --at 14:30             Start nap at 14:30 today
-  baby start-nap --at -10m              Started napping 10 minutes ago
-  baby end                              End current sleep now
-  baby end --at 15:00 --mood happy      End at 15:00 with mood
+  baby                                  Quick status overview
+  baby status                           Full status with predictions
+  baby nap                              Start nap now
+  baby nap --at 14:30                   Nap started at 14:30
+  baby up                               Baby woke up now
+  baby up --at 15:00 --mood happy       Woke at 15:00, happy
+  baby bed --at 19:30                   Night sleep at 19:30
+  baby potty --type pee                 Log potty (pee)
   baby sleeps --days 3                  Last 3 days of sleeps
   baby stats                            7-day statistics
-  baby diaper --type wet                Log wet diaper now
-  baby wake --at 07:30                  Baby woke up at 07:30
   baby query "SELECT * FROM sleep_log WHERE deleted=0 ORDER BY id DESC LIMIT 5"
 
 TABLES (for query command)
-  baby          Baby profile (name, birthdate)
+  baby          Baby profile (name, birthdate, potty_mode)
   sleep_log     Sleep sessions (start_time, end_time, type, mood, method, notes, ...)
   sleep_pauses  Pause/resume records within a sleep
-  diaper_log    Diaper changes (time, type, amount, note)
+  diaper_log    Diaper/potty log (time, type, amount, note)
   day_start     Daily wake-up times (date, wake_time)
   events        Raw event log (type, payload JSON, timestamp)
 
   All tables use soft deletes (deleted=0 for active rows).
-  Times are ISO 8601 strings. Types: "nap" or "night".`;
+  Times are ISO 8601 strings. Sleep types: "nap" or "night".`;
 
 const CMD_HELP: Record<string, string> = {
-  status: `baby status — Show current state, today's sleeps, and predictions
+  status: `baby status — Full status with today's sleeps, predictions, and details
 
 USAGE
-  baby [status] [--json]
+  baby status [--json]
 
 Shows baby's name and age, whether sleeping or awake, today's sleep log
-with durations, predicted next nap and bedtime, and diaper count.
+with durations, predicted next nap and bedtime, and potty/diaper count.
 
-This is the default command when no subcommand is given.`,
+For a quick overview, just run "baby" with no subcommand.`,
 
   sleeps: `baby sleeps — Show recent sleep history
 
@@ -740,27 +881,27 @@ EXAMPLES
   baby stats                    7-day overview
   baby stats --days 14          2-week overview`,
 
-  "start-nap": `baby start-nap — Start a nap
+  nap: `baby nap — Start a nap
 
 USAGE
-  baby start-nap [options]
+  baby nap [options]
 
 OPTIONS
   --at <time>     When the nap started (default: now)
                   Formats: 14:30, 2026-03-23T14:30, -10m, -1h
   --json          Output as JSON
 
-Fails if there's already an active sleep.
+Fails if there's already an active sleep. Run "baby up" first.
 
 EXAMPLES
-  baby start-nap                Start now
-  baby start-nap --at 14:30     Started at 14:30
-  baby start-nap --at -5m       Started 5 minutes ago`,
+  baby nap                Start now
+  baby nap --at 14:30     Started at 14:30
+  baby nap --at -5m       Started 5 minutes ago`,
 
-  "start-night": `baby start-night — Start night sleep
+  bed: `baby bed — Start night sleep
 
 USAGE
-  baby start-night [options]
+  baby bed [options]
 
 OPTIONS
   --at <time>     When night sleep started (default: now)
@@ -770,16 +911,21 @@ OPTIONS
 Fails if there's already an active sleep.
 
 EXAMPLES
-  baby start-night              Start now
-  baby start-night --at 19:30   Started at 19:30`,
+  baby bed                Start now
+  baby bed --at 19:30     Going to bed at 19:30`,
 
-  end: `baby end — End the current active sleep
+  up: `baby up — Baby woke up
 
 USAGE
-  baby end [options]
+  baby up [options]
+
+Smart behavior depending on context:
+  - Active night sleep: ends sleep + logs day start (morning wake-up)
+  - Active nap: ends the nap
+  - No active sleep: logs day start only (for manual morning wake-up)
 
 OPTIONS
-  --at <time>         When the sleep ended (default: now)
+  --at <time>         When baby woke up (default: now)
                       Formats: 14:30, 2026-03-23T14:30, -10m, -1h
   --mood <mood>       Baby's mood on waking
                       Examples: happy, crying, calm, fussy, content
@@ -791,13 +937,11 @@ OPTIONS
   --wake-notes <text> Notes about the waking
   --json              Output as JSON
 
-Fails if there's no active sleep.
-
 EXAMPLES
-  baby end                              End now
-  baby end --at 15:00                   Ended at 15:00
-  baby end --mood happy --method self   Woke up happy, fell asleep by self
-  baby end --at -5m --notes "Short nap, seemed tired still"`,
+  baby up                               Woke up now
+  baby up --at 07:30                    Woke up at 07:30
+  baby up --mood happy --method self    Woke up happy, fell asleep on own
+  baby up --at -5m --notes "Short nap"  Woke 5 min ago, short nap`,
 
   pause: `baby pause — Pause the current sleep
 
@@ -830,41 +974,42 @@ EXAMPLES
   baby resume               Resume now
   baby resume --at 14:55    Resumed at 14:55`,
 
-  wake: `baby wake — Log the morning wake-up time
+  potty: `baby potty — Log a potty visit
 
 USAGE
-  baby wake [options]
+  baby potty --type <type> [options]
+
+Adapts to the baby's current mode:
+
+  Potty training mode (potty_mode on):
+    --type pee              Pee on potty
+    --type poo              Poo on potty
+    --type nothing          Sat on potty, nothing happened
+    --type diaper-only      Diaper only, no potty attempt
+
+  Diaper mode (potty_mode off):
+    --type wet              Wet diaper
+    --type dirty            Dirty diaper
+    --type both             Wet + dirty
+    --type dry              Dry diaper
+
+Both "baby potty" and "baby diaper" work regardless of mode.
 
 OPTIONS
-  --at <time>     When baby woke up (default: now)
-                  Formats: 07:30, 2026-03-23T07:30, -30m
-  --json          Output as JSON
-
-Sets the day's anchor time used for nap predictions. One per day
-(overwrites if called again for the same date).
-
-EXAMPLES
-  baby wake                 Woke up now
-  baby wake --at 07:30      Woke up at 07:30`,
-
-  diaper: `baby diaper — Log a diaper change
-
-USAGE
-  baby diaper --type <type> [options]
-
-OPTIONS
-  --type <type>   Diaper type (required)
-                  Values: wet, dirty, both, dry
-  --at <time>     When the change happened (default: now)
+  --type <type>   Type (required, see above)
+  --at <time>     When it happened (default: now)
                   Formats: 14:30, 2026-03-23T14:30, -10m, -1h
-  --amount <amt>  Amount description (e.g. small, medium, large)
+  --amount <amt>  Amount (e.g. small, medium, large)
   --note <text>   Notes
   --json          Output as JSON
 
 EXAMPLES
-  baby diaper --type wet                Wet diaper now
-  baby diaper --type dirty --at 14:30   Dirty diaper at 14:30
-  baby diaper --type both --note "Big one" --amount large`,
+  baby potty --type pee                 Pee on potty now
+  baby potty --type poo --at 14:30      Poo at 14:30
+  baby potty --type nothing --note "Tried for 5 min"
+  baby diaper --type wet                Wet diaper (works in any mode)`,
+
+  diaper: "", // filled dynamically below
 
   query: `baby query — Run a read-only SQL query
 
@@ -893,10 +1038,13 @@ EXAMPLES
   baby query "PRAGMA table_info(sleep_log)"`,
 };
 
+// diaper help is same as potty
+CMD_HELP.diaper = CMD_HELP.potty;
+
 // ── Dispatch ──
 
 if (flags.help) {
-  if (command !== "status" || positional.length > 0) {
+  if (command) {
     console.log(CMD_HELP[command] || `Unknown command: ${command}\n\n${MAIN_HELP}`);
   } else {
     console.log(MAIN_HELP);
@@ -908,21 +1056,24 @@ const commands: Record<string, () => void> = {
   status: cmdStatus,
   sleeps: cmdSleeps,
   stats: cmdStats,
-  "start-nap": cmdStartNap,
-  "start-night": cmdStartNight,
-  end: cmdEnd,
+  nap: cmdNap,
+  bed: cmdBed,
+  up: cmdUp,
   pause: cmdPause,
   resume: cmdResume,
-  wake: cmdWake,
-  diaper: cmdDiaper,
+  potty: cmdPotty,
+  diaper: cmdPotty,
   query: cmdQuery,
 };
 
-const handler = commands[command];
-if (!handler) {
-  console.error(`Unknown command: ${command}\n`);
-  console.log(MAIN_HELP);
-  process.exit(1);
+if (!command) {
+  cmdDefault();
+} else {
+  const handler = commands[command];
+  if (!handler) {
+    console.error(`Unknown command: ${command}\n`);
+    console.log(MAIN_HELP);
+    process.exit(1);
+  }
+  handler();
 }
-
-handler();
