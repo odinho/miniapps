@@ -29,20 +29,20 @@ wake-up sheets, pause handling, diaper nudge, Norwegian strings, 77 Playwright t
 ## Known Issues & Polish
 
 ### A. Potty Mode Refinements
-- [ ] **A1. Potty edit modal in history**
+- [x] **A1. Potty edit modal in history**
   Clicking a potty entry in history opens the old diaper edit modal.
   Should show potty-specific pills (result + diaper status) matching the log modal.
 
-- [ ] **A2. Potty stats/count on dashboard**
+- [x] **A2. Potty stats/count on dashboard**
   Dashboard shows `diaperCount` but doesn't distinguish potty visits. Could show
   "3 dobesøk" vs "3 bleier" depending on mode.
 
-- [ ] **A3. Diaper nudge timing for potty mode**
+- [x] **A3. Diaper nudge timing for potty mode**
   2-hour window may not be right for potty training (more frequent attempts typical).
   Consider a setting for nudge interval, or default to 1h in potty mode.
 
 ### B. Arc & Predictions
-- [ ] **B1. Night mode arc endpoint times**
+- [x] **B1. Night mode arc endpoint times**
   Currently only day mode shows time labels on arc endpoints. Night mode should
   show bedtime and expected wake-up.
 
@@ -68,7 +68,7 @@ wake-up sheets, pause handling, diaper nudge, Norwegian strings, 77 Playwright t
   Parents often switch apps or want data for pediatrician visits. Export to CSV
   or JSON would be valuable. Simple download button in settings.
 
-- [ ] **C3. Undo last action**
+- [x] **C3. Undo last action**
   Accidentally ended a nap? Toast with "Angre" button that reverts the last event
   within 10 seconds. Much better than editing after the fact.
 
@@ -108,7 +108,7 @@ wake-up sheets, pause handling, diaper nudge, Norwegian strings, 77 Playwright t
   updates. New deploys should bust the old cache.
 
 ### G. Visual & UX Polish
-- [ ] **G1. Haptic feedback on mobile**
+- [x] **G1. Haptic feedback on mobile**
   `navigator.vibrate(10)` on sleep start/end, pill selection. Subtle tactile
   confirmation.
 
