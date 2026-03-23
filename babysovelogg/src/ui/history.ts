@@ -1,6 +1,6 @@
-import { getSleeps, getDiapers, postEvents } from "../api.js";
-import { getClientId } from "../sync.js";
-import { refreshState } from "../main.js";
+import { getSleeps, getDiapers } from "../api.js";
+import { sendEventWithOfflineFallback } from "../sync.js";
+import { refreshState, getAppState, setAppState } from "../main.js";
 import { el, formatDuration, formatTime } from "./components.js";
 import { showConfirm } from "./toast.js";
 import { MOODS, METHODS, MOOD_EMOJI, METHOD_EMOJI, FALL_ASLEEP_LABELS } from "../constants.js";
@@ -388,25 +388,24 @@ export function showEditModal(entry: SleepLogRow, container: HTMLElement): void 
   const cancelBtn = el("button", { className: "btn btn-ghost" }, ["Avbryt"]);
 
   saveBtn.addEventListener("click", async () => {
-    await postEvents([
+    await sendEventWithOfflineFallback(
+      "sleep.updated",
       {
-        type: "sleep.updated",
-        payload: {
-          sleepDomainId: entry.domain_id,
-          startTime: new Date(`${startDateInput.value}T${startTimeInput.value}`).toISOString(),
-          endTime:
-            endDateInput.value && endTimeInput.value
-              ? new Date(`${endDateInput.value}T${endTimeInput.value}`).toISOString()
-              : undefined,
-          type: selectedType,
-          mood: selectedMood,
-          method: selectedMethod,
-          fallAsleepTime: selectedFallAsleep,
-          notes: noteInput.value.trim() || undefined,
-        },
-        clientId: getClientId(),
+        sleepDomainId: entry.domain_id,
+        startTime: new Date(`${startDateInput.value}T${startTimeInput.value}`).toISOString(),
+        endTime:
+          endDateInput.value && endTimeInput.value
+            ? new Date(`${endDateInput.value}T${endTimeInput.value}`).toISOString()
+            : undefined,
+        type: selectedType,
+        mood: selectedMood,
+        method: selectedMethod,
+        fallAsleepTime: selectedFallAsleep,
+        notes: noteInput.value.trim() || undefined,
       },
-    ]);
+      getAppState,
+      setAppState,
+    );
     close();
     await refreshState();
     renderHistory(container);
@@ -419,13 +418,12 @@ export function showEditModal(entry: SleepLogRow, container: HTMLElement): void 
       "Avbryt",
     );
     if (confirmed) {
-      await postEvents([
-        {
-          type: "sleep.deleted",
-          payload: { sleepDomainId: entry.domain_id },
-          clientId: getClientId(),
-        },
-      ]);
+      await sendEventWithOfflineFallback(
+        "sleep.deleted",
+        { sleepDomainId: entry.domain_id },
+        getAppState,
+        setAppState,
+      );
       close();
       await refreshState();
       renderHistory(container);
@@ -560,18 +558,17 @@ function showDiaperEditModal(entry: DiaperLogRow, container: HTMLElement): void 
   const cancelBtn = el("button", { className: "btn btn-ghost" }, ["Avbryt"]);
 
   saveBtn.addEventListener("click", async () => {
-    await postEvents([
+    await sendEventWithOfflineFallback(
+      "diaper.updated",
       {
-        type: "diaper.updated",
-        payload: {
-          diaperDomainId: entry.domain_id,
-          type: selectedType,
-          amount: selectedAmount,
-          note: noteInput.value.trim() || undefined,
-        },
-        clientId: getClientId(),
+        diaperDomainId: entry.domain_id,
+        type: selectedType,
+        amount: selectedAmount,
+        note: noteInput.value.trim() || undefined,
       },
-    ]);
+      getAppState,
+      setAppState,
+    );
     close();
     await refreshState();
     renderHistory(container);
@@ -584,13 +581,12 @@ function showDiaperEditModal(entry: DiaperLogRow, container: HTMLElement): void 
       "Avbryt",
     );
     if (confirmed) {
-      await postEvents([
-        {
-          type: "diaper.deleted",
-          payload: { diaperDomainId: entry.domain_id },
-          clientId: getClientId(),
-        },
-      ]);
+      await sendEventWithOfflineFallback(
+        "diaper.deleted",
+        { diaperDomainId: entry.domain_id },
+        getAppState,
+        setAppState,
+      );
       close();
       await refreshState();
       renderHistory(container);

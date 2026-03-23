@@ -1,6 +1,6 @@
 import { getAppState, setAppState } from "../main.js";
 import { postEvents } from "../api.js";
-import { queueEvent, getClientId } from "../sync.js";
+import { queueEvent, getClientId, applyOptimisticEvent } from "../sync.js";
 import { generateSleepId, generateDiaperId } from "../identity.js";
 import { getExpectedNapCount } from "../engine/schedule.js";
 import {
@@ -25,7 +25,7 @@ import {
 import { toLocalDate, toLocalTime } from "../utils.js";
 import type { Baby, SleepLogRow, SleepPauseRow } from "../../types.js";
 
-/** Send event optimistically — if offline, queue it and show a toast. Returns true if online. */
+/** Send event optimistically — if offline, queue it, apply optimistic update, and show a toast. Returns true if online. */
 async function sendEvent(type: string, payload: Record<string, unknown>): Promise<boolean> {
   try {
     const result = await postEvents([{ type, payload, clientId: getClientId() }]);
@@ -33,6 +33,11 @@ async function sendEvent(type: string, payload: Record<string, unknown>): Promis
     return true;
   } catch {
     queueEvent(type, payload);
+    // Apply optimistic update to local state so UI reflects the change immediately
+    const state = getAppState();
+    if (state) {
+      setAppState(applyOptimisticEvent(state, type, payload));
+    }
     showToast("Lagra offline — synkar snart", "warning");
     return false;
   }
@@ -408,6 +413,19 @@ export function renderDashboard(container: HTMLElement): void {
 
   // Action buttons in the arc gap
   const arcActions = el("div", { className: "arc-actions" });
+
+  // Diaper/potty button — always available in all states
+  const isPottyMode = baby.potty_mode === 1;
+  const makeDiaperBtn = () => {
+    const btn = el("button", { className: "arc-action-btn diaper" }, [
+      isPottyMode ? "🚽 Do" : "🧷 Bleie",
+    ]);
+    btn.addEventListener("click", () =>
+      isPottyMode ? showPottyModal(baby, container) : showDiaperModal(baby, container),
+    );
+    return btn;
+  };
+
   if (isNightMode) {
     if (isSleeping) {
       // During active night sleep: pause + diaper
@@ -423,8 +441,9 @@ export function renderDashboard(container: HTMLElement): void {
         renderDashboard(container);
       });
       arcActions.appendChild(pauseActionBtn);
+      arcActions.appendChild(makeDiaperBtn());
     } else {
-      // Night, not sleeping: night waking + morning
+      // Night, not sleeping: night waking + morning + diaper
       const nightBtn = el("button", { className: "arc-action-btn night" }, ["🌙 Nattevaking"]);
       nightBtn.addEventListener("click", async () => {
         await sendEvent("sleep.started", {
@@ -439,10 +458,11 @@ export function renderDashboard(container: HTMLElement): void {
       morningBtn.addEventListener("click", () => showWakeUpPanel(baby, container));
       arcActions.appendChild(nightBtn);
       arcActions.appendChild(morningBtn);
+      arcActions.appendChild(makeDiaperBtn());
     }
   } else {
     if (isSleeping) {
-      // Sleeping during day: pause + wake
+      // Sleeping during day: pause + diaper
       const pauseActionBtn = el("button", { className: "arc-action-btn nap" }, [
         isPaused ? "▶️ Fortset" : "⏸️ Pause",
       ]);
@@ -455,6 +475,7 @@ export function renderDashboard(container: HTMLElement): void {
         renderDashboard(container);
       });
       arcActions.appendChild(pauseActionBtn);
+      arcActions.appendChild(makeDiaperBtn());
     } else {
       // Daytime, awake: nap + diaper
       const napBtn = el("button", { className: "arc-action-btn nap" }, ["😴 Lur"]);
@@ -467,15 +488,8 @@ export function renderDashboard(container: HTMLElement): void {
         });
         renderDashboard(container);
       });
-      const isPottyMode = baby.potty_mode === 1;
-      const diaperBtn = el("button", { className: "arc-action-btn diaper" }, [
-        isPottyMode ? "🚽 Do" : "🧷 Bleie",
-      ]);
-      diaperBtn.addEventListener("click", () =>
-        isPottyMode ? showPottyModal(baby, container) : showDiaperModal(baby, container),
-      );
       arcActions.appendChild(napBtn);
-      arcActions.appendChild(diaperBtn);
+      arcActions.appendChild(makeDiaperBtn());
     }
   }
   dash.appendChild(arcContainer);
@@ -622,26 +636,15 @@ function _showManualSleepModal(baby: Baby, container: HTMLElement): void {
       return;
     }
 
-    try {
-      const result = await postEvents([
-        {
-          type: "sleep.manual",
-          payload: {
-            babyId: baby.id,
-            startTime: start.toISOString(),
-            endTime: end.toISOString(),
-            type: selectedType,
-          },
-          clientId: getClientId(),
-        },
-      ]);
-      setAppState(result.state);
-      showToast("Søvn lagt til", "success");
-      close();
-      renderDashboard(container);
-    } catch {
-      showToast("Klarte ikkje lagra", "error");
-    }
+    const online = await sendEvent("sleep.manual", {
+      babyId: baby.id,
+      startTime: start.toISOString(),
+      endTime: end.toISOString(),
+      type: selectedType,
+    });
+    if (online) showToast("Søvn lagt til", "success");
+    close();
+    renderDashboard(container);
   });
 
   cancelBtn.addEventListener("click", close);
@@ -676,21 +679,13 @@ function _showEditStartModal(activeSleep: SleepLogRow, container: HTMLElement): 
       showToast("Ugyldig tid", "warning");
       return;
     }
-    try {
-      const result = await postEvents([
-        {
-          type: "sleep.updated",
-          payload: { sleepDomainId: activeSleep.domain_id, startTime: start.toISOString() },
-          clientId: getClientId(),
-        },
-      ]);
-      setAppState(result.state);
-      showToast("Starttid oppdatert", "success");
-      close();
-      renderDashboard(container);
-    } catch {
-      showToast("Klarte ikkje oppdatera", "error");
-    }
+    const online = await sendEvent("sleep.updated", {
+      sleepDomainId: activeSleep.domain_id,
+      startTime: start.toISOString(),
+    });
+    if (online) showToast("Starttid oppdatert", "success");
+    close();
+    renderDashboard(container);
   });
 
   cancelBtn.addEventListener("click", close);
@@ -879,24 +874,13 @@ function showTagSheet(sleepDomainId: string, container: HTMLElement): void {
   async function close() {
     overlay.remove();
     if (selectedMood || selectedMethod || selectedFallAsleep || noteInput.value.trim()) {
-      try {
-        const result = await postEvents([
-          {
-            type: "sleep.tagged",
-            payload: {
-              sleepDomainId,
-              mood: selectedMood,
-              method: selectedMethod,
-              fallAsleepTime: selectedFallAsleep,
-              notes: noteInput.value.trim() || undefined,
-            },
-            clientId: getClientId(),
-          },
-        ]);
-        setAppState(result.state);
-      } catch (err) {
-        console.error("Failed to save sleep tags:", err);
-      }
+      await sendEvent("sleep.tagged", {
+        sleepDomainId,
+        mood: selectedMood,
+        method: selectedMethod,
+        fallAsleepTime: selectedFallAsleep,
+        notes: noteInput.value.trim() || undefined,
+      });
     }
   }
 }
@@ -1078,21 +1062,10 @@ function showWakeUpSheet(
   async function close() {
     overlay.remove();
     if (wokeBy || noteInput.value.trim()) {
-      try {
-        const payload: Record<string, unknown> = { sleepDomainId };
-        if (wokeBy) payload.wokeBy = wokeBy;
-        if (noteInput.value.trim()) payload.wakeNotes = noteInput.value.trim();
-        const result = await postEvents([
-          {
-            type: "sleep.updated",
-            payload,
-            clientId: getClientId(),
-          },
-        ]);
-        setAppState(result.state);
-      } catch (err) {
-        console.error("Failed to save wake-up info:", err);
-      }
+      const payload: Record<string, unknown> = { sleepDomainId };
+      if (wokeBy) payload.wokeBy = wokeBy;
+      if (noteInput.value.trim()) payload.wakeNotes = noteInput.value.trim();
+      await sendEvent("sleep.updated", payload);
     }
   }
 }
@@ -1186,28 +1159,17 @@ function showDiaperModal(baby: Baby, container: HTMLElement): void {
       showToast("Ugyldig tid", "warning");
       return;
     }
-    try {
-      const result = await postEvents([
-        {
-          type: "diaper.logged",
-          payload: {
-            babyId: baby.id,
-            time: time.toISOString(),
-            type: selectedType,
-            amount: selectedAmount,
-            note: noteInput.value || undefined,
-            diaperDomainId: generateDiaperId(),
-          },
-          clientId: getClientId(),
-        },
-      ]);
-      setAppState(result.state);
-      showToast("Bleie logga", "success");
-      close();
-      renderDashboard(container);
-    } catch {
-      showToast("Klarte ikkje lagra", "error");
-    }
+    const online = await sendEvent("diaper.logged", {
+      babyId: baby.id,
+      time: time.toISOString(),
+      type: selectedType,
+      amount: selectedAmount,
+      note: noteInput.value || undefined,
+      diaperDomainId: generateDiaperId(),
+    });
+    if (online) showToast("Bleie logga", "success");
+    close();
+    renderDashboard(container);
   });
 
   cancelBtn.addEventListener("click", close);
@@ -1353,28 +1315,17 @@ function showPottyModal(baby: Baby, container: HTMLElement): void {
   const cancelBtn = el("button", { className: "btn btn-ghost" }, ["Avbryt"]);
 
   saveBtn.addEventListener("click", async () => {
-    try {
-      const result = await postEvents([
-        {
-          type: "diaper.logged",
-          payload: {
-            babyId: baby.id,
-            time: new Date().toISOString(),
-            type: selectedResult,
-            amount: selectedResult === "diaper_only" ? null : selectedDiaperStatus,
-            note: noteInput.value || undefined,
-            diaperDomainId: generateDiaperId(),
-          },
-          clientId: getClientId(),
-        },
-      ]);
-      setAppState(result.state);
-      showToast("Dobesøk logga", "success");
-      close();
-      renderDashboard(container);
-    } catch {
-      showToast("Klarte ikkje lagra", "error");
-    }
+    const online = await sendEvent("diaper.logged", {
+      babyId: baby.id,
+      time: new Date().toISOString(),
+      type: selectedResult,
+      amount: selectedResult === "diaper_only" ? null : selectedDiaperStatus,
+      note: noteInput.value || undefined,
+      diaperDomainId: generateDiaperId(),
+    });
+    if (online) showToast("Dobesøk logga", "success");
+    close();
+    renderDashboard(container);
   });
 
   cancelBtn.addEventListener("click", close);
@@ -1415,22 +1366,13 @@ function showWakeUpPanel(baby: Baby, container: HTMLElement): void {
       showToast("Ugyldig tid", "warning");
       return;
     }
-    try {
-      const result = await postEvents([
-        {
-          type: "day.started",
-          payload: { babyId: baby.id, wakeTime: wakeTime.toISOString() },
-          clientId: getClientId(),
-        },
-      ]);
-      setAppState(result.state);
-      showToast("Vaknetid sett", "success");
-      close();
-      renderDashboard(container);
-    } catch {
-      queueEvent("day.started", { babyId: baby.id, wakeTime: wakeTime.toISOString() });
-      showToast("Klarte ikkje lagra", "error");
-    }
+    const online = await sendEvent("day.started", {
+      babyId: baby.id,
+      wakeTime: wakeTime.toISOString(),
+    });
+    if (online) showToast("Vaknetid sett", "success");
+    close();
+    renderDashboard(container);
   });
 
   cancelBtn.addEventListener("click", close);
@@ -1470,43 +1412,23 @@ function showMorningPrompt(baby: Baby, container: HTMLElement): void {
       showToast("Ugyldig tid", "warning");
       return;
     }
-
-    try {
-      const result = await postEvents([
-        {
-          type: "day.started",
-          payload: { babyId: baby.id, wakeTime: wakeTime.toISOString() },
-          clientId: getClientId(),
-        },
-      ]);
-      setAppState(result.state);
-      showToast("Vaknetid sett", "success");
-      renderDashboard(container);
-    } catch {
-      queueEvent("day.started", { babyId: baby.id, wakeTime: wakeTime.toISOString() });
-      showToast("Klarte ikkje lagra vaknetid", "error");
-    }
+    const online = await sendEvent("day.started", {
+      babyId: baby.id,
+      wakeTime: wakeTime.toISOString(),
+    });
+    if (online) showToast("Vaknetid sett", "success");
+    renderDashboard(container);
   });
 
-  skipBtn.addEventListener("click", () => {
+  skipBtn.addEventListener("click", async () => {
     // Bypass morning prompt by creating a default wake-up time (6am)
     const earlyMorning = new Date();
     earlyMorning.setHours(6, 0, 0, 0);
-    postEvents([
-      {
-        type: "day.started",
-        payload: { babyId: baby.id, wakeTime: earlyMorning.toISOString() },
-        clientId: getClientId(),
-      },
-    ])
-      .then((result) => {
-        setAppState(result.state);
-        renderDashboard(container);
-      })
-      .catch(() => {
-        // If offline, just render dashboard anyway
-        renderDashboard(container);
-      });
+    await sendEvent("day.started", {
+      babyId: baby.id,
+      wakeTime: earlyMorning.toISOString(),
+    });
+    renderDashboard(container);
   });
 
   prompt.appendChild(el("div", { className: "btn-row" }, [skipBtn, saveBtn]));

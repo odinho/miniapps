@@ -1,5 +1,13 @@
 import { getState, setMutationHook, type AppState } from "./api.js";
-import { flushQueue, cacheState, getCachedState, connectSSE, markLocalMutation } from "./sync.js";
+import {
+  flushQueue,
+  cacheState,
+  getCachedState,
+  connectSSE,
+  markLocalMutation,
+  applyQueuedEvents,
+  hasPendingEvents,
+} from "./sync.js";
 import { injectStyles } from "./ui/styles.js";
 import { renderDashboard, cleanupDashboard } from "./ui/dashboard.js";
 import { renderHistory } from "./ui/history.js";
@@ -27,6 +35,10 @@ export async function refreshState(): Promise<AppState | null> {
     return currentState;
   } catch {
     currentState = getCachedState();
+    // Apply any queued events to cached state so offline changes are reflected
+    if (currentState && hasPendingEvents()) {
+      currentState = applyQueuedEvents(currentState);
+    }
     return currentState;
   }
 }
