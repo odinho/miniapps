@@ -259,6 +259,25 @@ html, body {
   color: #fff;
 }
 
+/* Wake time nudge row */
+.wake-time-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.wake-time-display {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.nudge-btn {
+  padding: 2px 8px !important;
+  font-size: 0.8rem !important;
+  min-width: 0 !important;
+  border-radius: var(--radius-sm) !important;
+}
+
 /* Compact sleep/wake toggle */
 .sleep-button {
   width: 56px;

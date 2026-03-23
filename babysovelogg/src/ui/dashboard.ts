@@ -958,9 +958,53 @@ function showWakeUpSheet(
 
   modal.appendChild(el("h2", null, ["Oppvakning"]));
 
-  // End time picker — pre-filled with the recorded end time, user can adjust
+  // Quick-adjust end time — show time with -1/-5 nudge buttons
+  let adjustedEndTime = new Date(recordedEndTime);
+  const timeDisplay = el("span", { className: "wake-time-display" }, [
+    formatTime(adjustedEndTime),
+  ]);
+
+  function nudgeTime(minutes: number) {
+    adjustedEndTime = new Date(adjustedEndTime.getTime() + minutes * 60000);
+    timeDisplay.textContent = formatTime(adjustedEndTime);
+  }
+
+  const minus1Btn = el("button", { className: "btn btn-ghost nudge-btn" }, ["-1"]);
+  const minus5Btn = el("button", { className: "btn btn-ghost nudge-btn" }, ["-5"]);
+  minus1Btn.addEventListener("click", () => nudgeTime(-1));
+  minus5Btn.addEventListener("click", () => nudgeTime(-5));
+
+  // Expandable full date/time picker for bigger adjustments
   const endTimeDt = makeDateTimeInputs(recordedEndTime);
-  modal.appendChild(dateTimeGroup("Vakna kl.", endTimeDt));
+  const fullPickerWrap = el("div", {
+    className: "form-group",
+    style: { display: "none", marginTop: "8px" },
+  }, [dateTimeGroup("", endTimeDt)]);
+
+  const editLink = el("span", {
+    className: "edit-start-link",
+    style: { fontSize: "0.8rem", marginLeft: "8px" },
+  }, ["endra"]);
+  editLink.addEventListener("click", () => {
+    // Sync the full picker with the nudged time
+    endTimeDt.dateInput.value = toLocalDate(adjustedEndTime.toISOString());
+    endTimeDt.timeInput.value = toLocalTime(adjustedEndTime.toISOString());
+    fullPickerWrap.style.display = "";
+    wakeTimeRow.style.display = "none";
+  });
+
+  const wakeTimeRow = el("div", {
+    className: "wake-time-row",
+  }, [
+    el("span", { style: { color: "var(--text-light)", fontSize: "0.85rem" } }, ["Vakna "]),
+    timeDisplay,
+    minus1Btn,
+    minus5Btn,
+    editLink,
+  ]);
+
+  modal.appendChild(wakeTimeRow);
+  modal.appendChild(fullPickerWrap);
 
   // Compact bedtime summary — show what was recorded at sleep start
   const hasBedtimeTags =
@@ -1128,17 +1172,20 @@ function showWakeUpSheet(
   // Auto-save on any close
   async function close() {
     overlay.remove();
-    // Check if end time was adjusted
-    const newEndTime = new Date(endTimeDt.getValue());
+    // Use full picker if expanded, otherwise use nudged time
+    const fullPickerVisible = fullPickerWrap.style.display !== "none";
+    const finalEndTime = fullPickerVisible
+      ? new Date(endTimeDt.getValue())
+      : adjustedEndTime;
     const endTimeChanged =
-      !isNaN(newEndTime.getTime()) &&
-      Math.abs(newEndTime.getTime() - new Date(recordedEndTime).getTime()) > 60000;
+      !isNaN(finalEndTime.getTime()) &&
+      Math.abs(finalEndTime.getTime() - new Date(recordedEndTime).getTime()) > 30000;
 
     if (wokeBy || noteInput.value.trim() || endTimeChanged) {
       const payload: Record<string, unknown> = { sleepDomainId };
       if (wokeBy) payload.wokeBy = wokeBy;
       if (noteInput.value.trim()) payload.wakeNotes = noteInput.value.trim();
-      if (endTimeChanged) payload.endTime = newEndTime.toISOString();
+      if (endTimeChanged) payload.endTime = finalEndTime.toISOString();
       await sendEvent("sleep.updated", payload);
       if (endTimeChanged) renderDashboard(container);
     }
