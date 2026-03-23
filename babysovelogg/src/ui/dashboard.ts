@@ -417,13 +417,13 @@ export function renderDashboard(container: HTMLElement): void {
   // Diaper/potty button — always available in all states
   const isPottyMode = baby.potty_mode === 1;
   const makeDiaperBtn = () => {
-    const btn = el("button", { className: "arc-action-btn diaper" }, [
+    const diaperBtn = el("button", { className: "arc-action-btn diaper" }, [
       isPottyMode ? "🚽 Do" : "🧷 Bleie",
     ]);
-    btn.addEventListener("click", () =>
+    diaperBtn.addEventListener("click", () =>
       isPottyMode ? showPottyModal(baby, container) : showDiaperModal(baby, container),
     );
-    return btn;
+    return diaperBtn;
   };
 
   if (isNightMode) {
