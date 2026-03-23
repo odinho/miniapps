@@ -1,6 +1,6 @@
 import { getAppState, setAppState } from "../main.js";
 import { postEvents } from "../api.js";
-import { queueEvent, getClientId, applyOptimisticEvent } from "../sync.js";
+import { queueEvent, getClientId, applyOptimisticEvent, hasPendingEvents, applyQueuedEvents } from "../sync.js";
 import { generateSleepId, generateDiaperId } from "../identity.js";
 import { getExpectedNapCount } from "../engine/schedule.js";
 import {
@@ -29,7 +29,9 @@ import type { Baby, SleepLogRow, SleepPauseRow } from "../../types.js";
 async function sendEvent(type: string, payload: Record<string, unknown>): Promise<boolean> {
   try {
     const result = await postEvents([{ type, payload, clientId: getClientId() }]);
-    setAppState(result.state);
+    // Server state may not include other queued offline events — reapply them
+    const effective = hasPendingEvents() ? applyQueuedEvents(result.state) : result.state;
+    setAppState(effective);
     return true;
   } catch {
     queueEvent(type, payload);
@@ -302,6 +304,30 @@ export function renderDashboard(container: HTMLElement): void {
   });
   const arcContainer = el("div", { className: "arc-container" });
   arcContainer.appendChild(arcSvg);
+
+  // Periodically refresh the arc SVG while sleeping so the active pill grows
+  if (isSleeping) {
+    const arcRefresh = setInterval(() => {
+      const freshSvg = renderArc({
+        todaySleeps: todaySleeps.map((s) => ({
+          start_time: s.start_time,
+          end_time: s.end_time,
+          type: s.type as "nap" | "night",
+        })),
+        activeSleep: activeSleep
+          ? { start_time: activeSleep.start_time, type: activeSleep.type as "nap" | "night" }
+          : null,
+        prediction: filteredPrediction,
+        isNightMode,
+        wakeUpTime: todayWakeUp?.wake_time,
+        startTimeLabel: isNightMode ? null : todayWakeUp?.wake_time ? formatTime(todayWakeUp.wake_time) : null,
+        endTimeLabel: isNightMode ? null : prediction?.bedtime ? "~" + formatTime(prediction.bedtime) : null,
+      });
+      const oldSvg = arcContainer.querySelector(".sleep-arc");
+      if (oldSvg) oldSvg.replaceWith(freshSvg);
+    }, 60000);
+    cleanups.push(() => clearInterval(arcRefresh));
+  }
 
   // Center text inside arc (countdown or timer)
   const arcCenter = el("div", { className: "arc-center-text" });

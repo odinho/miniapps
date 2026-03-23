@@ -243,7 +243,7 @@ export function applyOptimisticEvent(
         woke_by: null,
         wake_notes: null,
         deleted: 0,
-        domain_id: payload.sleepDomainId as string || `slp_optimistic_${Date.now()}`,
+        domain_id: (payload.sleepDomainId as string) || `slp_optimistic_${Date.now()}`,
         created_by_event_id: null,
         updated_by_event_id: null,
         pauses: [],
@@ -293,10 +293,7 @@ export function applyOptimisticEvent(
 }
 
 /** Find a sleep entry by domain_id in activeSleep or todaySleeps (returns mutable ref). */
-function findSleep(
-  state: AppState,
-  domainId: string,
-): SleepLogRow | undefined {
+function findSleep(state: AppState, domainId: string): SleepLogRow | undefined {
   if (state.activeSleep?.domain_id === domainId) return state.activeSleep;
   return state.todaySleeps.find((s) => s.domain_id === domainId);
 }

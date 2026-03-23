@@ -149,12 +149,27 @@ async function main() {
   // History and stats fetch their own data, so re-rendering them on every SSE update
   // would cause unnecessary refetches and disrupt scroll position / modal state.
   connectSSE((state) => {
-    setAppState(state);
+    // Reapply any queued offline events on top of server state so optimistic
+    // changes (e.g. an in-progress nap started while offline) aren't lost.
+    const effective = hasPendingEvents() ? applyQueuedEvents(state) : state;
+    setAppState(effective);
     const hash = window.location.hash || "#/";
     if (hash === "#/" || hash === "") {
       renderDashboard(content);
     }
     // Other routes will pick up the new state when navigated to
+  });
+
+  // When connectivity returns, flush queued offline events to the server.
+  window.addEventListener("online", async () => {
+    const result = await flushQueue();
+    if (result) {
+      setAppState(result.state);
+      const hash = window.location.hash || "#/";
+      if (hash === "#/" || hash === "") {
+        renderDashboard(content);
+      }
+    }
   });
 }
 

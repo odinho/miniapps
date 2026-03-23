@@ -264,9 +264,14 @@ export function renderArc(input: ArcInput): SVGElement {
     if (startFracRaw < -0.05 && endFracRaw < -0.05) continue;
 
     const startFrac = timeToArcFraction(bubble.startTime, config);
-    const endFrac = bubble.endTime
+    let endFrac = bubble.endTime
       ? timeToArcFraction(bubble.endTime, config)
       : timeToArcFraction(new Date(), config);
+
+    // Active bubbles always get a minimum visual size so they're visible immediately
+    if (bubble.status === "active" && endFrac - startFrac < 0.015) {
+      endFrac = Math.min(1, startFrac + 0.015);
+    }
 
     if (Math.abs(endFrac - startFrac) < 0.005) continue;
 

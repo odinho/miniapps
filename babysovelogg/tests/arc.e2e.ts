@@ -5,6 +5,8 @@ import {
   setWakeUpTime,
   addCompletedSleep,
   addActiveSleep,
+  dismissSheet,
+  forceMorning,
 } from "./fixtures";
 
 test("Arc renders on dashboard", async ({ page }) => {
@@ -130,4 +132,70 @@ test("Arc center shows timer when sleeping", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".arc-center-text")).toBeVisible();
   await expect(page.locator(".arc-center-label")).toContainText("Lurar");
+});
+
+test("Starting nap via UI shows active bubble on arc", async ({ page }) => {
+  await forceMorning(page);
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
+
+  await page.goto("/");
+  await expect(page.getByTestId("sleep-button")).toBeVisible();
+
+  // Start sleep via main button
+  await page.getByTestId("sleep-button").click();
+  await expect(page.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 5000 });
+
+  // Dismiss the tag sheet that appears
+  await dismissSheet(page);
+
+  // Active bubble must be visible on the arc
+  await expect(page.locator(".arc-bubble-active")).toHaveCount(1, { timeout: 5000 });
+  await expect(page.locator(".arc-active-pulse")).toHaveCount(1);
+});
+
+test("Active bubble persists after navigating away and back", async ({ page }) => {
+  await forceMorning(page);
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
+  addActiveSleep(babyId, new Date(Date.now() - 20 * 60000).toISOString(), "nap");
+
+  await page.goto("/");
+  await expect(page.locator(".arc-bubble-active")).toHaveCount(1);
+
+  // Navigate away and back — dashboard re-renders from current state
+  await page.evaluate(() => { window.location.hash = "#/history"; });
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { window.location.hash = "#/"; });
+
+  // Active bubble should still be on the arc after re-render
+  await expect(page.locator(".arc-bubble-active")).toHaveCount(1, { timeout: 5000 });
+  await expect(page.locator(".arc-active-pulse")).toHaveCount(1);
+});
+
+test("Active bubble survives offline event + SSE reconnect", async ({ page }) => {
+  await forceMorning(page);
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
+
+  await page.goto("/");
+  await expect(page.getByTestId("sleep-button")).toBeVisible();
+
+  // Go offline before starting nap
+  await page.context().setOffline(true);
+
+  // Start nap while offline — uses optimistic state
+  await page.getByTestId("sleep-button").click();
+  await expect(page.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 5000 });
+  await dismissSheet(page);
+
+  // Active bubble should appear from optimistic state
+  await expect(page.locator(".arc-bubble-active")).toHaveCount(1, { timeout: 5000 });
+
+  // Come back online — this should flush the queue and keep the active bubble
+  await page.context().setOffline(false);
+  await page.waitForTimeout(1000);
+
+  // Active bubble should still be present
+  await expect(page.locator(".arc-bubble-active")).toHaveCount(1);
 });
