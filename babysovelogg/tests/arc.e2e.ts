@@ -164,9 +164,13 @@ test("Active bubble persists after navigating away and back", async ({ page }) =
   await expect(page.locator(".arc-bubble-active")).toHaveCount(1);
 
   // Navigate away and back — dashboard re-renders from current state
-  await page.evaluate(() => { window.location.hash = "#/history"; });
+  await page.evaluate(() => {
+    window.location.hash = "#/history";
+  });
   await page.waitForTimeout(300);
-  await page.evaluate(() => { window.location.hash = "#/"; });
+  await page.evaluate(() => {
+    window.location.hash = "#/";
+  });
 
   // Active bubble should still be on the arc after re-render
   await expect(page.locator(".arc-bubble-active")).toHaveCount(1, { timeout: 5000 });

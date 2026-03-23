@@ -1,6 +1,14 @@
 import { getAppState, setAppState } from "../main.js";
 import { postEvents } from "../api.js";
-import { queueEvent, getClientId, applyOptimisticEvent, hasPendingEvents, applyQueuedEvents, getSSEStatus, getPendingCount } from "../sync.js";
+import {
+  queueEvent,
+  getClientId,
+  applyOptimisticEvent,
+  hasPendingEvents,
+  applyQueuedEvents,
+  isServerOffline,
+  getPendingCount,
+} from "../sync.js";
 import { generateSleepId, generateDiaperId } from "../identity.js";
 import { getExpectedNapCount } from "../engine/schedule.js";
 import {
@@ -87,24 +95,35 @@ let cleanups: (() => void)[] = [];
 
 function buildSyncBadge(): HTMLElement {
   const pending = getPendingCount();
-  // Only show "offline" when the browser is actually offline, not just because SSE hasn't connected yet
-  const isOffline = !navigator.onLine;
+  const isOffline = isServerOffline();
 
   if (isOffline) {
-    const badge = el("span", {
-      className: "sync-badge sync-badge-offline",
-      "data-testid": "sync-badge",
-    }, ["offline"]);
-    badge.addEventListener("click", () => { window.location.hash = "#/events"; });
+    const badge = el(
+      "span",
+      {
+        className: "sync-badge sync-badge-offline",
+        "data-testid": "sync-badge",
+      },
+      ["offline"],
+    );
+    badge.addEventListener("click", () => {
+      window.location.hash = "#/events";
+    });
     return badge;
   }
 
   if (pending > 0) {
-    const badge = el("span", {
-      className: "sync-badge sync-badge-pending",
-      "data-testid": "sync-badge",
-    }, [`${pending} ventande`]);
-    badge.addEventListener("click", () => { window.location.hash = "#/events"; });
+    const badge = el(
+      "span",
+      {
+        className: "sync-badge sync-badge-pending",
+        "data-testid": "sync-badge",
+      },
+      [`${pending} ventande`],
+    );
+    badge.addEventListener("click", () => {
+      window.location.hash = "#/events";
+    });
     return badge;
   }
 
@@ -263,6 +282,9 @@ export function renderDashboard(container: HTMLElement): void {
     dash.appendChild(pauseBtn);
   }
 
+  // Callbacks invoked by the unified 60s dashboard tick (arc, awake timer, etc.)
+  const tickCallbacks: (() => void)[] = [];
+
   // 12-hour arc visualization
   const isNightMode = document.documentElement.getAttribute("data-theme") === "night";
 
@@ -342,29 +364,36 @@ export function renderDashboard(container: HTMLElement): void {
   const arcContainer = el("div", { className: "arc-container" });
   arcContainer.appendChild(arcSvg);
 
-  // Periodically refresh the arc SVG while sleeping so the active pill grows
-  if (isSleeping) {
-    const arcRefresh = setInterval(() => {
-      const freshSvg = renderArc({
-        todaySleeps: todaySleeps.map((s) => ({
-          start_time: s.start_time,
-          end_time: s.end_time,
-          type: s.type as "nap" | "night",
-        })),
-        activeSleep: activeSleep
-          ? { start_time: activeSleep.start_time, type: activeSleep.type as "nap" | "night" }
+  // Refresh arc SVG (shows current time marker, growing sleep pill, etc.)
+  const refreshArc = () => {
+    const freshSvg = renderArc({
+      todaySleeps: todaySleeps.map((s) => ({
+        start_time: s.start_time,
+        end_time: s.end_time,
+        type: s.type as "nap" | "night",
+      })),
+      activeSleep: activeSleep
+        ? { start_time: activeSleep.start_time, type: activeSleep.type as "nap" | "night" }
+        : null,
+      prediction: filteredPrediction,
+      isNightMode,
+      wakeUpTime: todayWakeUp?.wake_time,
+      startTimeLabel: isNightMode
+        ? null
+        : todayWakeUp?.wake_time
+          ? formatTime(todayWakeUp.wake_time)
           : null,
-        prediction: filteredPrediction,
-        isNightMode,
-        wakeUpTime: todayWakeUp?.wake_time,
-        startTimeLabel: isNightMode ? null : todayWakeUp?.wake_time ? formatTime(todayWakeUp.wake_time) : null,
-        endTimeLabel: isNightMode ? null : prediction?.bedtime ? "~" + formatTime(prediction.bedtime) : null,
-      });
-      const oldSvg = arcContainer.querySelector(".sleep-arc");
-      if (oldSvg) oldSvg.replaceWith(freshSvg);
-    }, 60000);
-    cleanups.push(() => clearInterval(arcRefresh));
-  }
+      endTimeLabel: isNightMode
+        ? null
+        : prediction?.bedtime
+          ? "~" + formatTime(prediction.bedtime)
+          : null,
+    });
+    const oldSvg = arcContainer.querySelector(".sleep-arc");
+    if (oldSvg) oldSvg.replaceWith(freshSvg);
+  };
+  // Arc always updates on tick (shows current time marker even when awake)
+  tickCallbacks.push(refreshArc);
 
   // Center text inside arc (countdown or timer)
   const arcCenter = el("div", { className: "arc-center-text" });
@@ -466,11 +495,10 @@ export function renderDashboard(container: HTMLElement): void {
             },
             [`Vaken ${formatDuration(awakeMs)}`],
           );
-          // Update every minute so the awake timer stays current
-          const awakeInterval = setInterval(() => {
+          // Updated by the unified dashboardTick below
+          tickCallbacks.push(() => {
             awakeEl.textContent = `Vaken ${formatDuration(Date.now() - awakeSinceMs)}`;
-          }, 60000);
-          cleanups.push(() => clearInterval(awakeInterval));
+          });
           arcCenter.appendChild(awakeEl);
         }
       }
@@ -631,6 +659,14 @@ export function renderDashboard(container: HTMLElement): void {
   // Action buttons - below stats, in the big open space
   dash.appendChild(arcActions);
 
+  // Unified 60s tick — drives all time-dependent UI (arc marker, awake timer, etc.)
+  if (tickCallbacks.length > 0) {
+    const dashTick = setInterval(() => {
+      for (const cb of tickCallbacks) cb();
+    }, 60000);
+    cleanups.push(() => clearInterval(dashTick));
+  }
+
   view.appendChild(dash);
   container.appendChild(view);
 }
@@ -784,7 +820,11 @@ function _showEditStartModal(activeSleep: SleepLogRow, container: HTMLElement): 
   }
 }
 
-function showTagSheet(sleepDomainId: string, recordedStartTime: string, container: HTMLElement): void {
+function showTagSheet(
+  sleepDomainId: string,
+  recordedStartTime: string,
+  container: HTMLElement,
+): void {
   const overlay = el("div", { className: "modal-overlay", "data-testid": "modal-overlay" });
   const modal = el("div", { className: "modal tag-sheet" });
 
@@ -811,15 +851,23 @@ function showTagSheet(sleepDomainId: string, recordedStartTime: string, containe
   sm5Btn.addEventListener("click", () => nudgeStart(-5));
 
   const startFullDt = makeDateTimeInputs(recordedStartTime);
-  const startFullWrap = el("div", {
-    className: "form-group",
-    style: { display: "none", marginTop: "8px" },
-  }, [dateTimeGroup("", startFullDt)]);
+  const startFullWrap = el(
+    "div",
+    {
+      className: "form-group",
+      style: { display: "none", marginTop: "8px" },
+    },
+    [dateTimeGroup("", startFullDt)],
+  );
 
-  const startEditLink = el("span", {
-    className: "edit-start-link",
-    style: { fontSize: "0.8rem", marginLeft: "8px" },
-  }, ["endra"]);
+  const startEditLink = el(
+    "span",
+    {
+      className: "edit-start-link",
+      style: { fontSize: "0.8rem", marginLeft: "8px" },
+    },
+    ["endra"],
+  );
   const startTimeRow = el("div", { className: "wake-time-row" }, [
     el("span", { style: { color: "var(--text-light)", fontSize: "0.85rem" } }, ["La seg "]),
     startTimeDisplay,
@@ -1001,9 +1049,7 @@ function showTagSheet(sleepDomainId: string, recordedStartTime: string, containe
 
     // Check if start time was adjusted
     const fullPickerVisible = startFullWrap.style.display !== "none";
-    const finalStartTime = fullPickerVisible
-      ? new Date(startFullDt.getValue())
-      : adjustedStartTime;
+    const finalStartTime = fullPickerVisible ? new Date(startFullDt.getValue()) : adjustedStartTime;
     const startTimeChanged =
       !isNaN(finalStartTime.getTime()) &&
       Math.abs(finalStartTime.getTime() - new Date(recordedStartTime).getTime()) > 30000;
@@ -1042,9 +1088,7 @@ function showWakeUpSheet(
 
   // Quick-adjust end time — show time with -1/-5 nudge buttons
   let adjustedEndTime = new Date(recordedEndTime);
-  const timeDisplay = el("span", { className: "wake-time-display" }, [
-    formatTime(adjustedEndTime),
-  ]);
+  const timeDisplay = el("span", { className: "wake-time-display" }, [formatTime(adjustedEndTime)]);
 
   function nudgeTime(minutes: number) {
     adjustedEndTime = new Date(adjustedEndTime.getTime() + minutes * 60000);
@@ -1058,15 +1102,23 @@ function showWakeUpSheet(
 
   // Expandable full date/time picker for bigger adjustments
   const endTimeDt = makeDateTimeInputs(recordedEndTime);
-  const fullPickerWrap = el("div", {
-    className: "form-group",
-    style: { display: "none", marginTop: "8px" },
-  }, [dateTimeGroup("", endTimeDt)]);
+  const fullPickerWrap = el(
+    "div",
+    {
+      className: "form-group",
+      style: { display: "none", marginTop: "8px" },
+    },
+    [dateTimeGroup("", endTimeDt)],
+  );
 
-  const editLink = el("span", {
-    className: "edit-start-link",
-    style: { fontSize: "0.8rem", marginLeft: "8px" },
-  }, ["endra"]);
+  const editLink = el(
+    "span",
+    {
+      className: "edit-start-link",
+      style: { fontSize: "0.8rem", marginLeft: "8px" },
+    },
+    ["endra"],
+  );
   editLink.addEventListener("click", () => {
     // Sync the full picker with the nudged time
     endTimeDt.dateInput.value = toLocalDate(adjustedEndTime.toISOString());
@@ -1075,15 +1127,19 @@ function showWakeUpSheet(
     wakeTimeRow.style.display = "none";
   });
 
-  const wakeTimeRow = el("div", {
-    className: "wake-time-row",
-  }, [
-    el("span", { style: { color: "var(--text-light)", fontSize: "0.85rem" } }, ["Vakna "]),
-    timeDisplay,
-    minus1Btn,
-    minus5Btn,
-    editLink,
-  ]);
+  const wakeTimeRow = el(
+    "div",
+    {
+      className: "wake-time-row",
+    },
+    [
+      el("span", { style: { color: "var(--text-light)", fontSize: "0.85rem" } }, ["Vakna "]),
+      timeDisplay,
+      minus1Btn,
+      minus5Btn,
+      editLink,
+    ],
+  );
 
   modal.appendChild(wakeTimeRow);
   modal.appendChild(fullPickerWrap);
@@ -1146,7 +1202,7 @@ function showWakeUpSheet(
       );
     }
 
-    const editLink = el(
+    const editBedtimeLink = el(
       "span",
       { style: { fontSize: "0.75rem", color: "var(--primary)", cursor: "pointer" } },
       ["Endra →"],
@@ -1190,7 +1246,7 @@ function showWakeUpSheet(
               },
               ["Legging"],
             ),
-            editLink,
+            editBedtimeLink,
           ],
         ),
         ...summaryChildren,
@@ -1256,9 +1312,7 @@ function showWakeUpSheet(
     overlay.remove();
     // Use full picker if expanded, otherwise use nudged time
     const fullPickerVisible = fullPickerWrap.style.display !== "none";
-    const finalEndTime = fullPickerVisible
-      ? new Date(endTimeDt.getValue())
-      : adjustedEndTime;
+    const finalEndTime = fullPickerVisible ? new Date(endTimeDt.getValue()) : adjustedEndTime;
     const endTimeChanged =
       !isNaN(finalEndTime.getTime()) &&
       Math.abs(finalEndTime.getTime() - new Date(recordedEndTime).getTime()) > 30000;

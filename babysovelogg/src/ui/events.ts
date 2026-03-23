@@ -41,32 +41,37 @@ export async function renderEventsScreen(container: HTMLElement): Promise<void> 
   const domainIdParam = hashParams.get("domainId");
 
   const title = domainIdParam ? "Entitetshistorikk" : "Hendingslogg";
-  const closeBtn = el("button", {
-    "data-testid": "events-close-btn",
-    style: {
-      background: "none",
-      border: "none",
-      color: "var(--text)",
-      fontSize: "1.5rem",
-      cursor: "pointer",
-      padding: "4px 8px",
-      lineHeight: "1",
+  const closeBtn = el(
+    "button",
+    {
+      "data-testid": "events-close-btn",
+      style: {
+        background: "none",
+        border: "none",
+        color: "var(--text)",
+        fontSize: "1.5rem",
+        cursor: "pointer",
+        padding: "4px 8px",
+        lineHeight: "1",
+      },
     },
-  }, ["✕"]);
+    ["✕"],
+  );
   closeBtn.addEventListener("click", () => {
     window.location.hash = "#/";
   });
-  const headerRow = el("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "16px 16px 0",
+  const headerRow = el(
+    "div",
+    {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "16px 16px 0",
+      },
     },
-  }, [
-    el("h2", { style: { margin: "0" } }, [title]),
-    closeBtn,
-  ]);
+    [el("h2", { style: { margin: "0" } }, [title]), closeBtn],
+  );
   view.appendChild(headerRow);
 
   // Filter dropdown

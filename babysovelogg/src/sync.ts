@@ -87,8 +87,19 @@ export function getPendingCount(): number {
 export type SSEStatus = "connected" | "reconnecting" | "disconnected";
 
 let sseStatus: SSEStatus = "disconnected";
+let sseDisconnectedAt = 0; // timestamp when SSE last left "connected"
+const OFFLINE_GRACE_MS = 5000; // don't show "offline" until disconnected this long
+
 export function getSSEStatus(): SSEStatus {
   return sseStatus;
+}
+
+/** True when SSE has been disconnected long enough to consider the server unreachable. */
+export function isServerOffline(): boolean {
+  if (sseStatus === "connected") return false;
+  if (!navigator.onLine) return true;
+  // Grace period: don't flash "offline" for brief SSE reconnects or initial load
+  return sseDisconnectedAt > 0 && Date.now() - sseDisconnectedAt >= OFFLINE_GRACE_MS;
 }
 
 // Suppress SSE re-renders briefly after local mutations
@@ -99,12 +110,22 @@ export function markLocalMutation() {
 }
 
 export function connectSSE(onUpdate: (state: AppState) => void): () => void {
+  // Start the grace period clock — if SSE connects, this gets cleared
+  sseDisconnectedAt = Date.now();
+  // After grace period, re-evaluate badge in case SSE never connected
+  setTimeout(updateSyncDot, OFFLINE_GRACE_MS + 100);
+
   const es = new EventSource("/api/stream");
   es.addEventListener("open", () => {
     sseStatus = "connected";
+    sseDisconnectedAt = 0;
     updateSyncDot();
   });
   es.addEventListener("error", () => {
+    if (sseDisconnectedAt === 0) {
+      sseDisconnectedAt = Date.now();
+      setTimeout(updateSyncDot, OFFLINE_GRACE_MS + 100);
+    }
     sseStatus = "reconnecting";
     updateSyncDot();
   });
@@ -336,8 +357,7 @@ function updateSyncDot() {
   const badge = document.querySelector("[data-testid='sync-badge']") as HTMLElement | null;
   if (!badge) return;
   const pending = getPendingCount();
-  // Only show "offline" when the browser is actually offline
-  const isOffline = !navigator.onLine;
+  const isOffline = isServerOffline();
 
   // Reset classes
   badge.className = "sync-badge";

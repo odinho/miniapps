@@ -34,8 +34,10 @@ test("Event card preview shows formatted times, not raw ISO strings", async ({ p
   const count = await cards.count();
   expect(count).toBeGreaterThan(0);
   // No card preview should contain raw ISO timestamps like "2026-03-23T17:01"
-  for (let i = 0; i < count; i++) {
-    const preview = await cards.nth(i).locator("div:nth-child(2)").textContent();
+  const previews = await Promise.all(
+    Array.from({ length: count }, (_, i) => cards.nth(i).locator("div:nth-child(2)").textContent()),
+  );
+  for (const preview of previews) {
     if (preview) {
       expect(preview).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
     }

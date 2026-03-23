@@ -143,7 +143,7 @@ test('Stats: shows "totalt" when night sleep adds to total', async ({ page }) =>
   await expect(page.locator(".summary-row")).toContainText("totalt");
 });
 
-test("Sync badge does not show offline when SSE fails but browser is online", async ({ page }) => {
+test("Sync badge does not flash offline during SSE grace period", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
   // Hang SSE so it never opens — simulates initial load before SSE connects
@@ -153,8 +153,22 @@ test("Sync badge does not show offline when SSE fails but browser is online", as
   await page.goto("/");
   await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
   const badge = page.getByTestId("sync-badge");
-  // navigator.onLine is true, so should not show "offline" even without SSE
+  // Within grace period (5s), badge should NOT say "offline"
   await expect(badge).not.toHaveText("offline");
+});
+
+test("Sync badge shows offline after SSE grace period expires", async ({ page }) => {
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
+  // Return 503 for SSE so EventSource fires error and retries
+  await page.route("/api/stream", (route) =>
+    route.fulfill({ status: 503, body: "Service Unavailable" }),
+  );
+  await page.goto("/");
+  await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
+  const badge = page.getByTestId("sync-badge");
+  // After the 5s grace period, badge SHOULD show "offline"
+  await expect(badge).toHaveText("offline", { timeout: 10000 });
 });
 
 test("Redirects to settings when no baby exists", async ({ page }) => {
