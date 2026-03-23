@@ -229,15 +229,16 @@ export function renderDashboard(container: HTMLElement): void {
       // Start sleep — then show bedtime tag sheet
       const type = classifySleepType(todaySleeps, ageMonths, baby.custom_nap_count);
       const sleepDomainId = generateSleepId();
+      const startTimeIso = new Date().toISOString();
       await sendEvent("sleep.started", {
         babyId: baby.id,
-        startTime: new Date().toISOString(),
+        startTime: startTimeIso,
         type,
         sleepDomainId,
       });
       renderDashboard(container);
       // Show tag sheet using the domain ID we just generated
-      showTagSheet(sleepDomainId, container);
+      showTagSheet(sleepDomainId, startTimeIso, container);
     }
   });
 
@@ -542,13 +543,16 @@ export function renderDashboard(container: HTMLElement): void {
       // Daytime, awake: nap + diaper
       const napBtn = el("button", { className: "arc-action-btn nap" }, ["😴 Lur"]);
       napBtn.addEventListener("click", async () => {
+        const sleepDomainId = generateSleepId();
+        const startTimeIso = new Date().toISOString();
         await sendEvent("sleep.started", {
           babyId: baby.id,
-          startTime: new Date().toISOString(),
+          startTime: startTimeIso,
           type: "nap",
-          sleepDomainId: generateSleepId(),
+          sleepDomainId,
         });
         renderDashboard(container);
+        showTagSheet(sleepDomainId, startTimeIso, container);
       });
       arcActions.appendChild(napBtn);
       arcActions.appendChild(makeDiaperBtn());
@@ -764,7 +768,7 @@ function _showEditStartModal(activeSleep: SleepLogRow, container: HTMLElement): 
   }
 }
 
-function showTagSheet(sleepDomainId: string, container: HTMLElement): void {
+function showTagSheet(sleepDomainId: string, recordedStartTime: string, container: HTMLElement): void {
   const overlay = el("div", { className: "modal-overlay", "data-testid": "modal-overlay" });
   const modal = el("div", { className: "modal tag-sheet" });
 
@@ -773,6 +777,49 @@ function showTagSheet(sleepDomainId: string, container: HTMLElement): void {
   let selectedFallAsleep: string | null = null;
 
   modal.appendChild(el("h2", null, ["Korleis gjekk legginga?"]));
+
+  // Quick-adjust start time with nudge buttons
+  let adjustedStartTime = new Date(recordedStartTime);
+  const startTimeDisplay = el("span", { className: "wake-time-display" }, [
+    formatTime(adjustedStartTime),
+  ]);
+
+  function nudgeStart(minutes: number) {
+    adjustedStartTime = new Date(adjustedStartTime.getTime() + minutes * 60000);
+    startTimeDisplay.textContent = formatTime(adjustedStartTime);
+  }
+
+  const sm1Btn = el("button", { className: "btn btn-ghost nudge-btn" }, ["-1"]);
+  const sm5Btn = el("button", { className: "btn btn-ghost nudge-btn" }, ["-5"]);
+  sm1Btn.addEventListener("click", () => nudgeStart(-1));
+  sm5Btn.addEventListener("click", () => nudgeStart(-5));
+
+  const startFullDt = makeDateTimeInputs(recordedStartTime);
+  const startFullWrap = el("div", {
+    className: "form-group",
+    style: { display: "none", marginTop: "8px" },
+  }, [dateTimeGroup("", startFullDt)]);
+
+  const startEditLink = el("span", {
+    className: "edit-start-link",
+    style: { fontSize: "0.8rem", marginLeft: "8px" },
+  }, ["endra"]);
+  const startTimeRow = el("div", { className: "wake-time-row" }, [
+    el("span", { style: { color: "var(--text-light)", fontSize: "0.85rem" } }, ["La seg "]),
+    startTimeDisplay,
+    sm1Btn,
+    sm5Btn,
+    startEditLink,
+  ]);
+  startEditLink.addEventListener("click", () => {
+    startFullDt.dateInput.value = toLocalDate(adjustedStartTime.toISOString());
+    startFullDt.timeInput.value = toLocalTime(adjustedStartTime.toISOString());
+    startFullWrap.style.display = "";
+    startTimeRow.style.display = "none";
+  });
+
+  modal.appendChild(startTimeRow);
+  modal.appendChild(startFullWrap);
 
   // Mood selection — specifically about going to sleep
   modal.appendChild(
@@ -935,6 +982,23 @@ function showTagSheet(sleepDomainId: string, container: HTMLElement): void {
   // Auto-save on any close — never lose entered data
   async function close() {
     overlay.remove();
+
+    // Check if start time was adjusted
+    const fullPickerVisible = startFullWrap.style.display !== "none";
+    const finalStartTime = fullPickerVisible
+      ? new Date(startFullDt.getValue())
+      : adjustedStartTime;
+    const startTimeChanged =
+      !isNaN(finalStartTime.getTime()) &&
+      Math.abs(finalStartTime.getTime() - new Date(recordedStartTime).getTime()) > 30000;
+
+    if (startTimeChanged) {
+      await sendEvent("sleep.updated", {
+        sleepDomainId,
+        startTime: finalStartTime.toISOString(),
+      });
+    }
+
     if (selectedMood || selectedMethod || selectedFallAsleep || noteInput.value.trim()) {
       await sendEvent("sleep.tagged", {
         sleepDomainId,
@@ -944,6 +1008,8 @@ function showTagSheet(sleepDomainId: string, container: HTMLElement): void {
         notes: noteInput.value.trim() || undefined,
       });
     }
+
+    if (startTimeChanged) renderDashboard(container);
   }
 }
 
@@ -1330,14 +1396,15 @@ function showPredictedNapSheet(
   startBtn.addEventListener("click", async () => {
     close();
     const sleepDomainId = generateSleepId();
+    const startTimeIso = new Date().toISOString();
     await sendEvent("sleep.started", {
       babyId: baby.id,
-      startTime: new Date().toISOString(),
+      startTime: startTimeIso,
       type: "nap",
       sleepDomainId,
     });
     renderDashboard(container);
-    showTagSheet(sleepDomainId, container);
+    showTagSheet(sleepDomainId, startTimeIso, container);
   });
 
   skipBtn.addEventListener("click", () => {
