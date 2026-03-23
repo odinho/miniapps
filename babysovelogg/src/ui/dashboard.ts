@@ -18,6 +18,7 @@ import {
   renderTimerWithPauses,
   renderCountdown,
   formatTime,
+  haptic,
 } from "./components.js";
 import { showToast } from "./toast.js";
 import { renderArc } from "./arc.js";
@@ -230,6 +231,7 @@ export function renderDashboard(container: HTMLElement): void {
   );
 
   btn.addEventListener("click", async () => {
+    haptic();
     if (isSleeping && activeSleep) {
       // End sleep — save immediately, then show optional wake-up sheet
       // Get fresh sleep data with any tags set after start (via tag sheet)
@@ -312,12 +314,18 @@ export function renderDashboard(container: HTMLElement): void {
     isNightMode,
     wakeUpTime: todayWakeUp?.wake_time,
     startTimeLabel: isNightMode
-      ? null
+      ? activeSleep?.type === "night"
+        ? formatTime(activeSleep.start_time)
+        : prediction?.bedtime
+          ? "~" + formatTime(prediction.bedtime)
+          : null
       : todayWakeUp?.wake_time
         ? formatTime(todayWakeUp.wake_time)
         : null,
     endTimeLabel: isNightMode
-      ? null
+      ? todayWakeUp?.wake_time
+        ? "~" + formatTime(todayWakeUp.wake_time)
+        : null
       : prediction?.bedtime
         ? "~" + formatTime(prediction.bedtime)
         : null,
@@ -379,12 +387,18 @@ export function renderDashboard(container: HTMLElement): void {
       isNightMode,
       wakeUpTime: todayWakeUp?.wake_time,
       startTimeLabel: isNightMode
-        ? null
+        ? activeSleep?.type === "night"
+          ? formatTime(activeSleep.start_time)
+          : prediction?.bedtime
+            ? "~" + formatTime(prediction.bedtime)
+            : null
         : todayWakeUp?.wake_time
           ? formatTime(todayWakeUp.wake_time)
           : null,
       endTimeLabel: isNightMode
-        ? null
+        ? todayWakeUp?.wake_time
+          ? "~" + formatTime(todayWakeUp.wake_time)
+          : null
         : prediction?.bedtime
           ? "~" + formatTime(prediction.bedtime)
           : null,
@@ -997,12 +1011,14 @@ function showTagSheet(
     if (e.target === overlay) close();
   });
 
-  // Diaper-before-bed nudge: remind if no diaper in the last 2 hours
+  // Diaper/potty nudge: remind if no activity recently (1h potty, 2h diaper)
   const appState = getAppState();
   const lastDiaper = appState?.lastDiaperTime;
-  const twoHoursAgo = Date.now() - 2 * 3600000;
-  if (!lastDiaper || new Date(lastDiaper).getTime() < twoHoursAgo) {
-    const isPotty = appState?.baby?.potty_mode === 1;
+  const isPotty = appState?.baby?.potty_mode === 1;
+  const nudgeMs = isPotty ? 1 * 3600000 : 2 * 3600000;
+  const nudgeThreshold = Date.now() - nudgeMs;
+  if (!lastDiaper || new Date(lastDiaper).getTime() < nudgeThreshold) {
+    const nudgeHours = isPotty ? "1 time" : "2 timar";
     const nudge = el(
       "div",
       {
@@ -1020,7 +1036,11 @@ function showTagSheet(
           marginBottom: "12px",
         },
       },
-      [isPotty ? "🚽 Ikkje vore på do dei siste 2 timane" : "🧷 Inga bleie dei siste 2 timane"],
+      [
+        isPotty
+          ? `🚽 Ikkje vore på do den siste ${nudgeHours}`
+          : `🧷 Inga bleie dei siste ${nudgeHours}`,
+      ],
     );
     const logDiaperBtn = el(
       "button",

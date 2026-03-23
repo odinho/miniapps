@@ -61,6 +61,11 @@ export function formatAge(birthdate: string): string {
   return `${y} år ${m} mnd`;
 }
 
+/** Subtle haptic tap on mobile (no-op on desktop). */
+export function haptic(ms = 10): void {
+  navigator.vibrate?.(ms);
+}
+
 /** Returns a span that updates every second showing elapsed time from startTime. */
 export function renderTimer(startTime: string | Date): {
   element: HTMLSpanElement;

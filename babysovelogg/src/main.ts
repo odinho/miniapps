@@ -14,7 +14,7 @@ import { renderHistory } from "./ui/history.js";
 import { renderSettings } from "./ui/settings.js";
 import { renderStats } from "./ui/stats.js";
 import { renderEventsScreen } from "./ui/events.js";
-import { el } from "./ui/components.js";
+import { el, haptic } from "./ui/components.js";
 
 let currentState: AppState | null = null;
 
@@ -50,6 +50,12 @@ export function navigateTo(hash: string): void {
 async function main() {
   setMutationHook(markLocalMutation);
   injectStyles();
+
+  // Haptic feedback on pill & button taps (delegated, no-op on desktop)
+  document.addEventListener("click", (e) => {
+    const t = e.target as HTMLElement;
+    if (t.closest(".type-pill, .tag-pill, .nav-tab")) haptic();
+  });
 
   const app = document.getElementById("app")!;
   const content = el("div", {

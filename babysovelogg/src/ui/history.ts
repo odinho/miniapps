@@ -126,7 +126,7 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
             durationMs -= pe - ps;
           }
         }
-        const duration = entry.end_time ? formatDuration(Math.max(0, durationMs)) : "ongoing…";
+        const duration = entry.end_time ? formatDuration(Math.max(0, durationMs)) : "pågår…";
         const icon = entry.type === "night" ? "🌙" : "😴";
         const times = `${formatTime(entry.start_time)} — ${entry.end_time ? formatTime(entry.end_time) : "no"}`;
 
