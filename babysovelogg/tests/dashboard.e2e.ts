@@ -175,3 +175,60 @@ test("Redirects to settings when no baby exists", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Velkomen til Babysovelogg" })).toBeVisible();
 });
+
+test("Undo toast appears after starting sleep", async ({ page }) => {
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
+  await page.goto("/");
+  await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
+
+  await page.getByTestId("sleep-button").click();
+  await expect(page.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 5000 });
+
+  // Undo toast should appear with "Angre" button
+  await expect(page.getByText("Søvn starta")).toBeVisible({ timeout: 3000 });
+  await expect(page.getByRole("button", { name: "Angre" })).toBeVisible();
+
+  // Click undo — sleep should be reverted
+  await page.getByRole("button", { name: "Angre" }).click();
+  await expect(page.getByTestId("sleep-button")).toHaveClass(/awake/, { timeout: 5000 });
+});
+
+test("Undo toast appears after ending sleep", async ({ page }) => {
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
+  await page.goto("/");
+  await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
+
+  // Start sleep
+  await page.getByTestId("sleep-button").click();
+  await expect(page.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 5000 });
+  await dismissSheet(page);
+
+  // End sleep
+  await page.getByTestId("sleep-button").click();
+  await expect(page.getByTestId("sleep-button")).toHaveClass(/awake/, { timeout: 5000 });
+
+  // Undo toast should show "Søvn avslutta"
+  await expect(page.getByText("Søvn avslutta")).toBeVisible({ timeout: 3000 });
+  // May have two toasts (start + end) — click the last Angre button
+  await page.getByRole("button", { name: "Angre" }).last().click();
+
+  // Sleep should be active again
+  await expect(page.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 5000 });
+});
+
+test("Dashboard shows diaper count in summary", async ({ page }) => {
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
+  await page.goto("/");
+  await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
+
+  // Log a diaper
+  await page.getByRole("button", { name: /Bleie/ }).click();
+  await page.getByRole("button", { name: "Lagra" }).click();
+  await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });
+
+  // Summary should show "1 bleie"
+  await expect(page.locator(".summary-row")).toContainText("bleie", { timeout: 5000 });
+});

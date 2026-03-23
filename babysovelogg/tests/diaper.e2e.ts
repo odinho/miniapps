@@ -1,4 +1,12 @@
-import { test, expect, createBaby, setWakeUpTime, forceMorning } from "./fixtures";
+import {
+  test,
+  expect,
+  createBaby,
+  setWakeUpTime,
+  addDiaper,
+  enablePottyMode,
+  forceMorning,
+} from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await forceMorning(page);
@@ -80,4 +88,93 @@ test("Can delete a diaper entry", async ({ page }) => {
   await page.locator(".modal-overlay").last().getByRole("button", { name: "Slett" }).click();
 
   await expect(page.locator(".diaper-log-item")).toHaveCount(0, { timeout: 5000 });
+});
+
+// Potty mode tests
+
+test("Potty mode shows Do button instead of Bleie", async ({ page }) => {
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
+  enablePottyMode(babyId);
+  await page.goto("/");
+  await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
+
+  await expect(page.getByRole("button", { name: /Do/ })).toBeVisible();
+});
+
+test("Potty entry opens potty edit modal in history", async ({ page }) => {
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
+  enablePottyMode(babyId);
+  addDiaper(babyId, new Date().toISOString(), "potty_wet", "dry");
+
+  await page.goto("/#/history");
+  await expect(page.locator(".diaper-log-item")).toHaveCount(1, { timeout: 5000 });
+
+  // Category label should say "Do"
+  await expect(page.locator(".diaper-log-item .log-duration")).toHaveText("Do");
+
+  // Click opens potty edit modal (not diaper)
+  await page.locator(".diaper-log-item").click();
+  await expect(page.getByRole("heading", { name: "Dobesøk" })).toBeVisible();
+
+  // Should show potty-specific result pills (use data-potty to avoid ambiguity with status pills)
+  await expect(page.locator('[data-potty="potty_wet"]')).toBeVisible();
+  await expect(page.locator('[data-potty="potty_dirty"]')).toBeVisible();
+  await expect(page.locator('[data-potty="potty_nothing"]')).toBeVisible();
+  await expect(page.locator('[data-potty="diaper_only"]')).toBeVisible();
+
+  // The potty_wet result pill should be active
+  await expect(page.locator('[data-potty="potty_wet"]')).toHaveClass(/active/);
+});
+
+test("Can edit potty entry type in history", async ({ page }) => {
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
+  enablePottyMode(babyId);
+  addDiaper(babyId, new Date().toISOString(), "potty_wet", "dry");
+
+  await page.goto("/#/history");
+  await expect(page.locator(".diaper-log-item")).toHaveCount(1, { timeout: 5000 });
+
+  await page.locator(".diaper-log-item").click();
+  await expect(page.getByRole("heading", { name: "Dobesøk" })).toBeVisible();
+
+  // Change from potty_wet to potty_dirty (use data-potty to avoid status pill ambiguity)
+  await page.locator('[data-potty="potty_dirty"]').click();
+  await page.getByRole("button", { name: "Lagra" }).click();
+
+  await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });
+  // History should show updated type
+  await expect(page.locator(".diaper-log-item .log-meta")).toContainText("Bæsj på do");
+});
+
+test("Dashboard shows potty count in summary", async ({ page }) => {
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
+  enablePottyMode(babyId);
+
+  await page.goto("/");
+  await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
+
+  // Log a potty visit
+  await page.getByRole("button", { name: /Do/ }).click();
+  await page.getByRole("button", { name: "Lagra" }).click();
+  await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });
+
+  // Summary should show "1 dobesøk"
+  await expect(page.locator(".summary-row")).toContainText("dobesøk", { timeout: 5000 });
+});
+
+test("Diaper entry still opens diaper edit modal", async ({ page }) => {
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
+  addDiaper(babyId, new Date().toISOString(), "wet", "middels");
+
+  await page.goto("/#/history");
+  await expect(page.locator(".diaper-log-item")).toHaveCount(1, { timeout: 5000 });
+
+  await page.locator(".diaper-log-item").click();
+  // Should open diaper edit modal, not potty
+  await expect(page.getByRole("heading", { name: "Bleiedetaljar" })).toBeVisible();
 });

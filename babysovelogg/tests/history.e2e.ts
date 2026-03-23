@@ -4,6 +4,7 @@ import {
   createBaby,
   setWakeUpTime,
   seedBabyWithSleep,
+  addActiveSleep,
   getDb,
   forceMorning,
 } from "./fixtures";
@@ -93,4 +94,14 @@ test("Can delete a sleep entry", async ({ page }) => {
   await page.locator(".modal-overlay").last().getByRole("button", { name: "Slett" }).click();
 
   await expect(page.getByText("Ingen oppføringar enno")).toBeVisible({ timeout: 5000 });
+});
+
+test('Active sleep shows "pågår…" in history', async ({ page }) => {
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
+  addActiveSleep(babyId, new Date().toISOString(), "nap");
+
+  await page.goto("/#/history");
+  await expect(page.locator(".sleep-log-item")).toHaveCount(1, { timeout: 5000 });
+  await expect(page.locator(".sleep-log-item .log-duration")).toHaveText("pågår…");
 });

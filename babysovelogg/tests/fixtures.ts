@@ -118,6 +118,12 @@ export function addDiaper(
   return did;
 }
 
+export function enablePottyMode(babyId: number) {
+  const db = getDb();
+  db.prepare("UPDATE baby SET potty_mode = 1 WHERE id = ?").run(babyId);
+  db.close();
+}
+
 export function seedBabyWithSleep() {
   const db = getDb();
   const clientId = generateId();
