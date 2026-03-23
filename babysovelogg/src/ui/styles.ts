@@ -229,6 +229,36 @@ html, body {
   color: var(--text-light);
 }
 
+/* Sync status badge */
+.sync-badge {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 8px;
+  line-height: 1;
+  vertical-align: middle;
+}
+.sync-badge-ok {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  opacity: 0.5;
+  cursor: default;
+}
+.sync-badge-offline {
+  padding: 2px 7px;
+  background: var(--text-light);
+  color: #fff;
+}
+.sync-badge-pending {
+  padding: 2px 7px;
+  background: #ff9800;
+  color: #fff;
+}
+
 /* Compact sleep/wake toggle */
 .sleep-button {
   width: 56px;

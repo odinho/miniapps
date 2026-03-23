@@ -1,6 +1,6 @@
 import { getAppState, setAppState } from "../main.js";
 import { postEvents } from "../api.js";
-import { queueEvent, getClientId, applyOptimisticEvent, hasPendingEvents, applyQueuedEvents } from "../sync.js";
+import { queueEvent, getClientId, applyOptimisticEvent, hasPendingEvents, applyQueuedEvents, getSSEStatus, getPendingCount } from "../sync.js";
 import { generateSleepId, generateDiaperId } from "../identity.js";
 import { getExpectedNapCount } from "../engine/schedule.js";
 import {
@@ -85,6 +85,37 @@ function calcPauseMs(pauses: SleepPauseRow[]): number {
 
 let cleanups: (() => void)[] = [];
 
+function buildSyncBadge(): HTMLElement {
+  const status = getSSEStatus();
+  const pending = getPendingCount();
+  const isOffline = status !== "connected";
+
+  if (isOffline) {
+    const badge = el("span", {
+      className: "sync-badge sync-badge-offline",
+      "data-testid": "sync-badge",
+    }, ["offline"]);
+    badge.addEventListener("click", () => { window.location.hash = "#/events"; });
+    return badge;
+  }
+
+  if (pending > 0) {
+    const badge = el("span", {
+      className: "sync-badge sync-badge-pending",
+      "data-testid": "sync-badge",
+    }, [`${pending} ventande`]);
+    badge.addEventListener("click", () => { window.location.hash = "#/events"; });
+    return badge;
+  }
+
+  // Connected, no pending — small green dot
+  const badge = el("span", {
+    className: "sync-badge sync-badge-ok",
+    "data-testid": "sync-badge",
+  });
+  return badge;
+}
+
 // Track dismissed predicted naps (resets daily)
 const DISMISSED_KEY = "babysovelogg_dismissed_predictions";
 
@@ -163,6 +194,9 @@ export function renderDashboard(container: HTMLElement): void {
     ],
   );
 
+  // Sync status badge
+  const syncBadge = buildSyncBadge();
+
   dash.appendChild(
     el("div", { className: "header-row" }, [
       el("div", { className: "baby-info" }, [
@@ -170,6 +204,7 @@ export function renderDashboard(container: HTMLElement): void {
         el("span", { className: "baby-age", "data-testid": "baby-age" }, [
           formatAge(baby.birthdate),
         ]),
+        syncBadge,
       ]),
       btn,
     ]),
@@ -183,12 +218,13 @@ export function renderDashboard(container: HTMLElement): void {
       const sleepSnapshot = currentState?.activeSleep
         ? { ...currentState.activeSleep }
         : { ...activeSleep };
+      const endTimeIso = new Date().toISOString();
       await sendEvent("sleep.ended", {
         sleepDomainId: activeSleep.domain_id,
-        endTime: new Date().toISOString(),
+        endTime: endTimeIso,
       });
       renderDashboard(container);
-      showWakeUpSheet(activeSleep.domain_id, sleepSnapshot, container);
+      showWakeUpSheet(activeSleep.domain_id, sleepSnapshot, endTimeIso, container);
     } else {
       // Start sleep — then show bedtime tag sheet
       const type = classifySleepType(todaySleeps, ageMonths, baby.custom_nap_count);
@@ -914,12 +950,17 @@ function showTagSheet(sleepDomainId: string, container: HTMLElement): void {
 function showWakeUpSheet(
   sleepDomainId: string,
   sleepData: SleepLogRow,
+  recordedEndTime: string,
   container: HTMLElement,
 ): void {
   const overlay = el("div", { className: "modal-overlay", "data-testid": "modal-overlay" });
   const modal = el("div", { className: "modal tag-sheet" });
 
   modal.appendChild(el("h2", null, ["Oppvakning"]));
+
+  // End time picker — pre-filled with the recorded end time, user can adjust
+  const endTimeDt = makeDateTimeInputs(recordedEndTime);
+  modal.appendChild(dateTimeGroup("Vakna kl.", endTimeDt));
 
   // Compact bedtime summary — show what was recorded at sleep start
   const hasBedtimeTags =
@@ -1087,11 +1128,19 @@ function showWakeUpSheet(
   // Auto-save on any close
   async function close() {
     overlay.remove();
-    if (wokeBy || noteInput.value.trim()) {
+    // Check if end time was adjusted
+    const newEndTime = new Date(endTimeDt.getValue());
+    const endTimeChanged =
+      !isNaN(newEndTime.getTime()) &&
+      Math.abs(newEndTime.getTime() - new Date(recordedEndTime).getTime()) > 60000;
+
+    if (wokeBy || noteInput.value.trim() || endTimeChanged) {
       const payload: Record<string, unknown> = { sleepDomainId };
       if (wokeBy) payload.wokeBy = wokeBy;
       if (noteInput.value.trim()) payload.wakeNotes = noteInput.value.trim();
+      if (endTimeChanged) payload.endTime = newEndTime.toISOString();
       await sendEvent("sleep.updated", payload);
+      if (endTimeChanged) renderDashboard(container);
     }
   }
 }
@@ -1271,7 +1320,7 @@ function showPottyModal(baby: Baby, container: HTMLElement): void {
     { value: "potty_wet", label: "💧 Tiss" },
     { value: "potty_dirty", label: "💩 Bæsj" },
     { value: "potty_nothing", label: "∅ Ingenting" },
-    { value: "diaper_only", label: "🧷 Ingen do" },
+    { value: "diaper_only", label: "🧷 Berre bleie" },
   ];
   const resultPills = results.map((r) => {
     const pill = el(
@@ -1288,7 +1337,7 @@ function showPottyModal(baby: Baby, container: HTMLElement): void {
         (p, i) =>
           (p.className = `type-pill ${selectedResult === results[i].value ? "active" : ""}`),
       );
-      diaperStatusGroup.style.display = selectedResult === "diaper_only" ? "none" : "";
+      updateDiaperStatusVisibility();
     });
     return pill;
   });
@@ -1298,6 +1347,7 @@ function showPottyModal(baby: Baby, container: HTMLElement): void {
     { value: "dry", label: "Tørr ✨" },
     { value: "damp", label: "Litt 💧" },
     { value: "wet", label: "Våt 💧💧" },
+    { value: "dirty", label: "💩 Bæsj" },
   ];
   const statusPills = statuses.map((s) => {
     const pill = el(
@@ -1320,6 +1370,8 @@ function showPottyModal(baby: Baby, container: HTMLElement): void {
     placeholder: "Valfritt notat...",
   }) as HTMLInputElement;
 
+  const timeDt = makeDateTimeInputs(new Date().toISOString());
+
   modal.appendChild(el("h2", null, ["Logg dobesøk"]));
   modal.appendChild(
     el("div", { className: "form-group" }, [
@@ -1328,11 +1380,20 @@ function showPottyModal(baby: Baby, container: HTMLElement): void {
     ]),
   );
 
+  const diaperStatusLabel = el("label", null, ["Bleie"]);
   const diaperStatusGroup = el("div", { className: "form-group" }, [
-    el("label", null, ["Bleie"]),
+    diaperStatusLabel,
     el("div", { className: "type-pills" }, statusPills),
   ]);
+  function updateDiaperStatusVisibility() {
+    if (selectedResult === "diaper_only") {
+      diaperStatusLabel.textContent = "Innhald i bleie";
+    } else {
+      diaperStatusLabel.textContent = "Bleie";
+    }
+  }
   modal.appendChild(diaperStatusGroup);
+  modal.appendChild(dateTimeGroup("Tid", timeDt));
   modal.appendChild(
     el("div", { className: "form-group" }, [el("label", null, ["Notat"]), noteInput]),
   );
@@ -1341,11 +1402,16 @@ function showPottyModal(baby: Baby, container: HTMLElement): void {
   const cancelBtn = el("button", { className: "btn btn-ghost" }, ["Avbryt"]);
 
   saveBtn.addEventListener("click", async () => {
+    const time = new Date(timeDt.getValue());
+    if (isNaN(time.getTime())) {
+      showToast("Ugyldig tid", "warning");
+      return;
+    }
     const online = await sendEvent("diaper.logged", {
       babyId: baby.id,
-      time: new Date().toISOString(),
+      time: time.toISOString(),
       type: selectedResult,
-      amount: selectedResult === "diaper_only" ? null : selectedDiaperStatus,
+      amount: selectedDiaperStatus,
       note: noteInput.value || undefined,
       diaperDomainId: generateDiaperId(),
     });

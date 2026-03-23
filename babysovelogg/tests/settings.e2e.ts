@@ -36,15 +36,16 @@ test('Settings shows "lurar" for multiple naps', async ({ page }) => {
   await expect(page.locator(".sleep-info-panel")).toContainText("lurar");
 });
 
-test("Sync dot is not visible when connected", async ({ page }) => {
+test("Sync badge shows ok state when connected", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
   await page.goto("/");
   await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
 
-  // Sync dot should be hidden when connected
-  const syncDot = page.locator("#sync-dot");
-  await expect(syncDot).toHaveCSS("display", "none");
+  // Sync badge should show the green "ok" state when connected
+  const syncBadge = page.getByTestId("sync-badge");
+  await expect(syncBadge).toBeAttached();
+  await expect(syncBadge).toHaveClass(/sync-badge-ok/);
 });
 
 test("Can edit baby name", async ({ page }) => {

@@ -50,9 +50,9 @@ test("SSE: Both contexts work independently", async ({ page, browser }) => {
   await page2.goto("/");
   await expect(page2.getByTestId("baby-name")).toHaveText("SSE-Baby2", { timeout: 5000 });
 
-  // Sync dot exists in DOM (hidden when connected per fix A4)
-  await expect(page.locator("#sync-dot")).toBeAttached();
-  await expect(page2.locator("#sync-dot")).toBeAttached();
+  // Sync badge exists in dashboard header
+  await expect(page.getByTestId("sync-badge")).toBeAttached();
+  await expect(page2.getByTestId("sync-badge")).toBeAttached();
 
   await ctx2.close();
 });

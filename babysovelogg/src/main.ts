@@ -78,20 +78,6 @@ async function main() {
     tabButtons.push(btn);
     nav.appendChild(btn);
   }
-  // Sync indicator dot (subtle, inside the nav)
-  const syncDot = el("span", { id: "sync-dot" });
-  Object.assign(syncDot.style, {
-    width: "6px",
-    height: "6px",
-    borderRadius: "50%",
-    background: "var(--success)",
-    position: "absolute",
-    top: "8px",
-    right: "8px",
-    opacity: "0.6",
-  });
-  nav.style.position = "relative";
-  nav.appendChild(syncDot);
   app.appendChild(nav);
 
   // Initial load

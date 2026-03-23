@@ -332,28 +332,23 @@ export async function sendEventWithOfflineFallback(
 }
 
 function updateSyncDot() {
-  const dot = document.getElementById("sync-dot");
-  if (!dot) return;
+  // Update the sync badge in the dashboard header
+  const badge = document.querySelector("[data-testid='sync-badge']") as HTMLElement | null;
+  if (!badge) return;
   const pending = getPendingCount();
-  if (sseStatus === "connected" && pending === 0) {
-    dot.style.display = "none";
+  const isOffline = sseStatus !== "connected";
+
+  // Reset classes
+  badge.className = "sync-badge";
+
+  if (isOffline) {
+    badge.classList.add("sync-badge-offline");
+    badge.textContent = "offline";
+  } else if (pending > 0) {
+    badge.classList.add("sync-badge-pending");
+    badge.textContent = `${pending} ventande`;
   } else {
-    dot.style.display = "block";
-    if (pending > 0) {
-      dot.style.background = "#ff9800";
-      dot.textContent = String(pending);
-      dot.style.fontSize = "9px";
-      dot.style.color = "#fff";
-      dot.style.lineHeight = "14px";
-      dot.style.textAlign = "center";
-      dot.style.width = "14px";
-      dot.style.height = "14px";
-    } else {
-      dot.textContent = "";
-      dot.style.width = "6px";
-      dot.style.height = "6px";
-      dot.style.background = sseStatus === "reconnecting" ? "#ff9800" : "#999";
-    }
-    dot.style.opacity = "0.8";
+    badge.classList.add("sync-badge-ok");
+    badge.textContent = "";
   }
 }
