@@ -12,6 +12,7 @@
     "fmt": "oxfmt --write src/ server/ tests/ types.ts",
     "fmt:check": "oxfmt --check src/ server/ tests/ types.ts",
     "typecheck": "tsgo --noEmit",
+    "test:unit": "vitest run",
     "check": "tsgo --noEmit && oxlint src/ server/ tests/ && oxfmt --check src/ server/ tests/ types.ts"
   },
   "dependencies": {
@@ -19,7 +20,10 @@
     "valibot": "^1.3.1"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["better-sqlite3", "esbuild"]
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
@@ -29,6 +33,7 @@
     "esbuild": "^0.24.0",
     "oxfmt": "^0.41.0",
     "oxlint": "^1.56.0",
-    "tsx": "^4.0.0"
+    "tsx": "^4.0.0",
+    "vitest": "^4.1.0"
   }
 }

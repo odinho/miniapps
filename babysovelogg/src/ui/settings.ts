@@ -149,6 +149,90 @@ export function renderSettings(container: HTMLElement, opts?: { onboarding?: boo
 
   form.appendChild(el("div", { style: { marginTop: "24px" } }, [saveBtn]));
 
+  // Import from Napper
+  if (baby) {
+    const importSection = el(
+      "div",
+      {
+        style: {
+          marginTop: "32px",
+          borderTop: "1px solid var(--cream-dark)",
+          paddingTop: "24px",
+        },
+      },
+      [
+        el("h2", { style: { fontSize: "1.1rem", marginBottom: "8px" } }, ["Importer frå Napper"]),
+        el(
+          "div",
+          { style: { fontSize: "0.85rem", color: "var(--text-light)", marginBottom: "12px" } },
+          ["Last opp ei CSV-fil eksportert frå Napper-appen."],
+        ),
+      ],
+    );
+
+    const fileInput = el("input", {
+      type: "file",
+      accept: ".csv",
+    }) as HTMLInputElement;
+    fileInput.setAttribute("data-testid", "napper-file-input");
+
+    const importBtn = el(
+      "button",
+      {
+        className: "btn btn-primary",
+        disabled: true,
+      },
+      ["Importer"],
+    ) as HTMLButtonElement;
+    importBtn.setAttribute("data-testid", "napper-import-btn");
+
+    fileInput.addEventListener("change", () => {
+      importBtn.disabled = !fileInput.files?.length;
+    });
+
+    importBtn.addEventListener("click", async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+
+      importBtn.disabled = true;
+      importBtn.textContent = "Importerer...";
+
+      try {
+        const csvText = await file.text();
+        const res = await fetch("/api/import/napper", {
+          method: "POST",
+          headers: { "Content-Type": "text/csv" },
+          body: csvText,
+        });
+        const result = await res.json();
+
+        if (!res.ok) {
+          showToast(result.error || "Import feila", "error");
+          return;
+        }
+
+        showToast(
+          `Importerte ${result.sleeps} søvnøkter og ${result.dayStarts} vekkingar`,
+          "success",
+        );
+        await refreshState();
+      } catch {
+        showToast("Import feila — sjekk fila og prøv igjen", "error");
+      } finally {
+        importBtn.disabled = false;
+        importBtn.textContent = "Importer";
+      }
+    });
+
+    importSection.appendChild(
+      el("div", { style: { display: "flex", gap: "8px", alignItems: "center" } }, [
+        fileInput,
+        importBtn,
+      ]),
+    );
+    form.appendChild(importSection);
+  }
+
   // Show age-based sleep info panel when baby exists
   if (baby) {
     const ageMonths = calculateAgeMonths(baby.birthdate);

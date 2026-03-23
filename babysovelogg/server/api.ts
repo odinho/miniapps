@@ -6,6 +6,7 @@ import db from "./db.js";
 import { processBatchTx, getEvents } from "./events.js";
 import { rebuildAll } from "./projections.js";
 import { validateBatch } from "./schemas.js";
+import { parseNapperCsv, mapNapperToEvents } from "./import-napper.js";
 import {
   calculateAgeMonths,
   predictNextNap,
@@ -346,6 +347,42 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       }
       console.error(`[ERROR] POST /api/events:`, message);
       return json(res, { error: message }, 500);
+    }
+  }
+
+  // Import from Napper CSV
+  if (url.pathname === "/api/import/napper" && method === "POST") {
+    try {
+      const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as
+        | Baby
+        | undefined;
+      if (!baby) return json(res, { error: "No baby configured" }, 404);
+
+      const csvBody = await readBody(req);
+      const rows = parseNapperCsv(csvBody);
+      const events = mapNapperToEvents(rows, baby.id);
+
+      if (events.length > 0) {
+        processBatchTx(events);
+        broadcast("update", { state: getState() });
+      }
+
+      // Count what was imported
+      let sleeps = 0;
+      let dayStarts = 0;
+      for (const e of events) {
+        if (e.type === "sleep.manual" || e.type === "sleep.started") sleeps++;
+        if (e.type === "day.started") dayStarts++;
+      }
+      const skipped = rows.filter(
+        (r) => !["WOKE_UP", "NAP", "BED_TIME", "NIGHT_WAKING"].includes(r.category),
+      ).length;
+
+      return json(res, { sleeps, dayStarts, skipped, totalEvents: events.length });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[ERROR] POST /api/import/napper:`, message);
+      return json(res, { error: message }, 400);
     }
   }
 
