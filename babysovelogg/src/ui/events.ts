@@ -41,8 +41,33 @@ export async function renderEventsScreen(container: HTMLElement): Promise<void> 
   const domainIdParam = hashParams.get("domainId");
 
   const title = domainIdParam ? "Entitetshistorikk" : "Hendingslogg";
-  const header = el("h2", { style: { padding: "16px 16px 0", margin: "0" } }, [title]);
-  view.appendChild(header);
+  const closeBtn = el("button", {
+    "data-testid": "events-close-btn",
+    style: {
+      background: "none",
+      border: "none",
+      color: "var(--text)",
+      fontSize: "1.5rem",
+      cursor: "pointer",
+      padding: "4px 8px",
+      lineHeight: "1",
+    },
+  }, ["✕"]);
+  closeBtn.addEventListener("click", () => {
+    window.location.hash = "#/";
+  });
+  const headerRow = el("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "16px 16px 0",
+    },
+  }, [
+    el("h2", { style: { margin: "0" } }, [title]),
+    closeBtn,
+  ]);
+  view.appendChild(headerRow);
 
   // Filter dropdown
   let selectedType = "";
@@ -222,15 +247,24 @@ function renderEventCard(evt: EventItem): HTMLElement {
   return card;
 }
 
+const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
+function formatPayloadValue(key: string, value: unknown): string | null {
+  if (key.endsWith("DomainId") || key === "clientId") return null;
+  if (typeof value === "string" && ISO_RE.test(value)) {
+    return `${key}: ${formatTime(value)}`;
+  }
+  if (typeof value === "string" && value.length > 30) {
+    return `${key}: ${value.slice(0, 20)}…`;
+  }
+  return `${key}: ${JSON.stringify(value)}`;
+}
+
 function payloadPreview(payload: Record<string, unknown>): string {
   const parts: string[] = [];
   for (const [k, v] of Object.entries(payload)) {
-    if (k.endsWith("DomainId") || k === "clientId") continue;
-    if (typeof v === "string" && v.length > 30) {
-      parts.push(`${k}: ${v.slice(0, 20)}...`);
-    } else {
-      parts.push(`${k}: ${JSON.stringify(v)}`);
-    }
+    const formatted = formatPayloadValue(k, v);
+    if (formatted) parts.push(formatted);
   }
   return parts.join(", ") || "(empty)";
 }

@@ -148,13 +148,25 @@ async function main() {
 
   // When connectivity returns, flush queued offline events to the server.
   window.addEventListener("online", async () => {
+    // Re-render dashboard to update offline badge
+    const hash = window.location.hash || "#/";
+    if (hash === "#/" || hash === "") {
+      renderDashboard(content);
+    }
     const result = await flushQueue();
     if (result) {
       setAppState(result.state);
-      const hash = window.location.hash || "#/";
       if (hash === "#/" || hash === "") {
         renderDashboard(content);
       }
+    }
+  });
+
+  // When going offline, update the badge immediately
+  window.addEventListener("offline", () => {
+    const hash = window.location.hash || "#/";
+    if (hash === "#/" || hash === "") {
+      renderDashboard(content);
     }
   });
 }

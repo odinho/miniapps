@@ -336,7 +336,8 @@ function updateSyncDot() {
   const badge = document.querySelector("[data-testid='sync-badge']") as HTMLElement | null;
   if (!badge) return;
   const pending = getPendingCount();
-  const isOffline = sseStatus !== "connected";
+  // Only show "offline" when the browser is actually offline
+  const isOffline = !navigator.onLine;
 
   // Reset classes
   badge.className = "sync-badge";

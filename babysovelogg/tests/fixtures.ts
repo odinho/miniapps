@@ -179,6 +179,14 @@ export async function dismissSheet(page: Page) {
   }
 }
 
+export function addEvent(type: string, payload: Record<string, unknown>) {
+  const db = getDb();
+  db.prepare(
+    "INSERT INTO events (type, payload, client_id, client_event_id) VALUES (?, ?, ?, ?)",
+  ).run(type, JSON.stringify(payload), generateId(), generateId());
+  db.close();
+}
+
 /** Helper to generate IDs for tests */
 export { generateId, generateSleepId, generateDiaperId };
 

@@ -86,9 +86,9 @@ function calcPauseMs(pauses: SleepPauseRow[]): number {
 let cleanups: (() => void)[] = [];
 
 function buildSyncBadge(): HTMLElement {
-  const status = getSSEStatus();
   const pending = getPendingCount();
-  const isOffline = status !== "connected";
+  // Only show "offline" when the browser is actually offline, not just because SSE hasn't connected yet
+  const isOffline = !navigator.onLine;
 
   if (isOffline) {
     const badge = el("span", {
@@ -455,18 +455,23 @@ export function renderDashboard(container: HTMLElement): void {
       const lastSleep = todaySleeps.find((s) => s.end_time);
       const awakeSince = lastSleep?.end_time || todayWakeUp?.wake_time;
       if (awakeSince) {
-        const awakeMs = now.getTime() - new Date(awakeSince).getTime();
+        const awakeSinceMs = new Date(awakeSince).getTime();
+        const awakeMs = now.getTime() - awakeSinceMs;
         if (awakeMs > 60000) {
-          arcCenter.appendChild(
-            el(
-              "div",
-              {
-                className: "edit-start-link",
-                style: { textDecoration: "none", cursor: "default", pointerEvents: "auto" },
-              },
-              [`Vaken ${formatDuration(awakeMs)}`],
-            ),
+          const awakeEl = el(
+            "div",
+            {
+              className: "edit-start-link",
+              style: { textDecoration: "none", cursor: "default", pointerEvents: "auto" },
+            },
+            [`Vaken ${formatDuration(awakeMs)}`],
           );
+          // Update every minute so the awake timer stays current
+          const awakeInterval = setInterval(() => {
+            awakeEl.textContent = `Vaken ${formatDuration(Date.now() - awakeSinceMs)}`;
+          }, 60000);
+          cleanups.push(() => clearInterval(awakeInterval));
+          arcCenter.appendChild(awakeEl);
         }
       }
     }
@@ -566,6 +571,12 @@ export function renderDashboard(container: HTMLElement): void {
     const napTimeEl = el("div", { className: "stat-value" });
     const totalSleepEl = el("div", { className: "stat-value" });
 
+    const totalSep = el("span", { className: "summary-sep" }, ["·"]);
+    const totalSpan = el("span", null, [
+      totalSleepEl,
+      el("span", { className: "summary-label" }, [" totalt"]),
+    ]);
+
     const updateStats = () => {
       let activeMinutes = 0;
       if (activeSleep) {
@@ -581,6 +592,11 @@ export function renderDashboard(container: HTMLElement): void {
       napCountEl.textContent = String(napCount);
       napTimeEl.textContent = formatDuration(napMinutes * 60000);
       totalSleepEl.textContent = formatDuration(totalMinutes * 60000);
+
+      // Hide "totalt" when it matches nap time (no night sleep contributing)
+      const showTotal = Math.round(totalMinutes) !== Math.round(napMinutes);
+      totalSep.style.display = showTotal ? "" : "none";
+      totalSpan.style.display = showTotal ? "" : "none";
     };
 
     updateStats();
@@ -606,8 +622,8 @@ export function renderDashboard(container: HTMLElement): void {
       el("span", null, [napCountEl, napLabel]),
       el("span", { className: "summary-sep" }, ["·"]),
       el("span", null, [napTimeEl, el("span", { className: "summary-label" }, [" lurtid"])]),
-      el("span", { className: "summary-sep" }, ["·"]),
-      el("span", null, [totalSleepEl, el("span", { className: "summary-label" }, [" totalt"])]),
+      totalSep,
+      totalSpan,
     ]);
     dash.appendChild(summaryRow);
   }

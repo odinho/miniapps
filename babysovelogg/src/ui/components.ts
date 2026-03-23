@@ -109,10 +109,11 @@ export function renderCountdown(targetTime: string | Date): {
   const update = () => {
     const remaining = target - Date.now();
     if (remaining <= 0) {
-      span.textContent = "no!";
+      span.textContent = `+${formatDuration(-remaining)}`;
       span.style.color = "var(--peach-dark)";
     } else {
       span.textContent = formatDuration(remaining);
+      span.style.color = "";
     }
   };
   update();

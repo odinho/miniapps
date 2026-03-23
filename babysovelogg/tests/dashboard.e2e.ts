@@ -49,7 +49,7 @@ test("Dashboard shows stats section", async ({ page }) => {
 
   await expect(page.getByText("lurar")).toBeVisible();
   await expect(page.getByText("lurtid")).toBeVisible();
-  await expect(page.getByText("totalt")).toBeVisible();
+  // "totalt" is only shown when night sleep differs from nap time
 });
 
 test('Pluralization: 0 naps shows "0 lurar"', async ({ page }) => {
@@ -102,6 +102,59 @@ test('Pluralization: 2 naps shows "2 lurar"', async ({ page }) => {
   await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
   await expect(page.locator(".summary-row")).toContainText("2");
   await expect(page.locator(".summary-row")).toContainText("lurar");
+});
+
+test('Stats: hides "totalt" when equal to nap time (no night sleep)', async ({ page }) => {
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
+  const now = new Date();
+  addCompletedSleep(
+    babyId,
+    new Date(now.getTime() - 3600000).toISOString(),
+    new Date(now.getTime() - 1800000).toISOString(),
+    "nap",
+  );
+  await page.goto("/");
+  await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
+  await expect(page.locator(".summary-row").getByText("lurtid")).toBeVisible();
+  await expect(page.locator(".summary-row").getByText("totalt")).toBeHidden();
+});
+
+test('Stats: shows "totalt" when night sleep adds to total', async ({ page }) => {
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
+  const today = new Date();
+  today.setHours(1, 0, 0, 0);
+  addCompletedSleep(
+    babyId,
+    today.toISOString(),
+    new Date(today.getTime() + 3600000).toISOString(),
+    "night",
+  );
+  const now = new Date();
+  addCompletedSleep(
+    babyId,
+    new Date(now.getTime() - 3600000).toISOString(),
+    new Date(now.getTime() - 1800000).toISOString(),
+    "nap",
+  );
+  await page.goto("/");
+  await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
+  await expect(page.locator(".summary-row")).toContainText("totalt");
+});
+
+test("Sync badge does not show offline when SSE fails but browser is online", async ({ page }) => {
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
+  // Hang SSE so it never opens — simulates initial load before SSE connects
+  await page.route("/api/stream", () => {
+    // Never respond — SSE stays pending, sseStatus stays "disconnected"
+  });
+  await page.goto("/");
+  await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
+  const badge = page.getByTestId("sync-badge");
+  // navigator.onLine is true, so should not show "offline" even without SSE
+  await expect(badge).not.toHaveText("offline");
 });
 
 test("Redirects to settings when no baby exists", async ({ page }) => {
