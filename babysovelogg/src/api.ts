@@ -76,6 +76,13 @@ export async function getDiapersForStats(): Promise<DiaperLogRow[]> {
   return res.json();
 }
 
+export async function getWakeups(opts?: { limit?: number }): Promise<DayStartRow[]> {
+  const params = new URLSearchParams();
+  if (opts?.limit) params.set("limit", String(opts.limit));
+  const res = await fetch(`${BASE}/api/wakeups?${params}`);
+  return res.json();
+}
+
 export async function getSleeps(opts?: {
   from?: string;
   to?: string;

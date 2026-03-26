@@ -12,6 +12,26 @@ import {
 } from "./harness.js";
 import { renderDayState } from "../helpers/render-state.js";
 
+// --- B12: Wakeup time visible in API ---
+
+test("B12: GET /api/wakeups returns day_start entries", async () => {
+  const babyId = createBaby("Testa");
+
+  await postEvents([
+    makeEvent("day.started", {
+      babyId,
+      wakeTime: "2026-03-26T06:10:00.000Z",
+    }),
+  ]);
+
+  const res = await get("/api/wakeups?limit=50");
+  expect(res.ok).toBe(true);
+  const wakeups = await res.json();
+  expect(wakeups.length).toBe(1);
+  expect(wakeups[0].wake_time).toBe("2026-03-26T06:10:00.000Z");
+  expect(wakeups[0].baby_id).toBe(babyId);
+});
+
 // --- B15: Editing a nap to become a night sleep should NOT delete the entry ---
 
 test("B15: sleep.updated changing type from nap to night preserves the entry", async () => {

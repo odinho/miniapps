@@ -1,11 +1,11 @@
-import { getSleeps, getDiapers } from "../api.js";
+import { getSleeps, getDiapers, getWakeups } from "../api.js";
 import { sendEventWithOfflineFallback } from "../sync.js";
 import { refreshState, getAppState, setAppState } from "../main.js";
 import { el, formatDuration, formatTime } from "./components.js";
 import { showConfirm } from "./toast.js";
 import { MOODS, METHODS, MOOD_EMOJI, METHOD_EMOJI, FALL_ASLEEP_LABELS } from "../constants.js";
 import { toLocal, toLocalDate } from "../utils.js";
-import type { SleepLogRow, SleepPauseRow, DiaperLogRow } from "../../types.js";
+import type { SleepLogRow, SleepPauseRow, DiaperLogRow, DayStartRow } from "../../types.js";
 const DIAPER_ICONS: Record<string, string> = {
   wet: "💧",
   dirty: "💩",
@@ -34,20 +34,23 @@ const DIAPER_STATUS_LABELS: Record<string, string> = {
 
 type HistoryEntry =
   | (SleepLogRow & { _kind: "sleep"; _sortTime: string })
-  | (DiaperLogRow & { _kind: "diaper"; _sortTime: string });
+  | (DiaperLogRow & { _kind: "diaper"; _sortTime: string })
+  | (DayStartRow & { _kind: "wakeup"; _sortTime: string });
 
 export async function renderHistory(container: HTMLElement): Promise<void> {
   container.innerHTML = "";
   const view = el("div", { className: "view" });
-  const [sleeps, diapers] = await Promise.all([
+  const [sleeps, diapers, wakeups] = await Promise.all([
     getSleeps({ limit: 50 }),
     getDiapers({ limit: 50 }),
+    getWakeups({ limit: 50 }),
   ]);
 
   // Merge into unified list with sortTime
   const entries: HistoryEntry[] = [
     ...sleeps.map((s) => ({ ...s, _kind: "sleep" as const, _sortTime: s.start_time })),
     ...diapers.map((d) => ({ ...d, _kind: "diaper" as const, _sortTime: d.time })),
+    ...wakeups.map((w) => ({ ...w, _kind: "wakeup" as const, _sortTime: w.wake_time })),
   ];
   entries.sort((a, b) => new Date(b._sortTime).getTime() - new Date(a._sortTime).getTime());
 
@@ -189,7 +192,7 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
         ]);
         item.addEventListener("click", () => showEditModal(entry, container));
         log.appendChild(item);
-      } else {
+      } else if (entry._kind === "diaper") {
         const icon = DIAPER_ICONS[entry.type] || "💩";
         const isPotty = entry.type.startsWith("potty_") || entry.type === "diaper_only";
         const metaParts = [DIAPER_LABELS[entry.type] || entry.type];
@@ -219,6 +222,16 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
         item.addEventListener("click", () =>
           isPotty ? showPottyEditModal(entry, container) : showDiaperEditModal(entry, container),
         );
+        log.appendChild(item);
+      } else if (entry._kind === "wakeup") {
+        const item = el("div", { className: "sleep-log-item wakeup-log-item" }, [
+          el("span", { className: "log-icon" }, ["☀️"]),
+          el("div", { className: "log-info" }, [
+            el("div", { className: "log-times" }, [formatTime(entry.wake_time)]),
+            el("div", { className: "log-meta" }, ["Vakna"]),
+          ]),
+          el("span", { className: "log-duration" }, ["Morgon"]),
+        ]);
         log.appendChild(item);
       }
     }

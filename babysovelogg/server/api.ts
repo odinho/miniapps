@@ -399,6 +399,18 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     return json(res, db.prepare(sql).all(...params));
   }
 
+  if (url.pathname === "/api/wakeups" && method === "GET") {
+    const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as
+      | Baby
+      | undefined;
+    if (!baby) return json(res, []);
+    const limitParam = url.searchParams.get("limit") || "50";
+    const wakeups = db
+      .prepare("SELECT * FROM day_start WHERE baby_id = ? ORDER BY date DESC LIMIT ?")
+      .all(baby.id, parseInt(limitParam)) as DayStartRow[];
+    return json(res, wakeups);
+  }
+
   // Data export
   if (url.pathname === "/api/export" && method === "GET") {
     const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as
