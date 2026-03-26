@@ -450,9 +450,10 @@ export function renderDashboard(container: HTMLElement): void {
     } else if (prediction?.nextNap) {
       const nextNapTime = new Date(prediction.nextNap);
       const hoursUntilNap = (nextNapTime.getTime() - now.getTime()) / 3600000;
+      const showBedtime = prediction.napsAllDone || isEvening || hoursUntilNap < 0;
 
-      if ((isEvening || hoursUntilNap < 0) && prediction?.bedtime) {
-        // Evening or past nap time - show bedtime
+      if (showBedtime && prediction?.bedtime) {
+        // Naps done, evening, or past nap time — show bedtime countdown
         const bedtime = new Date(prediction.bedtime);
         const bedtimeInPast = bedtime.getTime() < now.getTime();
         if (bedtimeInPast) {
@@ -481,6 +482,13 @@ export function renderDashboard(container: HTMLElement): void {
         cleanups.push(cd.stop);
         arcCenter.appendChild(el("div", { className: "arc-center-label" }, ["Neste lur"]));
         arcCenter.appendChild(cd.element);
+      } else {
+        // B11: Nap time has passed but baby didn't sleep — show overtime
+        const overtimeMs = now.getTime() - nextNapTime.getTime();
+        arcCenter.appendChild(el("div", { className: "arc-center-label" }, ["Overtid"]));
+        arcCenter.appendChild(
+          el("span", { className: "countdown-value" }, [`+${formatDuration(overtimeMs)}`]),
+        );
       }
 
       // Show "awake since" info (only if wake time is in the past)

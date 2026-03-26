@@ -3,9 +3,11 @@ import {
   predictNextNap,
   recommendBedtime,
   predictDayNaps,
+  getExpectedNapCount,
 } from "./schedule.js";
 import { getTodayStats } from "./stats.js";
 import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry } from "../../types.js";
+import type { PredictedNap } from "./schedule.js";
 
 export interface DayData {
   baby: Baby;
@@ -16,6 +18,8 @@ export interface DayData {
   pausesBySleep: Map<number, SleepPauseRow[]>;
   diaperCount: number;
   lastDiaperTime: string | null;
+  /** Optional override for "now", used by tests. Defaults to Date.now(). */
+  now?: number;
 }
 
 function toSleepEntry(s: SleepLogRow): SleepEntry {
@@ -25,6 +29,7 @@ function toSleepEntry(s: SleepLogRow): SleepEntry {
 /** Pure state assembly — takes fetched data, returns the API response shape. */
 export function assembleState(data: DayData) {
   const { baby, activeSleep, todaySleeps, recentSleeps, todayWakeUp, pausesBySleep } = data;
+  const now = data.now ?? Date.now();
 
   const ageMonths = calculateAgeMonths(baby.birthdate);
 
@@ -42,8 +47,12 @@ export function assembleState(data: DayData) {
     if (wakeTimeForPrediction) {
       const customNaps = baby.custom_nap_count ?? null;
       const bedtime = recommendBedtime(todaySleeps.map(toSleepEntry), ageMonths, customNaps);
+      const bedtimeMs = new Date(bedtime).getTime();
+      const completedNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time);
+      const expectedNapCount = getExpectedNapCount(ageMonths, customNaps);
 
-      let predictedNaps = null;
+      // Build predicted naps from day schedule (accounts for custom nap count)
+      let predictedNaps: PredictedNap[] | null = null;
       if (todayWakeUp) {
         const allPredicted = predictDayNaps(
           todayWakeUp.wake_time,
@@ -51,14 +60,40 @@ export function assembleState(data: DayData) {
           recentSleeps.map(toSleepEntry),
           customNaps,
         );
-        const completedNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time);
-        predictedNaps = allPredicted.slice(completedNaps.length);
+        const remaining = allPredicted.slice(completedNaps.length);
+
+        // B8: Filter out predicted naps starting within 60 min of bedtime
+        predictedNaps = remaining.filter(
+          (n) => new Date(n.startTime).getTime() < bedtimeMs - 60 * 60000,
+        );
+      }
+
+      // B2: Derive nextNap from the day schedule when available (respects custom nap count)
+      // instead of the simple age-based wake window
+      let nextNap: string;
+      if (predictedNaps && predictedNaps.length > 0) {
+        nextNap = predictedNaps[0].startTime;
+      } else {
+        nextNap = predictNextNap(
+          wakeTimeForPrediction,
+          ageMonths,
+          recentSleeps.map(toSleepEntry),
+        );
+      }
+
+      // B8: Don't suggest a nap that starts within 60 min of bedtime
+      const nextNapMs = new Date(nextNap).getTime();
+      const napsAllDone = completedNaps.length >= expectedNapCount;
+      if (nextNapMs > bedtimeMs - 60 * 60000 || napsAllDone) {
+        // All naps done or too close to bedtime — show bedtime instead of next nap
+        nextNap = bedtime;
       }
 
       prediction = {
-        nextNap: predictNextNap(wakeTimeForPrediction, ageMonths, recentSleeps.map(toSleepEntry)),
+        nextNap,
         bedtime,
         predictedNaps,
+        napsAllDone,
       };
     }
   }

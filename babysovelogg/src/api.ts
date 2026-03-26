@@ -15,7 +15,7 @@ export interface AppState {
   activeSleep: SleepLogRow | null;
   todaySleeps: SleepLogRow[];
   stats: DayStats | null;
-  prediction: { nextNap: string; bedtime: string; predictedNaps: PredictedNap[] | null } | null;
+  prediction: { nextNap: string; bedtime: string; predictedNaps: PredictedNap[] | null; napsAllDone?: boolean } | null;
   ageMonths?: number;
   diaperCount?: number;
   lastDiaperTime?: string | null;

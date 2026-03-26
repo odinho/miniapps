@@ -146,4 +146,105 @@ describe("assembleState", () => {
     );
     expect(result.stats.totalNapMinutes).toBe(50); // 60 - 10
   });
+
+  it("B2: nextNap derived from day schedule respects custom nap count", () => {
+    // 9-month-old with 1 custom nap, woke at 06:00
+    // With 1 nap, the single wake window should be much longer than the age-based default
+    const baby9mo: Baby = { ...baseBaby, birthdate: "2025-06-12", custom_nap_count: 1 };
+    const wakeUp: DayStartRow = {
+      id: 1,
+      baby_id: 1,
+      date: "2026-03-26",
+      wake_time: "2026-03-26T06:00:00.000Z",
+      created_at: "2026-03-26T06:00:00.000Z",
+      created_by_event_id: null,
+    };
+
+    const result = assembleState(
+      dayData({
+        baby: baby9mo,
+        todayWakeUp: wakeUp,
+        now: new Date("2026-03-26T08:43:00.000Z").getTime(),
+      }),
+    );
+
+    // With 1 nap for a 9mo, the first wake window should be ~3h (180min midpoint)
+    // so next nap should be around 09:00, not 07:30
+    // The key assertion: nap should NOT be before 09:00
+    const nextNapTime = new Date(result.prediction!.nextNap);
+    expect(nextNapTime.getTime()).toBeGreaterThanOrEqual(
+      new Date("2026-03-26T09:00:00.000Z").getTime(),
+    );
+  });
+
+  it("B8: no nap suggested within 60 min of bedtime", () => {
+    // Set up: 9mo baby, wake at 06:00, 1 nap already done ending at 11:00
+    // At 16:51 bedtime should be ~18:00, no nap should be suggested
+    const baby9mo: Baby = { ...baseBaby, birthdate: "2025-06-12", custom_nap_count: 1 };
+    const wakeUp: DayStartRow = {
+      id: 1,
+      baby_id: 1,
+      date: "2026-03-26",
+      wake_time: "2026-03-26T06:00:00.000Z",
+      created_at: "2026-03-26T06:00:00.000Z",
+      created_by_event_id: null,
+    };
+    const completedNap = sleepRow({
+      start_time: "2026-03-26T09:30:00.000Z",
+      end_time: "2026-03-26T11:00:00.000Z",
+      type: "nap",
+    });
+
+    const result = assembleState(
+      dayData({
+        baby: baby9mo,
+        todaySleeps: [completedNap],
+        todayWakeUp: wakeUp,
+        now: new Date("2026-03-26T16:51:00.000Z").getTime(),
+      }),
+    );
+
+    // With 1 custom nap and 1 completed, napsAllDone should be true
+    expect(result.prediction!.napsAllDone).toBe(true);
+    // nextNap should be bedtime, not a new nap
+    expect(result.prediction!.nextNap).toBe(result.prediction!.bedtime);
+  });
+
+  it("B11: napsAllDone flag set when all expected naps are completed", () => {
+    // 9mo with 2 expected naps (default), both completed
+    const wakeUp: DayStartRow = {
+      id: 1,
+      baby_id: 1,
+      date: "2026-03-26",
+      wake_time: "2026-03-26T06:00:00.000Z",
+      created_at: "2026-03-26T06:00:00.000Z",
+      created_by_event_id: null,
+    };
+    const nap1 = sleepRow({
+      id: 1,
+      start_time: "2026-03-26T08:30:00.000Z",
+      end_time: "2026-03-26T09:30:00.000Z",
+      type: "nap",
+      domain_id: "slp_1",
+    });
+    const nap2 = sleepRow({
+      id: 2,
+      start_time: "2026-03-26T12:00:00.000Z",
+      end_time: "2026-03-26T13:00:00.000Z",
+      type: "nap",
+      domain_id: "slp_2",
+    });
+
+    const result = assembleState(
+      dayData({
+        todaySleeps: [nap1, nap2],
+        todayWakeUp: wakeUp,
+        now: new Date("2026-03-26T15:00:00.000Z").getTime(),
+      }),
+    );
+
+    expect(result.prediction!.napsAllDone).toBe(true);
+    // Should show bedtime, not next nap
+    expect(result.prediction!.nextNap).toBe(result.prediction!.bedtime);
+  });
 });
