@@ -1,9 +1,9 @@
 import { getAppState, refreshState, navigateTo } from "../main.js";
 import { postEvents } from "../api.js";
 import { queueEvent, getClientId } from "../sync.js";
-import { el, formatAge, formatDuration } from "./components.js";
+import { el, formatAge, formatDuration, formatTime } from "./components.js";
 import { showToast } from "./toast.js";
-import { calculateAgeMonths, WAKE_WINDOWS, findByAge } from "../engine/schedule.js";
+import { calculateAgeMonths, WAKE_WINDOWS, findByAge, getExpectedNapCount } from "../engine/schedule.js";
 
 export function renderSettings(container: HTMLElement, opts?: { onboarding?: boolean }): void {
   container.innerHTML = "";
@@ -238,6 +238,51 @@ export function renderSettings(container: HTMLElement, opts?: { onboarding?: boo
     const ageMonths = calculateAgeMonths(baby.birthdate);
     const wakeWindow = findByAge(WAKE_WINDOWS, ageMonths);
 
+    const sleepInfoChildren: (Node | string)[] = [
+      el("h2", { style: { fontSize: "1.1rem", marginBottom: "16px" } }, [
+        "Søvninfo for " + formatAge(baby.birthdate),
+      ]),
+      renderSleepInfoPanel(ageMonths, wakeWindow),
+    ];
+
+    // B4: Show the app's own predictions for today
+    if (state?.prediction) {
+      const predRows: { label: string; value: string }[] = [];
+      const expectedNaps = getExpectedNapCount(ageMonths, baby.custom_nap_count ?? undefined);
+      const completedNaps = state.todaySleeps.filter(
+        (s) => s.type === "nap" && s.end_time,
+      ).length;
+
+      predRows.push({ label: "Forventa lurar i dag", value: `${completedNaps} av ${expectedNaps}` });
+      if (state.prediction.predictedNaps && state.prediction.predictedNaps.length > 0) {
+        const nextNap = state.prediction.predictedNaps[0];
+        predRows.push({ label: "Neste lur", value: `~${formatTime(nextNap.startTime)}` });
+      }
+      predRows.push({ label: "Leggetid", value: `~${formatTime(state.prediction.bedtime)}` });
+
+      if (state.stats) {
+        const totalMin = state.stats.totalNapMinutes + state.stats.totalNightMinutes;
+        if (totalMin > 0) {
+          predRows.push({ label: "Søvn i dag", value: formatDuration(totalMin * 60000) });
+        }
+      }
+
+      const predPanel = el("div", {
+        style: { marginTop: "16px", padding: "12px", background: "var(--lavender)", borderRadius: "var(--radius-sm)" },
+      }, [
+        el("div", { style: { fontWeight: "600", marginBottom: "8px", fontSize: "0.9rem" } }, ["Appen reknar med"]),
+      ]);
+      for (const row of predRows) {
+        predPanel.appendChild(
+          el("div", { className: "stats-trend-row" }, [
+            el("div", { className: "stats-trend-label" }, [row.label]),
+            el("div", { className: "stats-trend-val" }, [row.value]),
+          ]),
+        );
+      }
+      sleepInfoChildren.push(predPanel);
+    }
+
     form.appendChild(
       el(
         "div",
@@ -248,12 +293,7 @@ export function renderSettings(container: HTMLElement, opts?: { onboarding?: boo
             paddingTop: "24px",
           },
         },
-        [
-          el("h2", { style: { fontSize: "1.1rem", marginBottom: "16px" } }, [
-            "Søvninfo for " + formatAge(baby.birthdate),
-          ]),
-          renderSleepInfoPanel(ageMonths, wakeWindow),
-        ],
+        sleepInfoChildren,
       ),
     );
   }
