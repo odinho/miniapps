@@ -59,7 +59,6 @@ test("Tags shown in history as emoji badges", async ({ page }) => {
   db.prepare(
     "INSERT INTO sleep_log (baby_id, start_time, end_time, type, mood, method, domain_id) VALUES (?, ?, ?, 'nap', 'happy', 'nursing', ?)",
   ).run(babyId, start, end, gid());
-  db.close();
 
   await page.goto("/#/history");
   await expect(page.locator(".tag-badge").first()).toBeVisible({ timeout: 5000 });
@@ -94,7 +93,6 @@ test("Can select fall-asleep bucket and enter note", async ({ page }) => {
   const sleep = db.prepare("SELECT * FROM sleep_log ORDER BY id DESC LIMIT 1").get() as SleepLogRow;
   expect(sleep.fall_asleep_time).toBe("5-15");
   expect(sleep.notes).toBe("Sovna fort i dag");
-  db.close();
 });
 
 test("Wake-up sheet appears after ending sleep", async ({ page }) => {
@@ -143,7 +141,6 @@ test("Can save wake-up info with woke-by and note", async ({ page }) => {
   const sleep = db.prepare("SELECT * FROM sleep_log ORDER BY id DESC LIMIT 1").get() as SleepLogRow;
   expect(sleep.woke_by).toBe("self");
   expect(sleep.wake_notes).toBe("Glad og uthvilt");
-  db.close();
 });
 
 test("Wake-up sheet shows compact bedtime summary when tags were set", async ({ page }) => {
@@ -223,7 +220,6 @@ test("Bedtime tags are NOT overwritten by wake-up sheet", async ({ page }) => {
   expect(sleep.mood).toBe("happy");
   expect(sleep.method).toBe("nursing");
   expect(sleep.woke_by).toBe("woken");
-  db.close();
 });
 
 test("Dismissing tag sheet auto-saves entered data", async ({ page }) => {
@@ -249,5 +245,4 @@ test("Dismissing tag sheet auto-saves entered data", async ({ page }) => {
   const sleep = db.prepare("SELECT * FROM sleep_log ORDER BY id DESC LIMIT 1").get() as SleepLogRow;
   expect(sleep.mood).toBe("happy");
   expect(sleep.notes).toBe("Viktig notat");
-  db.close();
 });

@@ -1,37 +1,70 @@
 import { test as base, expect, type Page } from "@playwright/test";
-import Database from "better-sqlite3";
-import path from "path";
+import { createServer, type Server } from "http";
+import { initDb, closeDb } from "../server/db.js";
+import { handleRequest } from "../server/api.js";
+import type Database from "better-sqlite3";
 
+let _db: Database.Database;
+
+// Worker-scoped fixture: one in-process server per Playwright worker
+export const test = base.extend<
+  { autoResetDb: void; autoMorning: void },
+  { workerServer: { server: Server; baseURL: string } }
+>({
+  workerServer: [
+    async ({}, use) => {
+      _db = initDb(":memory:");
+      const server = createServer(handleRequest);
+      await new Promise<void>((resolve) => {
+        server.listen(0, () => resolve());
+      });
+      const { port } = server.address() as { port: number };
+      await use({ server, baseURL: `http://localhost:${port}` });
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      closeDb();
+    },
+    { scope: "worker" },
+  ],
+
+  baseURL: async ({ workerServer }, use) => {
+    await use(workerServer.baseURL);
+  },
+
+  autoResetDb: [
+    async ({ workerServer }, use) => {
+      void workerServer; // ensure in-memory DB is ready
+      resetDb();
+      await use();
+    },
+    { auto: true },
+  ],
+  autoMorning: [
+    async ({ page }, use) => {
+      await forceMorning(page);
+      await use();
+    },
+    { auto: true },
+  ],
+});
+
+// --- DB helpers (use shared in-memory DB directly) ---
+
+/** Returns the shared in-process DB instance. Do NOT close it. */
 export function getDb() {
-  return new Database(path.join(process.cwd(), "db.sqlite"));
+  return _db;
 }
 
 export function resetDb() {
-  const db = getDb();
-  try {
-    db.prepare("DELETE FROM sleep_pauses").run();
-  } catch {}
-  try {
-    db.prepare("DELETE FROM diaper_log").run();
-  } catch {}
-  try {
-    db.prepare("DELETE FROM sleep_log").run();
-  } catch {}
-  try {
-    db.prepare("DELETE FROM day_start").run();
-  } catch {}
-  try {
-    db.prepare("DELETE FROM baby").run();
-  } catch {}
-  try {
-    db.prepare("DELETE FROM events").run();
-  } catch {}
-  // Reset autoincrement counters so rebuild produces matching IDs
-  try {
-    db.prepare("DELETE FROM sqlite_sequence").run();
-  } catch {}
-  db.close();
+  try { _db.prepare("DELETE FROM sleep_pauses").run(); } catch {}
+  try { _db.prepare("DELETE FROM diaper_log").run(); } catch {}
+  try { _db.prepare("DELETE FROM sleep_log").run(); } catch {}
+  try { _db.prepare("DELETE FROM day_start").run(); } catch {}
+  try { _db.prepare("DELETE FROM baby").run(); } catch {}
+  try { _db.prepare("DELETE FROM events").run(); } catch {}
+  try { _db.prepare("DELETE FROM sqlite_sequence").run(); } catch {}
 }
+
+// --- ID generation ---
 
 const EPOCH = new Date("2026-01-01T00:00:00Z").getTime();
 const BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -51,29 +84,27 @@ function generateDiaperId(): string {
   return generateId("dip");
 }
 
+// --- Seed helpers ---
+
 export function createBaby(name = "Testa", birthdate = "2025-06-12"): number {
-  const db = getDb();
   const clientId = generateId();
   const clientEventId = generateId();
-  db.prepare(
-    "INSERT INTO events (type, payload, client_id, client_event_id) VALUES ('baby.created', ?, ?, ?)",
-  ).run(JSON.stringify({ name, birthdate }), clientId, clientEventId);
-  const info = db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run(name, birthdate);
-  db.close();
+  _db
+    .prepare(
+      "INSERT INTO events (type, payload, client_id, client_event_id) VALUES ('baby.created', ?, ?, ?)",
+    )
+    .run(JSON.stringify({ name, birthdate }), clientId, clientEventId);
+  const info = _db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run(name, birthdate);
   return Number(info.lastInsertRowid);
 }
 
 export function setWakeUpTime(babyId: number, wakeTime?: Date) {
-  const db = getDb();
   const wake = wakeTime || new Date();
   wake.setHours(7, 0, 0, 0);
   const dateStr = wake.toISOString().split("T")[0];
-  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
-    babyId,
-    dateStr,
-    wake.toISOString(),
-  );
-  db.close();
+  _db
+    .prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)")
+    .run(babyId, dateStr, wake.toISOString());
 }
 
 export function addCompletedSleep(
@@ -83,22 +114,20 @@ export function addCompletedSleep(
   type = "nap",
   domainId?: string,
 ) {
-  const db = getDb();
   const did = domainId || generateSleepId();
-  db.prepare(
-    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, ?, ?)",
-  ).run(babyId, startTime, endTime, type, did);
-  db.close();
+  _db
+    .prepare(
+      "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, ?, ?)",
+    )
+    .run(babyId, startTime, endTime, type, did);
   return did;
 }
 
 export function addActiveSleep(babyId: number, startTime: string, type = "nap", domainId?: string) {
-  const db = getDb();
   const did = domainId || generateSleepId();
-  db.prepare(
-    "INSERT INTO sleep_log (baby_id, start_time, type, domain_id) VALUES (?, ?, ?, ?)",
-  ).run(babyId, startTime, type, did);
-  db.close();
+  _db
+    .prepare("INSERT INTO sleep_log (baby_id, start_time, type, domain_id) VALUES (?, ?, ?, ?)")
+    .run(babyId, startTime, type, did);
   return did;
 }
 
@@ -109,95 +138,46 @@ export function addDiaper(
   amount = "middels",
   domainId?: string,
 ) {
-  const db = getDb();
   const did = domainId || generateDiaperId();
-  db.prepare(
-    "INSERT INTO diaper_log (baby_id, time, type, amount, domain_id) VALUES (?, ?, ?, ?, ?)",
-  ).run(babyId, time, type, amount, did);
-  db.close();
+  _db
+    .prepare(
+      "INSERT INTO diaper_log (baby_id, time, type, amount, domain_id) VALUES (?, ?, ?, ?, ?)",
+    )
+    .run(babyId, time, type, amount, did);
   return did;
 }
 
 export function enablePottyMode(babyId: number) {
-  const db = getDb();
-  db.prepare("UPDATE baby SET potty_mode = 1 WHERE id = ?").run(babyId);
-  db.close();
+  _db.prepare("UPDATE baby SET potty_mode = 1 WHERE id = ?").run(babyId);
 }
 
 export function seedBabyWithSleep() {
-  const db = getDb();
   const clientId = generateId();
   const clientEventId = generateId();
-  db.prepare(
-    "INSERT INTO events (type, payload, client_id, client_event_id) VALUES ('baby.created', ?, ?, ?)",
-  ).run(JSON.stringify({ name: "Testa", birthdate: "2025-06-12" }), clientId, clientEventId);
-  db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run("Testa", "2025-06-12");
-  const babyId = db.prepare("SELECT id FROM baby LIMIT 1").get() as { id: number };
+  _db
+    .prepare(
+      "INSERT INTO events (type, payload, client_id, client_event_id) VALUES ('baby.created', ?, ?, ?)",
+    )
+    .run(JSON.stringify({ name: "Testa", birthdate: "2025-06-12" }), clientId, clientEventId);
+  _db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run("Testa", "2025-06-12");
+  const babyId = _db.prepare("SELECT id FROM baby LIMIT 1").get() as { id: number };
   const now = new Date();
   const start = new Date(now.getTime() - 3600000).toISOString();
   const end = now.toISOString();
   const domainId = generateSleepId();
-  db.prepare(
-    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, 'nap', ?)",
-  ).run(babyId.id, start, end, domainId);
-  db.close();
-}
-
-/** Custom test that auto-resets DB and forces morning hours before each test */
-export const test = base.extend<{ autoResetDb: void; autoMorning: void }>({
-  // eslint-disable-next-line no-empty-pattern
-  autoResetDb: [
-    async ({}, use) => {
-      resetDb();
-      await use();
-    },
-    { auto: true },
-  ],
-  autoMorning: [
-    async ({ page }, use) => {
-      await forceMorning(page);
-      await use();
-    },
-    { auto: true },
-  ],
-});
-
-/** Force morning hours (8 AM) in the browser so morning prompt and day theme work at any time */
-export async function forceMorning(page: Page) {
-  await page.addInitScript(() => {
-    Date.prototype.getHours = function () {
-      return 8;
-    };
-  });
-}
-
-/** Force a specific hour in the browser for time-dependent tests */
-export async function forceHour(page: Page, hour: number) {
-  await page.addInitScript((h: number) => {
-    Date.prototype.getHours = function () {
-      return h;
-    };
-  }, hour);
-}
-
-/** Dismiss any visible modal sheet (tag sheet or wake-up sheet) by clicking "Ferdig" */
-export async function dismissSheet(page: Page) {
-  const overlay = page.getByTestId("modal-overlay");
-  try {
-    await overlay.waitFor({ state: "visible", timeout: 3000 });
-    await page.getByRole("button", { name: "Ferdig" }).click();
-    await overlay.waitFor({ state: "hidden", timeout: 3000 });
-  } catch {
-    // No sheet visible, that's fine
-  }
+  _db
+    .prepare(
+      "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, 'nap', ?)",
+    )
+    .run(babyId.id, start, end, domainId);
 }
 
 export function addEvent(type: string, payload: Record<string, unknown>) {
-  const db = getDb();
-  db.prepare(
-    "INSERT INTO events (type, payload, client_id, client_event_id) VALUES (?, ?, ?, ?)",
-  ).run(type, JSON.stringify(payload), generateId(), generateId());
-  db.close();
+  _db
+    .prepare(
+      "INSERT INTO events (type, payload, client_id, client_event_id) VALUES (?, ?, ?, ?)",
+    )
+    .run(type, JSON.stringify(payload), generateId(), generateId());
 }
 
 /** Create an event envelope with auto-generated IDs. */
@@ -213,7 +193,38 @@ export function postEvents(
   return page.request.post("/api/events", { data: { events } });
 }
 
-/** Helper to generate IDs for tests */
+// --- Browser helpers ---
+
+/** Force morning hours (8 AM) in the browser */
+export async function forceMorning(page: Page) {
+  await page.addInitScript(() => {
+    Date.prototype.getHours = function () {
+      return 8;
+    };
+  });
+}
+
+/** Force a specific hour in the browser */
+export async function forceHour(page: Page, hour: number) {
+  await page.addInitScript((h: number) => {
+    Date.prototype.getHours = function () {
+      return h;
+    };
+  }, hour);
+}
+
+/** Dismiss any visible modal sheet by clicking "Ferdig" */
+export async function dismissSheet(page: Page) {
+  const overlay = page.getByTestId("modal-overlay");
+  try {
+    await overlay.waitFor({ state: "visible", timeout: 3000 });
+    await page.getByRole("button", { name: "Ferdig" }).click();
+    await overlay.waitFor({ state: "hidden", timeout: 3000 });
+  } catch {
+    // No sheet visible, that's fine
+  }
+}
+
 export { generateId, generateSleepId, generateDiaperId };
 
 export { expect };

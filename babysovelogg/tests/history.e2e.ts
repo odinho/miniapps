@@ -20,7 +20,9 @@ test("History page shows empty state when no sleeps", async ({ page }) => {
   setWakeUpTime(babyId);
 
   await page.goto("/#/history");
-  await expect(page.getByText("Ingen oppføringar enno")).toBeVisible({ timeout: 5000 });
+  // Wake-up entry is shown, but no sleep entries
+  await expect(page.locator(".wakeup-log-item")).toHaveCount(1, { timeout: 5000 });
+  await expect(page.locator(".sleep-log-item:not(.wakeup-log-item):not(.diaper-log-item)")).toHaveCount(0);
 });
 
 test("Clicking a sleep entry opens edit modal", async ({ page }) => {
@@ -61,7 +63,6 @@ test("Notes and fall-asleep-time visible in history list", async ({ page }) => {
   db.prepare(
     "INSERT INTO sleep_log (baby_id, start_time, end_time, type, fall_asleep_time, notes, woke_by, wake_notes, domain_id) VALUES (?, ?, ?, 'nap', '5-15', 'Roleg kveld', 'self', 'Glad ved oppvakning', ?)",
   ).run(babyId, start, end, gid());
-  db.close();
 
   await page.goto("/#/history");
   await expect(page.locator(".sleep-log-item").first()).toBeVisible({ timeout: 5000 });
@@ -97,6 +98,7 @@ test('Active sleep shows "pågår…" in history', async ({ page }) => {
   addActiveSleep(babyId, new Date().toISOString(), "nap");
 
   await page.goto("/#/history");
-  await expect(page.locator(".sleep-log-item")).toHaveCount(1, { timeout: 5000 });
-  await expect(page.locator(".sleep-log-item .log-duration")).toHaveText("pågår…");
+  const sleepItems = page.locator(".sleep-log-item:not(.wakeup-log-item):not(.diaper-log-item)");
+  await expect(sleepItems).toHaveCount(1, { timeout: 5000 });
+  await expect(sleepItems.locator(".log-duration")).toHaveText("pågår…");
 });

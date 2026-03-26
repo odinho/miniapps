@@ -60,7 +60,6 @@ test("Can set wake-up time via morning prompt", async ({ page }) => {
   expect(wakeUp).toBeTruthy();
   expect(wakeUp.wake_time).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   expect(wakeUp.date).toBe(dateStr);
-  db.close();
 });
 
 test("Skip button creates default wake-up time", async ({ page }) => {
@@ -83,7 +82,6 @@ test("Skip button creates default wake-up time", async ({ page }) => {
   const wakeDate = new Date(wakeUp.wake_time);
   expect(wakeDate.getHours()).toBe(6);
   expect(wakeDate.getMinutes()).toBe(0);
-  db.close();
 });
 
 test("Does not show morning prompt when wake-up time already set", async ({ page }) => {
@@ -107,7 +105,6 @@ test("Does not show morning prompt when sleep already logged today", async ({ pa
   db.prepare(
     "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, ?, ?)",
   ).run(babyId, oneHourAgo.toISOString(), now.toISOString(), "nap", domainId);
-  db.close();
 
   await page.goto("/");
   await expect(page.getByTestId("morning-prompt")).not.toBeVisible();

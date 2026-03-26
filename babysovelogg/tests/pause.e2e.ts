@@ -64,7 +64,6 @@ test("Timer adjusts for pause duration", async ({ page }) => {
     pauseTime,
     resumeTime,
   );
-  db.close();
 
   await page.goto("/");
   await expect(page.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 5000 });
@@ -99,7 +98,6 @@ test("Multiple pauses work correctly", async ({ page }) => {
   expect(pauses.length).toBe(2);
   expect(pauses[0].resume_time).toBeTruthy();
   expect(pauses[1].resume_time).toBeTruthy();
-  db.close();
 });
 
 test("History shows pause info", async ({ page }) => {
@@ -124,7 +122,6 @@ test("History shows pause info", async ({ page }) => {
     pauseTime,
     resumeTime2,
   );
-  db.close();
 
   await page.goto("/#/history");
   await expect(page.locator(".sleep-log-item").first()).toBeVisible({ timeout: 5000 });

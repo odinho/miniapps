@@ -24,7 +24,6 @@ test("After 20:00, sleep is classified as night", async ({ page }) => {
     .prepare("SELECT * FROM sleep_log WHERE baby_id = ? ORDER BY id DESC LIMIT 1")
     .get(babyId) as SleepLogRow;
   expect(sleep.type).toBe("night");
-  db.close();
 });
 
 test("Before 16:00, sleep is classified as nap", async ({ page }) => {
@@ -41,7 +40,6 @@ test("Before 16:00, sleep is classified as nap", async ({ page }) => {
     .prepare("SELECT * FROM sleep_log WHERE baby_id = ? ORDER BY id DESC LIMIT 1")
     .get(babyId) as SleepLogRow;
   expect(sleep.type).toBe("nap");
-  db.close();
 });
 
 test("At 17:45 with nap quota met, sleep is classified as night", async ({ page }) => {
@@ -74,7 +72,6 @@ test("At 17:45 with nap quota met, sleep is classified as night", async ({ page 
     .prepare("SELECT * FROM sleep_log WHERE baby_id = ? ORDER BY id DESC LIMIT 1")
     .get(babyId) as SleepLogRow;
   expect(sleep.type).toBe("night");
-  db.close();
 });
 
 test("At 17:00 with nap quota NOT met, sleep is classified as nap", async ({ page }) => {
@@ -92,5 +89,4 @@ test("At 17:00 with nap quota NOT met, sleep is classified as nap", async ({ pag
     .prepare("SELECT * FROM sleep_log WHERE baby_id = ? ORDER BY id DESC LIMIT 1")
     .get(babyId) as SleepLogRow;
   expect(sleep.type).toBe("nap");
-  db.close();
 });

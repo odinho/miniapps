@@ -73,7 +73,6 @@ test("Stats subtracts pause time from sleep durations", async ({ page }) => {
     new Date(now - 50 * 60000).toISOString(),
     new Date(now - 40 * 60000).toISOString(),
   );
-  db.close();
 
   await page.goto("/#/stats");
   // The stats should exist and show data

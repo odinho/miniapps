@@ -5,14 +5,7 @@ export default defineConfig({
   testMatch: /.*\.(test|e2e)\.ts/,
   testIgnore: ['**/unit/**', '**/integration/**'],
   timeout: 30_000,
-  workers: 1,
   use: {
-    baseURL: 'http://localhost:3200',
     headless: true,
-  },
-  webServer: {
-    command: 'PORT=3200 node dist/server.js',
-    port: 3200,
-    reuseExistingServer: true,
   },
 });
