@@ -1,16 +1,13 @@
-import { test, expect, beforeEach } from "vitest";
+import { test, expect } from "vitest";
 import {
   get,
   postEvents,
-  resetDb,
   createBaby,
   setWakeUpTime,
   makeEvent,
   generateSleepId,
   generateDiaperId,
 } from "./harness.js";
-
-beforeEach(() => resetDb());
 
 test("GET /api/events with type filter narrows results", async () => {
   const babyId = createBaby("Testa");

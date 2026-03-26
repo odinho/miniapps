@@ -1,18 +1,15 @@
-import { test, expect, beforeEach } from "vitest";
+import { test, expect } from "vitest";
 import {
   post,
   get,
   postEvents,
-  resetDb,
+  db,
   createBaby,
   setWakeUpTime,
-  getDb,
   makeEvent,
   generateSleepId,
   generateDiaperId,
 } from "./harness.js";
-
-beforeEach(() => resetDb());
 
 test("After sleep.started, sleep_log row has created_by_event_id", async () => {
   const babyId = createBaby("Testa");
@@ -25,11 +22,9 @@ test("After sleep.started, sleep_log row has created_by_event_id", async () => {
   const data = await res.json();
   const eventId = data.events[0].id;
 
-  const db = getDb();
   const sleep = db
     .prepare("SELECT created_by_event_id FROM sleep_log WHERE domain_id = ?")
     .get(did) as { created_by_event_id: number };
-  db.close();
   expect(sleep.created_by_event_id).toBe(eventId);
 });
 
@@ -48,11 +43,9 @@ test("After sleep.tagged, sleep_log row has updated_by_event_id", async () => {
   const tagData = await tagRes.json();
   const tagEventId = tagData.events[0].id;
 
-  const db = getDb();
   const sleep = db
     .prepare("SELECT updated_by_event_id FROM sleep_log WHERE domain_id = ?")
     .get(did) as { updated_by_event_id: number };
-  db.close();
   expect(sleep.updated_by_event_id).toBe(tagEventId);
 });
 
@@ -71,11 +64,9 @@ test("After diaper.logged, diaper_log row has created_by_event_id", async () => 
   const data = await res.json();
   const eventId = data.events[0].id;
 
-  const db = getDb();
   const diaper = db
     .prepare("SELECT created_by_event_id FROM diaper_log WHERE domain_id = ?")
     .get(did) as { created_by_event_id: number };
-  db.close();
   expect(diaper.created_by_event_id).toBe(eventId);
 });
 
@@ -99,14 +90,12 @@ test("After rebuild, traceability columns are correct", async () => {
   // Rebuild
   await post("/api/admin/rebuild", {});
 
-  const db = getDb();
   const sleep = db
     .prepare("SELECT created_by_event_id, updated_by_event_id FROM sleep_log WHERE domain_id = ?")
     .get(did) as {
     created_by_event_id: number;
     updated_by_event_id: number;
   };
-  db.close();
   expect(sleep.created_by_event_id).toBe(createEventId);
   expect(sleep.updated_by_event_id).toBe(tagEventId);
 });

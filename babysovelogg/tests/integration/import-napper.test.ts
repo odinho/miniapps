@@ -1,5 +1,6 @@
-import { describe, test, expect, beforeEach } from "vitest";
-import { get, postCsv, resetDb, createBaby } from "./harness.js";
+import { describe, test, expect } from "vitest";
+import { db, get, postCsv, createBaby } from "./harness.js";
+import { renderDayState } from "../helpers/render-state.js";
 
 const NAPPER_CSV = `start,end,category,overallHappiness,babyMoodOnWakeUp,diaperWeight,diaperContent,breastLeftMinutes,breastRightMinutes,amountPumpedLeft,amountPumpedRight,feedingAmount,temperature,bottleFeedingType,comment,createdAt,pauses
 2026-01-06T06:00:00.000+01:00,2026-01-06T06:00:00.000+01:00,WOKE_UP,,5,,,,,,,,,,,2026-01-07T12:25:25.998Z,
@@ -10,11 +11,9 @@ const NAPPER_CSV = `start,end,category,overallHappiness,babyMoodOnWakeUp,diaperW
 2026-01-06T22:34:00.000+01:00,2026-01-06T22:50:00.000+01:00,NIGHT_WAKING,,,,,,,,,,,,,2026-01-07T19:50:03.549Z,
 2026-01-07T05:46:00.000+01:00,2026-01-07T05:46:00.000+01:00,WOKE_UP,,3,,,,,,,,,,,2026-01-07T12:15:15.500Z,`;
 
-beforeEach(() => resetDb());
-
 describe("POST /api/import/napper", () => {
   test("imports CSV and creates correct sleep + day_start entries", async () => {
-    createBaby("Halldis", "2025-10-21");
+    const babyId = createBaby("Halldis", "2025-10-21");
 
     const res = await postCsv("/api/import/napper", NAPPER_CSV);
     expect(res.ok).toBe(true);
@@ -23,21 +22,12 @@ describe("POST /api/import/napper", () => {
     expect(body.dayStarts).toBeGreaterThanOrEqual(1);
     expect(body.skipped).toBeGreaterThanOrEqual(1); // SOLIDS
 
-    // Verify sleeps were created in DB
-    const sleepsRes = await get("/api/sleeps?limit=100");
-    const sleeps = await sleepsRes.json();
-    const naps = sleeps.filter((s: { type: string }) => s.type === "nap");
-    const nights = sleeps.filter((s: { type: string }) => s.type === "night");
-    expect(naps.length).toBe(2);
-    expect(nights.length).toBe(1);
-
-    // Night sleep should span BED_TIME -> WOKE_UP
-    const night = nights[0];
-    expect(night.start_time).toContain("2026-01-06T17:26"); // 18:26+01:00 -> UTC
-    expect(night.end_time).toContain("2026-01-07T04:46"); // 05:46+01:00 -> UTC
-
-    // Night should have a pause from the NIGHT_WAKING
-    expect(night.pauses).toHaveLength(1);
+    expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
+      "baby: Halldis (2025-10-21)
+      vekketid: 04:46
+      søvn: 08:00–08:45 lur 5 | 12:15–13:35 lur 3 | 17:26–04:46 natt 1 pause (16m) 3
+      bleier: (ingen)"
+    `);
   });
 
   test("returns 404 when no baby exists", async () => {

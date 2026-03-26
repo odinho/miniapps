@@ -1,18 +1,13 @@
-import { describe, test, expect, beforeEach } from "vitest";
+import { test, expect } from "vitest";
 import {
   post,
-  postEvents,
-  resetDb,
+  db,
   createBaby,
   setWakeUpTime,
-  getDb,
-  makeEvent,
   generateId,
   generateSleepId,
   generateDiaperId,
 } from "./harness.js";
-
-beforeEach(() => resetDb());
 
 // --- Envelope validation ---
 
@@ -130,10 +125,8 @@ test("POST batch where one event is invalid returns 400, nothing written", async
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
 
-  const db = getDb();
   const eventCountBefore = (db.prepare("SELECT COUNT(*) as c FROM events").get() as { c: number })
     .c;
-  db.close();
 
   const res = await post("/api/events", {
     events: [
@@ -157,10 +150,8 @@ test("POST batch where one event is invalid returns 400, nothing written", async
   });
   expect(res.status).toBe(400);
 
-  const db2 = getDb();
-  const eventCountAfter = (db2.prepare("SELECT COUNT(*) as c FROM events").get() as { c: number })
+  const eventCountAfter = (db.prepare("SELECT COUNT(*) as c FROM events").get() as { c: number })
     .c;
-  db2.close();
   expect(eventCountAfter).toBe(eventCountBefore);
 });
 
@@ -168,10 +159,8 @@ test("POST batch where projection fails midway returns 500, nothing written", as
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
 
-  const db = getDb();
   const eventCountBefore = (db.prepare("SELECT COUNT(*) as c FROM events").get() as { c: number })
     .c;
-  db.close();
 
   // sleep.ended with nonexistent domain_id will throw during projection
   const res = await post("/api/events", {
@@ -196,10 +185,8 @@ test("POST batch where projection fails midway returns 500, nothing written", as
   });
   expect(res.status).toBe(500);
 
-  const db2 = getDb();
-  const eventCountAfter = (db2.prepare("SELECT COUNT(*) as c FROM events").get() as { c: number })
+  const eventCountAfter = (db.prepare("SELECT COUNT(*) as c FROM events").get() as { c: number })
     .c;
-  db2.close();
   expect(eventCountAfter).toBe(eventCountBefore);
 });
 

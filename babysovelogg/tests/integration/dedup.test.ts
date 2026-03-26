@@ -1,17 +1,12 @@
-import { describe, test, expect, beforeEach } from "vitest";
+import { test, expect } from "vitest";
 import {
-  postEvents,
   post,
-  resetDb,
+  db,
   createBaby,
   setWakeUpTime,
-  getDb,
-  makeEvent,
   generateId,
   generateSleepId,
 } from "./harness.js";
-
-beforeEach(() => resetDb());
 
 test("Duplicate events with same clientId+clientEventId are ignored", async () => {
   const babyId = createBaby("Testa");
@@ -58,9 +53,7 @@ test("Duplicate events with same clientId+clientEventId are ignored", async () =
   expect(data2.events[0].duplicate).toBe(true);
 
   // Verify only one sleep was created
-  const db = getDb();
   const sleeps = db.prepare("SELECT * FROM sleep_log WHERE baby_id = ?").all(babyId);
-  db.close();
   expect(sleeps.length).toBe(1);
 });
 
@@ -136,13 +129,11 @@ test("Batch with mix of new and duplicate events", async () => {
   expect(data.events[1].duplicate).toBe(false);
 });
 
-test("Verify envelope columns exist", async () => {
-  const db = getDb();
+test("Verify envelope columns exist", () => {
   const row = db
     .prepare(
       "SELECT schema_version, correlation_id, caused_by_event_id, domain_id FROM events LIMIT 0",
     )
     .all();
   expect(row).toBeDefined();
-  db.close();
 });

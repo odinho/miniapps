@@ -1,22 +1,19 @@
-import { test, expect, beforeEach } from "vitest";
+import { test, expect } from "vitest";
 import {
+  db,
   post,
   postEvents,
-  resetDb,
   createBaby,
-  setWakeUpTime,
-  getDb,
+  setWakeUpTimeUTC,
   makeEvent,
   generateSleepId,
   generateDiaperId,
 } from "./harness.js";
 import { renderDayState } from "../helpers/render-state.js";
 
-beforeEach(() => resetDb());
-
 test("sleep.started with sleepDomainId creates row with domain_id set", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
+  setWakeUpTimeUTC(babyId, "2026-03-26", "2026-03-26T07:00:00Z");
   const did = generateSleepId();
 
   const res = await postEvents([
@@ -24,39 +21,39 @@ test("sleep.started with sleepDomainId creates row with domain_id set", async ()
   ]);
   expect(res.ok).toBe(true);
 
-  const db = getDb();
-  const sleep = db.prepare("SELECT domain_id FROM sleep_log WHERE domain_id = ?").get(did) as
-    | { domain_id: string }
-    | undefined;
-  db.close();
-  expect(sleep).toBeDefined();
-  expect(sleep!.domain_id).toBe(did);
+  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
+    "baby: Testa (2025-06-12)
+    vekketid: 07:00
+    søvn: 09:00–pågår lur
+    bleier: (ingen)"
+  `);
 });
 
 test("sleep.ended with sleepDomainId updates the correct row", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
+  setWakeUpTimeUTC(babyId, "2026-03-26", "2026-03-26T07:00:00Z");
   const did = generateSleepId();
 
   await postEvents([
     makeEvent("sleep.started", { babyId, startTime: "2026-03-26T09:00:00Z", sleepDomainId: did }),
   ]);
 
-  const endTime = "2026-03-26T10:30:00Z";
-  const res = await postEvents([makeEvent("sleep.ended", { sleepDomainId: did, endTime })]);
+  const res = await postEvents([
+    makeEvent("sleep.ended", { sleepDomainId: did, endTime: "2026-03-26T10:30:00Z" }),
+  ]);
   expect(res.ok).toBe(true);
 
-  const db = getDb();
-  const sleep = db.prepare("SELECT end_time FROM sleep_log WHERE domain_id = ?").get(did) as {
-    end_time: string;
-  };
-  db.close();
-  expect(sleep.end_time).toBe(endTime);
+  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
+    "baby: Testa (2025-06-12)
+    vekketid: 07:00
+    søvn: 09:00–10:30 lur
+    bleier: (ingen)"
+  `);
 });
 
 test("sleep.tagged with sleepDomainId updates the correct row", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
+  setWakeUpTimeUTC(babyId, "2026-03-26", "2026-03-26T07:00:00Z");
   const did = generateSleepId();
 
   await postEvents([
@@ -68,40 +65,38 @@ test("sleep.tagged with sleepDomainId updates the correct row", async () => {
   ]);
   expect(res.ok).toBe(true);
 
-  const db = getDb();
-  expect(renderDayState(db, babyId)).toContain("happy");
-  expect(renderDayState(db, babyId)).toContain("nursing");
-  db.close();
+  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
+    "baby: Testa (2025-06-12)
+    vekketid: 07:00
+    søvn: 09:00–pågår lur happy nursing
+    bleier: (ingen)"
+  `);
 });
 
 test("sleep.paused / sleep.resumed with sleepDomainId works", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
+  setWakeUpTimeUTC(babyId, "2026-03-26", "2026-03-26T07:00:00Z");
   const did = generateSleepId();
 
   await postEvents([
     makeEvent("sleep.started", { babyId, startTime: "2026-03-26T09:00:00Z", sleepDomainId: did }),
   ]);
 
-  const pauseTime = "2026-03-26T09:30:00Z";
-  await postEvents([makeEvent("sleep.paused", { sleepDomainId: did, pauseTime })]);
+  await postEvents([
+    makeEvent("sleep.paused", { sleepDomainId: did, pauseTime: "2026-03-26T09:30:00Z" }),
+  ]);
 
-  const resumeTime = "2026-03-26T09:35:00Z";
   const res = await postEvents([
-    makeEvent("sleep.resumed", { sleepDomainId: did, resumeTime }),
+    makeEvent("sleep.resumed", { sleepDomainId: did, resumeTime: "2026-03-26T09:35:00Z" }),
   ]);
   expect(res.ok).toBe(true);
 
-  const db = getDb();
-  const pauses = db
-    .prepare(
-      "SELECT sp.* FROM sleep_pauses sp JOIN sleep_log sl ON sp.sleep_id = sl.id WHERE sl.domain_id = ?",
-    )
-    .all(did) as { pause_time: string; resume_time: string }[];
-  db.close();
-  expect(pauses.length).toBe(1);
-  expect(pauses[0].pause_time).toBe(pauseTime);
-  expect(pauses[0].resume_time).toBe(resumeTime);
+  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
+    "baby: Testa (2025-06-12)
+    vekketid: 07:00
+    søvn: 09:00–pågår lur 1 pause (5m)
+    bleier: (ingen)"
+  `);
 });
 
 test("diaper.logged with diaperDomainId creates row with domain_id", async () => {
@@ -118,12 +113,11 @@ test("diaper.logged with diaperDomainId creates row with domain_id", async () =>
   ]);
   expect(res.ok).toBe(true);
 
-  const db = getDb();
-  const diaper = db.prepare("SELECT domain_id FROM diaper_log WHERE domain_id = ?").get(did) as {
-    domain_id: string;
-  };
-  db.close();
-  expect(diaper.domain_id).toBe(did);
+  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
+    "baby: Testa (2025-06-12)
+    søvn: (ingen)
+    bleier: 11:00 wet"
+  `);
 });
 
 test("diaper.deleted with diaperDomainId soft-deletes the correct row", async () => {
@@ -141,12 +135,11 @@ test("diaper.deleted with diaperDomainId soft-deletes the correct row", async ()
   const res = await postEvents([makeEvent("diaper.deleted", { diaperDomainId: did })]);
   expect(res.ok).toBe(true);
 
-  const db = getDb();
-  const diaper = db.prepare("SELECT deleted FROM diaper_log WHERE domain_id = ?").get(did) as {
-    deleted: number;
-  };
-  db.close();
-  expect(diaper.deleted).toBe(1);
+  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
+    "baby: Testa (2025-06-12)
+    søvn: (ingen)
+    bleier: (ingen)"
+  `);
 });
 
 test("Events without sleepDomainId are rejected by validation", async () => {
@@ -160,27 +153,27 @@ test("Events without sleepDomainId are rejected by validation", async () => {
 
 test("rebuildAll produces correct projection state", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
+  setWakeUpTimeUTC(babyId, "2026-03-26", "2026-03-26T07:00:00Z");
   const did1 = generateSleepId();
   const did2 = generateDiaperId();
 
   await postEvents([
     makeEvent("sleep.started", {
       babyId,
-      startTime: new Date(Date.now() - 3600000).toISOString(),
+      startTime: "2026-03-26T09:00:00Z",
       sleepDomainId: did1,
     }),
   ]);
   await postEvents([
     makeEvent("sleep.ended", {
       sleepDomainId: did1,
-      endTime: new Date(Date.now() - 1800000).toISOString(),
+      endTime: "2026-03-26T10:30:00Z",
     }),
   ]);
   await postEvents([
     makeEvent("diaper.logged", {
       babyId,
-      time: new Date().toISOString(),
+      time: "2026-03-26T11:00:00Z",
       type: "wet",
       diaperDomainId: did2,
     }),
@@ -191,11 +184,10 @@ test("rebuildAll produces correct projection state", async () => {
   const report = await rebuildRes.json();
   expect(report.success).toBe(true);
 
-  // Verify domain IDs are preserved
-  const db = getDb();
-  const sleep = db.prepare("SELECT domain_id FROM sleep_log WHERE domain_id = ?").get(did1);
-  const diaper = db.prepare("SELECT domain_id FROM diaper_log WHERE domain_id = ?").get(did2);
-  db.close();
-  expect(sleep).toBeDefined();
-  expect(diaper).toBeDefined();
+  // day_start was inserted directly (not via events), so rebuild drops it
+  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
+    "baby: Testa (2025-06-12)
+    søvn: 09:00–10:30 lur
+    bleier: 11:00 wet"
+  `);
 });

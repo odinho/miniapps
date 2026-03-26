@@ -1,4 +1,4 @@
-import db from "./db.js";
+import { db } from "./db.js";
 import type { AppEvent } from "./events.js";
 import type { EventRow } from "../types.js";
 import { validateEventPayload } from "./schemas.js";

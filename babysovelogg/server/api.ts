@@ -2,7 +2,7 @@ import { IncomingMessage, ServerResponse } from "node:http";
 import { readFile } from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
-import db from "./db.js";
+import { db } from "./db.js";
 import { processBatchTx, getEvents } from "./events.js";
 import { rebuildAll } from "./projections.js";
 import { validateBatch } from "./schemas.js";

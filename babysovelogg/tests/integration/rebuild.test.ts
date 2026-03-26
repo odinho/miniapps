@@ -1,34 +1,31 @@
-import { test, expect, beforeEach } from "vitest";
+import { test, expect } from "vitest";
 import {
   post,
   get,
   postEvents,
-  resetDb,
+  db,
   createBaby,
-  setWakeUpTime,
-  getDb,
+  setWakeUpTimeUTC,
   makeEvent,
   generateSleepId,
   generateDiaperId,
 } from "./harness.js";
-import { renderCounts } from "../helpers/render-state.js";
-
-beforeEach(() => resetDb());
+import { renderCounts, renderDayState } from "../helpers/render-state.js";
 
 test("Rebuild on clean data produces identical row counts", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
+  setWakeUpTimeUTC(babyId, "2026-03-26", "2026-03-26T07:00:00Z");
   const did = generateSleepId();
 
   await postEvents([
     makeEvent("sleep.started", {
       babyId,
-      startTime: new Date(Date.now() - 3600000).toISOString(),
+      startTime: "2026-03-26T09:00:00Z",
       sleepDomainId: did,
     }),
   ]);
   await postEvents([
-    makeEvent("sleep.ended", { sleepDomainId: did, endTime: new Date().toISOString() }),
+    makeEvent("sleep.ended", { sleepDomainId: did, endTime: "2026-03-26T10:30:00Z" }),
   ]);
 
   const res = await post("/api/admin/rebuild", {});
@@ -41,50 +38,56 @@ test("Rebuild on clean data produces identical row counts", async () => {
 
 test("Rebuild after manual DB corruption restores data", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
+  setWakeUpTimeUTC(babyId, "2026-03-26", "2026-03-26T07:00:00Z");
   const did = generateSleepId();
   const diaperDid = generateDiaperId();
 
   await postEvents([
     makeEvent("sleep.started", {
       babyId,
-      startTime: new Date(Date.now() - 3600000).toISOString(),
+      startTime: "2026-03-26T09:00:00Z",
       sleepDomainId: did,
     }),
   ]);
   await postEvents([
-    makeEvent("sleep.ended", { sleepDomainId: did, endTime: new Date().toISOString() }),
+    makeEvent("sleep.ended", { sleepDomainId: did, endTime: "2026-03-26T10:30:00Z" }),
   ]);
   await postEvents([
     makeEvent("diaper.logged", {
       babyId,
-      time: new Date().toISOString(),
+      time: "2026-03-26T11:00:00Z",
       type: "wet",
       diaperDomainId: diaperDid,
     }),
   ]);
 
   // Corrupt: delete a projection row
-  const db = getDb();
   db.prepare("DELETE FROM sleep_log WHERE domain_id = ?").run(did);
-  expect(renderCounts(db)).toContain("sleeps: 0");
-  db.close();
+  expect(renderCounts(db)).toMatchInlineSnapshot(
+    `"events: 4, sleeps: 0, diapers: 1, pauses: 0, dayStarts: 1"`,
+  );
 
   // Rebuild should restore
   const res = await post("/api/admin/rebuild", {});
   const report = await res.json();
   expect(report.success).toBe(true);
-  expect(report.after.sleeps).toBe(1);
+
+  // day_start was inserted directly (not via events), so rebuild drops it
+  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
+    "baby: Testa (2025-06-12)
+    søvn: 09:00–10:30 lur
+    bleier: 11:00 wet"
+  `);
 });
 
 test("Rebuild report includes correct event count and timing", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
+  setWakeUpTimeUTC(babyId, "2026-03-26", "2026-03-26T07:00:00Z");
 
   await postEvents([
     makeEvent("diaper.logged", {
       babyId,
-      time: new Date().toISOString(),
+      time: "2026-03-26T11:00:00Z",
       type: "wet",
       diaperDomainId: generateDiaperId(),
     }),
@@ -100,16 +103,21 @@ test("Rebuild report includes correct event count and timing", async () => {
 
 test("After rebuild, all domain_ids are preserved", async () => {
   const babyId = createBaby("Testa");
+  setWakeUpTimeUTC(babyId, "2026-03-26", "2026-03-26T07:00:00Z");
   const did1 = generateSleepId();
   const did2 = generateDiaperId();
 
   await postEvents([
-    makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did1 }),
+    makeEvent("sleep.started", {
+      babyId,
+      startTime: "2026-03-26T09:00:00Z",
+      sleepDomainId: did1,
+    }),
   ]);
   await postEvents([
     makeEvent("diaper.logged", {
       babyId,
-      time: new Date().toISOString(),
+      time: "2026-03-26T11:00:00Z",
       type: "dirty",
       diaperDomainId: did2,
     }),
@@ -117,29 +125,36 @@ test("After rebuild, all domain_ids are preserved", async () => {
 
   await post("/api/admin/rebuild", {});
 
-  const db = getDb();
-  const sleep = db.prepare("SELECT domain_id FROM sleep_log WHERE domain_id = ?").get(did1);
-  const diaper = db.prepare("SELECT domain_id FROM diaper_log WHERE domain_id = ?").get(did2);
-  db.close();
-  expect(sleep).toBeDefined();
-  expect(diaper).toBeDefined();
+  // day_start was inserted directly (not via events), so rebuild drops it
+  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
+    "baby: Testa (2025-06-12)
+    søvn: 09:00–pågår lur
+    bleier: 11:00 dirty"
+  `);
 });
 
 test("After rebuild, GET /api/state returns correct current state", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
+  setWakeUpTimeUTC(babyId, "2026-03-26", "2026-03-26T07:00:00Z");
   const did = generateDiaperId();
 
   await postEvents([
     makeEvent("diaper.logged", {
       babyId,
-      time: new Date().toISOString(),
+      time: "2026-03-26T11:00:00Z",
       type: "wet",
       diaperDomainId: did,
     }),
   ]);
 
   await post("/api/admin/rebuild", {});
+
+  // day_start was inserted directly (not via events), so rebuild drops it
+  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
+    "baby: Testa (2025-06-12)
+    søvn: (ingen)
+    bleier: 11:00 wet"
+  `);
 
   const stateRes = await get("/api/state");
   const state = await stateRes.json();

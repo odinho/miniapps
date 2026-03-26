@@ -1,14 +1,11 @@
-import { test, expect, beforeEach } from "vitest";
+import { test, expect } from "vitest";
 import {
   get,
-  resetDb,
   createBaby,
   setWakeUpTime,
   addCompletedSleep,
   addDiaper,
 } from "./harness.js";
-
-beforeEach(() => resetDb());
 
 test("Export JSON endpoint returns sleep and diaper data", async () => {
   const babyId = createBaby("Testa");
