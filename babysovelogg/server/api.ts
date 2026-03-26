@@ -7,26 +7,8 @@ import { processBatchTx, getEvents } from "./events.js";
 import { rebuildAll } from "./projections.js";
 import { validateBatch } from "./schemas.js";
 import { parseNapperCsv, mapNapperToEvents } from "./import-napper.js";
-import {
-  calculateAgeMonths,
-  predictNextNap,
-  recommendBedtime,
-  predictDayNaps,
-} from "../src/engine/schedule.js";
-import { getTodayStats } from "../src/engine/stats.js";
-import type {
-  Baby,
-  SleepLogRow,
-  SleepPauseRow,
-  DayStartRow,
-  SleepEntry,
-  EventRow,
-} from "../types.js";
-
-/** Convert DB row type (string) to SleepEntry type ("nap" | "night"). */
-function toSleepEntry(s: SleepLogRow): SleepEntry {
-  return { start_time: s.start_time, end_time: s.end_time, type: s.type as SleepEntry["type"] };
-}
+import { assembleState } from "../src/engine/state.js";
+import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, EventRow } from "../types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -113,7 +95,6 @@ function getState() {
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
-  // Use local date to match the projection logic
   const year = todayStart.getFullYear();
   const month = String(todayStart.getMonth() + 1).padStart(2, "0");
   const day = String(todayStart.getDate()).padStart(2, "0");
@@ -136,10 +117,9 @@ function getState() {
     )
     .all(baby.id, weekAgo) as SleepLogRow[];
 
-  const ageMonths = calculateAgeMonths(baby.birthdate);
   // Batch-fetch pauses for all today's sleeps (avoids N+1 query)
   const todaySleepIds = todaySleeps.map((s) => s.id);
-  const pausesBySlept = new Map<number, SleepPauseRow[]>();
+  const pausesBySleep = new Map<number, SleepPauseRow[]>();
   if (todaySleepIds.length > 0) {
     const allPauses = db
       .prepare(
@@ -147,45 +127,8 @@ function getState() {
       )
       .all(...todaySleepIds) as SleepPauseRow[];
     for (const p of allPauses) {
-      if (!pausesBySlept.has(p.sleep_id)) pausesBySlept.set(p.sleep_id, []);
-      pausesBySlept.get(p.sleep_id)!.push(p);
-    }
-  }
-
-  const todaySleepsWithPauses = todaySleeps.map((s) => ({
-    ...toSleepEntry(s),
-    pauses: pausesBySlept.get(s.id) || [],
-  }));
-  const stats = getTodayStats(todaySleepsWithPauses);
-
-  let prediction = null;
-  if (!activeSleep) {
-    const lastCompleted = todaySleeps.find((s) => s.end_time);
-    const wakeTimeForPrediction = lastCompleted?.end_time || todayWakeUp?.wake_time;
-
-    if (wakeTimeForPrediction) {
-      const customNaps = baby.custom_nap_count ?? null;
-      const bedtime = recommendBedtime(todaySleeps.map(toSleepEntry), ageMonths, customNaps);
-
-      // Predict remaining naps for the day, accounting for completed naps
-      let predictedNaps = null;
-      if (todayWakeUp) {
-        const allPredicted = predictDayNaps(
-          todayWakeUp.wake_time,
-          ageMonths,
-          recentSleeps.map(toSleepEntry),
-          customNaps,
-        );
-        // Filter out predictions that overlap with completed naps
-        const completedNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time);
-        predictedNaps = allPredicted.slice(completedNaps.length);
-      }
-
-      prediction = {
-        nextNap: predictNextNap(wakeTimeForPrediction, ageMonths, recentSleeps.map(toSleepEntry)),
-        bedtime,
-        predictedNaps,
-      };
+      if (!pausesBySleep.has(p.sleep_id)) pausesBySleep.set(p.sleep_id, []);
+      pausesBySleep.get(p.sleep_id)!.push(p);
     }
   }
 
@@ -194,26 +137,23 @@ function getState() {
       "SELECT COUNT(*) as count FROM diaper_log WHERE baby_id = ? AND time >= ? AND deleted = 0",
     )
     .get(baby.id, todayStart.toISOString()) as { count: number } | undefined;
-  const diaperCount = todayDiapers?.count ?? 0;
 
   const lastDiaper = db
     .prepare(
       "SELECT time FROM diaper_log WHERE baby_id = ? AND deleted = 0 ORDER BY time DESC LIMIT 1",
     )
     .get(baby.id) as { time: string } | undefined;
-  const lastDiaperTime = lastDiaper?.time ?? null;
 
-  return {
+  return assembleState({
     baby,
     activeSleep,
     todaySleeps,
-    stats,
-    prediction,
-    ageMonths,
-    diaperCount,
-    lastDiaperTime,
+    recentSleeps,
     todayWakeUp,
-  };
+    pausesBySleep,
+    diaperCount: todayDiapers?.count ?? 0,
+    lastDiaperTime: lastDiaper?.time ?? null,
+  });
 }
 
 export async function handleRequest(req: IncomingMessage, res: ServerResponse) {
