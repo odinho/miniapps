@@ -10,7 +10,11 @@ import {
   getPendingCount,
 } from "../sync.js";
 import { generateSleepId, generateDiaperId } from "../identity.js";
-import { getExpectedNapCount } from "../engine/schedule.js";
+import {
+  classifySleepType,
+  classifySleepTypeByHour,
+  calcPauseMs,
+} from "../engine/classification.js";
 import {
   el,
   formatAge,
@@ -52,44 +56,6 @@ async function sendEvent(type: string, payload: Record<string, unknown>): Promis
     showToast("Lagra offline — synkar snart", "warning");
     return false;
   }
-}
-
-/** Simple hour-based classification fallback. */
-function classifySleepTypeByHour(): "nap" | "night" {
-  const hour = new Date().getHours();
-  return hour >= 18 || hour < 6 ? "night" : "nap";
-}
-
-/** Smart classification: considers time-of-day, nap count, and last wake time. */
-function classifySleepType(
-  todaySleeps: SleepLogRow[],
-  ageMonths?: number,
-  customNapCount?: number | null,
-): "nap" | "night" {
-  const hour = new Date().getHours();
-  // Clear night (before 6am or after 8pm)
-  if (hour < 6 || hour >= 20) return "night";
-  // Clear daytime (before 4pm)
-  if (hour < 16) return "nap";
-  // Ambiguous zone (16:00–19:59): check if naps are done for the day
-  if (ageMonths != null) {
-    const expectedNaps = getExpectedNapCount(ageMonths, customNapCount);
-    const completedNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time).length;
-    if (completedNaps >= expectedNaps) return "night";
-  }
-  // In the 16–18 range, if we haven't met nap count, still likely a nap
-  if (hour < 18) return "nap";
-  return "night";
-}
-
-function calcPauseMs(pauses: SleepPauseRow[]): number {
-  let total = 0;
-  for (const p of pauses) {
-    const start = new Date(p.pause_time).getTime();
-    const end = p.resume_time ? new Date(p.resume_time).getTime() : Date.now();
-    total += end - start;
-  }
-  return total;
 }
 
 let cleanups: (() => void)[] = [];
