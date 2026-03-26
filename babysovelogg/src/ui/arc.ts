@@ -76,7 +76,7 @@ function describeArc(
 
 export interface ArcInput {
   todaySleeps: Array<{ start_time: string; end_time: string | null; type: "nap" | "night" }>;
-  activeSleep: { start_time: string; type: "nap" | "night" } | null;
+  activeSleep: { start_time: string; type: "nap" | "night"; isPaused?: boolean; pauseTime?: string } | null;
   prediction: {
     nextNap: string;
     bedtime?: string;
@@ -225,9 +225,13 @@ export function renderArc(input: ArcInput): SVGElement {
   }
 
   if (input.activeSleep) {
+    // B7: When paused, freeze the arc at the pause time instead of growing with current time
+    const activeEndTime = input.activeSleep.isPaused && input.activeSleep.pauseTime
+      ? new Date(input.activeSleep.pauseTime)
+      : null;
     bubbles.push({
       startTime: new Date(input.activeSleep.start_time),
-      endTime: null,
+      endTime: activeEndTime,
       type: input.activeSleep.type as "nap" | "night",
       status: "active",
     });

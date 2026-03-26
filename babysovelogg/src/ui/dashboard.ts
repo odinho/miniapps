@@ -286,7 +286,7 @@ export function renderDashboard(container: HTMLElement): void {
       type: s.type as "nap" | "night",
     })),
     activeSleep: activeSleep
-      ? { start_time: activeSleep.start_time, type: activeSleep.type as "nap" | "night" }
+      ? { start_time: activeSleep.start_time, type: activeSleep.type as "nap" | "night", isPaused, pauseTime: isPaused ? pauses[pauses.length - 1]?.pause_time : undefined }
       : null,
     prediction: filteredPrediction,
     isNightMode,
