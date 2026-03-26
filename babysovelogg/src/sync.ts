@@ -120,6 +120,8 @@ export function connectSSE(onUpdate: (state: AppState) => void): () => void {
     sseStatus = "connected";
     sseDisconnectedAt = 0;
     updateSyncDot();
+    // B13: On reconnect, flush any queued offline events
+    flushQueue().catch(() => {});
   });
   es.addEventListener("error", () => {
     if (sseDisconnectedAt === 0) {

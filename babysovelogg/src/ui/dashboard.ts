@@ -717,7 +717,7 @@ function dateTimeGroup(
   ]);
 }
 
-function _showManualSleepModal(baby: Baby, container: HTMLElement): void {
+export function showManualSleepModal(baby: Baby, container: HTMLElement): void {
   const overlay = el("div", { className: "modal-overlay", "data-testid": "modal-overlay" });
   const modal = el("div", { className: "modal" });
 
@@ -802,7 +802,7 @@ function _showManualSleepModal(baby: Baby, container: HTMLElement): void {
   }
 }
 
-function _showEditStartModal(activeSleep: SleepLogRow, container: HTMLElement): void {
+function showEditStartModal(activeSleep: SleepLogRow, container: HTMLElement): void {
   const overlay = el("div", { className: "modal-overlay", "data-testid": "modal-overlay" });
   const modal = el("div", { className: "modal" });
 

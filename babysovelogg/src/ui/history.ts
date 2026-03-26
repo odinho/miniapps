@@ -3,6 +3,7 @@ import { sendEventWithOfflineFallback } from "../sync.js";
 import { refreshState, getAppState, setAppState } from "../main.js";
 import { el, formatDuration, formatTime } from "./components.js";
 import { showConfirm } from "./toast.js";
+import { showManualSleepModal } from "./dashboard.js";
 import { MOODS, METHODS, MOOD_EMOJI, METHOD_EMOJI, FALL_ASLEEP_LABELS } from "../constants.js";
 import { toLocal, toLocalDate } from "../utils.js";
 import type { SleepLogRow, SleepPauseRow, DiaperLogRow, DayStartRow } from "../../types.js";
@@ -54,7 +55,17 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
   ];
   entries.sort((a, b) => new Date(b._sortTime).getTime() - new Date(a._sortTime).getTime());
 
-  view.appendChild(el("h2", { className: "history-header" }, ["Logg"]));
+  // Header with "add sleep" button for retroactive entries (B13/B14)
+  const state = getAppState();
+  const headerRow = el("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } }, [
+    el("h2", { className: "history-header", style: { margin: "0" } }, ["Logg"]),
+  ]);
+  if (state?.baby) {
+    const addBtn = el("button", { className: "btn btn-ghost", style: { fontSize: "0.85rem", padding: "4px 12px" } }, ["+ Legg til søvn"]);
+    addBtn.addEventListener("click", () => showManualSleepModal(state.baby!, container));
+    headerRow.appendChild(addBtn);
+  }
+  view.appendChild(headerRow);
 
   if (entries.length === 0) {
     view.appendChild(
