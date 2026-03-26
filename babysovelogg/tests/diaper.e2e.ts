@@ -1,16 +1,4 @@
-import {
-  test,
-  expect,
-  createBaby,
-  setWakeUpTime,
-  addDiaper,
-  enablePottyMode,
-  forceMorning,
-} from "./fixtures";
-
-test.beforeEach(async ({ page }) => {
-  await forceMorning(page);
-});
+import { test, expect, createBaby, setWakeUpTime, addDiaper, enablePottyMode } from "./fixtures";
 
 test("Can log a diaper change", async ({ page }) => {
   const babyId = createBaby("Testa");

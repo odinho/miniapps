@@ -143,12 +143,19 @@ export function seedBabyWithSleep() {
   db.close();
 }
 
-/** Custom test that auto-resets DB before each test */
-export const test = base.extend<{ autoResetDb: void }>({
+/** Custom test that auto-resets DB and forces morning hours before each test */
+export const test = base.extend<{ autoResetDb: void; autoMorning: void }>({
   // eslint-disable-next-line no-empty-pattern
   autoResetDb: [
     async ({}, use) => {
       resetDb();
+      await use();
+    },
+    { auto: true },
+  ],
+  autoMorning: [
+    async ({ page }, use) => {
+      await forceMorning(page);
       await use();
     },
     { auto: true },
@@ -191,6 +198,19 @@ export function addEvent(type: string, payload: Record<string, unknown>) {
     "INSERT INTO events (type, payload, client_id, client_event_id) VALUES (?, ?, ?, ?)",
   ).run(type, JSON.stringify(payload), generateId(), generateId());
   db.close();
+}
+
+/** Create an event envelope with auto-generated IDs. */
+export function makeEvent(type: string, payload: Record<string, unknown>) {
+  return { type, payload, clientId: "test", clientEventId: generateId() };
+}
+
+/** POST events to /api/events via Playwright page.request. */
+export function postEvents(
+  page: import("@playwright/test").Page,
+  events: Record<string, unknown>[],
+) {
+  return page.request.post("/api/events", { data: { events } });
 }
 
 /** Helper to generate IDs for tests */

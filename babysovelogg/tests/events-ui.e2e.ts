@@ -3,36 +3,24 @@ import {
   expect,
   createBaby,
   setWakeUpTime,
-  forceMorning,
-  generateId,
   generateSleepId,
   generateDiaperId,
+  postEvents,
+  makeEvent,
 } from "./fixtures";
-
-test.beforeEach(async ({ page }) => {
-  await forceMorning(page);
-});
-
-function postEvent(page: import("@playwright/test").Page, events: Record<string, unknown>[]) {
-  return page.request.post("/api/events", { data: { events } });
-}
-
-function makeEvent(type: string, payload: Record<string, unknown>) {
-  return { type, payload, clientId: "test", clientEventId: generateId() };
-}
 
 test("GET /api/events with type filter narrows results", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
 
-  await postEvent(page, [
+  await postEvents(page, [
     makeEvent("sleep.started", {
       babyId,
       startTime: new Date().toISOString(),
       sleepDomainId: generateSleepId(),
     }),
   ]);
-  await postEvent(page, [
+  await postEvents(page, [
     makeEvent("diaper.logged", {
       babyId,
       time: new Date().toISOString(),
@@ -54,11 +42,11 @@ test("GET /api/events with domainId filter returns entity events", async ({ page
   setWakeUpTime(babyId);
   const did = generateSleepId();
 
-  await postEvent(page, [
+  await postEvents(page, [
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
   ]);
-  await postEvent(page, [makeEvent("sleep.tagged", { sleepDomainId: did, mood: "calm" })]);
-  await postEvent(page, [
+  await postEvents(page, [makeEvent("sleep.tagged", { sleepDomainId: did, mood: "calm" })]);
+  await postEvents(page, [
     makeEvent("diaper.logged", {
       babyId,
       time: new Date().toISOString(),
@@ -79,7 +67,7 @@ test("GET /api/events with pagination returns correct total", async ({ page }) =
   // Create a few events
   await Promise.all(
     Array.from({ length: 5 }, () =>
-      postEvent(page, [
+      postEvents(page, [
         makeEvent("diaper.logged", {
           babyId,
           time: new Date().toISOString(),
@@ -101,7 +89,7 @@ test("Events screen renders with recent events", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
 
-  await postEvent(page, [
+  await postEvents(page, [
     makeEvent("diaper.logged", {
       babyId,
       time: new Date().toISOString(),
@@ -120,7 +108,7 @@ test("Tap event card expands payload", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
 
-  await postEvent(page, [
+  await postEvents(page, [
     makeEvent("diaper.logged", {
       babyId,
       time: new Date().toISOString(),

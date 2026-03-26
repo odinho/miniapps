@@ -1,17 +1,5 @@
-import {
-  test,
-  expect,
-  createBaby,
-  setWakeUpTime,
-  getDb,
-  dismissSheet,
-  forceMorning,
-} from "./fixtures";
+import { test, expect, createBaby, setWakeUpTime, getDb, dismissSheet } from "./fixtures";
 import type { SleepLogRow } from "../types";
-
-test.beforeEach(async ({ page }) => {
-  await forceMorning(page);
-});
 
 test("Tag sheet appears after starting sleep", async ({ page }) => {
   const babyId = createBaby("Testa");

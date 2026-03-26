@@ -1,8 +1,4 @@
-import { test, expect, forceMorning } from "./fixtures";
-
-test.beforeEach(async ({ page }) => {
-  await forceMorning(page);
-});
+import { test, expect } from "./fixtures";
 
 test("Get Started button creates baby and navigates to dashboard", async ({ page }) => {
   await page.goto("/");

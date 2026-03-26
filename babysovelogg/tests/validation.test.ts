@@ -3,16 +3,11 @@ import {
   expect,
   createBaby,
   setWakeUpTime,
-  forceMorning,
   getDb,
   generateId,
   generateSleepId,
   generateDiaperId,
 } from "./fixtures";
-
-test.beforeEach(async ({ page }) => {
-  await forceMorning(page);
-});
 
 // --- Envelope validation ---
 

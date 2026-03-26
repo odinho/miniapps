@@ -5,14 +5,9 @@ import {
   setWakeUpTime,
   getDb,
   dismissSheet,
-  forceMorning,
   generateId,
 } from "./fixtures";
 import type { SleepPauseRow } from "../types";
-
-test.beforeEach(async ({ page }) => {
-  await forceMorning(page);
-});
 
 test("Pause button appears when sleeping", async ({ page }) => {
   const babyId = createBaby("Testa");

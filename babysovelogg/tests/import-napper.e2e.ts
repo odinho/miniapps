@@ -1,4 +1,4 @@
-import { test, expect, createBaby, forceMorning } from "./fixtures.js";
+import { test, expect, createBaby } from "./fixtures.js";
 import path from "path";
 import { writeFileSync, mkdirSync } from "fs";
 
@@ -10,7 +10,6 @@ const NAPPER_CSV = `start,end,category,overallHappiness,babyMoodOnWakeUp,diaperW
 2026-01-07T05:46:00.000+01:00,2026-01-07T05:46:00.000+01:00,WOKE_UP,,3,,,,,,,,,,,2026-01-07T12:15:15.500Z,`;
 
 test("uploads CSV from settings page and sees imported data", async ({ page }) => {
-  await forceMorning(page);
   createBaby("Halldis", "2025-10-21");
 
   // Write a temp CSV file for upload

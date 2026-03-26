@@ -1,9 +1,5 @@
-import { test, expect, forceMorning } from "./fixtures";
+import { test, expect } from "./fixtures";
 import type { Page } from "@playwright/test";
-
-test.beforeEach(async ({ page }) => {
-  await forceMorning(page);
-});
 
 async function dismissMorningPrompt(page: Page) {
   await page.getByTestId("morning-prompt").waitFor({ state: "visible", timeout: 5000 });

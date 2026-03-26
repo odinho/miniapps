@@ -1,16 +1,4 @@
-import {
-  test,
-  expect,
-  createBaby,
-  setWakeUpTime,
-  addCompletedSleep,
-  addDiaper,
-  forceMorning,
-} from "./fixtures";
-
-test.beforeEach(async ({ page }) => {
-  await forceMorning(page);
-});
+import { test, expect, createBaby, setWakeUpTime, addCompletedSleep, addDiaper } from "./fixtures";
 
 test("Export JSON endpoint returns sleep and diaper data", async ({ page }) => {
   const babyId = createBaby("Testa");

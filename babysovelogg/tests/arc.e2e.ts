@@ -21,26 +21,13 @@ test("Arc renders on dashboard", async ({ page }) => {
 
 test("Completed sleeps appear as filled bubbles on arc", async ({ page }) => {
   const babyId = createBaby("Testa");
+  setWakeUpTime(babyId); // 07:00
+  // Sleep must be between wake-up (07:00) and forced browser hour (08:00) to appear as completed
   const now = new Date();
-  const hour = now.getHours();
-
-  let start: Date, end: Date;
-  if (hour >= 6 && hour < 18) {
-    start = new Date(now);
-    start.setHours(10, 0, 0, 0);
-    end = new Date(now);
-    end.setHours(11, 0, 0, 0);
-  } else if (hour >= 18) {
-    start = new Date(now);
-    start.setHours(20, 0, 0, 0);
-    end = new Date(now);
-    end.setHours(21, 0, 0, 0);
-  } else {
-    start = new Date(now);
-    start.setHours(0, 0, 0, 0);
-    end = new Date(now);
-    end.setHours(1, 0, 0, 0);
-  }
+  const start = new Date(now);
+  start.setHours(7, 15, 0, 0);
+  const end = new Date(now);
+  end.setHours(7, 45, 0, 0);
 
   addCompletedSleep(babyId, start.toISOString(), end.toISOString(), "nap");
 
@@ -94,34 +81,22 @@ test("Arc center shows countdown when not sleeping", async ({ page }) => {
 
 test("Clicking completed nap bubble opens edit modal", async ({ page }) => {
   const babyId = createBaby("Testa");
+  setWakeUpTime(babyId); // 07:00
   const now = new Date();
-  const hour = now.getHours();
-
-  let start: Date, end: Date;
-  if (hour >= 6 && hour < 18) {
-    start = new Date(now);
-    start.setHours(10, 0, 0, 0);
-    end = new Date(now);
-    end.setHours(11, 0, 0, 0);
-  } else if (hour >= 18) {
-    start = new Date(now);
-    start.setHours(20, 0, 0, 0);
-    end = new Date(now);
-    end.setHours(21, 0, 0, 0);
-  } else {
-    start = new Date(now);
-    start.setHours(0, 0, 0, 0);
-    end = new Date(now);
-    end.setHours(1, 0, 0, 0);
-  }
+  const start = new Date(now);
+  start.setHours(7, 15, 0, 0);
+  const end = new Date(now);
+  end.setHours(7, 45, 0, 0);
 
   addCompletedSleep(babyId, start.toISOString(), end.toISOString(), "nap");
 
   await page.goto("/");
   await expect(page.locator(".arc-bubble-completed")).toHaveCount(1);
 
-  // Click the completed bubble's tap target
-  await page.locator(".arc-bubble-completed").click();
+  // Trigger click via JS — SVG arc path hit areas are unreliable with Playwright's click positioning
+  await page
+    .locator(".arc-bubble-completed path[style*='cursor']")
+    .evaluate((el) => el.dispatchEvent(new MouseEvent("click", { bubbles: true })));
   await expect(page.getByRole("heading", { name: "Endra søvn" })).toBeVisible({ timeout: 5000 });
 });
 

@@ -3,31 +3,19 @@ import {
   expect,
   createBaby,
   setWakeUpTime,
-  forceMorning,
   getDb,
-  generateId,
   generateSleepId,
   generateDiaperId,
+  postEvents,
+  makeEvent,
 } from "./fixtures";
-
-test.beforeEach(async ({ page }) => {
-  await forceMorning(page);
-});
-
-function postEvent(page: import("@playwright/test").Page, events: Record<string, unknown>[]) {
-  return page.request.post("/api/events", { data: { events } });
-}
-
-function makeEvent(type: string, payload: Record<string, unknown>) {
-  return { type, payload, clientId: "test", clientEventId: generateId() };
-}
 
 test("sleep.started with sleepDomainId creates row with domain_id set", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
   const did = generateSleepId();
 
-  const res = await postEvent(page, [
+  const res = await postEvents(page, [
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
   ]);
   expect(res.ok()).toBe(true);
@@ -46,12 +34,12 @@ test("sleep.ended with sleepDomainId updates the correct row", async ({ page }) 
   setWakeUpTime(babyId);
   const did = generateSleepId();
 
-  await postEvent(page, [
+  await postEvents(page, [
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
   ]);
 
   const endTime = new Date().toISOString();
-  const res = await postEvent(page, [makeEvent("sleep.ended", { sleepDomainId: did, endTime })]);
+  const res = await postEvents(page, [makeEvent("sleep.ended", { sleepDomainId: did, endTime })]);
   expect(res.ok()).toBe(true);
 
   const db = getDb();
@@ -67,11 +55,11 @@ test("sleep.tagged with sleepDomainId updates the correct row", async ({ page })
   setWakeUpTime(babyId);
   const did = generateSleepId();
 
-  await postEvent(page, [
+  await postEvents(page, [
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
   ]);
 
-  const res = await postEvent(page, [
+  const res = await postEvents(page, [
     makeEvent("sleep.tagged", { sleepDomainId: did, mood: "happy", method: "nursing" }),
   ]);
   expect(res.ok()).toBe(true);
@@ -91,15 +79,15 @@ test("sleep.paused / sleep.resumed with sleepDomainId works", async ({ page }) =
   setWakeUpTime(babyId);
   const did = generateSleepId();
 
-  await postEvent(page, [
+  await postEvents(page, [
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
   ]);
 
   const pauseTime = new Date().toISOString();
-  await postEvent(page, [makeEvent("sleep.paused", { sleepDomainId: did, pauseTime })]);
+  await postEvents(page, [makeEvent("sleep.paused", { sleepDomainId: did, pauseTime })]);
 
   const resumeTime = new Date().toISOString();
-  const res = await postEvent(page, [
+  const res = await postEvents(page, [
     makeEvent("sleep.resumed", { sleepDomainId: did, resumeTime }),
   ]);
   expect(res.ok()).toBe(true);
@@ -120,7 +108,7 @@ test("diaper.logged with diaperDomainId creates row with domain_id", async ({ pa
   const babyId = createBaby("Testa");
   const did = generateDiaperId();
 
-  const res = await postEvent(page, [
+  const res = await postEvents(page, [
     makeEvent("diaper.logged", {
       babyId,
       time: new Date().toISOString(),
@@ -142,7 +130,7 @@ test("diaper.deleted with diaperDomainId soft-deletes the correct row", async ({
   const babyId = createBaby("Testa");
   const did = generateDiaperId();
 
-  await postEvent(page, [
+  await postEvents(page, [
     makeEvent("diaper.logged", {
       babyId,
       time: new Date().toISOString(),
@@ -150,7 +138,7 @@ test("diaper.deleted with diaperDomainId soft-deletes the correct row", async ({
       diaperDomainId: did,
     }),
   ]);
-  const res = await postEvent(page, [makeEvent("diaper.deleted", { diaperDomainId: did })]);
+  const res = await postEvents(page, [makeEvent("diaper.deleted", { diaperDomainId: did })]);
   expect(res.ok()).toBe(true);
 
   const db = getDb();
@@ -164,7 +152,7 @@ test("diaper.deleted with diaperDomainId soft-deletes the correct row", async ({
 test("Events without sleepDomainId are rejected by validation", async ({ page }) => {
   const babyId = createBaby("Testa");
 
-  const res = await postEvent(page, [
+  const res = await postEvents(page, [
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString() }),
   ]);
   expect(res.status()).toBe(400);
@@ -177,20 +165,20 @@ test("rebuildAll produces correct projection state", async ({ page }) => {
   const did2 = generateDiaperId();
 
   // Create events through API (they go to both events table and projections)
-  await postEvent(page, [
+  await postEvents(page, [
     makeEvent("sleep.started", {
       babyId,
       startTime: new Date(Date.now() - 3600000).toISOString(),
       sleepDomainId: did1,
     }),
   ]);
-  await postEvent(page, [
+  await postEvents(page, [
     makeEvent("sleep.ended", {
       sleepDomainId: did1,
       endTime: new Date(Date.now() - 1800000).toISOString(),
     }),
   ]);
-  await postEvent(page, [
+  await postEvents(page, [
     makeEvent("diaper.logged", {
       babyId,
       time: new Date().toISOString(),

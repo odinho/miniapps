@@ -6,12 +6,7 @@ import {
   seedBabyWithSleep,
   addActiveSleep,
   getDb,
-  forceMorning,
 } from "./fixtures";
-
-test.beforeEach(async ({ page }) => {
-  await forceMorning(page);
-});
 
 test("History page shows logged sleeps", async ({ page }) => {
   seedBabyWithSleep();

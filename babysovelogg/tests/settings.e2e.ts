@@ -1,8 +1,4 @@
-import { test, expect, createBaby, setWakeUpTime, forceMorning } from "./fixtures";
-
-test.beforeEach(async ({ page }) => {
-  await forceMorning(page);
-});
+import { test, expect, createBaby, setWakeUpTime } from "./fixtures";
 
 test("Settings shows sleep info panel with wake window format", async ({ page }) => {
   // 12-month baby has wake windows >= 60 min (210-300 min = 3h 30m – 5h)

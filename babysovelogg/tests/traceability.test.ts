@@ -3,31 +3,19 @@ import {
   expect,
   createBaby,
   setWakeUpTime,
-  forceMorning,
   getDb,
-  generateId,
   generateSleepId,
   generateDiaperId,
+  postEvents,
+  makeEvent,
 } from "./fixtures";
-
-test.beforeEach(async ({ page }) => {
-  await forceMorning(page);
-});
-
-function postEvent(page: import("@playwright/test").Page, events: Record<string, unknown>[]) {
-  return page.request.post("/api/events", { data: { events } });
-}
-
-function makeEvent(type: string, payload: Record<string, unknown>) {
-  return { type, payload, clientId: "test", clientEventId: generateId() };
-}
 
 test("After sleep.started, sleep_log row has created_by_event_id", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
   const did = generateSleepId();
 
-  const res = await postEvent(page, [
+  const res = await postEvents(page, [
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
   ]);
   const data = await res.json();
@@ -46,11 +34,11 @@ test("After sleep.tagged, sleep_log row has updated_by_event_id", async ({ page 
   setWakeUpTime(babyId);
   const did = generateSleepId();
 
-  await postEvent(page, [
+  await postEvents(page, [
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
   ]);
 
-  const tagRes = await postEvent(page, [
+  const tagRes = await postEvents(page, [
     makeEvent("sleep.tagged", { sleepDomainId: did, mood: "happy" }),
   ]);
   const tagData = await tagRes.json();
@@ -68,7 +56,7 @@ test("After diaper.logged, diaper_log row has created_by_event_id", async ({ pag
   const babyId = createBaby("Testa");
   const did = generateDiaperId();
 
-  const res = await postEvent(page, [
+  const res = await postEvents(page, [
     makeEvent("diaper.logged", {
       babyId,
       time: new Date().toISOString(),
@@ -92,13 +80,13 @@ test("After rebuild, traceability columns are correct", async ({ page }) => {
   setWakeUpTime(babyId);
   const did = generateSleepId();
 
-  const createRes = await postEvent(page, [
+  const createRes = await postEvents(page, [
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
   ]);
   const createData = await createRes.json();
   const createEventId = createData.events[0].id;
 
-  const tagRes = await postEvent(page, [
+  const tagRes = await postEvents(page, [
     makeEvent("sleep.tagged", { sleepDomainId: did, mood: "calm" }),
   ]);
   const tagData = await tagRes.json();
@@ -124,7 +112,7 @@ test("GET /api/sleeps returns rows with traceability fields", async ({ page }) =
   setWakeUpTime(babyId);
   const did = generateSleepId();
 
-  await postEvent(page, [
+  await postEvents(page, [
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
   ]);
 

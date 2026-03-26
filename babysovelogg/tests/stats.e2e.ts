@@ -5,13 +5,8 @@ import {
   setWakeUpTime,
   addCompletedSleep,
   getDb,
-  forceMorning,
   generateId,
 } from "./fixtures";
-
-test.beforeEach(async ({ page }) => {
-  await forceMorning(page);
-});
 
 test('Stats page shows Norwegian headers "7 dagar" / "30 dagar"', async ({ page }) => {
   const babyId = createBaby("Testa");

@@ -3,15 +3,10 @@ import {
   expect,
   createBaby,
   setWakeUpTime,
-  forceMorning,
   getDb,
   generateId,
   generateSleepId,
 } from "./fixtures";
-
-test.beforeEach(async ({ page }) => {
-  await forceMorning(page);
-});
 
 test("Duplicate events with same clientId+clientEventId are ignored", async ({ page }) => {
   const babyId = createBaby("Testa");

@@ -1,8 +1,4 @@
-import { test, expect, createBaby, setWakeUpTime, addEvent, forceMorning } from "./fixtures";
-
-test.beforeEach(async ({ page }) => {
-  await forceMorning(page);
-});
+import { test, expect, createBaby, setWakeUpTime, addEvent } from "./fixtures";
 
 test("Events page has a close button that navigates back", async ({ page }) => {
   const babyId = createBaby("Testa");

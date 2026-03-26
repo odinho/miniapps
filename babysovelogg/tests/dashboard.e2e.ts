@@ -5,12 +5,7 @@ import {
   setWakeUpTime,
   addCompletedSleep,
   dismissSheet,
-  forceMorning,
 } from "./fixtures";
-
-test.beforeEach(async ({ page }) => {
-  await forceMorning(page);
-});
 
 test("Dashboard shows baby name and sleep button", async ({ page }) => {
   const babyId = createBaby("Testa");
