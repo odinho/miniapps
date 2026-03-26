@@ -233,8 +233,8 @@ The test for "reset DB clears all projections" should not be five separate `expe
 
 ## Existing test helpers
 
-- **`tests/fixtures.ts`**: The shared test harness. Key exports:
-  - `test` — Custom Playwright test with `autoResetDb` fixture (resets all tables before each test)
+- **`tests/fixtures.ts`**: The shared Playwright test harness. Key exports:
+  - `test` — Custom Playwright test with `autoResetDb` (resets all tables) and `autoMorning` (forces hour to 8 AM) fixtures
   - `resetDb()` — Clears all tables: events, baby, sleep_log, diaper_log, day_start, sleep_pauses
   - `createBaby(name, birthdate)` — Creates a baby via event + direct insert
   - `setWakeUpTime(babyId, wakeTime)` — Sets wake-up time for the day
@@ -242,11 +242,18 @@ The test for "reset DB clears all projections" should not be five separate `expe
   - `addActiveSleep(babyId, start, type, domainId)` — Adds an in-progress sleep
   - `addDiaper(babyId, time, type, amount, domainId)` — Logs a diaper change
   - `addEvent(type, payload)` — Inserts a raw event
-  - `forceMorning(page)` / `forceHour(page, hour)` — Override `Date.getHours()` in the browser
+  - `makeEvent(type, payload)` — Creates an event envelope with auto-generated IDs
+  - `postEvents(page, events)` — POSTs events to `/api/events` via Playwright
+  - `forceMorning(page)` / `forceHour(page, hour)` — Override `Date.getHours()` in the browser (usually not needed — `autoMorning` handles it)
   - `dismissSheet(page)` — Closes modal overlays (tag sheet, wake-up prompt)
   - `generateId()`, `generateSleepId()`, `generateDiaperId()` — Domain ID generators
 
-When adding new state (projections, tables, etc.), update `resetDb()` and consider adding a renderer so existing tests automatically catch regressions.
+- **`tests/helpers/render-state.ts`**: State renderers for snapshot-based assertions:
+  - `renderDayState(db, babyId)` — Full baby state as readable string (sleeps, diapers, wake-up, pauses, tags)
+  - `renderEventLog(db)` — Compact event sequence summary
+  - `renderCounts(db)` — Projection row counts (events, sleeps, diapers, pauses, dayStarts)
+
+When adding new state (projections, tables, etc.), update `resetDb()` and the relevant renderer so existing tests automatically catch regressions.
 
 ## Repo expectations
 
@@ -259,20 +266,33 @@ When adding new state (projections, tables, etc.), update `resetDb()` and consid
 
 ## Current state (March 2026)
 
-This section is a point-in-time snapshot of where we are. The patterns above describe where we want to go.
+This section is a point-in-time snapshot. The patterns above describe where we want to go — some of that work is done, some remains.
 
 ### What exists today
 
-- 27 test files: 20 Playwright E2E, 6 Playwright "integration" (API-only), 1 Vitest unit test
-- Shared fixtures in `tests/fixtures.ts` with DB reset, seed helpers, time mocking — solid foundation
+- 25 test files: 20 Playwright E2E, 6 Playwright "integration" (API-only), 6 Vitest unit tests
+- 88 unit tests covering schedule prediction, stats, classification, and state assembly
+- 144 Playwright E2E tests covering UI flows and API behavior
+- Shared fixtures in `tests/fixtures.ts` with DB reset, seed helpers, time mocking, `autoMorning` fixture, shared `makeEvent()`/`postEvents()` helpers
 - Event-sourced architecture with working rebuild/replay — good testability at the data layer
-- Pure functions in `src/engine/` (schedule prediction, stats) — highly testable, but **zero unit tests** for them
+- Pure business logic extracted into `src/engine/`: schedule, stats, classification, state assembly — all unit-testable
+- State renderer (`tests/helpers/render-state.ts`) ready for snapshot-based assertions in new tests
 
-### What's wrong
+### What's been improved
+
+**Business logic extracted from UI.** `classifySleepType()`, `classifySleepTypeByHour()`, and `calcPauseMs()` moved from `dashboard.ts` to `src/engine/classification.ts` with optional `hour` parameter for testability. Covered by table-driven unit tests.
+
+**`getState()` split into fetch + pure assembly.** `server/api.ts` now does thin data fetching, then calls `assembleState()` from `src/engine/state.ts`. The assembly function is pure and unit-tested — no DB needed.
+
+**Engine functions have unit tests.** `calculateAgeMonths()`, `getWakeWindow()`, `predictNextNap()`, `predictDayNaps()`, `recommendBedtime()`, `detectNapTransition()`, `getTodayStats()`, `getWeekStats()`, `getAverageWakeWindow()` — all covered with table-driven tests.
+
+**Boilerplate eliminated.** `autoMorning` fixture replaced 19 identical `beforeEach(forceMorning)` blocks. `makeEvent()`/`postEvents()` consolidated from 4 duplicated definitions into shared fixtures.
+
+### What's still wrong
 
 **~35 tests don't need a browser but use Playwright anyway.** Files like `dedup.test.ts`, `rebuild.test.ts`, `domain-ids.test.ts`, `traceability.test.ts`, `import-napper.test.ts`, and `export.e2e.ts` only use `page.request.post()` and DB checks — never `page.goto()` or any DOM interaction. These could be fast Vitest integration tests that hit the server directly via `fetch()` or test the functions in-process, but instead they spin up a browser and go through Playwright. This makes them slow, noisy, and harder to debug.
 
-**Assertions are fragment piles.** Almost every test checks individual fields:
+**Assertions are still fragment piles.** Most E2E tests check individual fields:
 
 ```ts
 // From tags.e2e.ts — 4 separate assertions, easy to forget a 5th
@@ -282,51 +302,21 @@ expect(sleep.method).toBe("nursing");
 expect(sleep.woke_by).toBe("self");
 ```
 
-No renderers exist. No `toMatchInlineSnapshot()` anywhere. If someone adds a new field, nothing catches a missing assertion.
-
-**Setup boilerplate is repeated everywhere.** `forceMorning(page)` appears in `beforeEach` in 14 files. `postEvent()` and `makeEvent()` helpers are duplicated across 3+ files instead of living in fixtures. Manual sleep+pause insertion code (open DB, insert, close) is repeated in `pause.e2e.ts` 3 times.
-
-**Pure business logic has no tests.** `calculateAgeMonths()`, `predictNextNap()`, `recommendBedtime()`, `predictDayNaps()`, `getTodayStats()`, `getWeekStats()` are all pure functions with no side effects — perfect for table-driven unit tests. None of them have any.
-
-**Business logic is tangled with UI code.** `classifySleepType()` and `classifySleepTypeByHour()` live in `src/ui/dashboard.ts` (a 1700+ line file), making them impossible to test without importing the entire UI. Same for `calcPauseMs()`.
-
-**`getState()` in `server/api.ts` is untestable.** It's a 120-line function that does 6 DB queries, date math, stats computation, and prediction assembly — all inline with no parameters. You can't call it without a fully populated database.
+The `renderDayState()` renderer exists but is not yet used in existing tests. No `toMatchInlineSnapshot()` anywhere. New tests should adopt renderers; existing tests should be migrated opportunistically.
 
 ---
 
 ## Refactoring plan
 
-Each item is independent — do them in any order, one at a time.
+Each item is independent — do them in any order, one at a time. Completed items are marked with ~~strikethrough~~.
 
-### R1. Extract pure logic from `dashboard.ts`
+### ~~R1. Extract pure logic from `dashboard.ts`~~ ✓
 
-**Problem:** `classifySleepType()`, `classifySleepTypeByHour()`, and `calcPauseMs()` are pure functions buried in a 1700-line UI file. They can't be imported without pulling in DOM code.
+Done. `classifySleepType()`, `classifySleepTypeByHour()`, `calcPauseMs()` extracted to [`src/engine/classification.ts`](../src/engine/classification.ts) with optional `hour` parameter. Tests in [`tests/unit/classification.unit.ts`](../tests/unit/classification.unit.ts).
 
-**Move to:** `src/engine/classification.ts`
+### ~~R2. Unit tests for `src/engine/schedule.ts` and `stats.ts`~~ ✓
 
-**Code change:** Extract the three functions, keep the same signatures. Import them back into `dashboard.ts`. No behavior change.
-
-**Test:** Add `tests/unit/classification.unit.ts` — table-driven tests for the ambiguous zone logic (16:00–19:59), clear night, clear day, and nap-count-based classification. These are the kind of edge cases that are hard to get right in E2E and easy to nail in a table:
-
-```ts
-const cases = [
-  { hour: 3, expected: "night" },
-  { hour: 10, expected: "nap" },
-  { hour: 17, completedNaps: 2, expectedNaps: 2, expected: "night" },
-  { hour: 17, completedNaps: 1, expectedNaps: 2, expected: "nap" },
-  { hour: 21, expected: "night" },
-];
-```
-
-### R2. Unit tests for `src/engine/schedule.ts` and `stats.ts`
-
-**Problem:** These are pure functions — no DB, no side effects — yet they have zero tests. They contain the core domain logic (wake windows, nap predictions, bedtime recommendations).
-
-**Test:** Add `tests/unit/schedule.unit.ts` and `tests/unit/stats.unit.ts`.
-
-Table-driven, focused on edge cases: newborn vs 12-month wake windows, zero sleeps, single nap transition, overnight sleep with pauses. Use `toMatchInlineSnapshot()` for the full prediction output so regressions are obvious.
-
-No production code change needed.
+Done. [`tests/unit/schedule.unit.ts`](../tests/unit/schedule.unit.ts) and [`tests/unit/stats.unit.ts`](../tests/unit/stats.unit.ts) — 63 table-driven tests covering age calculation, wake windows, predictions, nap transitions, stats with pauses, week aggregation.
 
 ### R3. Move API-only tests from Playwright to Vitest
 
@@ -349,83 +339,27 @@ The test files barely change — swap `page.request.post(...)` for `post(...)` a
 
 **Approach:** Move the API-only tests to the Vitest integration harness from R3. Keep only the DOM tests in Playwright.
 
-### R5. Build a state renderer for integration tests
+### ~~R5. Build a state renderer for integration tests~~ ✓
 
-**Problem:** Tests assert on individual fields. Missing assertions are missing bug reports.
-
-**Approach:** Create `tests/helpers/render-state.ts`:
-
-```ts
-export function renderDayState(db: Database, babyId: number): string {
-  const baby = db.prepare("SELECT * FROM baby WHERE id = ?").get(babyId);
-  const sleeps = db.prepare(
-    "SELECT * FROM sleep_log WHERE baby_id = ? AND deleted = 0 ORDER BY start_time"
-  ).all(babyId);
-  const diapers = db.prepare(
-    "SELECT * FROM diaper_log WHERE baby_id = ? AND deleted = 0 ORDER BY time"
-  ).all(babyId);
-  // ... format into readable string
-}
-```
-
-Output looks like:
+Done. [`tests/helpers/render-state.ts`](../tests/helpers/render-state.ts) provides `renderDayState()`, `renderEventLog()`, and `renderCounts()`. Output looks like:
 
 ```
 baby: Testa (2025-06-12)
-sovelur: 09:00–10:30 lur | 13:00–14:00 lur
-bleier: 08:30 våt middels | 11:00 avføring stor
 vekketid: 07:00
+søvn: 09:00–10:30 lur | 13:00–14:00 lur
+bleier: 08:30 våt middels | 11:00 avføring stor
 ```
 
-Use in existing tests alongside (not instead of) current assertions. Adopt in all new tests.
+Not yet used in existing tests — adopt with `toMatchInlineSnapshot()` in all new tests and migrate existing tests opportunistically.
 
-### R6. Extract `getState()` into a testable assembler
+### ~~R6. Extract `getState()` into a testable assembler~~ ✓
 
-**Problem:** `server/api.ts:getState()` is 120 lines of mixed DB queries and business logic. Untestable without HTTP.
+Done. `server/api.ts:getState()` now does thin data fetching, then calls `assembleState()` from [`src/engine/state.ts`](../src/engine/state.ts). The assembly function takes a `DayData` object and returns the full API response shape — pure, no DB, unit-tested in [`tests/unit/state.unit.ts`](../tests/unit/state.unit.ts).
 
-**Approach:** Don't do DI. Instead, split it into two parts:
+### ~~R7. Consolidate test helpers~~ ✓
 
-1. **Data fetching** — stays in `api.ts`, does the queries, returns raw data:
-   ```ts
-   function fetchDayData(db, babyId, todayStart, weekAgo) {
-     return { baby, activeSleep, todaySleeps, recentSleeps, todayWakeUp, ... };
-   }
-   ```
+Done. `makeEvent()` and `postEvents()` moved to `tests/fixtures.ts`. Removed duplicated definitions from `dedup.test.ts`, `traceability.test.ts`, `domain-ids.test.ts`, and `events-ui.e2e.ts`.
 
-2. **State assembly** — pure function in `src/engine/state.ts`, takes data, returns the API response shape:
-   ```ts
-   export function assembleState(data: DayData): AppState {
-     const stats = getTodayStats(data.todaySleeps);
-     const prediction = buildPrediction(data);
-     return { baby: data.baby, stats, prediction, ... };
-   }
-   ```
+### ~~R8. Reduce `forceMorning` boilerplate~~ ✓
 
-The assembly function is pure and unit-testable. The data fetching stays thin and close to the DB. No interfaces, no DI, just "fetch data, then compute."
-
-### R7. Consolidate test helpers
-
-**Problem:** `postEvent()` and `makeEvent()` are duplicated in `dedup.test.ts`, `traceability.test.ts`, and `domain-ids.test.ts`. Sleep+pause DB insertion code is repeated in `pause.e2e.ts`.
-
-**Approach:** Move shared helpers into `tests/fixtures.ts` (or a new `tests/helpers/` directory if fixtures gets too large):
-- `postEvents(fetch, events)` — sends event batch to API
-- `makeEvent(type, payload)` — creates event envelope with generated IDs
-- `addSleepWithPauses(babyId, { start, end, pauses: [...] })` — seed sleep + pauses in one call
-
-### R8. Reduce `forceMorning` boilerplate
-
-**Problem:** 14 E2E files have identical `test.beforeEach(async ({ page }) => { await forceMorning(page); })`.
-
-**Approach:** Make it a Playwright fixture in `tests/fixtures.ts`:
-
-```ts
-export const test = base.extend<{ autoResetDb: void; morningPage: Page }>({
-  autoResetDb: [async ({}, use) => { resetDb(); await use(); }, { auto: true }],
-  morningPage: async ({ page }, use) => {
-    await forceMorning(page);
-    await use(page);
-  },
-});
-```
-
-Tests that need morning mode use `{ morningPage }` instead of `{ page }` + beforeEach. Tests that need a different hour still use `forceHour()` directly.
+Done. Added `autoMorning` auto-fixture to `tests/fixtures.ts` — forces hour to 8 AM for every test automatically. Removed 19 identical `beforeEach(forceMorning)` blocks. Tests that need a different hour still use `forceHour()` directly.
