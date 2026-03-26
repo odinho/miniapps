@@ -192,7 +192,8 @@ Default to these when they can express the behavior clearly.
 
 Relevant places in this repo:
 
-- [`tests/`](../tests/) — API, event-sourcing, validation, dedup, rebuild
+- [`tests/integration/`](../tests/integration/) — Vitest integration tests (API, event-sourcing, validation, dedup, rebuild, export, traceability)
+- [`tests/integration/harness.ts`](../tests/integration/harness.ts) — `post()`/`get()`/`postEvents()` wrappers around `fetch()`, re-exports DB helpers
 - [`tests/fixtures.ts`](../tests/fixtures.ts) — Shared DB helpers and Playwright fixtures
 
 Use them to cover complete behavior chains with real DB state and realistic inputs.
@@ -233,7 +234,7 @@ The test for "reset DB clears all projections" should not be five separate `expe
 
 ## Existing test helpers
 
-- **`tests/fixtures.ts`**: The shared Playwright test harness. Key exports:
+- **`tests/fixtures.ts`**: The shared test harness (used by both Playwright E2E and Vitest integration). Key exports:
   - `test` — Custom Playwright test with `autoResetDb` (resets all tables) and `autoMorning` (forces hour to 8 AM) fixtures
   - `resetDb()` — Clears all tables: events, baby, sleep_log, diaper_log, day_start, sleep_pauses
   - `createBaby(name, birthdate)` — Creates a baby via event + direct insert
@@ -247,6 +248,11 @@ The test for "reset DB clears all projections" should not be five separate `expe
   - `forceMorning(page)` / `forceHour(page, hour)` — Override `Date.getHours()` in the browser (usually not needed — `autoMorning` handles it)
   - `dismissSheet(page)` — Closes modal overlays (tag sheet, wake-up prompt)
   - `generateId()`, `generateSleepId()`, `generateDiaperId()` — Domain ID generators
+
+- **`tests/integration/harness.ts`**: Lightweight HTTP harness for Vitest integration tests. Re-exports all DB helpers from `fixtures.ts` and adds:
+  - `post(path, body)` / `get(path)` — `fetch()` wrappers against `http://localhost:3200`
+  - `postEvents(events)` — POSTs events to `/api/events` (no `page` needed)
+  - `postCsv(path, body)` — POSTs CSV content
 
 - **`tests/helpers/render-state.ts`**: State renderers for snapshot-based assertions:
   - `renderDayState(db, babyId)` — Full baby state as readable string (sleeps, diapers, wake-up, pauses, tags)
@@ -264,33 +270,7 @@ When adding new state (projections, tables, etc.), update `resetDb()` and the re
 
 ---
 
-## Current state (March 2026)
-
-This section is a point-in-time snapshot. The patterns above describe where we want to go — some of that work is done, some remains.
-
-### What exists today
-
-- 25 test files: 20 Playwright E2E, 6 Playwright "integration" (API-only), 6 Vitest unit tests
-- 88 unit tests covering schedule prediction, stats, classification, and state assembly
-- 144 Playwright E2E tests covering UI flows and API behavior
-- Shared fixtures in `tests/fixtures.ts` with DB reset, seed helpers, time mocking, `autoMorning` fixture, shared `makeEvent()`/`postEvents()` helpers
-- Event-sourced architecture with working rebuild/replay — good testability at the data layer
-- Pure business logic extracted into `src/engine/`: schedule, stats, classification, state assembly — all unit-testable
-- State renderer (`tests/helpers/render-state.ts`) ready for snapshot-based assertions in new tests
-
-### What's been improved
-
-**Business logic extracted from UI.** `classifySleepType()`, `classifySleepTypeByHour()`, and `calcPauseMs()` moved from `dashboard.ts` to `src/engine/classification.ts` with optional `hour` parameter for testability. Covered by table-driven unit tests.
-
-**`getState()` split into fetch + pure assembly.** `server/api.ts` now does thin data fetching, then calls `assembleState()` from `src/engine/state.ts`. The assembly function is pure and unit-tested — no DB needed.
-
-**Engine functions have unit tests.** `calculateAgeMonths()`, `getWakeWindow()`, `predictNextNap()`, `predictDayNaps()`, `recommendBedtime()`, `detectNapTransition()`, `getTodayStats()`, `getWeekStats()`, `getAverageWakeWindow()` — all covered with table-driven tests.
-
-**Boilerplate eliminated.** `autoMorning` fixture replaced 19 identical `beforeEach(forceMorning)` blocks. `makeEvent()`/`postEvents()` consolidated from 4 duplicated definitions into shared fixtures.
-
-### What's still wrong
-
-**~35 tests don't need a browser but use Playwright anyway.** Files like `dedup.test.ts`, `rebuild.test.ts`, `domain-ids.test.ts`, `traceability.test.ts`, `import-napper.test.ts`, and `export.e2e.ts` only use `page.request.post()` and DB checks — never `page.goto()` or any DOM interaction. These could be fast Vitest integration tests that hit the server directly via `fetch()` or test the functions in-process, but instead they spin up a browser and go through Playwright. This makes them slow, noisy, and harder to debug.
+## What's still wrong
 
 **Assertions are still fragment piles.** Most E2E tests check individual fields:
 
@@ -302,64 +282,4 @@ expect(sleep.method).toBe("nursing");
 expect(sleep.woke_by).toBe("self");
 ```
 
-The `renderDayState()` renderer exists but is not yet used in existing tests. No `toMatchInlineSnapshot()` anywhere. New tests should adopt renderers; existing tests should be migrated opportunistically.
-
----
-
-## Refactoring plan
-
-Each item is independent — do them in any order, one at a time. Completed items are marked with ~~strikethrough~~.
-
-### ~~R1. Extract pure logic from `dashboard.ts`~~ ✓
-
-Done. `classifySleepType()`, `classifySleepTypeByHour()`, `calcPauseMs()` extracted to [`src/engine/classification.ts`](../src/engine/classification.ts) with optional `hour` parameter. Tests in [`tests/unit/classification.unit.ts`](../tests/unit/classification.unit.ts).
-
-### ~~R2. Unit tests for `src/engine/schedule.ts` and `stats.ts`~~ ✓
-
-Done. [`tests/unit/schedule.unit.ts`](../tests/unit/schedule.unit.ts) and [`tests/unit/stats.unit.ts`](../tests/unit/stats.unit.ts) — 63 table-driven tests covering age calculation, wake windows, predictions, nap transitions, stats with pauses, week aggregation.
-
-### R3. Move API-only tests from Playwright to Vitest
-
-**Problem:** `dedup.test.ts`, `rebuild.test.ts`, `domain-ids.test.ts`, `traceability.test.ts`, `import-napper.test.ts` use Playwright only for `page.request`. They need a running server but not a browser.
-
-**Approach:** Create a lightweight Vitest integration harness that starts the server once (or uses the same `fetch()` against a test server), and provides helpers like `postEvents()` and `getDb()`. Move these 5 files to use it.
-
-**Code change:** A small `tests/integration/harness.ts` that:
-- Starts the server on a random port (or reuses the Playwright config's port)
-- Exports `post(path, body)` and `get(path)` wrappers around `fetch()`
-- Reuses the existing `resetDb()`, `createBaby()`, etc. from fixtures
-
-The test files barely change — swap `page.request.post(...)` for `post(...)` and drop the Playwright imports.
-
-**Benefit:** These tests run in ~1s instead of ~10s. No browser process. Better error messages (no Playwright stack traces for what is really a data assertion).
-
-### R4. Split `export.e2e.ts` and `events-ui.e2e.ts`
-
-**Problem:** `export.e2e.ts` has 4 tests — 3 are API-only, 1 checks that export buttons are visible. `events-ui.e2e.ts` has 7 tests — the first 5 are API-only (type filter, domainId filter, pagination), the last 2 test DOM rendering.
-
-**Approach:** Move the API-only tests to the Vitest integration harness from R3. Keep only the DOM tests in Playwright.
-
-### ~~R5. Build a state renderer for integration tests~~ ✓
-
-Done. [`tests/helpers/render-state.ts`](../tests/helpers/render-state.ts) provides `renderDayState()`, `renderEventLog()`, and `renderCounts()`. Output looks like:
-
-```
-baby: Testa (2025-06-12)
-vekketid: 07:00
-søvn: 09:00–10:30 lur | 13:00–14:00 lur
-bleier: 08:30 våt middels | 11:00 avføring stor
-```
-
-Not yet used in existing tests — adopt with `toMatchInlineSnapshot()` in all new tests and migrate existing tests opportunistically.
-
-### ~~R6. Extract `getState()` into a testable assembler~~ ✓
-
-Done. `server/api.ts:getState()` now does thin data fetching, then calls `assembleState()` from [`src/engine/state.ts`](../src/engine/state.ts). The assembly function takes a `DayData` object and returns the full API response shape — pure, no DB, unit-tested in [`tests/unit/state.unit.ts`](../tests/unit/state.unit.ts).
-
-### ~~R7. Consolidate test helpers~~ ✓
-
-Done. `makeEvent()` and `postEvents()` moved to `tests/fixtures.ts`. Removed duplicated definitions from `dedup.test.ts`, `traceability.test.ts`, `domain-ids.test.ts`, and `events-ui.e2e.ts`.
-
-### ~~R8. Reduce `forceMorning` boilerplate~~ ✓
-
-Done. Added `autoMorning` auto-fixture to `tests/fixtures.ts` — forces hour to 8 AM for every test automatically. Removed 19 identical `beforeEach(forceMorning)` blocks. Tests that need a different hour still use `forceHour()` directly.
+The `renderDayState()` renderer exists but is not yet widely used. New tests should adopt renderers with `toMatchInlineSnapshot()`; existing tests should be migrated opportunistically.

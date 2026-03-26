@@ -1,24 +1,28 @@
+import { test, expect, beforeEach } from "vitest";
 import {
-  test,
-  expect,
+  post,
+  postEvents,
+  resetDb,
   createBaby,
   setWakeUpTime,
   getDb,
+  makeEvent,
   generateSleepId,
   generateDiaperId,
-  postEvents,
-  makeEvent,
-} from "./fixtures";
+} from "./harness.js";
+import { renderDayState } from "../helpers/render-state.js";
 
-test("sleep.started with sleepDomainId creates row with domain_id set", async ({ page }) => {
+beforeEach(() => resetDb());
+
+test("sleep.started with sleepDomainId creates row with domain_id set", async () => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
   const did = generateSleepId();
 
-  const res = await postEvents(page, [
-    makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
+  const res = await postEvents([
+    makeEvent("sleep.started", { babyId, startTime: "2026-03-26T09:00:00Z", sleepDomainId: did }),
   ]);
-  expect(res.ok()).toBe(true);
+  expect(res.ok).toBe(true);
 
   const db = getDb();
   const sleep = db.prepare("SELECT domain_id FROM sleep_log WHERE domain_id = ?").get(did) as
@@ -29,18 +33,18 @@ test("sleep.started with sleepDomainId creates row with domain_id set", async ({
   expect(sleep!.domain_id).toBe(did);
 });
 
-test("sleep.ended with sleepDomainId updates the correct row", async ({ page }) => {
+test("sleep.ended with sleepDomainId updates the correct row", async () => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
   const did = generateSleepId();
 
-  await postEvents(page, [
-    makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
+  await postEvents([
+    makeEvent("sleep.started", { babyId, startTime: "2026-03-26T09:00:00Z", sleepDomainId: did }),
   ]);
 
-  const endTime = new Date().toISOString();
-  const res = await postEvents(page, [makeEvent("sleep.ended", { sleepDomainId: did, endTime })]);
-  expect(res.ok()).toBe(true);
+  const endTime = "2026-03-26T10:30:00Z";
+  const res = await postEvents([makeEvent("sleep.ended", { sleepDomainId: did, endTime })]);
+  expect(res.ok).toBe(true);
 
   const db = getDb();
   const sleep = db.prepare("SELECT end_time FROM sleep_log WHERE domain_id = ?").get(did) as {
@@ -50,47 +54,43 @@ test("sleep.ended with sleepDomainId updates the correct row", async ({ page }) 
   expect(sleep.end_time).toBe(endTime);
 });
 
-test("sleep.tagged with sleepDomainId updates the correct row", async ({ page }) => {
+test("sleep.tagged with sleepDomainId updates the correct row", async () => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
   const did = generateSleepId();
 
-  await postEvents(page, [
-    makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
+  await postEvents([
+    makeEvent("sleep.started", { babyId, startTime: "2026-03-26T09:00:00Z", sleepDomainId: did }),
   ]);
 
-  const res = await postEvents(page, [
+  const res = await postEvents([
     makeEvent("sleep.tagged", { sleepDomainId: did, mood: "happy", method: "nursing" }),
   ]);
-  expect(res.ok()).toBe(true);
+  expect(res.ok).toBe(true);
 
   const db = getDb();
-  const sleep = db.prepare("SELECT mood, method FROM sleep_log WHERE domain_id = ?").get(did) as {
-    mood: string;
-    method: string;
-  };
+  expect(renderDayState(db, babyId)).toContain("happy");
+  expect(renderDayState(db, babyId)).toContain("nursing");
   db.close();
-  expect(sleep.mood).toBe("happy");
-  expect(sleep.method).toBe("nursing");
 });
 
-test("sleep.paused / sleep.resumed with sleepDomainId works", async ({ page }) => {
+test("sleep.paused / sleep.resumed with sleepDomainId works", async () => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
   const did = generateSleepId();
 
-  await postEvents(page, [
-    makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
+  await postEvents([
+    makeEvent("sleep.started", { babyId, startTime: "2026-03-26T09:00:00Z", sleepDomainId: did }),
   ]);
 
-  const pauseTime = new Date().toISOString();
-  await postEvents(page, [makeEvent("sleep.paused", { sleepDomainId: did, pauseTime })]);
+  const pauseTime = "2026-03-26T09:30:00Z";
+  await postEvents([makeEvent("sleep.paused", { sleepDomainId: did, pauseTime })]);
 
-  const resumeTime = new Date().toISOString();
-  const res = await postEvents(page, [
+  const resumeTime = "2026-03-26T09:35:00Z";
+  const res = await postEvents([
     makeEvent("sleep.resumed", { sleepDomainId: did, resumeTime }),
   ]);
-  expect(res.ok()).toBe(true);
+  expect(res.ok).toBe(true);
 
   const db = getDb();
   const pauses = db
@@ -104,19 +104,19 @@ test("sleep.paused / sleep.resumed with sleepDomainId works", async ({ page }) =
   expect(pauses[0].resume_time).toBe(resumeTime);
 });
 
-test("diaper.logged with diaperDomainId creates row with domain_id", async ({ page }) => {
+test("diaper.logged with diaperDomainId creates row with domain_id", async () => {
   const babyId = createBaby("Testa");
   const did = generateDiaperId();
 
-  const res = await postEvents(page, [
+  const res = await postEvents([
     makeEvent("diaper.logged", {
       babyId,
-      time: new Date().toISOString(),
+      time: "2026-03-26T11:00:00Z",
       type: "wet",
       diaperDomainId: did,
     }),
   ]);
-  expect(res.ok()).toBe(true);
+  expect(res.ok).toBe(true);
 
   const db = getDb();
   const diaper = db.prepare("SELECT domain_id FROM diaper_log WHERE domain_id = ?").get(did) as {
@@ -126,20 +126,20 @@ test("diaper.logged with diaperDomainId creates row with domain_id", async ({ pa
   expect(diaper.domain_id).toBe(did);
 });
 
-test("diaper.deleted with diaperDomainId soft-deletes the correct row", async ({ page }) => {
+test("diaper.deleted with diaperDomainId soft-deletes the correct row", async () => {
   const babyId = createBaby("Testa");
   const did = generateDiaperId();
 
-  await postEvents(page, [
+  await postEvents([
     makeEvent("diaper.logged", {
       babyId,
-      time: new Date().toISOString(),
+      time: "2026-03-26T11:00:00Z",
       type: "wet",
       diaperDomainId: did,
     }),
   ]);
-  const res = await postEvents(page, [makeEvent("diaper.deleted", { diaperDomainId: did })]);
-  expect(res.ok()).toBe(true);
+  const res = await postEvents([makeEvent("diaper.deleted", { diaperDomainId: did })]);
+  expect(res.ok).toBe(true);
 
   const db = getDb();
   const diaper = db.prepare("SELECT deleted FROM diaper_log WHERE domain_id = ?").get(did) as {
@@ -149,36 +149,35 @@ test("diaper.deleted with diaperDomainId soft-deletes the correct row", async ({
   expect(diaper.deleted).toBe(1);
 });
 
-test("Events without sleepDomainId are rejected by validation", async ({ page }) => {
+test("Events without sleepDomainId are rejected by validation", async () => {
   const babyId = createBaby("Testa");
 
-  const res = await postEvents(page, [
+  const res = await postEvents([
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString() }),
   ]);
-  expect(res.status()).toBe(400);
+  expect(res.status).toBe(400);
 });
 
-test("rebuildAll produces correct projection state", async ({ page }) => {
+test("rebuildAll produces correct projection state", async () => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
   const did1 = generateSleepId();
   const did2 = generateDiaperId();
 
-  // Create events through API (they go to both events table and projections)
-  await postEvents(page, [
+  await postEvents([
     makeEvent("sleep.started", {
       babyId,
       startTime: new Date(Date.now() - 3600000).toISOString(),
       sleepDomainId: did1,
     }),
   ]);
-  await postEvents(page, [
+  await postEvents([
     makeEvent("sleep.ended", {
       sleepDomainId: did1,
       endTime: new Date(Date.now() - 1800000).toISOString(),
     }),
   ]);
-  await postEvents(page, [
+  await postEvents([
     makeEvent("diaper.logged", {
       babyId,
       time: new Date().toISOString(),
@@ -187,9 +186,8 @@ test("rebuildAll produces correct projection state", async ({ page }) => {
     }),
   ]);
 
-  // Rebuild
-  const rebuildRes = await page.request.post("/api/admin/rebuild");
-  expect(rebuildRes.ok()).toBe(true);
+  const rebuildRes = await post("/api/admin/rebuild", {});
+  expect(rebuildRes.ok).toBe(true);
   const report = await rebuildRes.json();
   expect(report.success).toBe(true);
 

@@ -1,21 +1,25 @@
+import { test, expect, beforeEach } from "vitest";
 import {
-  test,
-  expect,
+  post,
+  get,
+  postEvents,
+  resetDb,
   createBaby,
   setWakeUpTime,
   getDb,
+  makeEvent,
   generateSleepId,
   generateDiaperId,
-  postEvents,
-  makeEvent,
-} from "./fixtures";
+} from "./harness.js";
 
-test("After sleep.started, sleep_log row has created_by_event_id", async ({ page }) => {
+beforeEach(() => resetDb());
+
+test("After sleep.started, sleep_log row has created_by_event_id", async () => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
   const did = generateSleepId();
 
-  const res = await postEvents(page, [
+  const res = await postEvents([
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
   ]);
   const data = await res.json();
@@ -29,16 +33,16 @@ test("After sleep.started, sleep_log row has created_by_event_id", async ({ page
   expect(sleep.created_by_event_id).toBe(eventId);
 });
 
-test("After sleep.tagged, sleep_log row has updated_by_event_id", async ({ page }) => {
+test("After sleep.tagged, sleep_log row has updated_by_event_id", async () => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
   const did = generateSleepId();
 
-  await postEvents(page, [
+  await postEvents([
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
   ]);
 
-  const tagRes = await postEvents(page, [
+  const tagRes = await postEvents([
     makeEvent("sleep.tagged", { sleepDomainId: did, mood: "happy" }),
   ]);
   const tagData = await tagRes.json();
@@ -52,11 +56,11 @@ test("After sleep.tagged, sleep_log row has updated_by_event_id", async ({ page 
   expect(sleep.updated_by_event_id).toBe(tagEventId);
 });
 
-test("After diaper.logged, diaper_log row has created_by_event_id", async ({ page }) => {
+test("After diaper.logged, diaper_log row has created_by_event_id", async () => {
   const babyId = createBaby("Testa");
   const did = generateDiaperId();
 
-  const res = await postEvents(page, [
+  const res = await postEvents([
     makeEvent("diaper.logged", {
       babyId,
       time: new Date().toISOString(),
@@ -75,25 +79,25 @@ test("After diaper.logged, diaper_log row has created_by_event_id", async ({ pag
   expect(diaper.created_by_event_id).toBe(eventId);
 });
 
-test("After rebuild, traceability columns are correct", async ({ page }) => {
+test("After rebuild, traceability columns are correct", async () => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
   const did = generateSleepId();
 
-  const createRes = await postEvents(page, [
+  const createRes = await postEvents([
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
   ]);
   const createData = await createRes.json();
   const createEventId = createData.events[0].id;
 
-  const tagRes = await postEvents(page, [
+  const tagRes = await postEvents([
     makeEvent("sleep.tagged", { sleepDomainId: did, mood: "calm" }),
   ]);
   const tagData = await tagRes.json();
   const tagEventId = tagData.events[0].id;
 
   // Rebuild
-  await page.request.post("/api/admin/rebuild");
+  await post("/api/admin/rebuild", {});
 
   const db = getDb();
   const sleep = db
@@ -107,16 +111,16 @@ test("After rebuild, traceability columns are correct", async ({ page }) => {
   expect(sleep.updated_by_event_id).toBe(tagEventId);
 });
 
-test("GET /api/sleeps returns rows with traceability fields", async ({ page }) => {
+test("GET /api/sleeps returns rows with traceability fields", async () => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
   const did = generateSleepId();
 
-  await postEvents(page, [
+  await postEvents([
     makeEvent("sleep.started", { babyId, startTime: new Date().toISOString(), sleepDomainId: did }),
   ]);
 
-  const res = await page.request.get("/api/sleeps");
+  const res = await get("/api/sleeps");
   const sleeps = await res.json();
   expect(sleeps.length).toBeGreaterThanOrEqual(1);
   const sleep = sleeps.find((s: Record<string, unknown>) => s.domain_id === did);

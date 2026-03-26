@@ -1,4 +1,5 @@
-import { test, expect, createBaby } from "./fixtures.js";
+import { describe, test, expect, beforeEach } from "vitest";
+import { get, postCsv, resetDb, createBaby } from "./harness.js";
 
 const NAPPER_CSV = `start,end,category,overallHappiness,babyMoodOnWakeUp,diaperWeight,diaperContent,breastLeftMinutes,breastRightMinutes,amountPumpedLeft,amountPumpedRight,feedingAmount,temperature,bottleFeedingType,comment,createdAt,pauses
 2026-01-06T06:00:00.000+01:00,2026-01-06T06:00:00.000+01:00,WOKE_UP,,5,,,,,,,,,,,2026-01-07T12:25:25.998Z,
@@ -9,43 +10,38 @@ const NAPPER_CSV = `start,end,category,overallHappiness,babyMoodOnWakeUp,diaperW
 2026-01-06T22:34:00.000+01:00,2026-01-06T22:50:00.000+01:00,NIGHT_WAKING,,,,,,,,,,,,,2026-01-07T19:50:03.549Z,
 2026-01-07T05:46:00.000+01:00,2026-01-07T05:46:00.000+01:00,WOKE_UP,,3,,,,,,,,,,,2026-01-07T12:15:15.500Z,`;
 
-test.describe("POST /api/import/napper", () => {
-  test("imports CSV and creates correct sleep + day_start entries", async ({ page }) => {
+beforeEach(() => resetDb());
+
+describe("POST /api/import/napper", () => {
+  test("imports CSV and creates correct sleep + day_start entries", async () => {
     createBaby("Halldis", "2025-10-21");
 
-    const res = await page.request.post("/api/import/napper", {
-      data: NAPPER_CSV,
-      headers: { "Content-Type": "text/csv" },
-    });
-
-    expect(res.ok()).toBeTruthy();
+    const res = await postCsv("/api/import/napper", NAPPER_CSV);
+    expect(res.ok).toBe(true);
     const body = await res.json();
     expect(body.sleeps).toBeGreaterThanOrEqual(3); // 2 naps + 1 night
     expect(body.dayStarts).toBeGreaterThanOrEqual(1);
     expect(body.skipped).toBeGreaterThanOrEqual(1); // SOLIDS
 
     // Verify sleeps were created in DB
-    const sleepsRes = await page.request.get("/api/sleeps?limit=100");
+    const sleepsRes = await get("/api/sleeps?limit=100");
     const sleeps = await sleepsRes.json();
     const naps = sleeps.filter((s: { type: string }) => s.type === "nap");
     const nights = sleeps.filter((s: { type: string }) => s.type === "night");
     expect(naps.length).toBe(2);
     expect(nights.length).toBe(1);
 
-    // Night sleep should span BED_TIME → WOKE_UP
+    // Night sleep should span BED_TIME -> WOKE_UP
     const night = nights[0];
-    expect(night.start_time).toContain("2026-01-06T17:26"); // 18:26+01:00 → UTC
-    expect(night.end_time).toContain("2026-01-07T04:46"); // 05:46+01:00 → UTC
+    expect(night.start_time).toContain("2026-01-06T17:26"); // 18:26+01:00 -> UTC
+    expect(night.end_time).toContain("2026-01-07T04:46"); // 05:46+01:00 -> UTC
 
     // Night should have a pause from the NIGHT_WAKING
     expect(night.pauses).toHaveLength(1);
   });
 
-  test("returns 404 when no baby exists", async ({ page }) => {
-    const res = await page.request.post("/api/import/napper", {
-      data: NAPPER_CSV,
-      headers: { "Content-Type": "text/csv" },
-    });
-    expect(res.status()).toBe(404);
+  test("returns 404 when no baby exists", async () => {
+    const res = await postCsv("/api/import/napper", NAPPER_CSV);
+    expect(res.status).toBe(404);
   });
 });
