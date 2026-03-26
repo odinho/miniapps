@@ -668,20 +668,10 @@ export function renderDashboard(container: HTMLElement): void {
     // Diaper/potty count
     const dc = diaperCount ?? 0;
     if (dc > 0) {
-      const diaperLabel = isPottyMode
-        ? dc === 1
-          ? " dobesøk"
-          : " dobesøk"
-        : dc === 1
-          ? " bleie"
-          : " bleier";
+      const diaperLabel = isPottyMode ? " dobesøk" : dc === 1 ? " bleie" : " bleier";
+      const diaperCountEl = el("div", { className: "stat-value" }, [String(dc)]);
       summaryChildren.push(el("span", { className: "summary-sep" }, ["·"]));
-      summaryChildren.push(
-        el("span", null, [
-          el("div", { className: "stat-value", style: { display: "inline" } }, [String(dc)]),
-          el("span", { className: "summary-label" }, [diaperLabel]),
-        ]),
-      );
+      summaryChildren.push(el("span", null, [diaperCountEl, el("span", { className: "summary-label" }, [diaperLabel])]));
     }
 
     const summaryRow = el("div", { className: "summary-row" }, summaryChildren);
@@ -1574,9 +1564,9 @@ function showPottyModal(baby: Baby, container: HTMLElement): void {
   let selectedDiaperStatus = "dry";
   const statuses = [
     { value: "dry", label: "Tørr ✨" },
-    { value: "damp", label: "Litt 💧" },
+    { value: "damp", label: "Litt våt 💧" },
     { value: "wet", label: "Våt 💧💧" },
-    { value: "dirty", label: "💩 Bæsj" },
+    { value: "dirty", label: "Skitten 💩" },
   ];
   const statusPills = statuses.map((s) => {
     const pill = el(

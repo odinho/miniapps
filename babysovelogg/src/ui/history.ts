@@ -694,9 +694,9 @@ function showPottyEditModal(entry: DiaperLogRow, container: HTMLElement): void {
   let selectedStatus = entry.amount || "dry";
   const statuses = [
     { value: "dry", label: "Tørr ✨" },
-    { value: "damp", label: "Litt 💧" },
+    { value: "damp", label: "Litt våt 💧" },
     { value: "wet", label: "Våt 💧💧" },
-    { value: "dirty", label: "💩 Bæsj" },
+    { value: "dirty", label: "Skitten 💩" },
   ];
   const statusPills = statuses.map((s) => {
     const pill = el(
