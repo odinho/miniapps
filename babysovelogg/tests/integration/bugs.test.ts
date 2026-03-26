@@ -3,11 +3,9 @@ import {
   get,
   postEvents,
   createBaby,
-  setWakeUpTime,
   makeEvent,
   generateSleepId,
   generateDiaperId,
-  addCompletedSleep,
   db,
 } from "./harness.js";
 import { renderDayState } from "../helpers/render-state.js";

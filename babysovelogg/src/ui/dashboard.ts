@@ -104,6 +104,11 @@ function buildSyncBadge(): HTMLElement {
 
 // Track dismissed predicted naps (resets daily)
 const DISMISSED_KEY = "babysovelogg_dismissed_predictions";
+const MORNING_DISMISSED_KEY = "babysovelogg_morning_dismissed";
+
+function dismissMorning(): void {
+  sessionStorage.setItem(MORNING_DISMISSED_KEY, new Date().toISOString().slice(0, 10));
+}
 
 function getDismissedPredictions(): Set<number> {
   try {
@@ -155,7 +160,7 @@ export function renderDashboard(container: HTMLElement): void {
   // Use sessionStorage flag to prevent re-showing after user has already set wake time
   const currentHourForPrompt = new Date().getHours();
   const isMorningTime = currentHourForPrompt >= 5 && currentHourForPrompt < 12;
-  const morningDismissed = sessionStorage.getItem("babysovelogg_morning_dismissed") === new Date().toISOString().slice(0, 10);
+  const morningDismissed = sessionStorage.getItem(MORNING_DISMISSED_KEY) === new Date().toISOString().slice(0, 10);
   if (!todayWakeUp && todaySleeps.length === 0 && !activeSleep && isMorningTime && !morningDismissed) {
     showMorningPrompt(baby, container);
     return;
@@ -802,7 +807,7 @@ export function showManualSleepModal(baby: Baby, container: HTMLElement): void {
   }
 }
 
-function showEditStartModal(activeSleep: SleepLogRow, container: HTMLElement): void {
+function _showEditStartModal(activeSleep: SleepLogRow, container: HTMLElement): void {
   const overlay = el("div", { className: "modal-overlay", "data-testid": "modal-overlay" });
   const modal = el("div", { className: "modal" });
 
@@ -1722,10 +1727,6 @@ function showMorningPrompt(baby: Baby, container: HTMLElement): void {
 
   const saveBtn = el("button", { className: "btn btn-primary" }, ["Sett vaknetid"]);
   const skipBtn = el("button", { className: "btn btn-ghost" }, ["Hopp over"]);
-
-  const dismissMorning = () => {
-    sessionStorage.setItem("babysovelogg_morning_dismissed", new Date().toISOString().slice(0, 10));
-  };
 
   saveBtn.addEventListener("click", async () => {
     const wakeTime = new Date(wakeTimeDt.getValue());

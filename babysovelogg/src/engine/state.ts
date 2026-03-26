@@ -29,7 +29,6 @@ function toSleepEntry(s: SleepLogRow): SleepEntry {
 /** Pure state assembly — takes fetched data, returns the API response shape. */
 export function assembleState(data: DayData) {
   const { baby, activeSleep, todaySleeps, recentSleeps, todayWakeUp, pausesBySleep } = data;
-  const now = data.now ?? Date.now();
 
   const ageMonths = calculateAgeMonths(baby.birthdate);
 
