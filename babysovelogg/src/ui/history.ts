@@ -201,12 +201,19 @@ export async function renderHistory(container: HTMLElement): Promise<void> {
         const meta = metaParts.join(" · ");
         const categoryLabel = isPotty ? "Do" : "Bleie";
 
+        const infoChildren: (Node | string)[] = [
+          el("div", { className: "log-times" }, [formatTime(entry.time)]),
+          el("div", { className: "log-meta" }, [meta]),
+        ];
+        if (entry.note) {
+          infoChildren.push(
+            el("div", { className: "log-meta", style: { fontStyle: "italic" } }, [entry.note]),
+          );
+        }
+
         const item = el("div", { className: "sleep-log-item diaper-log-item" }, [
           el("span", { className: "log-icon" }, [icon]),
-          el("div", { className: "log-info" }, [
-            el("div", { className: "log-times" }, [formatTime(entry.time)]),
-            el("div", { className: "log-meta" }, [meta]),
-          ]),
+          el("div", { className: "log-info" }, infoChildren),
           el("span", { className: "log-duration" }, [categoryLabel]),
         ]);
         item.addEventListener("click", () =>

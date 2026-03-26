@@ -152,9 +152,11 @@ export function renderDashboard(container: HTMLElement): void {
 
   // Show morning prompt if no wake-up time set and no sleeps today
   // But only during morning hours (5-11), not in the middle of the night
+  // Use sessionStorage flag to prevent re-showing after user has already set wake time
   const currentHourForPrompt = new Date().getHours();
   const isMorningTime = currentHourForPrompt >= 5 && currentHourForPrompt < 12;
-  if (!todayWakeUp && todaySleeps.length === 0 && !activeSleep && isMorningTime) {
+  const morningDismissed = sessionStorage.getItem("babysovelogg_morning_dismissed") === new Date().toISOString().slice(0, 10);
+  if (!todayWakeUp && todaySleeps.length === 0 && !activeSleep && isMorningTime && !morningDismissed) {
     showMorningPrompt(baby, container);
     return;
   }
@@ -311,10 +313,21 @@ export function renderDashboard(container: HTMLElement): void {
     },
     onStartClick: () => {
       if (isNightMode) {
-        // Night start = find the night sleep entry
+        // Night start = find the night sleep entry, or start bedtime
         const nightSleep = todaySleeps.find((s) => s.type === "night");
-        if (nightSleep) showEditModal(nightSleep, container);
-        else showWakeUpPanel(baby, container);
+        if (nightSleep) {
+          showEditModal(nightSleep, container);
+        } else if (!activeSleep) {
+          // No night sleep yet — start bedtime
+          const sleepDomainId = generateSleepId();
+          const startTimeIso = new Date().toISOString();
+          sendEvent("sleep.started", {
+            babyId: baby.id,
+            startTime: startTimeIso,
+            type: "night",
+            sleepDomainId,
+          }).then(() => renderDashboard(container));
+        }
       } else {
         // Day start = wake-up time, allow editing
         showWakeUpPanel(baby, container);
@@ -770,6 +783,7 @@ function _showManualSleepModal(baby: Baby, container: HTMLElement): void {
       startTime: start.toISOString(),
       endTime: end.toISOString(),
       type: selectedType,
+      sleepDomainId: generateSleepId(),
     });
     if (online) showToast("Søvn lagt til", "success");
     close();
@@ -1711,12 +1725,17 @@ function showMorningPrompt(baby: Baby, container: HTMLElement): void {
   const saveBtn = el("button", { className: "btn btn-primary" }, ["Sett vaknetid"]);
   const skipBtn = el("button", { className: "btn btn-ghost" }, ["Hopp over"]);
 
+  const dismissMorning = () => {
+    sessionStorage.setItem("babysovelogg_morning_dismissed", new Date().toISOString().slice(0, 10));
+  };
+
   saveBtn.addEventListener("click", async () => {
     const wakeTime = new Date(wakeTimeDt.getValue());
     if (isNaN(wakeTime.getTime())) {
       showToast("Ugyldig tid", "warning");
       return;
     }
+    dismissMorning();
     const online = await sendEvent("day.started", {
       babyId: baby.id,
       wakeTime: wakeTime.toISOString(),
@@ -1727,6 +1746,7 @@ function showMorningPrompt(baby: Baby, container: HTMLElement): void {
 
   skipBtn.addEventListener("click", async () => {
     // Bypass morning prompt by creating a default wake-up time (6am)
+    dismissMorning();
     const earlyMorning = new Date();
     earlyMorning.setHours(6, 0, 0, 0);
     await sendEvent("day.started", {
