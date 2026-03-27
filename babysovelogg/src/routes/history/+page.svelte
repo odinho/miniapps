@@ -3,6 +3,8 @@
 	import { formatTime } from '$lib/utils.js';
 	import EditSleepModal from '$lib/components/EditSleepModal.svelte';
 	import EditDiaperModal from '$lib/components/EditDiaperModal.svelte';
+	import ManualSleepModal from '$lib/components/ManualSleepModal.svelte';
+	import { appState } from '$lib/stores/app.svelte.js';
 	import {
 		type HistoryEntry,
 		fetchHistory,
@@ -28,6 +30,9 @@
 
 	let editingSleep = $state<SleepLogRow | null>(null);
 	let editingDiaper = $state<DiaperLogRow | null>(null);
+	let showManualSleep = $state(false);
+
+	const baby = $derived(appState.state.baby);
 
 	const grouped = $derived(groupByDate(entries));
 
@@ -59,6 +64,11 @@
 		load();
 	}
 
+	function closeManualSleep() {
+		showManualSleep = false;
+		load();
+	}
+
 	$effect(() => {
 		load();
 	});
@@ -67,6 +77,16 @@
 <div class="view">
 	<div style="display: flex; justify-content: space-between; align-items: center;">
 		<h2 class="history-header">Logg</h2>
+		{#if baby}
+			<button
+				class="btn btn-ghost"
+				style="font-size: 0.85rem; padding: 8px 12px; min-height: 0;"
+				data-testid="add-sleep-btn"
+				onclick={() => (showManualSleep = true)}
+			>
+				+ Legg til søvn
+			</button>
+		{/if}
 	</div>
 
 	{#if loading}
@@ -172,5 +192,12 @@
 		entry={editingDiaper}
 		onClose={closeDiaperEdit}
 		onDeleted={closeDiaperEdit}
+	/>
+{/if}
+
+{#if showManualSleep && baby}
+	<ManualSleepModal
+		babyId={baby.id}
+		onClose={closeManualSleep}
 	/>
 {/if}

@@ -2,6 +2,7 @@
 	import type { SleepLogRow } from '$lib/types.js';
 	import { sync } from '$lib/stores/sync.svelte.js';
 	import { MOODS, METHODS, FALL_ASLEEP_BUCKETS } from '$lib/constants.js';
+	import { formatTime, formatDuration } from '$lib/utils.js';
 	import {
 		SLEEP_TYPES,
 		buildSleepUpdateEvent,
@@ -86,6 +87,23 @@
 			busy = false;
 			confirmDelete = false;
 			onDeleted?.();
+		}
+	}
+
+	let confirmPauseDelete = $state<number | null>(null);
+
+	async function deletePause(index: number) {
+		if (busy) return;
+		busy = true;
+		try {
+			await sync.sendEvents([{
+				type: 'sleep.pause_deleted',
+				payload: { sleepDomainId: entry.domain_id, pauseIndex: index },
+			}]);
+		} finally {
+			busy = false;
+			confirmPauseDelete = null;
+			onClose?.();
 		}
 	}
 
@@ -189,6 +207,41 @@
 			<label for="edit-sleep-notes">Notat</label>
 			<input id="edit-sleep-notes" type="text" placeholder="Valfritt notat..." bind:value={notes} />
 		</div>
+
+		<!-- Pauses -->
+		{#if entry.pauses && entry.pauses.length > 0}
+			<div class="form-group">
+				<span class="form-label">Pausar</span>
+				<div style="display: flex; flex-direction: column; gap: 6px;">
+					{#each entry.pauses as pause, i}
+						<div style="display: flex; align-items: center; justify-content: space-between; background: var(--white); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 0.85rem;">
+							<span>
+								⏸️ {formatTime(pause.pause_time)}{pause.resume_time ? ` – ${formatTime(pause.resume_time)}` : ' (pågår)'}
+								{#if pause.resume_time}
+									<span style="color: var(--text-light); margin-left: 4px;">
+										({formatDuration(new Date(pause.resume_time).getTime() - new Date(pause.pause_time).getTime())})
+									</span>
+								{/if}
+							</span>
+							{#if confirmPauseDelete === i}
+								<span style="display: flex; gap: 4px;">
+									<button class="btn btn-ghost" style="padding: 4px 8px; min-height: 0; font-size: 0.75rem;" onclick={() => (confirmPauseDelete = null)}>Nei</button>
+									<button class="btn btn-danger" style="padding: 4px 8px; min-height: 0; font-size: 0.75rem;" onclick={() => deletePause(i)} disabled={busy}>Ja, slett</button>
+								</span>
+							{:else}
+								<button
+									class="btn btn-ghost"
+									style="padding: 4px 8px; min-height: 0; font-size: 0.75rem; color: var(--danger-dark);"
+									onclick={() => (confirmPauseDelete = i)}
+								>
+									Slett
+								</button>
+							{/if}
+						</div>
+					{/each}
+				</div>
+			</div>
+		{/if}
 
 		<!-- Action buttons -->
 		<div class="btn-row">

@@ -97,8 +97,12 @@ The vanilla TypeScript UI (~5000+ lines of manual DOM manipulation) hasn't scale
 
 ### Phase 6: Manual testing
 - [x] Fix *all* tests and checks (0 E2E failures, 0 typecheck errors, 0 lint errors)
+- [x] UX review: fix dashboard layout (pause button placement, stats position, arc time labels)
+- [x] Add missing features: manual sleep entry, pause deletion in edit modal
+- [x] Fix settings prediction panel formatting (compact times, show actual vs predicted)
+- [x] Fix stats best/worst to exclude incomplete current day
+- [x] Improve integration test quality (renderer+snapshot pattern per testing.md)
 - [ ] Do the three manual tests
-- [ ] Check for UX issues and fix them while having done the manual testing
 - [ ] Do a proper review of the entire branch
 
 ### E2E Failure Categories — ALL FIXED

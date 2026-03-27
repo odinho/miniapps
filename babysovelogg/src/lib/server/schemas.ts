@@ -100,6 +100,10 @@ const payloadSchemas: Record<string, v.BaseSchema<unknown, unknown, v.BaseIssue<
     sleepDomainId: domainId,
     resumeTime: isoDateTime,
   }),
+  "sleep.pause_deleted": v.object({
+    sleepDomainId: domainId,
+    pauseIndex: v.number(),
+  }),
   "diaper.logged": v.object({
     babyId: v.number(),
     time: isoDateTime,

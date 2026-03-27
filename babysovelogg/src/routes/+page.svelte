@@ -10,8 +10,9 @@
 	import DiaperForm from '$lib/components/DiaperForm.svelte';
 	import WakeUpSheet from '$lib/components/WakeUpSheet.svelte';
 	import EditSleepModal from '$lib/components/EditSleepModal.svelte';
-	import { formatDuration } from '$lib/utils.js';
+	import { formatDuration, formatTime } from '$lib/utils.js';
 	import { calcPauseMs } from '$lib/engine/classification.js';
+	import { buildPause, buildResume, isPaused } from '$lib/sleep-actions.js';
 
 	// --- modal state ---
 	let showTagSheet = $state(false);
@@ -61,6 +62,22 @@
 	const todayWakeUp = $derived(s.todayWakeUp);
 	const pottyMode = $derived(baby?.potty_mode === 1);
 
+	const paused = $derived(isPaused(activeSleep?.pauses));
+	let pauseBusy = $state(false);
+
+	async function handlePauseToggle() {
+		if (pauseBusy || !activeSleep) return;
+		pauseBusy = true;
+		try {
+			const event = paused
+				? buildResume(activeSleep.domain_id)
+				: buildPause(activeSleep.domain_id);
+			await sync.sendEvents([event]);
+		} finally {
+			pauseBusy = false;
+		}
+	}
+
 	const isNightMode = $derived.by(() => {
 		const h = new Date().getHours();
 		return h < 6 || h >= 18;
@@ -107,6 +124,27 @@
 				}
 			: null,
 	);
+
+	// Arc endpoint time labels
+	const arcStartLabel = $derived.by(() => {
+		if (isNightMode) {
+			// Night: start = bedtime (last night sleep start or active sleep start)
+			const nightSleep = activeSleep?.type === 'night' ? activeSleep :
+				todaySleeps.toReversed().find(sl => sl.type === 'night');
+			return nightSleep ? formatTime(nightSleep.start_time) : null;
+		}
+		// Day: start = wake-up time
+		return todayWakeUp?.wake_time ? formatTime(todayWakeUp.wake_time) : null;
+	});
+
+	const arcEndLabel = $derived.by(() => {
+		if (isNightMode) {
+			// Night: end = expected wake-up (use 07:00 as default or prediction)
+			return null; // Will show ☀️ icon
+		}
+		// Day: end = predicted bedtime
+		return prediction?.bedtime ? formatTime(prediction.bedtime) : null;
+	});
 
 	// Synthesize a minimal DiaperLogRow array for TagSheet's diaper nudge check.
 	// The nudge only needs the latest diaper time — we don't have the full array in state.
@@ -329,6 +367,8 @@
 				prediction={arcPrediction}
 				isNightMode={isNightMode}
 				wakeUpTime={todayWakeUp?.wake_time}
+				startTimeLabel={arcStartLabel}
+				endTimeLabel={arcEndLabel}
 				onSleepClick={onArcBubbleClick}
 			/>
 			<Timer
@@ -341,6 +381,16 @@
 
 		<!-- Action buttons -->
 		<div class="arc-actions">
+			{#if activeSleep && !activeSleep.end_time}
+				<button
+					class="arc-action-btn {paused ? 'morning' : 'nap'}"
+					data-testid="pause-btn"
+					onclick={handlePauseToggle}
+					disabled={pauseBusy}
+				>
+					{paused ? '▶️ Fortset' : '⏸️ Pause'}
+				</button>
+			{/if}
 			{#if showMorningButton}
 				<button class="arc-action-btn morning" onclick={triggerMorning}>
 					☀️ Morgon
@@ -350,6 +400,9 @@
 				{pottyMode ? '🚽 Do' : '🧷 Bleie'}
 			</button>
 		</div>
+
+		<!-- Spacer to push stats down -->
+		<div style="flex: 1;"></div>
 
 		<!-- Summary stats -->
 		<div class="summary-row">

@@ -213,6 +213,23 @@ export function applyEvent(event: AppEvent): void {
       break;
     }
 
+    case "sleep.pause_deleted": {
+      const sleep = db
+        .prepare("SELECT id FROM sleep_log WHERE domain_id = ?")
+        .get(payload.sleepDomainId) as { id: number } | undefined;
+      if (!sleep) {
+        throw new Error(`sleep.pause_deleted: no sleep found with domain_id ${payload.sleepDomainId}`);
+      }
+      const pauses = db
+        .prepare("SELECT id FROM sleep_pauses WHERE sleep_id = ? ORDER BY pause_time ASC")
+        .all(sleep.id) as { id: number }[];
+      const idx = payload.pauseIndex as number;
+      if (idx >= 0 && idx < pauses.length) {
+        db.prepare("DELETE FROM sleep_pauses WHERE id = ?").run(pauses[idx].id);
+      }
+      break;
+    }
+
     case "diaper.logged":
       db.prepare(
         "INSERT INTO diaper_log (baby_id, time, type, amount, note, domain_id, created_by_event_id) VALUES (?, ?, ?, ?, ?, ?, ?)",

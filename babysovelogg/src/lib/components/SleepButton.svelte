@@ -2,13 +2,7 @@
 	import type { SleepLogRow, Baby } from '$lib/types.js';
 	import { tick } from 'svelte';
 	import { sync } from '$lib/stores/sync.svelte.js';
-	import {
-		buildStartSleep,
-		buildEndSleep,
-		buildPause,
-		buildResume,
-		isPaused,
-	} from '$lib/sleep-actions.js';
+	import { buildStartSleep, buildEndSleep } from '$lib/sleep-actions.js';
 
 	interface Props {
 		activeSleep: SleepLogRow | null;
@@ -23,7 +17,6 @@
 		$props();
 
 	const isSleeping = $derived(!!activeSleep && !activeSleep.end_time);
-	const paused = $derived(isPaused(activeSleep?.pauses));
 
 	let busy = $state(false);
 
@@ -52,19 +45,6 @@
 			busy = false;
 		}
 	}
-
-	async function handlePauseToggle() {
-		if (busy || !activeSleep) return;
-		busy = true;
-		try {
-			const event = paused
-				? buildResume(activeSleep.domain_id)
-				: buildPause(activeSleep.domain_id);
-			await sync.sendEvents([event]);
-		} finally {
-			busy = false;
-		}
-	}
 </script>
 
 <button
@@ -76,14 +56,3 @@
 	<span class="icon">{isSleeping ? '🌙' : '☀️'}</span>
 	<span class="label">{isSleeping ? 'Vakne' : 'Sove'}</span>
 </button>
-
-{#if isSleeping && activeSleep}
-	<button
-		class="btn {paused ? 'btn-primary' : 'btn-ghost'} pause-btn"
-		data-testid="pause-btn"
-		onclick={handlePauseToggle}
-		disabled={busy}
-	>
-		{paused ? '▶️ Fortset' : '⏸️ Pause'}
-	</button>
-{/if}

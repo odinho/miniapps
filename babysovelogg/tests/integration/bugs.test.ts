@@ -22,12 +22,10 @@ test("B12: GET /api/wakeups returns day_start entries", async () => {
     }),
   ]);
 
-  const res = await get("/api/wakeups?limit=50");
-  expect(res.ok).toBe(true);
-  const wakeups = await res.json();
-  expect(wakeups.length).toBe(1);
-  expect(wakeups[0].wake_time).toBe("2026-03-26T06:10:00.000Z");
-  expect(wakeups[0].baby_id).toBe(babyId);
+  const wakeups = await (await get("/api/wakeups?limit=50")).json();
+  expect(wakeups).toMatchObject([
+    { wake_time: "2026-03-26T06:10:00.000Z", baby_id: babyId },
+  ]);
 });
 
 // --- B15: Editing a nap to become a night sleep should NOT delete the entry ---
@@ -51,9 +49,11 @@ test("B15: sleep.updated changing type from nap to night preserves the entry", a
     }),
   ]);
 
-  // Verify the nap exists
-  const before = renderDayState(db, babyId);
-  expect(before).toContain("09:00–10:30 lur");
+  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
+    "baby: Testa (2025-06-12)
+    søvn: 09:00–10:30 lur
+    bleier: (ingen)"
+  `);
 
   // Change type to night
   await postEvents([
@@ -63,17 +63,11 @@ test("B15: sleep.updated changing type from nap to night preserves the entry", a
     }),
   ]);
 
-  // Entry should still exist, just with type "night"
-  const after = renderDayState(db, babyId);
-  expect(after).toContain("09:00–10:30 natt");
-
-  // Also verify via API that the sleep is still returned
-  const res = await get("/api/sleeps?limit=50");
-  const sleeps = await res.json();
-  const entry = sleeps.find((s: { domain_id: string }) => s.domain_id === did);
-  expect(entry).toBeTruthy();
-  expect(entry.type).toBe("night");
-  expect(entry.deleted).toBe(0);
+  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
+    "baby: Testa (2025-06-12)
+    søvn: 09:00–10:30 natt
+    bleier: (ingen)"
+  `);
 });
 
 test("B15: sleep.updated with type + times preserves the entry", async () => {
@@ -95,7 +89,6 @@ test("B15: sleep.updated with type + times preserves the entry", async () => {
     }),
   ]);
 
-  // Update type + start + end time all at once (simulates full edit modal save)
   await postEvents([
     makeEvent("sleep.updated", {
       sleepDomainId: did,
@@ -109,8 +102,11 @@ test("B15: sleep.updated with type + times preserves the entry", async () => {
     }),
   ]);
 
-  const after = renderDayState(db, babyId);
-  expect(after).toContain("08:30–10:00 natt");
+  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
+    "baby: Testa (2025-06-12)
+    søvn: 08:30–10:00 natt
+    bleier: (ingen)"
+  `);
 });
 
 // --- Wakeup derivation: night sleep end_time IS the morning ---
@@ -130,16 +126,14 @@ test("Wakeup derived from overnight night sleep — no day.started needed", asyn
     makeEvent("sleep.ended", { sleepDomainId: did, endTime: nightEnd }),
   ]);
 
-  // DB has no day_start row — wakeup is purely derived
   expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
     "baby: Testa (2025-06-12)
     søvn: 18:30–06:00 natt
     bleier: (ingen)"
   `);
 
-  // API should still derive todayWakeUp from the night sleep end
+  // API should derive todayWakeUp from the night sleep end
   const state = await (await get("/api/state")).json();
-  expect(state.todayWakeUp).toBeTruthy();
   expect(state.todayWakeUp.wake_time).toBe(nightEnd);
 });
 
@@ -159,11 +153,18 @@ test("Explicit day.started takes precedence over derived wakeup", async () => {
     makeEvent("day.started", { babyId, wakeTime: `${today}T06:10:00.000Z` }),
   ]);
 
+  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
+    "baby: Testa (2025-06-12)
+    vekketid: 06:10
+    søvn: 18:30–05:50 natt
+    bleier: (ingen)"
+  `);
+
   const state = await (await get("/api/state")).json();
   expect(state.todayWakeUp.wake_time).toBe(`${today}T06:10:00.000Z`);
 });
 
-// --- B5+B6: Diaper note and type visibility in API ---
+// --- B5+B6: Diaper note and type visibility ---
 
 test("B5: diaper with dirty type preserves type in response", async () => {
   const babyId = createBaby("Testa");
@@ -179,12 +180,11 @@ test("B5: diaper with dirty type preserves type in response", async () => {
     }),
   ]);
 
-  const res = await get("/api/diapers?limit=50");
-  const diapers = await res.json();
-  const entry = diapers.find((d: { domain_id: string }) => d.domain_id === did);
-  expect(entry).toBeTruthy();
-  expect(entry.type).toBe("dirty");
-  expect(entry.amount).toBe("middels");
+  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
+    "baby: Testa (2025-06-12)
+    søvn: (ingen)
+    bleier: 10:00 dirty middels"
+  `);
 });
 
 test("B6: diaper note is stored and returned", async () => {
@@ -202,10 +202,15 @@ test("B6: diaper note is stored and returned", async () => {
     }),
   ]);
 
-  const res = await get("/api/diapers?limit=50");
-  const diapers = await res.json();
+  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
+    "baby: Testa (2025-06-12)
+    søvn: (ingen)
+    bleier: 10:00 wet middels"
+  `);
+
+  // Pin: note is queryable from API
+  const diapers = await (await get("/api/diapers?limit=50")).json();
   const entry = diapers.find((d: { domain_id: string }) => d.domain_id === did);
-  expect(entry).toBeTruthy();
   expect(entry.note).toBe("Litt raudt utslett");
 });
 
@@ -231,6 +236,14 @@ test("B6: diaper note survives update", async () => {
     }),
   ]);
 
-  const after = renderDayState(db, babyId);
-  expect(after).toContain("dirty");
+  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
+    "baby: Testa (2025-06-12)
+    søvn: (ingen)
+    bleier: 10:00 dirty"
+  `);
+
+  // Pin: note was updated
+  const diapers = await (await get("/api/diapers?limit=50")).json();
+  const entry = diapers.find((d: { domain_id: string }) => d.domain_id === did);
+  expect(entry.note).toBe("Oppdatert notat");
 });

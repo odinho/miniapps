@@ -221,6 +221,7 @@ html, body {
   align-items: center;
   gap: 12px;
   text-align: center;
+  min-height: 100%;
 }
 
 /* Header row: baby info + sleep button */
@@ -747,7 +748,7 @@ html, body {
   .fab-menu { position: absolute !important; }
 }
 
-/* --- Pause/resume button --- */
+/* --- Pause/resume button (now inline in arc-actions) --- */
 .pause-btn {
   max-width: 340px;
   width: 100%;
@@ -1035,16 +1036,18 @@ html, body {
 }
 
 .stats-trend-label {
-  flex: 1.2;
+  flex: 0 0 auto;
   font-size: 0.85rem;
+  min-width: 0;
 }
 
 .stats-trend-val {
-  flex: 0.8;
+  flex: 1;
   text-align: right;
   font-size: 0.85rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  min-width: 0;
 }
 
 /* --- Compact summary row --- */

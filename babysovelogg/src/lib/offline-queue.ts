@@ -153,6 +153,19 @@ export function applyOptimisticEvent(
 			break;
 		}
 
+		case "sleep.pause_deleted": {
+			const pauseTarget = findSleep(s, payload.sleepDomainId as string);
+			if (pauseTarget && pauseTarget.pauses) {
+				const idx = payload.pauseIndex as number;
+				if (idx >= 0 && idx < pauseTarget.pauses.length) {
+					const pauses = [...pauseTarget.pauses];
+					pauses.splice(idx, 1);
+					pauseTarget.pauses = pauses;
+				}
+			}
+			break;
+		}
+
 		case "sleep.tagged": {
 			const target = findSleep(s, payload.sleepDomainId as string);
 			if (target) {

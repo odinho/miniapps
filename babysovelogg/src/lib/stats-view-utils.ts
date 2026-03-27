@@ -214,7 +214,9 @@ export interface BestWorst {
 }
 
 export function getBestWorst(weekStats: WeekStats): BestWorst | null {
+	const today = new Date().toISOString().slice(0, 10);
 	const daysWithTotal = weekStats.days
+		.filter((d) => d.date !== today) // exclude incomplete current day
 		.map((d) => ({
 			date: d.date,
 			total: d.stats.totalNapMinutes + d.stats.totalNightMinutes,

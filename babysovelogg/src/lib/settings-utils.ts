@@ -174,9 +174,14 @@ export function buildPredictionRows(opts: {
 		);
 		const bedtime = recommendBedtime(opts.recentSleeps, opts.ageMonths, opts.napCount ?? undefined);
 		for (let i = 0; i < predicted.length; i++) {
+			const actual = opts.recentSleeps.filter(s => s.type === 'nap' && s.end_time)[i];
+			const predictedStr = `${formatTime(predicted[i].startTime)}–${formatTime(predicted[i].endTime)}`;
+			const actualStr = actual
+				? ` (var ${formatTime(actual.start_time)}–${formatTime(actual.end_time!)})`
+				: '';
 			rows.push({
 				label: `Lur ${i + 1}`,
-				value: `~${formatTime(predicted[i].startTime)} – ~${formatTime(predicted[i].endTime)}`,
+				value: `~${predictedStr}${actualStr}`,
 			});
 		}
 		rows.push({ label: 'Leggetid', value: `~${formatTime(bedtime)}` });
@@ -186,7 +191,7 @@ export function buildPredictionRows(opts: {
 				const nap = opts.serverPrediction.predictedNaps[i];
 				rows.push({
 					label: `Lur ${i + 1}`,
-					value: `~${formatTime(nap.startTime)} – ~${formatTime(nap.endTime)}`,
+					value: `~${formatTime(nap.startTime)}–${formatTime(nap.endTime)}`,
 				});
 			}
 		}
