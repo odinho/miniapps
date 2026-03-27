@@ -3,18 +3,18 @@
 ## Build
 
 ```bash
-npm run build
+bun run build
 ```
 
-This runs esbuild to bundle the client TypeScript into `dist/bundle.js` and compiles the server to `dist/server.js`. Static assets from `public/` are copied to `dist/`.
+SvelteKit compiles the app with `adapter-node` into `build/index.js`. Static assets are in `build/client/`.
 
 ## Run
 
 ```bash
-PORT=3200 node dist/server.js
+PORT=3200 node build/index.js
 ```
 
-The server serves both the API and static files. SQLite database (`db.sqlite`) is created in the working directory.
+The server handles both the API and static file serving. SQLite database (`db.sqlite`) is created in the working directory on first request.
 
 ## systemd Service
 
@@ -28,11 +28,12 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/path/to/babysovelogg
-ExecStart=/usr/bin/node dist/server.js
+ExecStart=/usr/bin/node build/index.js
 User=openclaw
 Restart=always
 RestartSec=5
 Environment=PORT=3200
+Environment=ORIGIN=https://napper.example.com
 
 [Install]
 WantedBy=multi-user.target
@@ -41,6 +42,8 @@ WantedBy=multi-user.target
 ```bash
 sudo systemctl enable --now babysovelogg
 ```
+
+**Note:** SvelteKit adapter-node requires `ORIGIN` to be set in production for CSRF protection.
 
 ## nginx Reverse Proxy
 
@@ -59,6 +62,8 @@ server {
         proxy_set_header Connection '';
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
 
         # SSE support
         proxy_buffering off;
@@ -69,23 +74,21 @@ server {
 
 Key points:
 - `proxy_buffering off` is required for SSE to work
+- `X-Forwarded-Proto` is needed for SvelteKit's CSRF check
 - No auth — designed for trusted networks or behind VPN
 
 ## Database
 
-SQLite file (`db.sqlite`) in the working directory. Uses DELETE journal mode
-(SQLite default) — all data is always in the single `.db` file. No `-wal`/`-shm`
-files to worry about.
+SQLite file (`db.sqlite`) in the working directory. Uses DELETE journal mode — all data is in the single `.sqlite` file, no `-wal`/`-shm` files.
 
-**Backups:** Copy `db.sqlite` while the server is stopped, or use
-`sqlite3 db.sqlite '.backup backup.db'` while running.
+**Backups:** Copy `db.sqlite` while the server is stopped, or use `sqlite3 db.sqlite '.backup backup.db'` while running.
 
-**Deploy safety:** The server handles SIGTERM/SIGINT for clean DB shutdown.
-The systemd default `KillSignal=SIGTERM` is fine.
+**Rebuild:** POST to `/api/admin/rebuild` to replay all events and rebuild materialized views. Useful after schema changes or data corruption.
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `3200` | Server port |
-| `NODE_ENV` | — | Set to `production` to serve static from same dir as server.js |
+| `PORT` | `3000` | Server port |
+| `DB_PATH` | `./db.sqlite` | SQLite database file path |
+| `ORIGIN` | — | Required in production for CSRF (e.g. `https://napper.example.com`) |
