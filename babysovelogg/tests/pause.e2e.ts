@@ -124,6 +124,7 @@ test("History shows pause info", async ({ page }) => {
   );
 
   await page.goto("/#/history");
-  await expect(page.locator(".sleep-log-item").first()).toBeVisible({ timeout: 5000 });
-  await expect(page.locator(".sleep-log-item .log-meta").first()).toContainText("1 pause");
+  const sleepItem = page.locator(".sleep-log-item:not(.wakeup-log-item)").first();
+  await expect(sleepItem).toBeVisible({ timeout: 5000 });
+  await expect(sleepItem.locator(".log-meta").first()).toContainText("1 pause");
 });

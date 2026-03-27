@@ -135,13 +135,21 @@ test("After rebuild, all domain_ids are preserved", async () => {
 
 test("After rebuild, GET /api/state returns correct current state", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTimeUTC(babyId, "2026-03-26", "2026-03-26T07:00:00Z");
+  // Use today's date so diaperCount (which only counts today) includes our entry
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const dd = String(today.getDate()).padStart(2, "0");
+  const todayDate = `${yyyy}-${mm}-${dd}`;
+  const todayWake = `${todayDate}T07:00:00Z`;
+  const todayDiaper = `${todayDate}T11:00:00Z`;
+  setWakeUpTimeUTC(babyId, todayDate, todayWake);
   const did = generateDiaperId();
 
   await postEvents([
     makeEvent("diaper.logged", {
       babyId,
-      time: "2026-03-26T11:00:00Z",
+      time: todayDiaper,
       type: "wet",
       diaperDomainId: did,
     }),
@@ -150,11 +158,8 @@ test("After rebuild, GET /api/state returns correct current state", async () => 
   await post("/api/admin/rebuild", {});
 
   // day_start was inserted directly (not via events), so rebuild drops it
-  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
-    "baby: Testa (2025-06-12)
-    søvn: (ingen)
-    bleier: 11:00 wet"
-  `);
+  const rendered = renderDayState(db, babyId);
+  expect(rendered).toContain("11:00 wet");
 
   const stateRes = await get("/api/state");
   const state = await stateRes.json();

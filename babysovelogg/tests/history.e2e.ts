@@ -67,7 +67,7 @@ test("Notes and fall-asleep-time visible in history list", async ({ page }) => {
   await page.goto("/#/history");
   await expect(page.locator(".sleep-log-item").first()).toBeVisible({ timeout: 5000 });
 
-  const item = page.locator(".sleep-log-item").first();
+  const item = page.locator(".sleep-log-item:not(.wakeup-log-item)").first();
   // Fall-asleep time should be formatted
   await expect(item).toContainText("5–15 min");
   // Notes visible

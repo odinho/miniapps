@@ -1,5 +1,5 @@
 import * as esbuild from "esbuild";
-import { cpSync, mkdirSync, existsSync, readFileSync, writeFileSync, readdirSync } from "fs";
+import { cpSync, mkdirSync, existsSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -65,6 +65,14 @@ async function main() {
     await ctx.watch();
     console.log("Watching for changes...");
   } else {
+    // Clean old hashed bundles before building new one
+    if (existsSync(outdir)) {
+      for (const f of readdirSync(outdir)) {
+        if (/^bundle-[A-Z0-9]+\.js(\.map)?$/i.test(f)) {
+          unlinkSync(resolve(outdir, f));
+        }
+      }
+    }
     // Production: content-hashed filename for cache busting
     await esbuild.build({
       entryPoints: ["src/main.ts"],

@@ -340,8 +340,11 @@ export function renderDashboard(container: HTMLElement): void {
     },
     onEndClick: () => {
       if (isNightMode) {
-        // Night end = morning wake-up
-        showWakeUpPanel(baby, container);
+        // Night end = morning wake-up, but only show in the small hours (B17)
+        const endClickHour = new Date().getHours();
+        if (endClickHour < 12) {
+          showWakeUpPanel(baby, container);
+        }
       } else {
         // Day end = bedtime. Show the night sleep entry if exists
         const nightSleep = todaySleeps.find((s) => s.type === "night");
@@ -455,7 +458,7 @@ export function renderDashboard(container: HTMLElement): void {
     } else if (prediction?.nextNap) {
       const nextNapTime = new Date(prediction.nextNap);
       const hoursUntilNap = (nextNapTime.getTime() - now.getTime()) / 3600000;
-      const showBedtime = prediction.napsAllDone || isEvening || hoursUntilNap < 0;
+      const showBedtime = prediction.napsAllDone || isEvening;
 
       if (showBedtime && prediction?.bedtime) {
         // Naps done, evening, or past nap time — show bedtime countdown
@@ -555,7 +558,7 @@ export function renderDashboard(container: HTMLElement): void {
       arcActions.appendChild(pauseActionBtn);
       arcActions.appendChild(makeDiaperBtn());
     } else {
-      // Night, not sleeping: night waking + morning + diaper
+      // Night, not sleeping: night waking + (maybe morning) + diaper
       const nightBtn = el("button", { className: "arc-action-btn night" }, ["🌙 Nattevaking"]);
       nightBtn.addEventListener("click", async () => {
         await sendEvent("sleep.started", {
@@ -566,10 +569,15 @@ export function renderDashboard(container: HTMLElement): void {
         });
         renderDashboard(container);
       });
-      const morningBtn = el("button", { className: "arc-action-btn morning" }, ["☀️ Morgon"]);
-      morningBtn.addEventListener("click", () => showWakeUpPanel(baby, container));
       arcActions.appendChild(nightBtn);
-      arcActions.appendChild(morningBtn);
+      // B17: Only show morning button in the small hours (midnight–12),
+      // not right after bedtime (18–24) when it makes no sense
+      const currentHourForMorning = new Date().getHours();
+      if (currentHourForMorning < 12) {
+        const morningBtn = el("button", { className: "arc-action-btn morning" }, ["☀️ Morgon"]);
+        morningBtn.addEventListener("click", () => showWakeUpPanel(baby, container));
+        arcActions.appendChild(morningBtn);
+      }
       arcActions.appendChild(makeDiaperBtn());
     }
   } else {
