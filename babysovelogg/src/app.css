@@ -564,7 +564,7 @@ html, body {
   margin-bottom: 16px;
 }
 
-.modal label, .settings label {
+.modal label, .settings label, .modal .form-label, .settings .form-label {
   display: block;
   font-size: 0.8rem;
   color: var(--text-light);

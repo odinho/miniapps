@@ -20,13 +20,20 @@
 
 	let { entry, onClose, onDeleted }: Props = $props();
 
-	const isPotty = isPottyEntry(entry.type);
+	const isPotty = $derived(isPottyEntry(entry.type));
 
-	let selectedType = $state(entry.type);
-	let selectedAmount = $state(entry.amount || (isPotty ? 'dry' : 'middels'));
-	let notes = $state(entry.note || '');
+	let selectedType = $state('');
+	let selectedAmount = $state('');
+	let notes = $state('');
 	let busy = $state(false);
 	let confirmDelete = $state(false);
+
+	// Sync form fields when entry prop changes (e.g. SSE update while modal is open)
+	$effect(() => {
+		selectedType = entry.type;
+		selectedAmount = entry.amount || (isPottyEntry(entry.type) ? 'dry' : 'middels');
+		notes = entry.note || '';
+	});
 
 	async function save() {
 		if (busy) return;
@@ -71,7 +78,7 @@
 		{#if isPotty}
 			<!-- Potty result -->
 			<div class="form-group">
-				<label>Resultat</label>
+				<span class="form-label">Resultat</span>
 				<div class="type-pills diaper-type-pills">
 					{#each POTTY_EDIT_RESULTS as r}
 						<button
@@ -89,7 +96,7 @@
 			<!-- Diaper status -->
 			{#if selectedType !== 'diaper_only'}
 				<div class="form-group">
-					<label>Bleie</label>
+					<span class="form-label">Bleie</span>
 					<div class="type-pills">
 						{#each POTTY_EDIT_STATUSES as s}
 							<button
@@ -106,7 +113,7 @@
 		{:else}
 			<!-- Diaper type -->
 			<div class="form-group">
-				<label>Type</label>
+				<span class="form-label">Type</span>
 				<div class="type-pills diaper-type-pills">
 					{#each DIAPER_EDIT_TYPES as t}
 						<button
@@ -122,7 +129,7 @@
 
 			<!-- Amount -->
 			<div class="form-group">
-				<label>Mengd</label>
+				<span class="form-label">Mengd</span>
 				<div class="type-pills">
 					{#each DIAPER_EDIT_AMOUNTS as a}
 						<button
@@ -139,8 +146,8 @@
 
 		<!-- Notes -->
 		<div class="form-group">
-			<label>Notat</label>
-			<input type="text" placeholder="Valfritt notat..." bind:value={notes} />
+			<label for="edit-diaper-notes">Notat</label>
+			<input id="edit-diaper-notes" type="text" placeholder="Valfritt notat..." bind:value={notes} />
 		</div>
 
 		<!-- Time display -->

@@ -74,7 +74,7 @@
 		{#if pottyMode}
 			<!-- Potty result -->
 			<div class="form-group">
-				<label>Resultat</label>
+				<span class="form-label">Resultat</span>
 				<div class="type-pills diaper-type-pills">
 					{#each POTTY_RESULTS as r}
 						<button
@@ -92,7 +92,7 @@
 			<!-- Diaper status (hidden when diaper_only) -->
 			{#if !hideDiaperStatus}
 				<div class="form-group">
-					<label>Bleie</label>
+					<span class="form-label">Bleie</span>
 					<div class="type-pills">
 						{#each POTTY_DIAPER_STATUSES as s}
 							<button
@@ -110,7 +110,7 @@
 		{:else}
 			<!-- Diaper type -->
 			<div class="form-group">
-				<label>Type</label>
+				<span class="form-label">Type</span>
 				<div class="type-pills diaper-type-pills">
 					{#each DIAPER_TYPES as t}
 						<button
@@ -127,7 +127,7 @@
 
 			<!-- Amount -->
 			<div class="form-group">
-				<label>Mengd</label>
+				<span class="form-label">Mengd</span>
 				<div class="type-pills">
 					{#each DIAPER_AMOUNTS as a}
 						<button
@@ -145,8 +145,9 @@
 
 		<!-- Time -->
 		<div class="form-group">
-			<label>Tid</label>
+			<label for="diaper-time">Tid</label>
 			<input
+				id="diaper-time"
 				type="datetime-local"
 				value={toDatetimeLocal(time)}
 				onchange={handleTimeChange}
@@ -156,8 +157,9 @@
 
 		<!-- Notes -->
 		<div class="form-group">
-			<label>Notat</label>
+			<label for="diaper-notes">Notat</label>
 			<input
+				id="diaper-notes"
 				type="text"
 				placeholder="Valfritt notat..."
 				bind:value={notes}

@@ -19,17 +19,30 @@
 
 	let { entry, onClose, onDeleted }: Props = $props();
 
-	let startDate = $state(isoToDateInput(entry.start_time));
-	let startTime = $state(isoToTimeInput(entry.start_time));
-	let endDate = $state(entry.end_time ? isoToDateInput(entry.end_time) : '');
-	let endTime = $state(entry.end_time ? isoToTimeInput(entry.end_time) : '');
-	let selectedType = $state(entry.type);
-	let selectedMood = $state<string | null>(entry.mood || null);
-	let selectedMethod = $state<string | null>(entry.method || null);
-	let selectedFallAsleep = $state<string | null>(entry.fall_asleep_time || null);
-	let notes = $state(entry.notes || '');
+	let startDate = $state('');
+	let startTime = $state('');
+	let endDate = $state('');
+	let endTime = $state('');
+	let selectedType = $state('nap');
+	let selectedMood = $state<string | null>(null);
+	let selectedMethod = $state<string | null>(null);
+	let selectedFallAsleep = $state<string | null>(null);
+	let notes = $state('');
 	let busy = $state(false);
 	let confirmDelete = $state(false);
+
+	// Sync form fields when entry prop changes (e.g. SSE update while modal is open)
+	$effect(() => {
+		startDate = isoToDateInput(entry.start_time);
+		startTime = isoToTimeInput(entry.start_time);
+		endDate = entry.end_time ? isoToDateInput(entry.end_time) : '';
+		endTime = entry.end_time ? isoToTimeInput(entry.end_time) : '';
+		selectedType = entry.type;
+		selectedMood = entry.mood || null;
+		selectedMethod = entry.method || null;
+		selectedFallAsleep = entry.fall_asleep_time || null;
+		notes = entry.notes || '';
+	});
 
 	function toggleMood(value: string) {
 		selectedMood = selectedMood === value ? null : value;
@@ -89,7 +102,7 @@
 
 		<!-- Type -->
 		<div class="form-group">
-			<label>Type</label>
+			<span class="form-label">Type</span>
 			<div class="type-pills">
 				{#each SLEEP_TYPES as t}
 					<button
@@ -105,7 +118,7 @@
 
 		<!-- Start -->
 		<div class="form-group">
-			<label>Start</label>
+			<span class="form-label">Start</span>
 			<div class="datetime-row">
 				<input type="date" bind:value={startDate} />
 				<input type="time" bind:value={startTime} />
@@ -114,7 +127,7 @@
 
 		<!-- End -->
 		<div class="form-group">
-			<label>Slutt</label>
+			<span class="form-label">Slutt</span>
 			<div class="datetime-row">
 				<input type="date" bind:value={endDate} />
 				<input type="time" bind:value={endTime} />
@@ -123,7 +136,7 @@
 
 		<!-- Mood -->
 		<div class="form-group">
-			<label>Humør ved legging</label>
+			<span class="form-label">Humør ved legging</span>
 			<div class="tag-pills">
 				{#each MOODS as m}
 					<button
@@ -140,7 +153,7 @@
 
 		<!-- Method -->
 		<div class="form-group">
-			<label>Metode</label>
+			<span class="form-label">Metode</span>
 			<div class="tag-pills">
 				{#each METHODS as m}
 					<button
@@ -157,7 +170,7 @@
 
 		<!-- Fall asleep time -->
 		<div class="form-group">
-			<label>Innsovningstid</label>
+			<span class="form-label">Innsovningstid</span>
 			<div class="type-pills">
 				{#each FALL_ASLEEP_BUCKETS as b}
 					<button
@@ -173,8 +186,8 @@
 
 		<!-- Notes -->
 		<div class="form-group">
-			<label>Notat</label>
-			<input type="text" placeholder="Valfritt notat..." bind:value={notes} />
+			<label for="edit-sleep-notes">Notat</label>
+			<input id="edit-sleep-notes" type="text" placeholder="Valfritt notat..." bind:value={notes} />
 		</div>
 
 		<!-- Action buttons -->

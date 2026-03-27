@@ -182,7 +182,7 @@
 		<!-- Nap count pills (only when baby exists) -->
 		{#if baby}
 			<div class="form-group">
-				<label>Tal lurar per dag</label>
+				<span class="form-label">Tal lurar per dag</span>
 				<div style="font-size: 0.75rem; color: var(--text-light); margin-bottom: 8px;">
 					Overstyrer aldersbasert tal. Auto brukar standard for alderen.
 				</div>
@@ -201,7 +201,7 @@
 
 			<!-- Potty mode toggle -->
 			<div class="form-group">
-				<label>Bleie / potte</label>
+				<span class="form-label">Bleie / potte</span>
 				<div class="type-pills">
 					{#each POTTY_OPTIONS as opt}
 						<button

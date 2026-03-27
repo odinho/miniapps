@@ -100,7 +100,7 @@
 
 		<!-- Start time adjustment -->
 		<div class="form-group">
-			<label>Starttid</label>
+			<span class="form-label">Starttid</span>
 			<div class="wake-time-row">
 				<span class="wake-time-display">{displayTime}</span>
 				<button class="btn btn-ghost nudge-btn" onclick={() => handleNudge(1)}>-1 min</button>
@@ -122,7 +122,7 @@
 
 		<!-- Mood -->
 		<div class="form-group">
-			<label>Humør ved legging</label>
+			<span class="form-label">Humør ved legging</span>
 			<div class="tag-pills">
 				{#each MOODS as m}
 					<button
@@ -140,7 +140,7 @@
 
 		<!-- Method -->
 		<div class="form-group">
-			<label>Metode</label>
+			<span class="form-label">Metode</span>
 			<div class="tag-pills">
 				{#each METHODS as m}
 					<button
@@ -158,7 +158,7 @@
 
 		<!-- Fall asleep time -->
 		<div class="form-group">
-			<label>Innsovningstid</label>
+			<span class="form-label">Innsovningstid</span>
 			<div class="type-pills">
 				{#each FALL_ASLEEP_BUCKETS as bucket}
 					<button
@@ -175,8 +175,9 @@
 
 		<!-- Notes -->
 		<div class="form-group">
-			<label>Notat</label>
+			<label for="tag-notes">Notat</label>
 			<input
+				id="tag-notes"
 				type="text"
 				placeholder="Valfritt notat..."
 				bind:value={notes}

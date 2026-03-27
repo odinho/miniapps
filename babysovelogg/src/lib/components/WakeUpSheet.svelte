@@ -72,7 +72,7 @@
 
 		<!-- Woke-by -->
 		<div class="form-group">
-			<label>Oppvakning</label>
+			<span class="form-label">Oppvakning</span>
 			<div class="type-pills">
 				{#each WOKE_OPTIONS as option}
 					<button
@@ -89,8 +89,9 @@
 
 		<!-- Notes -->
 		<div class="form-group">
-			<label>Notat</label>
+			<label for="wake-notes">Notat</label>
 			<input
+				id="wake-notes"
 				type="text"
 				placeholder="Valfritt notat..."
 				bind:value={notes}
