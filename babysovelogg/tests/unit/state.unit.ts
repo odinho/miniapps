@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { assembleState, type DayData } from "../../src/engine/state.js";
-import type { Baby, SleepLogRow, DayStartRow } from "../../types.js";
+import { assembleState, type DayData } from "$lib/engine/state.js";
+import type { Baby, SleepLogRow, DayStartRow } from "$lib/types.js";
 
 const baseBaby: Baby = {
   id: 1,
