@@ -94,7 +94,7 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="modal-overlay" onclick={handleOverlayClick} data-testid="tag-sheet-overlay">
+<div class="modal-overlay" onclick={handleOverlayClick} data-testid="modal-overlay">
 	<div class="modal" data-testid="tag-sheet">
 		<h2>Korleis gjekk legginga?</h2>
 

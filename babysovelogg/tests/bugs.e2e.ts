@@ -113,7 +113,7 @@ test("B15: changing sleep type from nap to night preserves the entry", async ({ 
   napEnd.setHours(10, 0, 0, 0);
   addCompletedSleep(babyId, napStart.toISOString(), napEnd.toISOString());
 
-  await page.goto("/#/history");
+  await page.goto("/history");
   const sleepItems = page.locator(".sleep-log-item:not(.wakeup-log-item):not(.diaper-log-item)");
   await expect(sleepItems).toHaveCount(1, { timeout: 5000 });
   await expect(sleepItems.locator(".log-meta").first()).toContainText("Lur");
@@ -211,7 +211,7 @@ test("B19: settings shows all predicted nap times", async ({ page }) => {
   setWakeUpTime(babyId);
 
   // Default nap count for 9 months = 2
-  await page.goto("/#/settings");
+  await page.goto("/settings");
   await expect(page.getByText("Appen reknar med")).toBeVisible({ timeout: 5000 });
 
   // Should show "Lur 1" and "Lur 2" (two predicted naps)
@@ -225,7 +225,7 @@ test("B19: settings prediction updates reactively when changing nap count", asyn
   const db = getDb();
   setWakeUpTime(babyId);
 
-  await page.goto("/#/settings");
+  await page.goto("/settings");
   await expect(page.getByText("Appen reknar med")).toBeVisible({ timeout: 5000 });
 
   const predPanel = page.getByTestId("pred-panel");
@@ -255,7 +255,7 @@ test("B5: dirty diaper shows type in history log", async ({ page }) => {
     "INSERT INTO diaper_log (baby_id, time, type, amount, domain_id) VALUES (?, ?, 'dirty', 'middels', ?)",
   ).run(babyId, new Date().toISOString(), generateId());
 
-  await page.goto("/#/history");
+  await page.goto("/history");
   const diaperItem = page.locator(".diaper-log-item").first();
   await expect(diaperItem).toBeVisible({ timeout: 5000 });
   // Should show the type label "Skitten", not just "Do" or "Bleie"
@@ -273,7 +273,7 @@ test("B6: diaper notes are visible in history log", async ({ page }) => {
     "INSERT INTO diaper_log (baby_id, time, type, amount, note, domain_id) VALUES (?, ?, 'wet', 'middels', 'Litt raudt utslett', ?)",
   ).run(babyId, new Date().toISOString(), generateId());
 
-  await page.goto("/#/history");
+  await page.goto("/history");
   const diaperItem = page.locator(".diaper-log-item").first();
   await expect(diaperItem).toBeVisible({ timeout: 5000 });
   await expect(diaperItem).toContainText("Litt raudt utslett");
@@ -285,7 +285,7 @@ test("B12: wakeup time appears as entry in history", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
 
-  await page.goto("/#/history");
+  await page.goto("/history");
   const wakeupItem = page.locator(".wakeup-log-item").first();
   await expect(wakeupItem).toBeVisible({ timeout: 5000 });
   await expect(wakeupItem).toContainText("07:00");

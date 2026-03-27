@@ -148,6 +148,42 @@
 		diaperFromTagSheet = false;
 		showDiaperForm = true;
 	}
+
+	// --- Morning prompt ---
+	// Shows when baby exists, no todayWakeUp, and it's morning (5-12)
+	const needsMorningPrompt = $derived(() => {
+		if (!baby || todayWakeUp) return false;
+		// If there are already sleeps today, skip prompt (wakeup was implicit)
+		if (todaySleeps.length > 0) return false;
+		const h = new Date().getHours();
+		return h >= 5 && h < 13;
+	});
+
+	let morningDate = $state('');
+	let morningTime = $state('07:00');
+	let morningBusy = $state(false);
+
+	$effect(() => {
+		// Pre-fill date with today
+		morningDate = new Date().toISOString().split('T')[0];
+	});
+
+	async function setMorningWakeTime() {
+		if (morningBusy || !baby) return;
+		morningBusy = true;
+		try {
+			const wakeTime = new Date(`${morningDate}T${morningTime}:00`).toISOString();
+			const event = {
+				type: 'day.started',
+				payload: { babyId: baby.id, date: morningDate, wakeTime },
+				clientId: crypto.randomUUID(),
+				clientEventId: crypto.randomUUID(),
+			};
+			await sync.sendEvents([event]);
+		} finally {
+			morningBusy = false;
+		}
+	}
 </script>
 
 {#if !loaded}
@@ -159,12 +195,26 @@
 		<p style="color: var(--text-light); margin-top: 4rem;">Ingen baby funnen. <a href="/settings">Innstillingar</a></p>
 	</div>
 {:else}
-	<div class="dashboard">
+	<div class="dashboard" data-testid="dashboard">
+		{#if needsMorningPrompt()}
+			<div class="morning-prompt" data-testid="morning-prompt">
+				<div class="morning-icon" data-testid="morning-icon">☀️</div>
+				<p>God morgon! Når vakna {baby.name}?</p>
+				<div style="display: flex; gap: 8px; margin: 8px 0;">
+					<input type="date" bind:value={morningDate} />
+					<input type="time" bind:value={morningTime} />
+				</div>
+				<button class="btn btn-primary" onclick={setMorningWakeTime} disabled={morningBusy}>
+					Sett vaknetid
+				</button>
+			</div>
+		{/if}
+
 		<!-- Header: baby info + sync badge -->
 		<div class="header-row">
 			<div class="baby-info">
-				<span class="baby-name">{baby.name}</span>
-				<span class="baby-age">{ageMonths} md</span>
+				<span class="baby-name" data-testid="baby-name">{baby.name}</span>
+				<span class="baby-age" data-testid="baby-age">{ageMonths} md</span>
 				{#if sync.pendingCount > 0}
 					<span class="sync-badge sync-badge-pending" data-testid="sync-badge">{sync.pendingCount} ventande</span>
 				{:else if sync.status === 'connected'}
@@ -204,7 +254,7 @@
 
 		<!-- Action buttons -->
 		<div class="arc-actions">
-			<button class="arc-action-btn diaper" onclick={openDiaper}>
+			<button class="arc-action-btn diaper" onclick={openDiaper} data-testid="fab">
 				{pottyMode ? '🚽 Do' : '🧷 Bleie'}
 			</button>
 		</div>

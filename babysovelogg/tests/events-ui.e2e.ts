@@ -21,7 +21,7 @@ test("Events screen renders with recent events", async ({ page }) => {
     }),
   ]);
 
-  await page.goto("/#/events");
+  await page.goto("/events");
   await page.waitForSelector("[data-testid='events-list']");
   const cards = await page.getByTestId("event-card").count();
   expect(cards).toBeGreaterThanOrEqual(1);
@@ -40,7 +40,7 @@ test("Tap event card expands payload", async ({ page }) => {
     }),
   ]);
 
-  await page.goto("/#/events");
+  await page.goto("/events");
   await page.waitForSelector("[data-testid='event-card']");
   const firstCard = page.getByTestId("event-card").first();
   await firstCard.click();

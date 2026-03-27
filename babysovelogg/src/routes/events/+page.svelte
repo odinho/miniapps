@@ -71,7 +71,7 @@
 <div class="view view-fade-in">
 	<div class="events-header">
 		<h1 class="events-title">{title}</h1>
-		<a href="/" class="events-close" aria-label="Lukk">&times;</a>
+		<a href="/" class="events-close" aria-label="Lukk" data-testid="events-close-btn">&times;</a>
 	</div>
 
 	{#if !domainId}
@@ -92,10 +92,11 @@
 	{:else if events.length === 0}
 		<p class="events-status">Ingen hendingar funne.</p>
 	{:else}
-		<div class="events-list">
+		<div class="events-list" data-testid="events-list">
 			{#each events as ev (ev.id)}
 				<button
 					class="event-card"
+					data-testid="event-card"
 					style="border-left-color: {getTypeColor(ev.type)}"
 					onclick={() => toggleExpanded(ev.id)}
 					aria-expanded={expandedId === ev.id}

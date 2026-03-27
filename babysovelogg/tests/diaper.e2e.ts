@@ -96,7 +96,7 @@ test("Potty entry opens potty edit modal in history", async ({ page }) => {
   enablePottyMode(babyId);
   addDiaper(babyId, new Date().toISOString(), "potty_wet", "dry");
 
-  await page.goto("/#/history");
+  await page.goto("/history");
   await expect(page.locator(".diaper-log-item")).toHaveCount(1, { timeout: 5000 });
 
   // Category label should say "Do"
@@ -122,7 +122,7 @@ test("Can edit potty entry type in history", async ({ page }) => {
   enablePottyMode(babyId);
   addDiaper(babyId, new Date().toISOString(), "potty_wet", "dry");
 
-  await page.goto("/#/history");
+  await page.goto("/history");
   await expect(page.locator(".diaper-log-item")).toHaveCount(1, { timeout: 5000 });
 
   await page.locator(".diaper-log-item").click();
@@ -159,7 +159,7 @@ test("Diaper entry still opens diaper edit modal", async ({ page }) => {
   setWakeUpTime(babyId);
   addDiaper(babyId, new Date().toISOString(), "wet", "middels");
 
-  await page.goto("/#/history");
+  await page.goto("/history");
   await expect(page.locator(".diaper-log-item")).toHaveCount(1, { timeout: 5000 });
 
   await page.locator(".diaper-log-item").click();

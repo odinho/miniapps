@@ -97,9 +97,13 @@ function initSchema(database: Database) {
 /** Initialize (or re-initialize) the database. Defaults to file-based db.sqlite. */
 export function initDb(dbPath?: string): Database.Database {
   if (db) try { db.close(); } catch {}
-  db = new Database(dbPath ?? path.join(process.cwd(), "db.sqlite"));
+  const finalPath = dbPath ?? process.env.DB_PATH ?? path.join(process.cwd(), "db.sqlite");
+  db = new Database(finalPath);
   db.pragma("journal_mode = DELETE");
   db.pragma("foreign_keys = ON");
+  if (finalPath !== ":memory:") {
+    db.pragma("busy_timeout = 5000");
+  }
   initSchema(db);
   return db;
 }
