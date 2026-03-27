@@ -77,6 +77,7 @@
 						<button
 							class="type-pill"
 							class:active={selectedType === r.value}
+							data-potty={r.value}
 							onclick={() => (selectedType = r.value)}
 						>
 							{r.label}
