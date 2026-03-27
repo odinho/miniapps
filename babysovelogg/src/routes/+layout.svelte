@@ -28,6 +28,11 @@
 		applyTheme();
 		const interval = setInterval(applyTheme, 60_000);
 		sync.init();
+
+		if ('serviceWorker' in navigator) {
+			navigator.serviceWorker.register('/service-worker.js');
+		}
+
 		return () => {
 			clearInterval(interval);
 			sync.destroy();
