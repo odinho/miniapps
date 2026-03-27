@@ -22,7 +22,7 @@ wake-up sheets, pause handling, diaper nudge, Norwegian strings, 77 Playwright t
 - Arc endpoint time labels (wake-up time, estimated bedtime)
 - Arc endpoint taps open sleep entries
 - Predicted nap interaction (tap to start or dismiss)
-- Renamed Napper → Babysovelogg, napper.db → db.sqlite
+- Renamed Nap → Babysovelogg, nap.db → db.sqlite
 
 ---
 

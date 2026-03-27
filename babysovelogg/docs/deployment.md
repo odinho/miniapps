@@ -33,7 +33,7 @@ User=openclaw
 Restart=always
 RestartSec=5
 Environment=PORT=3200
-Environment=ORIGIN=https://napper.example.com
+Environment=ORIGIN=https://sove.example.com
 
 [Install]
 WantedBy=multi-user.target
@@ -50,10 +50,10 @@ sudo systemctl enable --now babysovelogg
 ```nginx
 server {
     listen 443 ssl;
-    server_name napper.example.com;
+    server_name sove.example.com;
 
-    ssl_certificate /etc/letsencrypt/live/napper.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/napper.example.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/sove.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/sove.example.com/privkey.pem;
 
     location / {
         proxy_pass http://127.0.0.1:3200;
@@ -91,4 +91,4 @@ SQLite file (`db.sqlite`) in the working directory. Uses DELETE journal mode —
 |----------|---------|-------------|
 | `PORT` | `3000` | Server port |
 | `DB_PATH` | `./db.sqlite` | SQLite database file path |
-| `ORIGIN` | — | Required in production for CSRF (e.g. `https://napper.example.com`) |
+| `ORIGIN` | — | Required in production for CSRF (e.g. `https://sove.example.com`) |
