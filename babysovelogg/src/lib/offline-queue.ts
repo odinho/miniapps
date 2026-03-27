@@ -212,9 +212,42 @@ export function applyOptimisticEvent(
 		}
 
 		case "sleep.deleted": {
-			s.todaySleeps = s.todaySleeps.filter(
-				(sl) => sl.domain_id !== (payload.sleepDomainId as string),
-			);
+			const domainId = payload.sleepDomainId as string;
+			const deleted = s.todaySleeps.find((sl) => sl.domain_id === domainId);
+			s.todaySleeps = s.todaySleeps.filter((sl) => sl.domain_id !== domainId);
+			if (s.stats && deleted?.end_time) {
+				const durationMs =
+					new Date(deleted.end_time).getTime() - new Date(deleted.start_time).getTime();
+				const durationMin = Math.max(0, durationMs / 60000);
+				if (deleted.type === "nap") {
+					s.stats.napCount = Math.max(0, s.stats.napCount - 1);
+					s.stats.totalNapMinutes = Math.max(0, s.stats.totalNapMinutes - durationMin);
+				} else {
+					s.stats.totalNightMinutes = Math.max(0, s.stats.totalNightMinutes - durationMin);
+				}
+			}
+			break;
+		}
+
+		case "sleep.restarted": {
+			const domainId = payload.sleepDomainId as string;
+			const idx = s.todaySleeps.findIndex((sl) => sl.domain_id === domainId);
+			if (idx !== -1) {
+				const original = s.todaySleeps[idx];
+				s.activeSleep = { ...original, end_time: null };
+				s.todaySleeps = s.todaySleeps.filter((_, i) => i !== idx);
+				if (s.stats && original.end_time) {
+					const durationMs =
+						new Date(original.end_time).getTime() - new Date(original.start_time).getTime();
+					const durationMin = Math.max(0, durationMs / 60000);
+					if (original.type === "nap") {
+						s.stats.napCount = Math.max(0, s.stats.napCount - 1);
+						s.stats.totalNapMinutes = Math.max(0, s.stats.totalNapMinutes - durationMin);
+					} else {
+						s.stats.totalNightMinutes = Math.max(0, s.stats.totalNightMinutes - durationMin);
+					}
+				}
+			}
 			break;
 		}
 
@@ -225,10 +258,15 @@ export function applyOptimisticEvent(
 		}
 
 		case "day.started": {
+			// Derive date from wakeTime, matching server behavior in projections.ts
+			const wakeDate = new Date(payload.wakeTime as string);
+			const year = wakeDate.getFullYear();
+			const month = String(wakeDate.getMonth() + 1).padStart(2, "0");
+			const day = String(wakeDate.getDate()).padStart(2, "0");
 			s.todayWakeUp = {
 				id: 0,
 				baby_id: (payload.babyId as number) || s.baby?.id || 0,
-				date: new Date().toISOString().slice(0, 10),
+				date: `${year}-${month}-${day}`,
 				wake_time: payload.wakeTime as string,
 				created_at: new Date().toISOString(),
 				created_by_event_id: null,

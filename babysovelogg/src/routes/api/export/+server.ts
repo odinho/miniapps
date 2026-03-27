@@ -3,6 +3,13 @@ import type { RequestHandler } from "./$types.js";
 import { db } from "$lib/server/db.js";
 import type { Baby, SleepLogRow, SleepPauseRow } from "$lib/types.js";
 
+function csvField(value: string): string {
+  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
 export const GET: RequestHandler = ({ url }) => {
   const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby | undefined;
   if (!baby) return json({ error: "No baby configured" }, { status: 404 });
@@ -47,7 +54,7 @@ export const GET: RequestHandler = ({ url }) => {
           s.type,
           s.mood || "",
           s.method || "",
-          (s.notes || "").replace(/,/g, ";"),
+          csvField(s.notes || ""),
         ].join(","),
       );
     }
@@ -58,7 +65,7 @@ export const GET: RequestHandler = ({ url }) => {
       note: string | null;
     }[]) {
       lines.push(
-        ["diaper", d.time, "", d.type, "", "", (d.note || "").replace(/,/g, ";")].join(","),
+        ["diaper", d.time, "", d.type, "", "", csvField(d.note || "")].join(","),
       );
     }
     return new Response(lines.join("\n"), {

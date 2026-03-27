@@ -28,10 +28,6 @@ function createSync() {
 	let reconnectDelay = 1000;
 	const MAX_RECONNECT_DELAY = 30000;
 
-	// SSE mutation suppression — ignore SSE updates briefly after local mutations
-	let lastMutationTime = 0;
-	const SSE_SUPPRESS_MS = 1000;
-
 	function refreshPendingCount() {
 		pendingCount = _getPendingCount();
 	}
@@ -54,8 +50,6 @@ function createSync() {
 			try {
 				const data = JSON.parse(e.data);
 				if (data.state) {
-					// Suppress SSE re-renders briefly after local mutations
-					if (Date.now() - lastMutationTime < SSE_SUPPRESS_MS) return;
 					const normalized = normalizeState(data.state);
 					cacheState(normalized);
 					appState.set(normalized);
@@ -167,7 +161,7 @@ function createSync() {
 		},
 
 		/** Send domain events to the server, or queue offline with optimistic state update.
-		 *  Returns true if sent online, false if queued offline. */
+		 *  Returns the new AppState on success, or null on server error. */
 		async sendEvents(events: DomainEvent[]): Promise<AppState | null> {
 			const clientId = getClientId();
 			const batch = events.map((e) => ({
@@ -178,30 +172,16 @@ function createSync() {
 				...(e.domainId ? { domainId: e.domainId } : {}),
 			}));
 
-			lastMutationTime = Date.now();
-
+			// Try the network request — only queue offline on actual network failure
+			let res: Response;
 			try {
-				const res = await fetch("/api/events", {
+				res = await fetch("/api/events", {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({ events: batch }),
 				});
-
-				if (!res.ok) {
-					const body = await res.json().catch(() => ({}));
-					throw new Error(body.error || `Event send failed: ${res.status}`);
-				}
-
-				const data = await res.json();
-				if (data.state) {
-					const normalized = normalizeState(data.state);
-					cacheState(normalized);
-					appState.set(normalized);
-					return normalized;
-				}
-				return null;
 			} catch {
-				// Offline — queue events and apply optimistically
+				// Network failure — queue events and apply optimistically
 				for (const evt of batch) {
 					enqueue({
 						type: evt.type,
@@ -213,7 +193,6 @@ function createSync() {
 				}
 				refreshPendingCount();
 
-				// Optimistic local state update
 				let currentState = appState.state;
 				for (const evt of events) {
 					currentState = applyOptimisticEvent(currentState, evt.type, evt.payload);
@@ -222,6 +201,23 @@ function createSync() {
 				appState.set(currentState);
 				return currentState;
 			}
+
+			// Server responded — do NOT queue on 4xx/5xx
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({}));
+				const msg = (body as Record<string, unknown>).error || `Event send failed: ${res.status}`;
+				appState.setError(String(msg));
+				return null;
+			}
+
+			const data = await res.json();
+			if (data.state) {
+				const normalized = normalizeState(data.state);
+				cacheState(normalized);
+				appState.set(normalized);
+				return normalized;
+			}
+			return null;
 		},
 
 		/** Disconnect SSE and cancel pending reconnects. */

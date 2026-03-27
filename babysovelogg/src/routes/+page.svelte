@@ -42,6 +42,10 @@
 		const events = undoToast.undoEvents;
 		undoToast = null;
 		if (undoTimer) clearTimeout(undoTimer);
+		// Close any modals that may reference the entity being undone
+		showTagSheet = false;
+		showWakeUpSheet = false;
+		editingSleep = null;
 		await sync.sendEvents(events);
 	}
 
@@ -57,13 +61,13 @@
 	const todayWakeUp = $derived(s.todayWakeUp);
 	const pottyMode = $derived(baby?.potty_mode === 1);
 
-	const isNightMode = $derived(() => {
+	const isNightMode = $derived.by(() => {
 		const h = new Date().getHours();
 		return h < 6 || h >= 18;
 	});
 
 	// Morning button visible at 4-5 AM (late night / early morning)
-	const showMorningButton = $derived(() => {
+	const showMorningButton = $derived.by(() => {
 		if (!baby || activeSleep) return false;
 		const h = new Date().getHours();
 		return h >= 4 && h < 6;
@@ -120,12 +124,12 @@
 		return () => clearInterval(iv);
 	});
 
-	const liveNapCount = $derived(() => {
+	const liveNapCount = $derived.by(() => {
 		const base = stats?.napCount ?? 0;
 		return base + (activeSleep?.type === 'nap' && !activeSleep.end_time ? 1 : 0);
 	});
 
-	const liveNapMs = $derived(() => {
+	const liveNapMs = $derived.by(() => {
 		const base = (stats?.totalNapMinutes ?? 0) * 60_000;
 		if (activeSleep?.type === 'nap' && !activeSleep.end_time) {
 			const elapsed = now - new Date(activeSleep.start_time).getTime() - calcPauseMs(activeSleep.pauses ?? []);
@@ -134,7 +138,7 @@
 		return base;
 	});
 
-	const liveTotalMs = $derived(() => {
+	const liveTotalMs = $derived.by(() => {
 		const napBase = (stats?.totalNapMinutes ?? 0) * 60_000;
 		const nightBase = (stats?.totalNightMinutes ?? 0) * 60_000;
 		let activeMs = 0;
@@ -145,7 +149,7 @@
 	});
 
 	const showTotal = $derived(
-		Math.round(liveTotalMs() / 60_000) !== Math.round(liveNapMs() / 60_000),
+		Math.round(liveTotalMs / 60_000) !== Math.round(liveNapMs / 60_000),
 	);
 
 	// --- callbacks ---
@@ -206,7 +210,7 @@
 
 	// --- Morning prompt ---
 	// Shows when baby exists, no todayWakeUp, and it's morning (5-12)
-	const needsMorningPrompt = $derived(() => {
+	const needsMorningPrompt = $derived.by(() => {
 		if (!baby || todayWakeUp) return false;
 		// If there are already sleeps today, skip prompt (wakeup was implicit)
 		if (todaySleeps.length > 0) return false;
@@ -272,7 +276,7 @@
 	</div>
 {:else}
 	<div class="dashboard" data-testid="dashboard">
-		{#if needsMorningPrompt()}
+		{#if needsMorningPrompt}
 			<div class="morning-prompt" data-testid="morning-prompt">
 				<div class="morning-icon" data-testid="morning-icon">🌅</div>
 				<h2>God morgon!</h2>
@@ -323,7 +327,7 @@
 				todaySleeps={arcSleeps}
 				activeSleep={arcActiveSleep}
 				prediction={arcPrediction}
-				isNightMode={isNightMode()}
+				isNightMode={isNightMode}
 				wakeUpTime={todayWakeUp?.wake_time}
 				onSleepClick={onArcBubbleClick}
 			/>
@@ -337,7 +341,7 @@
 
 		<!-- Action buttons -->
 		<div class="arc-actions">
-			{#if showMorningButton()}
+			{#if showMorningButton}
 				<button class="arc-action-btn morning" onclick={triggerMorning}>
 					☀️ Morgon
 				</button>
@@ -350,18 +354,18 @@
 		<!-- Summary stats -->
 		<div class="summary-row">
 			<span>
-				<span class="stat-value">{liveNapCount()}</span>
-				<span class="summary-label">{liveNapCount() === 1 ? 'lur' : 'lurar'}</span>
+				<span class="stat-value">{liveNapCount}</span>
+				<span class="summary-label">{liveNapCount === 1 ? 'lur' : 'lurar'}</span>
 			</span>
 			<span class="summary-sep">·</span>
 			<span>
-				<span class="stat-value">{formatDuration(liveNapMs())}</span>
+				<span class="stat-value">{formatDuration(liveNapMs)}</span>
 				<span class="summary-label">lurtid</span>
 			</span>
 			{#if showTotal}
 				<span class="summary-sep">·</span>
 				<span>
-					<span class="stat-value">{formatDuration(liveTotalMs())}</span>
+					<span class="stat-value">{formatDuration(liveTotalMs)}</span>
 					<span class="summary-label">totalt</span>
 				</span>
 			{/if}
