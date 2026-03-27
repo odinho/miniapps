@@ -3,13 +3,16 @@ import { postEvents } from "../api.js";
 import { queueEvent, getClientId } from "../sync.js";
 import { el, formatAge, formatDuration, formatTime } from "./components.js";
 import { showToast } from "./toast.js";
-import { calculateAgeMonths, WAKE_WINDOWS, findByAge, getExpectedNapCount } from "../engine/schedule.js";
+import { calculateAgeMonths, WAKE_WINDOWS, findByAge, getExpectedNapCount, predictDayNaps, recommendBedtime } from "../engine/schedule.js";
 
 export function renderSettings(container: HTMLElement, opts?: { onboarding?: boolean }): void {
   container.innerHTML = "";
   const state = getAppState();
   const baby = state?.baby;
   const isOnboarding = opts?.onboarding || !baby;
+
+  // B19: callback for nap pills to reactively update prediction panel
+  let onNapCountChange: ((napCount: number | null) => void) | null = null;
 
   const view = el("div", { className: "view" });
   const form = el("div", { className: "settings" });
@@ -69,6 +72,8 @@ export function renderSettings(container: HTMLElement, opts?: { onboarding?: boo
           (p, i) =>
             (p.className = `type-pill ${selectedNapCount === napOptions[i].value ? "active" : ""}`),
         );
+        // B19: reactively update prediction when nap count changes
+        onNapCountChange?.(selectedNapCount);
       });
       return pill;
     });
@@ -245,43 +250,71 @@ export function renderSettings(container: HTMLElement, opts?: { onboarding?: boo
       renderSleepInfoPanel(ageMonths, wakeWindow),
     ];
 
-    // B4: Show the app's own predictions for today
-    if (state?.prediction) {
+    // B4/B19: Show the app's own predictions for today, reactive to nap count changes
+    const predPanelContainer = el("div", { "data-testid": "pred-panel" });
+    const completedNaps = state?.todaySleeps.filter(
+      (s) => s.type === "nap" && s.end_time,
+    ).length ?? 0;
+    const wakeTime = state?.todayWakeUp?.wake_time;
+    const recentSleeps = state?.todaySleeps ?? [];
+
+    function renderPredPanel(napCount: number | null | undefined) {
+      predPanelContainer.innerHTML = "";
+      const expected = getExpectedNapCount(ageMonths, napCount ?? undefined);
       const predRows: { label: string; value: string }[] = [];
-      const expectedNaps = getExpectedNapCount(ageMonths, baby.custom_nap_count ?? undefined);
-      const completedNaps = state.todaySleeps.filter(
-        (s) => s.type === "nap" && s.end_time,
-      ).length;
+      predRows.push({ label: "Forventa lurar i dag", value: `${completedNaps} av ${expected}` });
 
-      predRows.push({ label: "Forventa lurar i dag", value: `${completedNaps} av ${expectedNaps}` });
-      if (state.prediction.predictedNaps && state.prediction.predictedNaps.length > 0) {
-        const nextNap = state.prediction.predictedNaps[0];
-        predRows.push({ label: "Neste lur", value: `~${formatTime(nextNap.startTime)}` });
+      // Compute predicted naps client-side so it's reactive to nap count changes
+      if (wakeTime) {
+        const predicted = predictDayNaps(wakeTime, ageMonths, recentSleeps, napCount ?? undefined);
+        const bedtime = recommendBedtime(recentSleeps, ageMonths, napCount ?? undefined);
+        for (let i = 0; i < predicted.length; i++) {
+          predRows.push({
+            label: `Lur ${i + 1}`,
+            value: `~${formatTime(predicted[i].startTime)} – ~${formatTime(predicted[i].endTime)}`,
+          });
+        }
+        predRows.push({ label: "Leggetid", value: `~${formatTime(bedtime)}` });
+      } else if (state?.prediction) {
+        // Fallback to server prediction when no wakeTime
+        if (state.prediction.predictedNaps) {
+          for (let i = 0; i < state.prediction.predictedNaps.length; i++) {
+            const nap = state.prediction.predictedNaps[i];
+            predRows.push({
+              label: `Lur ${i + 1}`,
+              value: `~${formatTime(nap.startTime)} – ~${formatTime(nap.endTime)}`,
+            });
+          }
+        }
+        predRows.push({ label: "Leggetid", value: `~${formatTime(state.prediction.bedtime)}` });
       }
-      predRows.push({ label: "Leggetid", value: `~${formatTime(state.prediction.bedtime)}` });
 
-      if (state.stats) {
+      if (state?.stats) {
         const totalMin = state.stats.totalNapMinutes + state.stats.totalNightMinutes;
         if (totalMin > 0) {
           predRows.push({ label: "Søvn i dag", value: formatDuration(totalMin * 60000) });
         }
       }
 
-      const predPanel = el("div", {
+      const panel = el("div", {
         style: { marginTop: "16px", padding: "12px", background: "var(--lavender)", borderRadius: "var(--radius-sm)" },
       }, [
         el("div", { style: { fontWeight: "600", marginBottom: "8px", fontSize: "0.9rem" } }, ["Appen reknar med"]),
       ]);
       for (const row of predRows) {
-        predPanel.appendChild(
+        panel.appendChild(
           el("div", { className: "stats-trend-row" }, [
             el("div", { className: "stats-trend-label" }, [row.label]),
             el("div", { className: "stats-trend-val" }, [row.value]),
           ]),
         );
       }
-      sleepInfoChildren.push(predPanel);
+      predPanelContainer.appendChild(panel);
     }
+
+    renderPredPanel(selectedNapCount);
+    onNapCountChange = renderPredPanel;
+    sleepInfoChildren.push(predPanelContainer);
 
     form.appendChild(
       el(

@@ -218,8 +218,16 @@ export function renderDashboard(container: HTMLElement): void {
         sleepDomainId: activeSleep.domain_id,
         endTime: endTimeIso,
       });
+      // B18: Ending a night sleep IS the morning — auto-set today's wakeup
+      // so the morning prompt doesn't reappear with a spurious entry
+      if (activeSleep.type === "night") {
+        await sendEvent("day.started", {
+          babyId: baby.id,
+          wakeTime: endTimeIso,
+        });
+      }
       renderDashboard(container);
-      showWakeUpSheet(activeSleep.domain_id, sleepSnapshot, endTimeIso, container);
+      showWakeUpSheet(activeSleep.domain_id, sleepSnapshot, endTimeIso, container, activeSleep.type === "night" ? baby.id : undefined);
       const domainId = activeSleep.domain_id;
       showUndoToast("Søvn avslutta", async () => {
         await sendEvent("sleep.updated", { sleepDomainId: domainId, endTime: null });
@@ -1122,6 +1130,7 @@ function showWakeUpSheet(
   sleepData: SleepLogRow,
   recordedEndTime: string,
   container: HTMLElement,
+  nightSleepBabyId?: number,
 ): void {
   const overlay = el("div", { className: "modal-overlay", "data-testid": "modal-overlay" });
   const modal = el("div", { className: "modal tag-sheet" });
@@ -1365,6 +1374,13 @@ function showWakeUpSheet(
       if (noteInput.value.trim()) payload.wakeNotes = noteInput.value.trim();
       if (endTimeChanged) payload.endTime = finalEndTime.toISOString();
       await sendEvent("sleep.updated", payload);
+      // B18: If the user adjusted the end time on a night sleep, also update the wakeup
+      if (endTimeChanged && nightSleepBabyId) {
+        await sendEvent("day.started", {
+          babyId: nightSleepBabyId,
+          wakeTime: finalEndTime.toISOString(),
+        });
+      }
       if (endTimeChanged) renderDashboard(container);
     }
   }

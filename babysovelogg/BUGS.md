@@ -142,3 +142,20 @@ Legend: ✅ Fixed  ⚠️ Partial  🔧 Fixed this session
 **Root cause:** The "☀️ Morgon" action button and the arc's end-icon click both showed the wake panel unconditionally in night mode, even right after bedtime (18-24h) when morning makes no sense.
 **Fix:** Morning button and arc end-click wake panel are now only available when `currentHour < 12` (midnight to noon), not in the evening hours (18-24). Night waking button (🌙) remains always available.
 **Test:** `bugs.e2e.ts` — "B17: morning button not shown in early night hours", "B17: morning button IS shown in late night hours"
+
+---
+
+## B18 – Morning prompt reappears after ending night sleep 🔧
+**Screenshot:** 2026-03-27 06:13, 06:22
+**Description:** After ending a night sleep at ~05:50 (the baby woke up), the morning prompt "God morgon! Når vakna babyen?" appears AGAIN. This creates a spurious duplicate wakeup entry in the log. The ending of a night sleep IS the morning — there's no need for a separate wakeup dialog.
+**Root cause:** `todaySleeps` only includes sleeps with `start_time >= today 00:00`. A night sleep that started yesterday isn't in `todaySleeps`, so the morning prompt condition `!todayWakeUp && todaySleeps.length === 0 && !activeSleep` passes.
+**Fix:** When ending a night sleep, automatically send a `day.started` event with the end time as the wakeup time. The wake-up sheet also updates the wakeup if the user adjusts the end time.
+**Test:** `bugs.e2e.ts` — "B18: ending night sleep auto-sets wakeup, no morning prompt"
+
+---
+
+## B19 – Settings prediction: only shows next nap, not reactive 🔧
+**Screenshot:** 2026-03-27 06:17, 06:18
+**Description:** The "Appen reknar med" section in settings only shows "Neste lur" (next nap), not all predicted naps for the day. When the user changes the nap count (e.g., from Auto/2 to 1), the prediction doesn't update until after saving and reloading.
+**Fix:** Settings now shows all predicted nap times ("Lur 1", "Lur 2", etc.) with start–end ranges. Prediction recomputes client-side when the nap count pill is tapped, using `predictDayNaps()` and `recommendBedtime()` directly.
+**Test:** `bugs.e2e.ts` — "B19: settings shows all predicted nap times", "B19: settings prediction updates reactively when changing nap count"

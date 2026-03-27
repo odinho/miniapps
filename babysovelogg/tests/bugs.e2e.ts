@@ -146,6 +146,104 @@ test("B17: morning button IS shown in late night hours", async ({ page }) => {
   await expect(page.locator(".arc-action-btn.morning")).toBeVisible({ timeout: 3000 });
 });
 
+// --- B18: Ending a night sleep should auto-create wakeup ---
+// When the user ends a night sleep, that IS the morning. The app should automatically
+// create a day.started event so the morning prompt does NOT re-appear.
+
+test("B18: ending night sleep auto-sets wakeup, no morning prompt", async ({ page }) => {
+  const babyId = createBaby("Testa");
+  const db = getDb();
+  const { generateId } = await import("./fixtures");
+
+  // Set yesterday's wakeup (so baby has a "previous day")
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(7, 0, 0, 0);
+  const yesterdayDate = yesterday.toISOString().split("T")[0];
+  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
+    babyId,
+    yesterdayDate,
+    yesterday.toISOString(),
+  );
+
+  // Create an active night sleep that started yesterday evening
+  const nightStart = new Date();
+  nightStart.setDate(nightStart.getDate() - 1);
+  nightStart.setHours(18, 30, 0, 0);
+  const domainId = generateId();
+  db.prepare(
+    "INSERT INTO sleep_log (baby_id, start_time, type, domain_id) VALUES (?, ?, 'night', ?)",
+  ).run(babyId, nightStart.toISOString(), domainId);
+
+  await forceHour(page, 6);
+  await page.goto("/");
+  await expect(page.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 5000 });
+
+  // End the night sleep by clicking the sleep button
+  await page.getByTestId("sleep-button").click();
+
+  // Dismiss the wake-up sheet
+  const overlay = page.getByTestId("modal-overlay");
+  try {
+    await overlay.waitFor({ state: "visible", timeout: 3000 });
+    await page.getByRole("button", { name: "Ferdig" }).click();
+    await overlay.waitFor({ state: "hidden", timeout: 3000 });
+  } catch {}
+
+  // Dashboard should be visible — NOT the morning prompt
+  await expect(page.getByTestId("dashboard")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByTestId("morning-prompt")).not.toBeVisible();
+
+  // Verify a day_start was created for today
+  const today = new Date().toISOString().split("T")[0];
+  const wakeup = db.prepare("SELECT * FROM day_start WHERE baby_id = ? AND date = ?").get(
+    babyId,
+    today,
+  ) as { wake_time: string } | undefined;
+  expect(wakeup).toBeTruthy();
+});
+
+// --- B19: Settings prediction shows all naps and reacts to nap count change ---
+
+test("B19: settings shows all predicted nap times", async ({ page }) => {
+  const babyId = createBaby("Testa");
+  const db = getDb();
+  setWakeUpTime(babyId);
+
+  // Default nap count for 9 months = 2
+  await page.goto("/#/settings");
+  await expect(page.getByText("Appen reknar med")).toBeVisible({ timeout: 5000 });
+
+  // Should show "Lur 1" and "Lur 2" (two predicted naps)
+  const predPanel = page.getByTestId("pred-panel");
+  await expect(predPanel).toContainText("Lur 1");
+  await expect(predPanel).toContainText("Lur 2");
+});
+
+test("B19: settings prediction updates reactively when changing nap count", async ({ page }) => {
+  const babyId = createBaby("Testa");
+  const db = getDb();
+  setWakeUpTime(babyId);
+
+  await page.goto("/#/settings");
+  await expect(page.getByText("Appen reknar med")).toBeVisible({ timeout: 5000 });
+
+  const predPanel = page.getByTestId("pred-panel");
+
+  // Initially auto = 2 naps for 9 months
+  await expect(predPanel).toContainText("Lur 2");
+
+  // Change to 1 nap
+  await page.locator(".type-pill", { hasText: "1" }).first().click();
+
+  // Should now show only "Lur 1", not "Lur 2"
+  await expect(predPanel).toContainText("Lur 1");
+  await expect(predPanel).not.toContainText("Lur 2");
+
+  // And "0 av 1" expected naps
+  await expect(predPanel).toContainText("0 av 1");
+});
+
 // --- B5: Diaper poop type visible in history ---
 
 test("B5: dirty diaper shows type in history log", async ({ page }) => {
