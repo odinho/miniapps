@@ -22,6 +22,13 @@ import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry } from "
 process.on("exit", closeDb);
 db.pragma("busy_timeout = 3000");
 
+// ── Clock (mockable for tests via MOCK_TIME env var, e.g. "2026-03-15T12:00:00Z") ──
+
+const _mockTime = process.env.MOCK_TIME ? new Date(process.env.MOCK_TIME).getTime() : undefined;
+function now(): number {
+  return _mockTime ?? Date.now();
+}
+
 // ── ID generation (Node.js-compatible, matches src/identity.ts format) ──
 
 const EPOCH = new Date("2026-01-01T00:00:00Z").getTime();
@@ -75,20 +82,20 @@ const jsonOut = flags.json === true;
 // ── Time parsing ──
 
 function parseTime(value: string | true | undefined): string {
-  if (!value || value === true) return new Date().toISOString();
+  if (!value || value === true) return new Date(now()).toISOString();
 
   // Relative: -10m, -1h, -30s
   const rel = value.match(/^-(\d+)(s|m|h)$/);
   if (rel) {
     const n = parseInt(rel[1]);
     const ms = rel[2] === "h" ? n * 3600000 : rel[2] === "m" ? n * 60000 : n * 1000;
-    return new Date(Date.now() - ms).toISOString();
+    return new Date(now() - ms).toISOString();
   }
 
   // Time only: 14:30 → today at that time
   const hm = value.match(/^(\d{1,2}):(\d{2})$/);
   if (hm) {
-    const d = new Date();
+    const d = new Date(now());
     d.setHours(parseInt(hm[1]), parseInt(hm[2]), 0, 0);
     return d.toISOString();
   }
@@ -123,7 +130,7 @@ function fmtDuration(minutes: number): string {
 }
 
 function fmtAgo(iso: string): string {
-  const min = (Date.now() - new Date(iso).getTime()) / 60000;
+  const min = (now() - new Date(iso).getTime()) / 60000;
   if (min < 1) return "just now";
   if (min < 60) return `${Math.round(min)}m ago`;
   const h = Math.floor(min / 60);
@@ -132,7 +139,7 @@ function fmtAgo(iso: string): string {
 }
 
 function calcSleepDuration(s: SleepLogRow): number {
-  const endMs = s.end_time ? new Date(s.end_time).getTime() : Date.now();
+  const endMs = s.end_time ? new Date(s.end_time).getTime() : now();
   const total = (endMs - new Date(s.start_time).getTime()) / 60000;
   if (!s.pauses) return total;
   let pauseMs = 0;
@@ -203,7 +210,7 @@ function getActiveSleep(babyId: number): (SleepLogRow & { pauses: SleepPauseRow[
 }
 
 function getSleeps(babyId: number, days: number, limit: number): SleepLogRow[] {
-  const from = new Date(Date.now() - days * 86400000).toISOString();
+  const from = new Date(now() - days * 86400000).toISOString();
   const sleeps = db
     .prepare(
       "SELECT * FROM sleep_log WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time DESC LIMIT ?",
@@ -230,15 +237,15 @@ function attachPauses(sleeps: SleepLogRow[]) {
 }
 
 function getTodayWakeUp(babyId: number): DayStartRow | undefined {
-  const now = new Date();
-  const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const today = new Date(now());
+  const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   return db
     .prepare("SELECT * FROM day_start WHERE baby_id = ? AND date = ?")
     .get(babyId, dateStr) as DayStartRow | undefined;
 }
 
 function getTodayDiaperCount(babyId: number): number {
-  const todayStart = new Date();
+  const todayStart = new Date(now());
   todayStart.setHours(0, 0, 0, 0);
   return (
     db
@@ -262,7 +269,7 @@ function cmdDefault() {
   const baby = getBaby();
   const ageMonths = calculateAgeMonths(baby.birthdate);
   const active = getActiveSleep(baby.id);
-  const todayStart = new Date();
+  const todayStart = new Date(now());
   todayStart.setHours(0, 0, 0, 0);
   const todaySleeps = db
     .prepare(
@@ -313,7 +320,7 @@ function cmdDefault() {
     const lastCompleted = todaySleeps.toReversed().find((s) => s.end_time);
     const wakeTime = lastCompleted?.end_time || wakeUp?.wake_time;
     if (wakeTime) {
-      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+      const weekAgo = new Date(now() - 7 * 86400000).toISOString();
       const recentSleeps = db
         .prepare(
           "SELECT * FROM sleep_log WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time DESC",
@@ -348,7 +355,7 @@ function cmdStatus() {
   const baby = getBaby();
   const ageMonths = calculateAgeMonths(baby.birthdate);
   const active = getActiveSleep(baby.id);
-  const todayStart = new Date();
+  const todayStart = new Date(now());
   todayStart.setHours(0, 0, 0, 0);
   const todaySleeps = db
     .prepare(
@@ -367,7 +374,7 @@ function cmdStatus() {
     const lastCompleted = todaySleeps.toReversed().find((s) => s.end_time);
     const wakeTime = lastCompleted?.end_time || wakeUp?.wake_time;
     if (wakeTime) {
-      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+      const weekAgo = new Date(now() - 7 * 86400000).toISOString();
       const recentSleeps = db
         .prepare(
           "SELECT * FROM sleep_log WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time DESC",
@@ -467,7 +474,7 @@ function cmdStatus() {
     console.log();
     if (prediction.nextNap) {
       const napTime = new Date(prediction.nextNap);
-      const inMin = (napTime.getTime() - Date.now()) / 60000;
+      const inMin = (napTime.getTime() - now()) / 60000;
       const when = inMin > 0 ? `in ${fmtDuration(inMin)}` : `${fmtDuration(-inMin)} overdue`;
       console.log(`Next nap:  ~${fmtTime(prediction.nextNap)} (${when})`);
     }
