@@ -165,12 +165,14 @@
 			<div class="baby-info">
 				<span class="baby-name">{baby.name}</span>
 				<span class="baby-age">{ageMonths} md</span>
-				{#if sync.status === 'connected'}
-					<span class="sync-badge sync-badge-ok"></span>
+				{#if sync.pendingCount > 0}
+					<span class="sync-badge sync-badge-pending" data-testid="sync-badge">{sync.pendingCount} ventande</span>
+				{:else if sync.status === 'connected'}
+					<span class="sync-badge sync-badge-ok" data-testid="sync-badge"></span>
 				{:else if sync.status === 'connecting'}
-					<span class="sync-badge sync-badge-pending">...</span>
+					<span class="sync-badge sync-badge-pending" data-testid="sync-badge">...</span>
 				{:else}
-					<span class="sync-badge sync-badge-offline">offline</span>
+					<span class="sync-badge sync-badge-offline" data-testid="sync-badge">offline</span>
 				{/if}
 			</div>
 			<SleepButton

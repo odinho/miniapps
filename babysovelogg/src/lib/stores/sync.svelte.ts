@@ -1,7 +1,19 @@
 import { appState, type AppState } from "./app.svelte.js";
 import { getClientId, generateId } from "$lib/identity.js";
+import {
+	getQueue,
+	clearQueue,
+	enqueue,
+	getPendingCount as _getPendingCount,
+	hasPendingEvents,
+	cacheState,
+	getCachedState,
+	applyOptimisticEvent,
+	applyQueuedEvents,
+	type QueuedEvent,
+} from "$lib/offline-queue.js";
 
-type ConnectionStatus = "disconnected" | "connecting" | "connected";
+export type ConnectionStatus = "disconnected" | "connecting" | "connected";
 
 interface DomainEvent {
 	type: string;
@@ -11,10 +23,19 @@ interface DomainEvent {
 
 function createSync() {
 	let status = $state<ConnectionStatus>("disconnected");
+	let pendingCount = $state(0);
 	let eventSource: EventSource | null = null;
 	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 	let reconnectDelay = 1000;
 	const MAX_RECONNECT_DELAY = 30000;
+
+	// SSE mutation suppression — ignore SSE updates briefly after local mutations
+	let lastMutationTime = 0;
+	const SSE_SUPPRESS_MS = 1000;
+
+	function refreshPendingCount() {
+		pendingCount = _getPendingCount();
+	}
 
 	function connect() {
 		if (eventSource) return;
@@ -26,13 +47,19 @@ function createSync() {
 		es.onopen = () => {
 			status = "connected";
 			reconnectDelay = 1000;
+			// B13: On reconnect, flush any queued offline events
+			flushQueue();
 		};
 
 		es.addEventListener("update", (e: MessageEvent) => {
 			try {
 				const data = JSON.parse(e.data);
 				if (data.state) {
-					appState.set(normalizeState(data.state));
+					// Suppress SSE re-renders briefly after local mutations
+					if (Date.now() - lastMutationTime < SSE_SUPPRESS_MS) return;
+					const normalized = normalizeState(data.state);
+					cacheState(normalized);
+					appState.set(normalized);
 				}
 			} catch {
 				// Ignore malformed SSE data
@@ -62,6 +89,30 @@ function createSync() {
 		}, reconnectDelay);
 	}
 
+	/** Flush all queued offline events to the server. */
+	async function flushQueue(): Promise<void> {
+		const queue = getQueue();
+		if (queue.length === 0) return;
+		try {
+			const res = await fetch("/api/events", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ events: queue }),
+			});
+			if (!res.ok) throw new Error(`Flush failed: ${res.status}`);
+			clearQueue();
+			refreshPendingCount();
+			const data = await res.json();
+			if (data.state) {
+				const normalized = normalizeState(data.state);
+				cacheState(normalized);
+				appState.set(normalized);
+			}
+		} catch {
+			// Still offline or server error — keep queue, retry on next reconnect
+		}
+	}
+
 	/** Normalize server state to ensure null instead of undefined for optional fields. */
 	function normalizeState(raw: Record<string, unknown>): AppState {
 		return {
@@ -83,20 +134,41 @@ function createSync() {
 			return status;
 		},
 
+		/** Number of events queued offline. Reactive. */
+		get pendingCount() {
+			return pendingCount;
+		},
+
 		/** Fetch initial state from server and connect SSE. */
 		async init() {
+			// Load cached state first so UI renders immediately even if offline
+			const cached = getCachedState();
+			if (cached) {
+				const withQueued = hasPendingEvents() ? applyQueuedEvents(cached) : cached;
+				appState.set(withQueued);
+			}
+			refreshPendingCount();
+
 			try {
 				const res = await fetch("/api/state");
 				if (!res.ok) throw new Error(`State fetch failed: ${res.status}`);
 				const raw = await res.json();
-				appState.set(normalizeState(raw));
+				const normalized = normalizeState(raw);
+				cacheState(normalized);
+				// If we have pending queued events, apply them on top of server state
+				const withQueued = hasPendingEvents() ? applyQueuedEvents(normalized) : normalized;
+				appState.set(withQueued);
 			} catch (e) {
-				appState.setError(e instanceof Error ? e.message : String(e));
+				// If we already loaded from cache, don't show error
+				if (!cached) {
+					appState.setError(e instanceof Error ? e.message : String(e));
+				}
 			}
 			connect();
 		},
 
-		/** Send domain events to the server. Returns the response state. */
+		/** Send domain events to the server, or queue offline with optimistic state update.
+		 *  Returns true if sent online, false if queued offline. */
 		async sendEvents(events: DomainEvent[]): Promise<AppState | null> {
 			const clientId = getClientId();
 			const batch = events.map((e) => ({
@@ -107,24 +179,50 @@ function createSync() {
 				...(e.domainId ? { domainId: e.domainId } : {}),
 			}));
 
-			const res = await fetch("/api/events", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ events: batch }),
-			});
+			lastMutationTime = Date.now();
 
-			if (!res.ok) {
-				const body = await res.json().catch(() => ({}));
-				throw new Error(body.error || `Event send failed: ${res.status}`);
-			}
+			try {
+				const res = await fetch("/api/events", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ events: batch }),
+				});
 
-			const data = await res.json();
-			if (data.state) {
-				const normalized = normalizeState(data.state);
-				appState.set(normalized);
-				return normalized;
+				if (!res.ok) {
+					const body = await res.json().catch(() => ({}));
+					throw new Error(body.error || `Event send failed: ${res.status}`);
+				}
+
+				const data = await res.json();
+				if (data.state) {
+					const normalized = normalizeState(data.state);
+					cacheState(normalized);
+					appState.set(normalized);
+					return normalized;
+				}
+				return null;
+			} catch {
+				// Offline — queue events and apply optimistically
+				for (const evt of batch) {
+					enqueue({
+						type: evt.type,
+						payload: evt.payload,
+						clientId: evt.clientId,
+						clientEventId: evt.clientEventId,
+						timestamp: new Date().toISOString(),
+					});
+				}
+				refreshPendingCount();
+
+				// Optimistic local state update
+				let currentState = appState.state;
+				for (const evt of events) {
+					currentState = applyOptimisticEvent(currentState, evt.type, evt.payload);
+				}
+				cacheState(currentState);
+				appState.set(currentState);
+				return currentState;
 			}
-			return null;
 		},
 
 		/** Disconnect SSE and cancel pending reconnects. */

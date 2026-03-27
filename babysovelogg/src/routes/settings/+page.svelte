@@ -98,8 +98,8 @@
 
 		try {
 			await sync.sendEvents([event]);
-		} catch {
-			showToast('Lagra offline — synkar når tilkoplinga er tilbake', 'warning');
+		} catch (err) {
+			showToast(`Feil ved lagring: ${err instanceof Error ? err.message : 'ukjend feil'}`, 'error');
 		} finally {
 			saving = false;
 		}
