@@ -8,7 +8,7 @@
 //    or: pnpm baby [command] [options]
 
 import { randomBytes } from "node:crypto";
-import db, { closeDb } from "../server/db.js";
+import { db, closeDb } from "../server/db.js";
 import { processBatchTx } from "../server/events.js";
 import {
   calculateAgeMonths,
