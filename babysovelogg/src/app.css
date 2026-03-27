@@ -175,6 +175,7 @@ html, body {
   display: flex;
   flex-direction: column;
   padding-top: var(--safe-top);
+  background: var(--cream);
   padding-bottom: var(--safe-bottom);
 }
 
