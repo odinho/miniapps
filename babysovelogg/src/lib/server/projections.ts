@@ -136,6 +136,16 @@ export function applyEvent(event: AppEvent): void {
       break;
     }
 
+    case "sleep.restarted": {
+      const result = db
+        .prepare("UPDATE sleep_log SET end_time = NULL, updated_by_event_id = ? WHERE domain_id = ?")
+        .run(eventId, payload.sleepDomainId);
+      if (result.changes === 0) {
+        throw new Error(`sleep.restarted: no sleep found with domain_id ${payload.sleepDomainId}`);
+      }
+      break;
+    }
+
     case "sleep.tagged": {
       const sets: string[] = ["updated_by_event_id = ?"];
       const vals: unknown[] = [eventId];

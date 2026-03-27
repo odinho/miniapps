@@ -1,7 +1,6 @@
 import {
 	calculateAgeMonths,
 	WAKE_WINDOWS,
-	SLEEP_NEEDS,
 	findByAge,
 	getExpectedNapCount,
 	predictDayNaps,

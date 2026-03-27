@@ -12,7 +12,7 @@ test("Dashboard shows baby name and sleep button", async ({ page }) => {
   setWakeUpTime(babyId);
   await page.goto("/");
   await expect(page.getByTestId("baby-name")).toHaveText("Testa");
-  await expect(page.getByTestId("baby-age")).toContainText("md");
+  await expect(page.getByTestId("baby-age")).toContainText("mnd");
   await expect(page.getByTestId("sleep-button")).toBeVisible();
   await expect(page.getByTestId("sleep-button")).toHaveClass(/awake/);
 });

@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { db, get, postCsv, createBaby } from "./harness.js";
+import { db, postCsv, createBaby } from "./harness.js";
 import { renderDayState } from "../helpers/render-state.js";
 
 const NAPPER_CSV = `start,end,category,overallHappiness,babyMoodOnWakeUp,diaperWeight,diaperContent,breastLeftMinutes,breastRightMinutes,amountPumpedLeft,amountPumpedRight,feedingAmount,temperature,bottleFeedingType,comment,createdAt,pauses

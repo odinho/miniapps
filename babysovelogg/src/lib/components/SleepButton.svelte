@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { SleepLogRow, Baby } from '$lib/types.js';
+	import { tick } from 'svelte';
 	import { sync } from '$lib/stores/sync.svelte.js';
 	import {
 		buildStartSleep,
@@ -31,9 +32,11 @@
 		busy = true;
 		try {
 			if (isSleeping && activeSleep) {
+				const domainId = activeSleep.domain_id;
 				const result = buildEndSleep(activeSleep, baby.id);
 				await sync.sendEvents(result.events);
-				onSleepEnded?.(activeSleep.domain_id, result.sleepSnapshot, result.endTime);
+				await tick();
+				onSleepEnded?.(domainId, result.sleepSnapshot, result.endTime);
 			} else {
 				const result = buildStartSleep(
 					baby.id,
@@ -42,6 +45,7 @@
 					baby.custom_nap_count,
 				);
 				await sync.sendEvents(result.events);
+				await tick();
 				onSleepStarted?.(result.sleepDomainId, result.startTime);
 			}
 		} finally {

@@ -4,17 +4,17 @@ Mark things off in the list as you do them!
 
 **Current status (2026-03-27):**
 - Unit tests: 405 pass (17 files) — run with `bunx vitest run tests/unit/`
-- Integration tests: 51 pass (9 files) — run with `bunx vitest run tests/integration/`
-- E2E tests: 86 of 112 pass — run with `npx playwright test`
+- Integration tests: 72 pass (10 files) — run with `bunx vitest run tests/integration/`
+- E2E tests: 112 pass (all) — run with `npx playwright test`
 - Build: succeeds (`bun run build`)
-- Typecheck: 10 errors (`bun run typecheck`)
-- Lint: 13 errors (`bun run lint`)
+- Typecheck: 0 errors (`bun run typecheck`)
+- Lint: 0 errors (`bun run lint`)
 
 **Remaining work:**
-1. Fix typecheck errors (WakeUpPayload types, E2E `../types` imports)
-2. Fix lint errors (unused imports, prefer-addEventListener)
-3. Fix 26 failing E2E tests (see failure categories below)
-4. Port CLI (`cli/baby.ts` + `tests/integration/cli.test.ts`) from main branch
+1. ~~Fix typecheck errors~~ — DONE (0 errors)
+2. ~~Fix lint errors~~ — DONE (0 errors)
+3. ~~Fix 26 failing E2E tests~~ — DONE (all 112 pass)
+4. ~~Port CLI~~ — DONE (`cli/baby.ts` + `tests/integration/cli.test.ts`, 21 tests passing)
 5. Phase 6: Manual testing, UX review, adversarial branch review
 
 Everything should work as it does on `main` branch, the CLI should be implemented and work. All
@@ -88,35 +88,33 @@ The vanilla TypeScript UI (~5000+ lines of manual DOM manipulation) hasn't scale
 
 ### Phase 5: Tests + Cutover — MOSTLY DONE
 
-- [x] Port Playwright E2E tests (112 tests across 20 files, 86 passing)
-- [x] Port integration tests to SvelteKit API (51 tests across 9 files)
+- [x] Port Playwright E2E tests (112 tests across 20 files, all passing)
+- [x] Port integration tests to SvelteKit API (72 tests across 10 files, all passing)
 - [x] Verify unit tests pass (405 tests across 17 files)
 - [ ] Mobile viewport testing
 - [x] Remove old files (already done on this branch)
-- [ ] CLI needs to continue to work — **MISSING**: `cli/baby.ts` and `tests/integration/cli.test.ts`
-  exist on `main` but were not ported to `sveltekit` branch
+- [x] CLI ported — `cli/baby.ts` and `tests/integration/cli.test.ts` (21 tests passing)
 
 ### Phase 6: Manual testing
-- [ ] Fix *all* tests and checks (26 E2E failures, 10 typecheck errors, 13 lint errors)
+- [x] Fix *all* tests and checks (0 E2E failures, 0 typecheck errors, 0 lint errors)
 - [ ] Do the three manual tests
 - [ ] Check for UX issues and fix them while having done the manual testing
 - [ ] Do a proper review of the entire branch
 
-### E2E Failure Categories (26 tests)
+### E2E Failure Categories — ALL FIXED
 
-| Category | Count | Tests |
-|----------|-------|-------|
-| Theme switching | 3 | theme.e2e.ts — CSS vars, data-theme, stars pseudo-elements |
-| Undo toast | 2 | dashboard.e2e.ts:174, :192 — not implemented |
-| Onboarding | 2 | onboarding.e2e.ts — Get Started button, validation |
-| SSE/multi-client | 4 | sse.e2e.ts (2), multi-client.e2e.ts (2) |
-| Wake-up/morning prompt | 2 | wakeup.e2e.ts:13, :65 |
-| Tags/wake-up sheet | 5 | tags.e2e.ts:98, :117, :146, :175, :193 |
-| Arc bubble | 2 | arc.e2e.ts:82 (click-to-edit), :151 (offline survive) |
-| Diaper potty | 2 | diaper.e2e.ts:93, :119 — potty edit modal |
-| Dashboard redirect | 1 | dashboard.e2e.ts:169 — no baby → settings |
-| Bugs regressions | 2 | bugs.e2e.ts:46 (bedtime), :136 (morning button) |
-| Settings sync badge | 1 | settings.e2e.ts:35 |
+All 26 previously failing tests now pass. Key fixes:
+- **Theme**: Added explicit `[data-theme="day"]` CSS selector, waited for dashboard before theme assertions
+- **Undo toast**: Implemented undo toast with `sleep.deleted` / `sleep.restarted` events
+- **Onboarding**: Auto-redirect from `/` to `/settings` when no baby exists
+- **SSE/multi-client**: Added initial SSE comment to flush headers and trigger `open` event
+- **Morning prompt**: Fixed heading to `<h2>`, icon to 🌅, added "Hopp over" skip button
+- **Tags/wake-up**: Fixed Svelte 5 reactive prop timing in SleepButton (capture domain_id before await)
+- **Arc bubble**: Added `onSleepClick` handler, fixed `structuredClone` failing on Svelte 5 `$state` proxies
+- **Diaper potty**: Added `data-potty` attributes to EditDiaperModal result pills
+- **Morning button**: Added `☀️ Morgon` button visible at 4-5 AM
+- **Sync badge**: Initial SSE flush fixed connection timing
+- **Night glow**: Added box-shadow to `.arc-action-btn.diaper` in night theme
 
 ## Key Files for New Agents
 

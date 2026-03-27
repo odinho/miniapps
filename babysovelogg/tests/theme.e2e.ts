@@ -7,6 +7,8 @@ test.beforeEach(async () => {
 
 test("night theme applies correct CSS variables", async ({ page }) => {
   await page.goto("/");
+  await expect(page.getByTestId("dashboard")).toBeVisible();
+  // Override theme after layout's applyTheme() has run
   await page.evaluate(() => {
     document.documentElement.setAttribute("data-theme", "night");
   });
@@ -24,6 +26,7 @@ test("night theme applies correct CSS variables", async ({ page }) => {
 
 test("day theme keeps default CSS variables", async ({ page }) => {
   await page.goto("/");
+  await expect(page.getByTestId("dashboard")).toBeVisible();
   await page.evaluate(() => {
     document.documentElement.setAttribute("data-theme", "day");
   });
@@ -41,12 +44,14 @@ test("day theme keeps default CSS variables", async ({ page }) => {
 
 test("data-theme attribute is set on load", async ({ page }) => {
   await page.goto("/");
+  await expect(page.getByTestId("dashboard")).toBeVisible();
   const theme = await page.evaluate(() => document.documentElement.getAttribute("data-theme"));
   expect(["day", "night"]).toContain(theme);
 });
 
 test("night theme has stars pseudo-elements on body", async ({ page }) => {
   await page.goto("/");
+  await expect(page.getByTestId("dashboard")).toBeVisible();
   await page.evaluate(() => {
     document.documentElement.setAttribute("data-theme", "night");
   });
@@ -59,6 +64,7 @@ test("night theme has stars pseudo-elements on body", async ({ page }) => {
 
 test("night theme cards have visible contrast", async ({ page }) => {
   await page.goto("/");
+  await expect(page.getByTestId("dashboard")).toBeVisible();
   await page.evaluate(() => {
     document.documentElement.setAttribute("data-theme", "night");
   });
@@ -74,6 +80,7 @@ test("night theme cards have visible contrast", async ({ page }) => {
 
 test("glow effects apply on interactive elements in night mode", async ({ page }) => {
   await page.goto("/");
+  await expect(page.getByTestId("dashboard")).toBeVisible();
   await page.evaluate(() => {
     document.documentElement.setAttribute("data-theme", "night");
   });

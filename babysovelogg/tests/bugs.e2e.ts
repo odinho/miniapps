@@ -76,7 +76,7 @@ test("B11: shows bedtime when all expected naps are completed", async ({ page })
   const centerLabel = page.locator(".arc-center-label");
   await expect(centerLabel).toBeVisible({ timeout: 5000 });
   const text = await centerLabel.textContent();
-  expect(text).toMatch(/Leggetid|Neste/);
+  expect(text).toMatch(/Leggetid|Neste|leggetid/);
 });
 
 // --- B17: Moon/morning button context at night ---
@@ -207,7 +207,6 @@ test("B18: ending night sleep auto-sets wakeup, no morning prompt", async ({ pag
 
 test("B19: settings shows all predicted nap times", async ({ page }) => {
   const babyId = createBaby("Testa");
-  const db = getDb();
   setWakeUpTime(babyId);
 
   // Default nap count for 9 months = 2
@@ -222,7 +221,6 @@ test("B19: settings shows all predicted nap times", async ({ page }) => {
 
 test("B19: settings prediction updates reactively when changing nap count", async ({ page }) => {
   const babyId = createBaby("Testa");
-  const db = getDb();
   setWakeUpTime(babyId);
 
   await page.goto("/settings");

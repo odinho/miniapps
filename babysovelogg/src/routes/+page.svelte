@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { SleepLogRow, DiaperLogRow } from '$lib/types.js';
+	import { goto } from '$app/navigation';
 	import { appState } from '$lib/stores/app.svelte.js';
 	import { sync } from '$lib/stores/sync.svelte.js';
 	import Arc from '$lib/components/Arc.svelte';
@@ -8,6 +9,7 @@
 	import TagSheet from '$lib/components/TagSheet.svelte';
 	import DiaperForm from '$lib/components/DiaperForm.svelte';
 	import WakeUpSheet from '$lib/components/WakeUpSheet.svelte';
+	import EditSleepModal from '$lib/components/EditSleepModal.svelte';
 	import { formatDuration } from '$lib/utils.js';
 	import { calcPauseMs } from '$lib/engine/classification.js';
 
@@ -22,6 +24,26 @@
 
 	let showDiaperForm = $state(false);
 	let diaperFromTagSheet = $state(false);
+
+	let editingSleep = $state<SleepLogRow | null>(null);
+
+	// --- undo toast ---
+	let undoToast = $state<{ message: string; undoEvents: Array<{ type: string; payload: Record<string, unknown> }> } | null>(null);
+	let undoTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function showUndoToast(message: string, undoEvents: Array<{ type: string; payload: Record<string, unknown> }>) {
+		if (undoTimer) clearTimeout(undoTimer);
+		undoToast = { message, undoEvents };
+		undoTimer = setTimeout(() => { undoToast = null; }, 5000);
+	}
+
+	async function handleUndo() {
+		if (!undoToast) return;
+		const events = undoToast.undoEvents;
+		undoToast = null;
+		if (undoTimer) clearTimeout(undoTimer);
+		await sync.sendEvents(events);
+	}
 
 	// --- derived state from store ---
 	const s = $derived(appState.state);
@@ -40,12 +62,26 @@
 		return h < 6 || h >= 18;
 	});
 
+	// Morning button visible at 4-5 AM (late night / early morning)
+	const showMorningButton = $derived(() => {
+		if (!baby || activeSleep) return false;
+		const h = new Date().getHours();
+		return h >= 4 && h < 6;
+	});
+
+	// Redirect to settings when no baby exists
+	$effect(() => {
+		if (loaded && !baby) {
+			goto('/settings');
+		}
+	});
+
 	// Adapt types for Arc.svelte which expects narrower types than AppState provides
 	const arcSleeps = $derived(
-		todaySleeps.map((s) => ({
-			start_time: s.start_time,
-			end_time: s.end_time,
-			type: s.type as 'nap' | 'night',
+		todaySleeps.map((sl) => ({
+			start_time: sl.start_time,
+			end_time: sl.end_time,
+			type: sl.type as 'nap' | 'night',
 		})),
 	);
 	const arcActiveSleep = $derived(
@@ -117,12 +153,20 @@
 		tagSheetSleepId = sleepDomainId;
 		tagSheetStartTime = startTime;
 		showTagSheet = true;
+		showUndoToast('Søvn starta', [{
+			type: 'sleep.deleted',
+			payload: { sleepDomainId },
+		}]);
 	}
 
 	function onSleepEnded(domainId: string, sleepSnapshot: SleepLogRow) {
 		wakeUpSleepId = domainId;
 		wakeUpSnapshot = sleepSnapshot;
 		showWakeUpSheet = true;
+		showUndoToast('Søvn avslutta', [{
+			type: 'sleep.restarted',
+			payload: { sleepDomainId: domainId },
+		}]);
 	}
 
 	function onTagSheetClose() {
@@ -147,6 +191,17 @@
 	function openDiaper() {
 		diaperFromTagSheet = false;
 		showDiaperForm = true;
+	}
+
+	function onArcBubbleClick(sleepIndex: number) {
+		const sleep = todaySleeps[sleepIndex];
+		if (sleep) {
+			editingSleep = sleep;
+		}
+	}
+
+	function onEditSleepClose() {
+		editingSleep = null;
 	}
 
 	// --- Morning prompt ---
@@ -176,13 +231,34 @@
 			const event = {
 				type: 'day.started',
 				payload: { babyId: baby.id, date: morningDate, wakeTime },
-				clientId: crypto.randomUUID(),
-				clientEventId: crypto.randomUUID(),
 			};
 			await sync.sendEvents([event]);
 		} finally {
 			morningBusy = false;
 		}
+	}
+
+	async function skipMorningWakeTime() {
+		if (morningBusy || !baby) return;
+		morningBusy = true;
+		try {
+			const today = new Date();
+			today.setHours(6, 0, 0, 0);
+			const dateStr = today.toISOString().split('T')[0];
+			const event = {
+				type: 'day.started',
+				payload: { babyId: baby.id, date: dateStr, wakeTime: today.toISOString() },
+			};
+			await sync.sendEvents([event]);
+		} finally {
+			morningBusy = false;
+		}
+	}
+
+	function triggerMorning() {
+		// Force the morning prompt to show by scrolling to top
+		// The morning button acts as a shortcut for the morning workflow
+		window.scrollTo({ top: 0, behavior: 'smooth' });
 	}
 </script>
 
@@ -192,21 +268,27 @@
 	</div>
 {:else if !baby}
 	<div class="dashboard">
-		<p style="color: var(--text-light); margin-top: 4rem;">Ingen baby funnen. <a href="/settings">Innstillingar</a></p>
+		<p style="color: var(--text-light); margin-top: 4rem;">Lastar...</p>
 	</div>
 {:else}
 	<div class="dashboard" data-testid="dashboard">
 		{#if needsMorningPrompt()}
 			<div class="morning-prompt" data-testid="morning-prompt">
-				<div class="morning-icon" data-testid="morning-icon">☀️</div>
-				<p>God morgon! Når vakna {baby.name}?</p>
+				<div class="morning-icon" data-testid="morning-icon">🌅</div>
+				<h2>God morgon!</h2>
+				<p>Når vakna {baby.name}?</p>
 				<div style="display: flex; gap: 8px; margin: 8px 0;">
 					<input type="date" bind:value={morningDate} />
 					<input type="time" bind:value={morningTime} />
 				</div>
-				<button class="btn btn-primary" onclick={setMorningWakeTime} disabled={morningBusy}>
-					Sett vaknetid
-				</button>
+				<div style="display: flex; gap: 8px;">
+					<button class="btn btn-primary" onclick={setMorningWakeTime} disabled={morningBusy}>
+						Sett vaknetid
+					</button>
+					<button class="btn btn-ghost" onclick={skipMorningWakeTime} disabled={morningBusy}>
+						Hopp over
+					</button>
+				</div>
 			</div>
 		{/if}
 
@@ -214,7 +296,7 @@
 		<div class="header-row">
 			<div class="baby-info">
 				<span class="baby-name" data-testid="baby-name">{baby.name}</span>
-				<span class="baby-age" data-testid="baby-age">{ageMonths} md</span>
+				<span class="baby-age" data-testid="baby-age">{ageMonths} mnd</span>
 				{#if sync.pendingCount > 0}
 					<span class="sync-badge sync-badge-pending" data-testid="sync-badge">{sync.pendingCount} ventande</span>
 				{:else if sync.status === 'connected'}
@@ -243,6 +325,7 @@
 				prediction={arcPrediction}
 				isNightMode={isNightMode()}
 				wakeUpTime={todayWakeUp?.wake_time}
+				onSleepClick={onArcBubbleClick}
 			/>
 			<Timer
 				{activeSleep}
@@ -254,6 +337,11 @@
 
 		<!-- Action buttons -->
 		<div class="arc-actions">
+			{#if showMorningButton()}
+				<button class="arc-action-btn morning" onclick={triggerMorning}>
+					☀️ Morgon
+				</button>
+			{/if}
 			<button class="arc-action-btn diaper" onclick={openDiaper} data-testid="fab">
 				{pottyMode ? '🚽 Do' : '🧷 Bleie'}
 			</button>
@@ -311,5 +399,21 @@
 			{pottyMode}
 			onClose={onDiaperClose}
 		/>
+	{/if}
+
+	{#if editingSleep}
+		<EditSleepModal
+			entry={editingSleep}
+			onClose={onEditSleepClose}
+			onDeleted={onEditSleepClose}
+		/>
+	{/if}
+
+	<!-- Undo toast -->
+	{#if undoToast}
+		<div class="undo-toast">
+			<span>{undoToast.message}</span>
+			<button class="btn btn-ghost" onclick={handleUndo}>Angre</button>
+		</div>
 	{/if}
 {/if}

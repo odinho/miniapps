@@ -916,6 +916,7 @@ html, body {
 [data-theme="night"] .arc-action-btn.diaper {
   background: rgba(248, 213, 196, 0.2);
   color: var(--peach);
+  box-shadow: 0 0 12px rgba(248, 213, 196, 0.3);
 }
 [data-theme="night"] .arc-action-btn.night {
   box-shadow: 0 0 12px rgba(184, 169, 212, 0.3);
@@ -1164,4 +1165,28 @@ html, body {
 @keyframes toast-out {
   from { opacity: 1; }
   to { opacity: 0; }
+}
+
+/* --- Undo toast --- */
+.undo-toast {
+  position: fixed;
+  bottom: calc(80px + var(--safe-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text);
+  color: var(--cream);
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 900;
+  box-shadow: var(--shadow-lg);
+  animation: toast-in 0.3s ease;
+}
+
+.undo-toast .btn {
+  color: var(--sun);
+  font-weight: 600;
+  padding: 4px 8px;
 }

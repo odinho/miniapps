@@ -10,7 +10,6 @@ import {
 	getCachedState,
 	applyOptimisticEvent,
 	applyQueuedEvents,
-	type QueuedEvent,
 } from "$lib/offline-queue.js";
 
 export type ConnectionStatus = "disconnected" | "connecting" | "connected";
@@ -44,12 +43,12 @@ function createSync() {
 		const es = new EventSource("/api/stream");
 		eventSource = es;
 
-		es.onopen = () => {
+		es.addEventListener("open", () => {
 			status = "connected";
 			reconnectDelay = 1000;
 			// B13: On reconnect, flush any queued offline events
 			flushQueue();
-		};
+		});
 
 		es.addEventListener("update", (e: MessageEvent) => {
 			try {
@@ -66,10 +65,10 @@ function createSync() {
 			}
 		});
 
-		es.onerror = () => {
+		es.addEventListener("error", () => {
 			cleanup();
 			scheduleReconnect();
-		};
+		});
 	}
 
 	function cleanup() {

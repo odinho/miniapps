@@ -65,16 +65,18 @@ test("GET /api/events with pagination returns correct total", async () => {
   const babyId = createBaby("Testa");
 
   // Create a few events
-  for (let i = 0; i < 5; i++) {
-    await postEvents([
-      makeEvent("diaper.logged", {
-        babyId,
-        time: new Date().toISOString(),
-        type: "wet",
-        diaperDomainId: generateDiaperId(),
-      }),
-    ]);
-  }
+  await Promise.all(
+    Array.from({ length: 5 }, () =>
+      postEvents([
+        makeEvent("diaper.logged", {
+          babyId,
+          time: new Date().toISOString(),
+          type: "wet",
+          diaperDomainId: generateDiaperId(),
+        }),
+      ]),
+    ),
+  );
 
   const res = await get("/api/events?limit=2&offset=0");
   const data = await res.json();

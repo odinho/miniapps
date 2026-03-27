@@ -80,7 +80,7 @@ export function applyOptimisticEvent(
 	type: string,
 	payload: Record<string, unknown>,
 ): AppState {
-	const s = structuredClone(state);
+	const s: AppState = JSON.parse(JSON.stringify(state));
 
 	switch (type) {
 		case "sleep.started": {

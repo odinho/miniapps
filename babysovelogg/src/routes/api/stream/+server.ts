@@ -10,6 +10,8 @@ export const GET: RequestHandler = () => {
     start(ctrl) {
       controller = ctrl;
       addClient(controller);
+      // Send initial comment to flush headers and trigger EventSource 'open' event
+      controller.enqueue(encoder.encode(":\n\n"));
       heartbeatTimer = setInterval(() => {
         try {
           controller.enqueue(encoder.encode(":\n\n"));

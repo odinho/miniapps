@@ -80,6 +80,9 @@ const payloadSchemas: Record<string, v.BaseSchema<unknown, unknown, v.BaseIssue<
   "sleep.deleted": v.object({
     sleepDomainId: domainId,
   }),
+  "sleep.restarted": v.object({
+    sleepDomainId: domainId,
+  }),
   "sleep.tagged": v.object({
     sleepDomainId: domainId,
     mood: optStr,
