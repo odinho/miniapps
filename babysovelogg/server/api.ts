@@ -106,9 +106,27 @@ function getState() {
     )
     .all(baby.id, todayStart.toISOString()) as SleepLogRow[];
 
-  const todayWakeUp = db
+  let todayWakeUp = db
     .prepare("SELECT * FROM day_start WHERE baby_id = ? AND date = ?")
     .get(baby.id, todayDateStr) as DayStartRow | undefined;
+
+  // Derive wakeup from overnight night sleep if no explicit day.started exists.
+  // Ending a night sleep IS the morning — no separate wakeup event needed.
+  if (!todayWakeUp) {
+    const overnightSleep = db
+      .prepare(
+        "SELECT end_time FROM sleep_log WHERE baby_id = ? AND type = 'night' AND start_time < ? AND end_time >= ? AND deleted = 0 ORDER BY end_time DESC LIMIT 1",
+      )
+      .get(baby.id, todayStart.toISOString(), todayStart.toISOString()) as { end_time: string } | undefined;
+    if (overnightSleep) {
+      todayWakeUp = {
+        baby_id: baby.id,
+        date: todayDateStr,
+        wake_time: overnightSleep.end_time,
+        created_by_event_id: null,
+      } as DayStartRow;
+    }
+  }
 
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
   const recentSleeps = db

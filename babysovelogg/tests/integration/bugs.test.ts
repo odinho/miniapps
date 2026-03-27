@@ -113,6 +113,56 @@ test("B15: sleep.updated with type + times preserves the entry", async () => {
   expect(after).toContain("08:30–10:00 natt");
 });
 
+// --- Wakeup derivation: night sleep end_time IS the morning ---
+
+test("Wakeup derived from overnight night sleep — no day.started needed", async () => {
+  const babyId = createBaby("Testa");
+  const did = generateSleepId();
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const nightStart = `${yesterday}T18:30:00.000Z`;
+  const nightEnd = `${today}T06:00:00.000Z`;
+
+  await postEvents([
+    makeEvent("sleep.started", { babyId, startTime: nightStart, type: "night", sleepDomainId: did }),
+  ]);
+  await postEvents([
+    makeEvent("sleep.ended", { sleepDomainId: did, endTime: nightEnd }),
+  ]);
+
+  // DB has no day_start row — wakeup is purely derived
+  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
+    "baby: Testa (2025-06-12)
+    søvn: 18:30–06:00 natt
+    bleier: (ingen)"
+  `);
+
+  // API should still derive todayWakeUp from the night sleep end
+  const state = await (await get("/api/state")).json();
+  expect(state.todayWakeUp).toBeTruthy();
+  expect(state.todayWakeUp.wake_time).toBe(nightEnd);
+});
+
+test("Explicit day.started takes precedence over derived wakeup", async () => {
+  const babyId = createBaby("Testa");
+  const did = generateSleepId();
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+  await postEvents([
+    makeEvent("sleep.started", { babyId, startTime: `${yesterday}T18:30:00.000Z`, type: "night", sleepDomainId: did }),
+  ]);
+  await postEvents([
+    makeEvent("sleep.ended", { sleepDomainId: did, endTime: `${today}T05:50:00.000Z` }),
+  ]);
+  await postEvents([
+    makeEvent("day.started", { babyId, wakeTime: `${today}T06:10:00.000Z` }),
+  ]);
+
+  const state = await (await get("/api/state")).json();
+  expect(state.todayWakeUp.wake_time).toBe(`${today}T06:10:00.000Z`);
+});
+
 // --- B5+B6: Diaper note and type visibility in API ---
 
 test("B5: diaper with dirty type preserves type in response", async () => {
