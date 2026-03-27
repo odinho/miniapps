@@ -1,10 +1,89 @@
-import { createServer, type Server } from "http";
+import { createServer, type Server, type IncomingMessage, type ServerResponse } from "http";
 import { beforeAll, afterAll, beforeEach } from "vitest";
-import { initDb, db as _db, closeDb } from "../../server/db.js";
-import { handleRequest } from "../../server/api.js";
+import { db, initDb, closeDb } from "$lib/server/db.js";
 
-// Re-export the live db binding for direct use in tests
-export { db } from "../../server/db.js";
+// Import SvelteKit route handlers
+import { GET as eventsGET, POST as eventsPOST } from "../../src/routes/api/events/+server.js";
+import { GET as stateGET } from "../../src/routes/api/state/+server.js";
+import { GET as sleepsGET } from "../../src/routes/api/sleeps/+server.js";
+import { GET as diapersGET } from "../../src/routes/api/diapers/+server.js";
+import { GET as wakeupsGET } from "../../src/routes/api/wakeups/+server.js";
+import { GET as exportGET } from "../../src/routes/api/export/+server.js";
+import { POST as importNapperPOST } from "../../src/routes/api/import/napper/+server.js";
+import { POST as adminRebuildPOST } from "../../src/routes/api/admin/rebuild/+server.js";
+
+// Re-export db for direct use in tests
+export { db } from "$lib/server/db.js";
+
+// Route table mapping paths to handlers
+type Handler = (event: { request: Request; url: URL; params: Record<string, string> }) => Response | Promise<Response>;
+const routes: { pattern: string; GET?: Handler; POST?: Handler }[] = [
+  { pattern: "/api/events", GET: eventsGET as Handler, POST: eventsPOST as Handler },
+  { pattern: "/api/state", GET: stateGET as Handler },
+  { pattern: "/api/sleeps", GET: sleepsGET as Handler },
+  { pattern: "/api/diapers", GET: diapersGET as Handler },
+  { pattern: "/api/wakeups", GET: wakeupsGET as Handler },
+  { pattern: "/api/export", GET: exportGET as Handler },
+  { pattern: "/api/import/napper", POST: importNapperPOST as Handler },
+  { pattern: "/api/admin/rebuild", POST: adminRebuildPOST as Handler },
+];
+
+// Convert Node IncomingMessage → Web Request
+async function toWebRequest(req: IncomingMessage, baseUrl: string): Promise<Request> {
+  const url = new URL(req.url!, baseUrl);
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (value) headers.set(key, Array.isArray(value) ? value.join(", ") : value);
+  }
+
+  const init: RequestInit = { method: req.method, headers };
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) chunks.push(chunk as Buffer);
+    init.body = Buffer.concat(chunks).toString();
+  }
+
+  return new Request(url.toString(), init);
+}
+
+// Convert Web Response → Node ServerResponse
+async function sendWebResponse(webRes: Response, nodeRes: ServerResponse) {
+  nodeRes.statusCode = webRes.status;
+  webRes.headers.forEach((value, key) => nodeRes.setHeader(key, value));
+  const body = await webRes.arrayBuffer();
+  nodeRes.end(Buffer.from(body));
+}
+
+// Mini-router
+async function handleRequest(req: IncomingMessage, res: ServerResponse) {
+  const baseUrl = "http://localhost";
+  const url = new URL(req.url!, baseUrl);
+  const pathname = url.pathname;
+
+  const route = routes.find((r) => pathname === r.pattern);
+  if (!route) {
+    res.statusCode = 404;
+    res.end(JSON.stringify({ error: `Not found: ${pathname}` }));
+    return;
+  }
+
+  const method = req.method as "GET" | "POST";
+  const handler = route[method];
+  if (!handler) {
+    res.statusCode = 405;
+    res.end(JSON.stringify({ error: "Method not allowed" }));
+    return;
+  }
+
+  try {
+    const webReq = await toWebRequest(req, baseUrl);
+    const webRes = await handler({ request: webReq, url, params: {} });
+    await sendWebResponse(webRes, res);
+  } catch (err) {
+    res.statusCode = 500;
+    res.end(JSON.stringify({ error: String(err) }));
+  }
+}
 
 let server: Server;
 let baseUrl: string;
@@ -27,14 +106,14 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
-  _db.prepare("DELETE FROM sleep_pauses").run();
-  _db.prepare("DELETE FROM diaper_log").run();
-  _db.prepare("DELETE FROM sleep_log").run();
-  _db.prepare("DELETE FROM day_start").run();
-  _db.prepare("DELETE FROM baby").run();
-  _db.prepare("DELETE FROM events").run();
+  db.prepare("DELETE FROM sleep_pauses").run();
+  db.prepare("DELETE FROM diaper_log").run();
+  db.prepare("DELETE FROM sleep_log").run();
+  db.prepare("DELETE FROM day_start").run();
+  db.prepare("DELETE FROM baby").run();
+  db.prepare("DELETE FROM events").run();
   try {
-    _db.prepare("DELETE FROM sqlite_sequence").run();
+    db.prepare("DELETE FROM sqlite_sequence").run();
   } catch {}
 });
 
@@ -87,12 +166,10 @@ export function generateDiaperId(): string {
 // --- Seed helpers (use shared in-memory db directly) ---
 
 export function createBaby(name = "Testa", birthdate = "2025-06-12"): number {
-  _db
-    .prepare(
-      "INSERT INTO events (type, payload, client_id, client_event_id) VALUES ('baby.created', ?, ?, ?)",
-    )
-    .run(JSON.stringify({ name, birthdate }), generateId(), generateId());
-  const info = _db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run(name, birthdate);
+  db.prepare(
+    "INSERT INTO events (type, payload, client_id, client_event_id) VALUES ('baby.created', ?, ?, ?)",
+  ).run(JSON.stringify({ name, birthdate }), generateId(), generateId());
+  const info = db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run(name, birthdate);
   return Number(info.lastInsertRowid);
 }
 
@@ -100,16 +177,20 @@ export function setWakeUpTime(babyId: number, wakeTime?: Date) {
   const wake = wakeTime || new Date();
   wake.setHours(7, 0, 0, 0);
   const dateStr = wake.toISOString().split("T")[0];
-  _db
-    .prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)")
-    .run(babyId, dateStr, wake.toISOString());
+  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
+    babyId,
+    dateStr,
+    wake.toISOString(),
+  );
 }
 
 /** Timezone-safe version that takes explicit ISO strings for deterministic snapshots. */
 export function setWakeUpTimeUTC(babyId: number, date: string, wakeTimeISO: string) {
-  _db
-    .prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)")
-    .run(babyId, date, wakeTimeISO);
+  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
+    babyId,
+    date,
+    wakeTimeISO,
+  );
 }
 
 export function addCompletedSleep(
@@ -120,11 +201,9 @@ export function addCompletedSleep(
   domainId?: string,
 ) {
   const did = domainId || generateSleepId();
-  _db
-    .prepare(
-      "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, ?, ?)",
-    )
-    .run(babyId, startTime, endTime, type, did);
+  db.prepare(
+    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, ?, ?)",
+  ).run(babyId, startTime, endTime, type, did);
   return did;
 }
 
@@ -136,11 +215,9 @@ export function addDiaper(
   domainId?: string,
 ) {
   const did = domainId || generateDiaperId();
-  _db
-    .prepare(
-      "INSERT INTO diaper_log (baby_id, time, type, amount, domain_id) VALUES (?, ?, ?, ?, ?)",
-    )
-    .run(babyId, time, type, amount, did);
+  db.prepare(
+    "INSERT INTO diaper_log (baby_id, time, type, amount, domain_id) VALUES (?, ?, ?, ?, ?)",
+  ).run(babyId, time, type, amount, did);
   return did;
 }
 

@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import type { SleepLogRow, DiaperLogRow, DayStartRow, Baby, SleepPauseRow } from "../../types.js";
+import type { SleepLogRow, DiaperLogRow, DayStartRow, Baby, SleepPauseRow } from "$lib/types.js";
 
 /** Render a compact, readable summary of a baby's current day state from the DB. */
 export function renderDayState(db: Database.Database, babyId: number): string {
