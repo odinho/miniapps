@@ -1,19 +1,19 @@
 import type { DiaperLogRow } from '$lib/types.js';
 
 /** Payload for a sleep.tagged event. */
-export interface TagPayload {
+export type TagPayload = {
 	sleepDomainId: string;
 	mood: string | null;
 	method: string | null;
 	fallAsleepTime: string | null;
 	notes: string | null;
-}
+};
 
 /** Payload for a sleep.updated event (start time adjustment). */
-export interface TimeAdjustPayload {
+export type TimeAdjustPayload = {
 	sleepDomainId: string;
 	startTime: string;
-}
+};
 
 /** Build a sleep.tagged event from tag sheet selections. Returns null if nothing was selected. */
 export function buildTagEvent(

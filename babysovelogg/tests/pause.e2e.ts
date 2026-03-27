@@ -7,7 +7,7 @@ import {
   dismissSheet,
   generateId,
 } from "./fixtures";
-import type { SleepPauseRow } from "../types";
+import type { SleepPauseRow } from "../src/lib/types";
 
 test("Pause button appears when sleeping", async ({ page }) => {
   const babyId = createBaby("Testa");

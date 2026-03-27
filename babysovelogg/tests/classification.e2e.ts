@@ -7,7 +7,7 @@ import {
   getDb,
   forceHour,
 } from "./fixtures";
-import type { SleepLogRow } from "../types";
+import type { SleepLogRow } from "../src/lib/types";
 
 test("After 20:00, sleep is classified as night", async ({ page }) => {
   await forceHour(page, 21);

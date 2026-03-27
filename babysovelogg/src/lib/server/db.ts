@@ -3,7 +3,7 @@ import path from "path";
 
 export let db: Database.Database;
 
-function initSchema(database: Database) {
+function initSchema(database: Database.Database) {
   database.exec(`
     CREATE TABLE IF NOT EXISTS events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

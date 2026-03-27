@@ -1,5 +1,5 @@
 import { test, expect, createBaby, setWakeUpTime, getDb, dismissSheet } from "./fixtures";
-import type { SleepLogRow } from "../types";
+import type { SleepLogRow } from "../src/lib/types";
 
 test("Tag sheet appears after starting sleep", async ({ page }) => {
   const babyId = createBaby("Testa");

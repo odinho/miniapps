@@ -8,11 +8,11 @@ export const WOKE_OPTIONS = [
 ] as const;
 
 /** Payload for a wake-up sleep.updated event. */
-export interface WakeUpPayload {
+export type WakeUpPayload = {
 	sleepDomainId: string;
 	wokeBy?: string;
 	wakeNotes?: string;
-}
+};
 
 /** Build a sleep.updated event with wake-up data. Returns null if nothing was entered. */
 export function buildWakeUpEvent(

@@ -31,14 +31,14 @@ export const POTTY_DIAPER_STATUSES = [
 ] as const;
 
 /** Payload for a diaper.logged event. */
-export interface DiaperLoggedPayload {
+export type DiaperLoggedPayload = {
 	babyId: number;
 	time: string;
 	type: string;
 	diaperDomainId: string;
 	amount: string | null;
 	note: string | null;
-}
+};
 
 /** Check whether a potty result type hides the diaper status selector. */
 export function shouldHideDiaperStatus(pottyResult: string): boolean {

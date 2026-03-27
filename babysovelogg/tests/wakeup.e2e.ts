@@ -8,7 +8,7 @@ import {
   forceHour,
   generateId,
 } from "./fixtures";
-import type { Baby, DayStartRow } from "../types";
+import type { Baby, DayStartRow } from "../src/lib/types";
 
 test("Shows morning prompt when no wake-up time and no sleeps", async ({ page }) => {
   await forceMorning(page);
