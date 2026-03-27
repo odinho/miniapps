@@ -74,6 +74,11 @@ The vanilla TypeScript UI (~5000+ lines of manual DOM manipulation) hasn't scale
 - [ ] Mobile viewport testing
 - [ ] Remove old files (already done on this branch)
 
+### Phase 6: Manual testing
+- [ ] Do the three manual tests
+- [ ] Check for UX issues and fix them while having done the manual testing
+- [ ] Do a proper review of the entire branch
+
 ## What Changed vs What Stayed
 
 ### Stays (copied/adapted)
@@ -124,6 +129,16 @@ The vanilla TypeScript UI (~5000+ lines of manual DOM manipulation) hasn't scale
 3. ~~Production build succeeds~~ — **client 70KB, server 350KB**
 4. Port integration tests to new API shape
 5. Port Playwright E2E tests to new UI
-6. Manual test: start sleep → end sleep → check history → check stats
-7. Manual test: go offline → start sleep → reconnect → verify sync
-8. Manual test: open on phone, check PWA install, check responsive layout
+6. "Manual" test (use chrome-devtools mcp): start sleep → end sleep → check history → check stats
+7. "Manual" test (use chrome-devtools mcp): go offline → start sleep → reconnect → verify sync
+8. "Manual" test (use chrome-devtools mcp): open on phone, check PWA install, check responsive layout
+9. Adversarial review of the entire branch, find issues, find architectural things that can be
+   improved, especially make sure the tests are great and cover what we need.
+10. Go through UX and make sure it all makes good sense and feels like a really solid app, which is
+    understandable to the wife.
+
+--
+
+Remember to update the file with any things the next agent should know. Or files it should read
+early etc. So that the next agent can be more effective and need less time looking around the code
+base.
