@@ -31,6 +31,34 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* --- Day theme (explicit) --- */
+[data-theme="day"] {
+  --lavender: #e8dff5;
+  --lavender-dark: #c4b5d9;
+  --peach: #f8d5c4;
+  --peach-dark: #e8a98a;
+  --cream: #fdf6f0;
+  --cream-dark: #f0e6d6;
+  --moon: #b8a9d4;
+  --moon-glow: #d4c8ef;
+  --sun: #f5c76e;
+  --sun-glow: #fae0a0;
+  --text: #4a3f5c;
+  --text-light: #8a7fa0;
+  --danger: #e88a8a;
+  --danger-dark: #d06060;
+  --success: #8acfa0;
+  --white: #ffffff;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --shadow: 0 2px 16px rgba(74, 63, 92, 0.08);
+  --shadow-md: 0 4px 20px rgba(74, 63, 92, 0.10);
+  --shadow-lg: 0 8px 32px rgba(74, 63, 92, 0.12);
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* --- Night theme --- */
 [data-theme="night"] {
   --cream: #1a1a2e;
