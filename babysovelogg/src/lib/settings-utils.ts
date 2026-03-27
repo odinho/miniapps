@@ -51,11 +51,16 @@ export function buildBabyEvent(
 	payload: SettingsPayload,
 	isNew: boolean,
 ): { type: string; payload: Record<string, unknown> } {
+	const tz = typeof Intl !== "undefined"
+		? Intl.DateTimeFormat().resolvedOptions().timeZone
+		: null;
 	const p: Record<string, unknown> = {
 		name: payload.name,
 		birthdate: payload.birthdate,
 	};
-	if (!isNew) {
+	if (isNew) {
+		p.timezone = tz;
+	} else {
 		p.customNapCount = payload.customNapCount ?? null;
 		p.pottyMode = payload.pottyMode ?? false;
 	}

@@ -7,6 +7,7 @@ export interface Baby {
   created_at: string;
   custom_nap_count: number | null;
   potty_mode: number;
+  timezone: string | null;
   created_by_event_id: number | null;
   updated_by_event_id: number | null;
 }

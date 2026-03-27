@@ -86,23 +86,36 @@ function createSync() {
 	async function flushQueue(): Promise<void> {
 		const queue = getQueue();
 		if (queue.length === 0) return;
+
+		let res: Response;
 		try {
-			const res = await fetch("/api/events", {
+			res = await fetch("/api/events", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ events: queue }),
 			});
-			if (!res.ok) throw new Error(`Flush failed: ${res.status}`);
+		} catch {
+			// Network failure — keep queue, retry on next reconnect
+			return;
+		}
+
+		if (!res.ok) {
+			// Server rejected the batch (4xx/5xx) — clear the poison-pill queue
+			const body = await res.json().catch(() => ({}));
+			const msg = (body as Record<string, unknown>).error || `Flush rejected: ${res.status}`;
 			clearQueue();
 			refreshPendingCount();
-			const data = await res.json();
-			if (data.state) {
-				const normalized = normalizeState(data.state);
-				cacheState(normalized);
-				appState.set(normalized);
-			}
-		} catch {
-			// Still offline or server error — keep queue, retry on next reconnect
+			appState.setError(String(msg));
+			return;
+		}
+
+		clearQueue();
+		refreshPendingCount();
+		const data = await res.json();
+		if (data.state) {
+			const normalized = normalizeState(data.state);
+			cacheState(normalized);
+			appState.set(normalized);
 		}
 	}
 

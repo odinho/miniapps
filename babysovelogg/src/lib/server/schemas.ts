@@ -41,12 +41,14 @@ const payloadSchemas: Record<string, v.BaseSchema<unknown, unknown, v.BaseIssue<
   "baby.created": v.object({
     name: v.string(),
     birthdate: v.string(),
+    timezone: optStr,
   }),
   "baby.updated": v.object({
     name: optStr,
     birthdate: optStr,
     customNapCount: optNum,
     pottyMode: v.nullish(v.boolean()),
+    timezone: optStr,
   }),
   "sleep.started": v.object({
     babyId: v.number(),

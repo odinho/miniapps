@@ -5,6 +5,7 @@
 
 import type { AppState } from "./stores/app.svelte.js";
 import type { SleepLogRow, DayStartRow } from "./types.js";
+import { isoToDateInTz } from "./tz.js";
 
 const QUEUE_KEY = "babysovelogg_event_queue";
 const STATE_CACHE_KEY = "babysovelogg_cached_state";
@@ -258,15 +259,12 @@ export function applyOptimisticEvent(
 		}
 
 		case "day.started": {
-			// Derive date from wakeTime, matching server behavior in projections.ts
-			const wakeDate = new Date(payload.wakeTime as string);
-			const year = wakeDate.getFullYear();
-			const month = String(wakeDate.getMonth() + 1).padStart(2, "0");
-			const day = String(wakeDate.getDate()).padStart(2, "0");
+			// Derive date in baby's timezone, matching server behavior in projections.ts
+			const tz = s.baby?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 			s.todayWakeUp = {
 				id: 0,
 				baby_id: (payload.babyId as number) || s.baby?.id || 0,
-				date: `${year}-${month}-${day}`,
+				date: isoToDateInTz(payload.wakeTime as string, tz),
 				wake_time: payload.wakeTime as string,
 				created_at: new Date().toISOString(),
 				created_by_event_id: null,

@@ -17,7 +17,7 @@ import type { SleepLogRow } from '$lib/types.js';
 
 function makeState(overrides: Partial<AppState> = {}): AppState {
 	return {
-		baby: { id: 1, name: 'Halldis', birthdate: '2025-06-01', created_at: '2025-06-01', custom_nap_count: null, potty_mode: 0, created_by_event_id: null, updated_by_event_id: null },
+		baby: { id: 1, name: 'Halldis', birthdate: '2025-06-01', created_at: '2025-06-01', custom_nap_count: null, potty_mode: 0, timezone: null, created_by_event_id: null, updated_by_event_id: null },
 		activeSleep: null,
 		todaySleeps: [],
 		stats: { napCount: 1, totalNapMinutes: 45, totalNightMinutes: 600, sleeps: [] },

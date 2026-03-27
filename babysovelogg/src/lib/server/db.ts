@@ -31,6 +31,7 @@ function initSchema(database: Database.Database) {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       custom_nap_count INTEGER,
       potty_mode INTEGER DEFAULT 0,
+      timezone TEXT,
       created_by_event_id INTEGER,
       updated_by_event_id INTEGER
     );
@@ -80,6 +81,13 @@ function initSchema(database: Database.Database) {
       created_by_event_id INTEGER
     );
   `);
+
+  // Migration: add timezone column to existing baby tables
+  try {
+    database.exec("ALTER TABLE baby ADD COLUMN timezone TEXT");
+  } catch {
+    // Column already exists — ignore
+  }
 
   database.exec(`
     CREATE TABLE IF NOT EXISTS day_start (

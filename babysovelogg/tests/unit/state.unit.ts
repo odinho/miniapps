@@ -9,6 +9,7 @@ const baseBaby: Baby = {
   created_at: "2026-01-01T00:00:00.000Z",
   custom_nap_count: null,
   potty_mode: 0,
+  timezone: null,
   created_by_event_id: null,
   updated_by_event_id: null,
 };

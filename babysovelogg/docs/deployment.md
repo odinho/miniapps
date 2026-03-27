@@ -85,6 +85,10 @@ SQLite file (`db.sqlite`) in the working directory. Uses DELETE journal mode —
 
 **Rebuild:** POST to `/api/admin/rebuild` to replay all events and rebuild materialized views. Useful after schema changes or data corruption.
 
+## Architecture Constraints
+
+**Single-process only.** SSE broadcast uses an in-memory client set (`broadcast.ts`). All connected clients must be in the same process. Do not run under clustering, PM2 multi-instance, or multiple containers. One process per family — if you need multiple families, run separate processes with separate databases.
+
 ## Environment Variables
 
 | Variable | Default | Description |

@@ -40,7 +40,8 @@ describe('buildBabyEvent', () => {
 	it('builds baby.created for new baby', () => {
 		const ev = buildBabyEvent({ name: 'Halldis', birthdate: '2025-06-15' }, true);
 		expect(ev.type).toBe('baby.created');
-		expect(ev.payload).toEqual({ name: 'Halldis', birthdate: '2025-06-15' });
+		expect(ev.payload).toMatchObject({ name: 'Halldis', birthdate: '2025-06-15' });
+		expect(ev.payload).toHaveProperty('timezone');
 		expect(ev.payload).not.toHaveProperty('customNapCount');
 		expect(ev.payload).not.toHaveProperty('pottyMode');
 	});

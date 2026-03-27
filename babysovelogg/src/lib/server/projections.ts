@@ -2,6 +2,7 @@ import { db } from "./db.js";
 import type { AppEvent } from "./events.js";
 import type { EventRow } from "$lib/types.js";
 import { validateEventPayload } from "./schemas.js";
+import { isoToDateInTz } from "$lib/tz.js";
 
 export function applyEvent(event: AppEvent): void {
   const { type, payload } = event;
@@ -10,8 +11,8 @@ export function applyEvent(event: AppEvent): void {
   switch (type) {
     case "baby.created":
       db.prepare(
-        `INSERT INTO baby (name, birthdate, created_at, created_by_event_id) VALUES (?, ?, datetime('now'), ?)`,
-      ).run(payload.name, payload.birthdate, eventId);
+        `INSERT INTO baby (name, birthdate, timezone, created_at, created_by_event_id) VALUES (?, ?, ?, datetime('now'), ?)`,
+      ).run(payload.name, payload.birthdate, payload.timezone ?? null, eventId);
       break;
 
     case "baby.updated": {
@@ -36,6 +37,10 @@ export function applyEvent(event: AppEvent): void {
       if (payload.pottyMode !== undefined) {
         sets.push("potty_mode = ?");
         vals.push(payload.pottyMode ? 1 : 0);
+      }
+      if (payload.timezone !== undefined) {
+        sets.push("timezone = ?");
+        vals.push(payload.timezone);
       }
       vals.push(baby.id);
       db.prepare(`UPDATE baby SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
@@ -258,12 +263,10 @@ export function applyEvent(event: AppEvent): void {
     }
 
     case "day.started": {
-      // Use local date (not UTC) to determine the day
-      const wakeDate = new Date(payload.wakeTime as string);
-      const year = wakeDate.getFullYear();
-      const month = String(wakeDate.getMonth() + 1).padStart(2, "0");
-      const day = String(wakeDate.getDate()).padStart(2, "0");
-      const dateStr = `${year}-${month}-${day}`;
+      // Derive date in the baby's timezone (falls back to UTC if no timezone set)
+      const baby = db.prepare("SELECT timezone FROM baby ORDER BY id DESC LIMIT 1").get() as { timezone: string | null } | undefined;
+      const tz = baby?.timezone || "UTC";
+      const dateStr = isoToDateInTz(payload.wakeTime as string, tz);
       db.prepare(
         "INSERT OR REPLACE INTO day_start (baby_id, date, wake_time, created_by_event_id) VALUES (?, ?, ?, ?)",
       ).run(payload.babyId, dateStr, payload.wakeTime, eventId);
