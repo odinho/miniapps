@@ -7,7 +7,7 @@ import {
   getDb,
   forceHour,
 } from "./fixtures";
-import type { SleepLogRow } from "../src/lib/types";
+import { renderDayState } from "./helpers/render-state";
 
 test("After 20:00, sleep is classified as night", async ({ page }) => {
   await forceHour(page, 21);
@@ -19,11 +19,7 @@ test("After 20:00, sleep is classified as night", async ({ page }) => {
   await page.getByTestId("sleep-button").click();
   await expect(page.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 5000 });
 
-  const db = getDb();
-  const sleep = db
-    .prepare("SELECT * FROM sleep_log WHERE baby_id = ? ORDER BY id DESC LIMIT 1")
-    .get(babyId) as SleepLogRow;
-  expect(sleep.type).toBe("night");
+  expect(renderDayState(getDb(), babyId)).toContain("natt");
 });
 
 test("Before 16:00, sleep is classified as nap", async ({ page }) => {
@@ -35,11 +31,7 @@ test("Before 16:00, sleep is classified as nap", async ({ page }) => {
   await page.getByTestId("sleep-button").click();
   await expect(page.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 5000 });
 
-  const db = getDb();
-  const sleep = db
-    .prepare("SELECT * FROM sleep_log WHERE baby_id = ? ORDER BY id DESC LIMIT 1")
-    .get(babyId) as SleepLogRow;
-  expect(sleep.type).toBe("nap");
+  expect(renderDayState(getDb(), babyId)).toContain("lur");
 });
 
 test("At 17:45 with nap quota met, sleep is classified as night", async ({ page }) => {
@@ -67,11 +59,7 @@ test("At 17:45 with nap quota met, sleep is classified as night", async ({ page 
   await page.getByTestId("sleep-button").click();
   await expect(page.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 5000 });
 
-  const db = getDb();
-  const sleep = db
-    .prepare("SELECT * FROM sleep_log WHERE baby_id = ? ORDER BY id DESC LIMIT 1")
-    .get(babyId) as SleepLogRow;
-  expect(sleep.type).toBe("night");
+  expect(renderDayState(getDb(), babyId)).toMatch(/søvn:.*natt$/m);
 });
 
 test("At 17:00 with nap quota NOT met, sleep is classified as nap", async ({ page }) => {
@@ -84,9 +72,5 @@ test("At 17:00 with nap quota NOT met, sleep is classified as nap", async ({ pag
   await page.getByTestId("sleep-button").click();
   await expect(page.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 5000 });
 
-  const db = getDb();
-  const sleep = db
-    .prepare("SELECT * FROM sleep_log WHERE baby_id = ? ORDER BY id DESC LIMIT 1")
-    .get(babyId) as SleepLogRow;
-  expect(sleep.type).toBe("nap");
+  expect(renderDayState(getDb(), babyId)).toMatch(/søvn:.*lur$/m);
 });

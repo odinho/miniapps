@@ -278,14 +278,8 @@ When adding new state (projections, tables, etc.), update `resetDb()` and the re
 
 ## What's still wrong
 
-**Assertions are still fragment piles.** Most E2E tests check individual fields:
+**Playwright lacks inline snapshots.** Vitest tests can use `renderDayState()` with `toMatchInlineSnapshot()` for full-state assertions. Playwright's `expect` doesn't support inline snapshots — only external file snapshots via `toMatchSnapshot()`.
 
-```ts
-// From tags.e2e.ts — 4 separate assertions, easy to forget a 5th
-const sleep = db.prepare("SELECT * FROM sleep_log ORDER BY id DESC LIMIT 1").get();
-expect(sleep.mood).toBe("happy");
-expect(sleep.method).toBe("nursing");
-expect(sleep.woke_by).toBe("self");
-```
+E2E tests now use `renderDayState()` with `toContain()`/`toMatch()` instead of raw SQL queries. This is better (renderer catches missing projections, failure messages show full state) but not as strong as inline snapshots.
 
-The `renderDayState()` renderer exists but is not yet widely used. New tests should adopt renderers with `toMatchInlineSnapshot()`; existing tests should be migrated opportunistically.
+**Remaining fragment-style E2E assertions:** `wakeup.e2e.ts` still uses raw DB queries for timezone-dependent time checks that the UTC-based renderer can't replace cleanly.

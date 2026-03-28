@@ -194,13 +194,11 @@ test("B18: ending night sleep auto-sets wakeup, no morning prompt", async ({ pag
   await expect(page.getByTestId("dashboard")).toBeVisible({ timeout: 5000 });
   await expect(page.getByTestId("morning-prompt")).not.toBeVisible();
 
-  // Verify a day_start was created for today
-  const today = new Date().toISOString().split("T")[0];
-  const wakeup = db.prepare("SELECT * FROM day_start WHERE baby_id = ? AND date = ?").get(
-    babyId,
-    today,
-  ) as { wake_time: string } | undefined;
-  expect(wakeup).toBeTruthy();
+  // Verify a day_start was created for today (yesterday's + today's = 2)
+  const { renderDayState } = await import("./helpers/render-state");
+  expect(renderDayState(db, babyId)).toContain("vekketid:");
+  const dayStarts = db.prepare("SELECT COUNT(*) as c FROM day_start WHERE baby_id = ?").get(babyId) as { c: number };
+  expect(dayStarts.c).toBe(2);
 });
 
 // --- B19: Settings prediction shows all naps and reacts to nap count change ---

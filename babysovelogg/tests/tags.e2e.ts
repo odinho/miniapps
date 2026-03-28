@@ -1,5 +1,5 @@
 import { test, expect, createBaby, setWakeUpTime, getDb, dismissSheet } from "./fixtures";
-import type { SleepLogRow } from "../src/lib/types";
+import { renderDayState } from "./helpers/render-state";
 
 test("Tag sheet appears after starting sleep", async ({ page }) => {
   const babyId = createBaby("Testa");
@@ -89,10 +89,9 @@ test("Can select fall-asleep bucket and enter note", async ({ page }) => {
   await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });
 
   // Verify in DB
-  const db = getDb();
-  const sleep = db.prepare("SELECT * FROM sleep_log ORDER BY id DESC LIMIT 1").get() as SleepLogRow;
-  expect(sleep.fall_asleep_time).toBe("5-15");
-  expect(sleep.notes).toBe("Sovna fort i dag");
+  const state = renderDayState(getDb(), babyId);
+  expect(state).toContain('innsov:5-15');
+  expect(state).toContain('"Sovna fort i dag"');
 });
 
 test("Wake-up sheet appears after ending sleep", async ({ page }) => {
@@ -137,10 +136,9 @@ test("Can save wake-up info with woke-by and note", async ({ page }) => {
   await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });
 
   // Verify in DB
-  const db = getDb();
-  const sleep = db.prepare("SELECT * FROM sleep_log ORDER BY id DESC LIMIT 1").get() as SleepLogRow;
-  expect(sleep.woke_by).toBe("self");
-  expect(sleep.wake_notes).toBe("Glad og uthvilt");
+  const state = renderDayState(getDb(), babyId);
+  expect(state).toContain("vekt:self");
+  expect(state).toContain('vaknenotat:"Glad og uthvilt"');
 });
 
 test("Wake-up sheet shows compact bedtime summary when tags were set", async ({ page }) => {
@@ -214,12 +212,9 @@ test("Bedtime tags are NOT overwritten by wake-up sheet", async ({ page }) => {
   await page.getByRole("button", { name: "Ferdig" }).click();
   await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });
 
-  // Verify bedtime tags still intact
-  const db = getDb();
-  const sleep = db.prepare("SELECT * FROM sleep_log ORDER BY id DESC LIMIT 1").get() as SleepLogRow;
-  expect(sleep.mood).toBe("normal");
-  expect(sleep.method).toBe("nursing");
-  expect(sleep.woke_by).toBe("woken");
+  // Verify bedtime tags still intact + wake-up info saved
+  const state = renderDayState(getDb(), babyId);
+  expect(state).toContain("normal nursing vekt:woken");
 });
 
 test("Dismissing tag sheet auto-saves entered data", async ({ page }) => {
@@ -241,8 +236,7 @@ test("Dismissing tag sheet auto-saves entered data", async ({ page }) => {
   await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });
 
   // Data should have been saved
-  const db = getDb();
-  const sleep = db.prepare("SELECT * FROM sleep_log ORDER BY id DESC LIMIT 1").get() as SleepLogRow;
-  expect(sleep.mood).toBe("normal");
-  expect(sleep.notes).toBe("Viktig notat");
+  const state = renderDayState(getDb(), babyId);
+  expect(state).toContain('normal');
+  expect(state).toContain('"Viktig notat"');
 });

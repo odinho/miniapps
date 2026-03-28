@@ -7,7 +7,7 @@ import {
   dismissSheet,
   generateId,
 } from "./fixtures";
-import type { SleepPauseRow } from "../src/lib/types";
+import { renderDayState } from "./helpers/render-state";
 
 test("Pause button appears when sleeping", async ({ page }) => {
   const babyId = createBaby("Testa");
@@ -93,11 +93,8 @@ test("Multiple pauses work correctly", async ({ page }) => {
   await page.getByTestId("pause-btn").click();
   await expect(page.getByTestId("pause-btn")).toContainText("Pause", { timeout: 5000 });
 
-  const db = getDb();
-  const pauses = db.prepare("SELECT * FROM sleep_pauses").all() as SleepPauseRow[];
-  expect(pauses.length).toBe(2);
-  expect(pauses[0].resume_time).toBeTruthy();
-  expect(pauses[1].resume_time).toBeTruthy();
+  const state = renderDayState(getDb(), babyId);
+  expect(state).toMatch(/2 pause/);
 });
 
 test("History shows pause info", async ({ page }) => {

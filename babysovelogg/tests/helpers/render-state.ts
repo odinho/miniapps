@@ -104,12 +104,17 @@ function renderSleep(s: SleepLogRow, pauses?: SleepPauseRow[]): string {
   }
   if (s.mood) parts.push(s.mood);
   if (s.method) parts.push(s.method);
+  if (s.fall_asleep_time) parts.push(`innsov:${s.fall_asleep_time}`);
+  if (s.woke_by) parts.push(`vekt:${s.woke_by}`);
+  if (s.notes) parts.push(`"${s.notes}"`);
+  if (s.wake_notes) parts.push(`vaknenotat:"${s.wake_notes}"`);
   return parts.join(" ");
 }
 
 function renderDiaper(d: DiaperLogRow): string {
   const parts = [fmtTime(d.time), d.type];
   if (d.amount) parts.push(d.amount);
+  if (d.note) parts.push(`"${d.note}"`);
   return parts.join(" ");
 }
 
