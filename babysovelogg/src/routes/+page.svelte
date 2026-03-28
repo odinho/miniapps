@@ -368,7 +368,7 @@
 
 		<!-- Header: baby info + sync badge -->
 		<div class="header-row">
-			<div class="baby-info">
+			<button class="baby-info" onclick={() => goto('/events')} style="cursor: pointer; background: none; border: none; padding: 0; text-align: left; font: inherit;">
 				<span class="baby-name" data-testid="baby-name">{baby.name}</span>
 				<span class="baby-age" data-testid="baby-age">{ageMonths} mnd</span>
 				{#if sync.pendingCount > 0}
@@ -380,7 +380,7 @@
 				{:else}
 					<span class="sync-badge sync-badge-offline" data-testid="sync-badge">offline</span>
 				{/if}
-			</div>
+			</button>
 			<SleepButton
 				{activeSleep}
 				{todaySleeps}

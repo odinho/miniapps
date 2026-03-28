@@ -163,6 +163,17 @@
 				if (durationMs > 10 * 60000) {
 					label = { x: labelPt.x, y: labelPt.y, text: formatDuration(durationMs), opacity: 1 };
 				}
+			} else if (bubble.status === 'active') {
+				// Show start time label once active sleep has been going for 3+ minutes
+				const elapsed = now.getTime() - bubble.startTime.getTime();
+				if (elapsed > 3 * 60000) {
+					label = {
+						x: labelPt.x,
+						y: labelPt.y,
+						text: formatTime(bubble.startTime),
+						opacity: 0.8,
+					};
+				}
 			} else if (bubble.status === 'predicted') {
 				label = {
 					x: labelPt.x,

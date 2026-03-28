@@ -2,16 +2,11 @@
 	import { goto } from '$app/navigation';
 	import { appState } from '$lib/stores/app.svelte.js';
 	import { sync } from '$lib/stores/sync.svelte.js';
-	import { calculateAgeMonths } from '$lib/engine/schedule.js';
 	import {
 		NAP_OPTIONS,
 		POTTY_OPTIONS,
 		buildBabyEvent,
 		validateSettings,
-		buildSleepInfoRows,
-		buildPredictionRows,
-		getNextSleepMilestone,
-		formatAge,
 	} from '$lib/settings-utils.js';
 
 	// --- derived state ---
@@ -38,31 +33,6 @@
 			pottyEnabled = baby.potty_mode === 1;
 		}
 	});
-
-	// --- computed ---
-	const ageMonths = $derived(baby ? calculateAgeMonths(baby.birthdate) : 0);
-	const sleepInfoRows = $derived(baby ? buildSleepInfoRows(ageMonths) : []);
-	const nextMilestone = $derived(baby ? getNextSleepMilestone(ageMonths) : null);
-
-	const predictionRows = $derived(
-		baby
-			? buildPredictionRows({
-					ageMonths,
-					napCount: selectedNapCount,
-					completedNaps:
-						s.todaySleeps.filter((sl) => sl.type === 'nap' && sl.end_time).length,
-					wakeTime: s.todayWakeUp?.wake_time ?? null,
-					recentSleeps: s.todaySleeps.map((sl) => ({
-						start_time: sl.start_time,
-						end_time: sl.end_time,
-						type: sl.type as 'nap' | 'night',
-					})),
-					serverPrediction: s.prediction,
-					totalSleepMinutes:
-						(s.stats?.totalNapMinutes ?? 0) + (s.stats?.totalNightMinutes ?? 0),
-				})
-			: [],
-	);
 
 	// --- import state ---
 	let importFile = $state<File | null>(null);
@@ -250,57 +220,13 @@
 				</div>
 			</div>
 
-			<!-- Sleep info panel -->
-			<div
-				style="margin-top: 32px; border-top: 1px solid var(--cream-dark); padding-top: 24px;"
-			>
-				<h2 style="font-size: 1.1rem; margin-bottom: 16px;">
-					Søvninfo for {formatAge(baby.birthdate)}
-				</h2>
-
-				<div class="sleep-info-panel">
-					{#each sleepInfoRows as row}
-						<div class="stats-trend-row">
-							<div class="stats-trend-label">{row.label}</div>
-							<div class="stats-trend-val">{row.value}</div>
-						</div>
-					{/each}
-
-					{#if nextMilestone}
-						<div
-							style="margin-top: 12px; padding: 12px; background: var(--lavender); border-radius: var(--radius-sm); font-size: 0.85rem;"
-						>
-							<div style="font-weight: 600; margin-bottom: 4px;">Kva som kjem</div>
-							<div style="color: var(--text-light);">{nextMilestone}</div>
-						</div>
-					{/if}
-				</div>
-
-				<!-- Reactive prediction panel -->
-				{#if predictionRows.length > 0}
-					<div
-						data-testid="pred-panel"
-						style="margin-top: 16px; padding: 12px; background: var(--lavender); border-radius: var(--radius-sm);"
-					>
-						<div style="font-weight: 600; margin-bottom: 8px; font-size: 0.9rem;">
-							Appen reknar med
-						</div>
-						{#each predictionRows as row}
-							<div class="stats-trend-row">
-								<div class="stats-trend-label">{row.label}</div>
-								<div class="stats-trend-val">{row.value}</div>
-							</div>
-						{/each}
-					</div>
-				{/if}
-			</div>
 		{/if}
 
 		<!-- App footer -->
 		<div
 			style="margin-top: 32px; text-align: center; color: var(--text-light); font-size: 0.75rem;"
 		>
-			<div>Babysovelogg v0.2</div>
+			<div>Babysovelogg v{__APP_VERSION__}</div>
 			<div style="margin-top: 4px;">Søvnsporing for den vesle</div>
 		</div>
 	</div>

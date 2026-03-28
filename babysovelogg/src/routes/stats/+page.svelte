@@ -6,6 +6,41 @@
 		computeAllStats,
 		type ComputedStats,
 	} from '$lib/stats-view-utils.js';
+	import { appState } from '$lib/stores/app.svelte.js';
+	import { calculateAgeMonths } from '$lib/engine/schedule.js';
+	import {
+		buildSleepInfoRows,
+		buildPredictionRows,
+		getNextSleepMilestone,
+		formatAge,
+	} from '$lib/settings-utils.js';
+
+	const s = $derived(appState.state);
+	const baby = $derived(s.baby);
+	const ageMonths = $derived(baby ? calculateAgeMonths(baby.birthdate) : 0);
+	const sleepInfoRows = $derived(baby ? buildSleepInfoRows(ageMonths) : []);
+	const nextMilestone = $derived(baby ? getNextSleepMilestone(ageMonths) : null);
+	const selectedNapCount = $derived(baby?.custom_nap_count ?? null);
+
+	const predictionRows = $derived(
+		baby
+			? buildPredictionRows({
+					ageMonths,
+					napCount: selectedNapCount,
+					completedNaps:
+						s.todaySleeps.filter((sl) => sl.type === 'nap' && sl.end_time).length,
+					wakeTime: s.todayWakeUp?.wake_time ?? null,
+					recentSleeps: s.todaySleeps.map((sl) => ({
+						start_time: sl.start_time,
+						end_time: sl.end_time,
+						type: sl.type as 'nap' | 'night',
+					})),
+					serverPrediction: s.prediction,
+					totalSleepMinutes:
+						(s.stats?.totalNapMinutes ?? 0) + (s.stats?.totalNightMinutes ?? 0),
+				})
+			: [],
+	);
 
 	let loading = $state(true);
 	let error = $state(false);
@@ -37,6 +72,49 @@
 
 <div class="view stats-view">
 	<h1 class="history-header">Statistikk</h1>
+
+	<!-- Sleep info for age + predictions -->
+	{#if baby}
+		<div class="stats-section">
+			<h3 class="stats-section-title">
+				Søvninfo for {formatAge(baby.birthdate)}
+			</h3>
+			<div class="sleep-info-panel">
+				{#each sleepInfoRows as row}
+					<div class="stats-trend-row">
+						<div class="stats-trend-label">{row.label}</div>
+						<div class="stats-trend-val">{row.value}</div>
+					</div>
+				{/each}
+
+				{#if nextMilestone}
+					<div
+						style="margin-top: 12px; padding: 12px; background: var(--lavender); border-radius: var(--radius-sm); font-size: 0.85rem;"
+					>
+						<div style="font-weight: 600; margin-bottom: 4px;">Kva som kjem</div>
+						<div style="color: var(--text-light);">{nextMilestone}</div>
+					</div>
+				{/if}
+			</div>
+
+			{#if predictionRows.length > 0}
+				<div
+					data-testid="pred-panel"
+					style="margin-top: 16px; padding: 12px; background: var(--lavender); border-radius: var(--radius-sm);"
+				>
+					<div style="font-weight: 600; margin-bottom: 8px; font-size: 0.9rem;">
+						Appen reknar med
+					</div>
+					{#each predictionRows as row}
+						<div class="stats-trend-row">
+							<div class="stats-trend-label">{row.label}</div>
+							<div class="stats-trend-val">{row.value}</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
+	{/if}
 
 	{#if loading}
 		<div class="history-empty">Lastar...</div>

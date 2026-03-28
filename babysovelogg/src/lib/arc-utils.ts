@@ -118,7 +118,8 @@ export function collectBubbles(
     });
   }
 
-  if (prediction?.predictedNaps && !activeSleep) {
+  // Show predicted nap ghosts even during active sleep
+  if (prediction?.predictedNaps) {
     prediction.predictedNaps.forEach((pred, idx) => {
       bubbles.push({
         startTime: new Date(pred.startTime),
@@ -135,6 +136,18 @@ export function collectBubbles(
       endTime: new Date(predTime.getTime() + 45 * 60000),
       type: "nap",
       status: "predicted",
+    });
+  }
+
+  // Show bedtime as a ghost arc on the day view
+  if (prediction?.bedtime) {
+    const bedtime = new Date(prediction.bedtime);
+    bubbles.push({
+      startTime: bedtime,
+      endTime: new Date(bedtime.getTime() + 45 * 60000),
+      type: "night",
+      status: "predicted",
+      predictionIndex: (prediction.predictedNaps?.length ?? 0),
     });
   }
 
