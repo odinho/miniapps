@@ -245,6 +245,7 @@
 			>
 		{/if}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<circle
 			cx={startPt.x}
 			cy={startPt.y}
@@ -276,6 +277,7 @@
 			>
 		{/if}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<circle
 			cx={endPt.x}
 			cy={endPt.y}
@@ -314,8 +316,9 @@
 				class={b.cssClass}
 			/>
 
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			{#if b.status === 'completed' && onSleepClick && b.sleepIndex != null}
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<path
 					d={b.tapD}
 					fill="none"
@@ -326,8 +329,9 @@
 				/>
 			{/if}
 
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			{#if b.status === 'predicted' && onPredictedNapClick && b.predictionIndex != null}
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<path
 					d={b.tapD}
 					fill="none"

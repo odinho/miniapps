@@ -8,14 +8,14 @@
     "build": "vite build",
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
     "test": "vitest run tests/unit/",
     "test:unit": "vitest run tests/unit/",
     "test:e2e": "npx playwright test",
-    "lint": "oxlint src/ tests/",
+    "lint": "oxlint --deny-warnings src/ tests/",
     "fmt": "oxfmt --write src/ tests/",
     "fmt:check": "oxfmt --check src/ tests/",
-    "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
+    "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings"
   },
   "dependencies": {
     "better-sqlite3": "^12.8.0",
