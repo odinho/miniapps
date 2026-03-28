@@ -340,7 +340,7 @@ test("nap --at with relative time format", () => {
 
 test("up with mood and method", () => {
   cli(["nap"]);
-  const { stdout } = cli(["up", "--mood", "happy", "--method", "rocking", "--json"], {
+  const { stdout } = cli(["up", "--mood", "normal", "--method", "rocking", "--json"], {
     mockTime: at("+30m"),
   });
   const data = JSON.parse(stdout);

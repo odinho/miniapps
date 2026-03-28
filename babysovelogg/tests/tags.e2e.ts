@@ -26,8 +26,8 @@ test("Can select mood and method and save", async ({ page }) => {
     timeout: 5000,
   });
 
-  await page.getByRole("button", { name: "Glad" }).click();
-  await expect(page.getByRole("button", { name: "Glad" })).toHaveClass(/active/);
+  await page.getByRole("button", { name: "Normal" }).click();
+  await expect(page.getByRole("button", { name: "Normal" })).toHaveClass(/active/);
 
   await page.getByRole("button", { name: "Amming" }).click();
   await expect(page.getByRole("button", { name: "Amming" })).toHaveClass(/active/);
@@ -57,7 +57,7 @@ test("Tags shown in history as emoji badges", async ({ page }) => {
   const end = now.toISOString();
   const { generateId: gid } = await import("./fixtures");
   db.prepare(
-    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, mood, method, domain_id) VALUES (?, ?, ?, 'nap', 'happy', 'nursing', ?)",
+    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, mood, method, domain_id) VALUES (?, ?, ?, 'nap', 'normal', 'nursing', ?)",
   ).run(babyId, start, end, gid());
 
   await page.goto("/history");
@@ -154,7 +154,7 @@ test("Wake-up sheet shows compact bedtime summary when tags were set", async ({ 
   await expect(page.getByRole("heading", { name: "Korleis gjekk legginga?" })).toBeVisible({
     timeout: 5000,
   });
-  await page.getByRole("button", { name: "Glad" }).click();
+  await page.getByRole("button", { name: "Normal" }).click();
   await page.getByRole("button", { name: "Amming" }).click();
   await page.getByRole("button", { name: "Ferdig" }).click();
   await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });
@@ -201,7 +201,7 @@ test("Bedtime tags are NOT overwritten by wake-up sheet", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Korleis gjekk legginga?" })).toBeVisible({
     timeout: 5000,
   });
-  await page.getByRole("button", { name: "Glad" }).click();
+  await page.getByRole("button", { name: "Normal" }).click();
   await page.getByRole("button", { name: "Amming" }).click();
   await page.getByRole("button", { name: "Ferdig" }).click();
   await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });
@@ -217,7 +217,7 @@ test("Bedtime tags are NOT overwritten by wake-up sheet", async ({ page }) => {
   // Verify bedtime tags still intact
   const db = getDb();
   const sleep = db.prepare("SELECT * FROM sleep_log ORDER BY id DESC LIMIT 1").get() as SleepLogRow;
-  expect(sleep.mood).toBe("happy");
+  expect(sleep.mood).toBe("normal");
   expect(sleep.method).toBe("nursing");
   expect(sleep.woke_by).toBe("woken");
 });
@@ -235,7 +235,7 @@ test("Dismissing tag sheet auto-saves entered data", async ({ page }) => {
   });
 
   // Enter some data, then dismiss by clicking overlay
-  await page.getByRole("button", { name: "Glad" }).click();
+  await page.getByRole("button", { name: "Normal" }).click();
   await page.locator('input[placeholder="Valfritt notat..."]').fill("Viktig notat");
   await page.getByTestId("modal-overlay").click({ position: { x: 5, y: 5 } });
   await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });
@@ -243,6 +243,6 @@ test("Dismissing tag sheet auto-saves entered data", async ({ page }) => {
   // Data should have been saved
   const db = getDb();
   const sleep = db.prepare("SELECT * FROM sleep_log ORDER BY id DESC LIMIT 1").get() as SleepLogRow;
-  expect(sleep.mood).toBe("happy");
+  expect(sleep.mood).toBe("normal");
   expect(sleep.notes).toBe("Viktig notat");
 });

@@ -89,6 +89,9 @@ function initSchema(database: Database.Database) {
     // Column already exists — ignore
   }
 
+  // Migration: merge "happy" mood into "normal"
+  database.exec("UPDATE sleep_log SET mood = 'normal' WHERE mood = 'happy'");
+
   database.exec(`
     CREATE TABLE IF NOT EXISTS day_start (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
