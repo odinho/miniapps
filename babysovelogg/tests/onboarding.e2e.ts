@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, generateId } from "./fixtures";
 
 test("Get Started button creates baby and navigates to dashboard", async ({ page }) => {
   await page.goto("/");
@@ -37,7 +37,6 @@ test("Get Started validates required fields", async ({ page }) => {
 });
 
 test("Sleep tracking flow after onboarding", async ({ page, request }) => {
-  const { generateId } = await import("./fixtures");
   // Create baby via API
   await request.post("/api/events", {
     data: {

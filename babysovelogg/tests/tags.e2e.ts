@@ -1,4 +1,4 @@
-import { test, expect, createBaby, setWakeUpTime, getDb, dismissSheet } from "./fixtures";
+import { test, expect, createBaby, setWakeUpTime, getDb, dismissSheet, generateId } from "./fixtures";
 import { renderDayState } from "./helpers/render-state";
 
 test("Tag sheet appears after starting sleep", async ({ page }) => {
@@ -55,10 +55,9 @@ test("Tags shown in history as emoji badges", async ({ page }) => {
   const now = new Date();
   const start = new Date(now.getTime() - 3600000).toISOString();
   const end = now.toISOString();
-  const { generateId: gid } = await import("./fixtures");
   db.prepare(
     "INSERT INTO sleep_log (baby_id, start_time, end_time, type, mood, method, domain_id) VALUES (?, ?, ?, 'nap', 'normal', 'nursing', ?)",
-  ).run(babyId, start, end, gid());
+  ).run(babyId, start, end, generateId());
 
   await page.goto("/history");
   await expect(page.locator(".tag-badge").first()).toBeVisible({ timeout: 5000 });

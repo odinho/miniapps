@@ -6,7 +6,9 @@ import {
   forceHour,
   addCompletedSleep,
   setWakeUpTime,
+  generateId,
 } from "./fixtures";
+import { renderDayState } from "./helpers/render-state";
 
 // --- B11: Dashboard shows overtime when a nap is skipped ---
 // When the predicted nap window has passed without a nap being logged,
@@ -63,7 +65,6 @@ test("B11: shows bedtime when all expected naps are completed", async ({ page })
   napStart.setHours(9, 0, 0, 0);
   const napEnd = new Date(today);
   napEnd.setHours(10, 0, 0, 0);
-  const { generateId } = await import("./fixtures");
   db.prepare(
     "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, 'nap', ?)",
   ).run(babyId, napStart.toISOString(), napEnd.toISOString(), generateId());
@@ -153,8 +154,6 @@ test("B17: morning button IS shown in late night hours", async ({ page }) => {
 test("B18: ending night sleep auto-sets wakeup, no morning prompt", async ({ page }) => {
   const babyId = createBaby("Testa");
   const db = getDb();
-  const { generateId } = await import("./fixtures");
-
   // Set yesterday's wakeup (so baby has a "previous day")
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
@@ -195,7 +194,6 @@ test("B18: ending night sleep auto-sets wakeup, no morning prompt", async ({ pag
   await expect(page.getByTestId("morning-prompt")).not.toBeVisible();
 
   // Verify a day_start was created for today (yesterday's + today's = 2)
-  const { renderDayState } = await import("./helpers/render-state");
   expect(renderDayState(db, babyId)).toContain("vekketid:");
   const dayStarts = db.prepare("SELECT COUNT(*) as c FROM day_start WHERE baby_id = ?").get(babyId) as { c: number };
   expect(dayStarts.c).toBe(2);
@@ -246,7 +244,6 @@ test("B5: dirty diaper shows type in history log", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
   const db = getDb();
-  const { generateId } = await import("./fixtures");
   db.prepare(
     "INSERT INTO diaper_log (baby_id, time, type, amount, domain_id) VALUES (?, ?, 'dirty', 'middels', ?)",
   ).run(babyId, new Date().toISOString(), generateId());
@@ -264,7 +261,6 @@ test("B6: diaper notes are visible in history log", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
   const db = getDb();
-  const { generateId } = await import("./fixtures");
   db.prepare(
     "INSERT INTO diaper_log (baby_id, time, type, amount, note, domain_id) VALUES (?, ?, 'wet', 'middels', 'Litt raudt utslett', ?)",
   ).run(babyId, new Date().toISOString(), generateId());
