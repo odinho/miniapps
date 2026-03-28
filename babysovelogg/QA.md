@@ -22,7 +22,7 @@ wake-up sheets, pause handling, diaper nudge, Norwegian strings, 77 Playwright t
 - Arc endpoint time labels (wake-up time, estimated bedtime)
 - Arc endpoint taps open sleep entries
 - Predicted nap interaction (tap to start or dismiss)
-- Renamed Napper → Babysovelogg, napper.db → db.sqlite
+- Renamed Nap → Babysovelogg, nap.db → db.sqlite
 
 ---
 
@@ -64,9 +64,17 @@ wake-up sheets, pause handling, diaper nudge, Norwegian strings, 77 Playwright t
   Currently loads last 50 entries. For long-term use, need lazy loading or
   date-range filtering UI.
 
-- [ ] **C2. Export data**
+- [x] **C2. Export data**
   Parents often switch apps or want data for pediatrician visits. Export to CSV
   or JSON would be valuable. Simple download button in settings.
+
+- [x] **C4. Manual sleep entry ("+ Legg til søvn")**
+  Button in history header opens a modal to add retroactive sleep entries.
+  Uses `sleep.manual` event (single event with both start and end time).
+
+- [x] **C5. Pause deletion in edit modal**
+  Sleep edit modal shows all pauses with times and durations. Each pause has
+  a delete button with confirmation. Uses `sleep.pause_deleted` event.
 
 - [x] **C3. Undo last action**
   Accidentally ended a nap? Toast with "Angre" button that reverts the last event

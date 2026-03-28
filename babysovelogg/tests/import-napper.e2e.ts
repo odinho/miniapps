@@ -19,7 +19,7 @@ test("uploads CSV from settings page and sees imported data", async ({ page }) =
   writeFileSync(csvPath, NAPPER_CSV);
 
   // Navigate to settings
-  await page.goto("/#/settings");
+  await page.goto("/settings");
   await page.waitForSelector("[data-testid='napper-file-input']");
 
   // Upload the CSV
@@ -35,7 +35,7 @@ test("uploads CSV from settings page and sees imported data", async ({ page }) =
   await expect(page.locator(".toast")).toContainText("Importerte");
 
   // Navigate to history and verify entries appear
-  await page.goto("/#/history");
+  await page.goto("/history");
   await page.waitForTimeout(500);
 
   // Should see sleep entries in the history

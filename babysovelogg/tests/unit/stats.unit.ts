@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getTodayStats, getWeekStats, getAverageWakeWindow } from "../../src/engine/stats.js";
-import type { SleepEntry } from "../../types.js";
+import { getTodayStats, getWeekStats, getAverageWakeWindow } from "$lib/engine/stats.js";
+import type { SleepEntry } from "$lib/types.js";
 
 // --- helpers ---
 

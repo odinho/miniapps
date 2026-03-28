@@ -3,8 +3,8 @@ import {
   classifySleepType,
   classifySleepTypeByHour,
   calcPauseMs,
-} from "../../src/engine/classification.js";
-import type { SleepLogRow, SleepPauseRow } from "../../types.js";
+} from "$lib/engine/classification.js";
+import type { SleepLogRow, SleepPauseRow } from "$lib/types.js";
 
 function sleepRow(overrides: Partial<SleepLogRow> = {}): SleepLogRow {
   return {

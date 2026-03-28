@@ -7,5 +7,6 @@ export default defineConfig({
   timeout: 30_000,
   use: {
     headless: true,
+    serviceWorkers: 'block',
   },
 });

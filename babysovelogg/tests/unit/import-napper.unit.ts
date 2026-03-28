@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseNapperCsv, mapNapperToEvents } from "../../server/import-napper.js";
+import { parseNapperCsv, mapNapperToEvents } from "$lib/server/import-napper.js";
 
 // --- DSL helpers for building CSV strings ---
 

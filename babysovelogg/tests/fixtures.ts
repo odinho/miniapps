@@ -1,27 +1,71 @@
 import { test as base, expect, type Page } from "@playwright/test";
-import { createServer, type Server } from "http";
-import { initDb, closeDb } from "../server/db.js";
-import { handleRequest } from "../server/api.js";
-import type Database from "better-sqlite3";
+import { spawn, type ChildProcess } from "child_process";
+import Database from "better-sqlite3";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 let _db: Database.Database;
 
-// Worker-scoped fixture: one in-process server per Playwright worker
+// Worker-scoped fixture: one built SvelteKit server per Playwright worker
 export const test = base.extend<
   { autoResetDb: void; autoMorning: void },
-  { workerServer: { server: Server; baseURL: string } }
+  { workerServer: { proc: ChildProcess; baseURL: string; dbPath: string } }
 >({
   workerServer: [
-    async ({}, use) => {
-      _db = initDb(":memory:");
-      const server = createServer(handleRequest);
-      await new Promise<void>((resolve) => {
-        server.listen(0, () => resolve());
+    async ({}, use, workerInfo) => {
+      const port = 4200 + workerInfo.workerIndex;
+      const dbPath = path.join(os.tmpdir(), `bsl-e2e-${workerInfo.workerIndex}-${Date.now()}.sqlite`);
+
+      // Clean up any existing file
+      try { fs.unlinkSync(dbPath); } catch {}
+
+      // Spawn the built SvelteKit server
+      const buildDir = path.join(__dirname, "..", "build", "index.js");
+      const proc = spawn("node", [buildDir], {
+        env: { ...process.env, PORT: String(port), DB_PATH: dbPath },
+        stdio: ["pipe", "pipe", "pipe"],
       });
-      const { port } = server.address() as { port: number };
-      await use({ server, baseURL: `http://localhost:${port}` });
-      await new Promise<void>((resolve) => server.close(() => resolve()));
-      closeDb();
+
+      // Wait for server to start
+      await new Promise<void>((resolve, reject) => {
+        const onData = (data: Buffer) => {
+          if (data.toString().includes("Listening")) {
+            proc.stdout?.off("data", onData);
+            resolve();
+          }
+        };
+        proc.stdout?.on("data", onData);
+        proc.on("error", reject);
+        const timer = setTimeout(() => reject(new Error("Server startup timeout")), 10000);
+        proc.stdout?.once("data", () => clearTimeout(timer));
+      });
+
+      // Trigger a request to force lazy-loaded DB module initialization.
+      // The built server loads route handlers (and DB schema) on first request.
+      const baseURL = `http://localhost:${port}`;
+      await fetch(`${baseURL}/api/state`);
+
+      // Open a separate DB connection for test code (seeding + assertions)
+      _db = new Database(dbPath);
+      _db.pragma("foreign_keys = ON");
+      _db.pragma("busy_timeout = 5000");
+
+      await use({ proc, baseURL, dbPath });
+
+      // Cleanup
+      _db.close();
+      proc.kill("SIGTERM");
+      // Wait briefly for graceful shutdown
+      await new Promise<void>((resolve) => {
+        proc.on("exit", () => resolve());
+        setTimeout(() => { proc.kill("SIGKILL"); resolve(); }, 2000);
+      });
+      try { fs.unlinkSync(dbPath); } catch {}
     },
     { scope: "worker" },
   ],
@@ -32,7 +76,7 @@ export const test = base.extend<
 
   autoResetDb: [
     async ({ workerServer }, use) => {
-      void workerServer; // ensure in-memory DB is ready
+      void workerServer; // ensure server + DB are ready
       resetDb();
       await use();
     },
@@ -47,9 +91,9 @@ export const test = base.extend<
   ],
 });
 
-// --- DB helpers (use shared in-memory DB directly) ---
+// --- DB helpers (use shared file-based DB via separate connection) ---
 
-/** Returns the shared in-process DB instance. Do NOT close it. */
+/** Returns the test DB connection. Do NOT close it. */
 export function getDb() {
   return _db;
 }

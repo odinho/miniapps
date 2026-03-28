@@ -3,7 +3,7 @@ import { test, expect, createBaby, setWakeUpTime, addEvent } from "./fixtures";
 test("Events page has a close button that navigates back", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
-  await page.goto("/#/events");
+  await page.goto("/events");
   await expect(page.getByRole("heading", { name: "Hendingslogg" })).toBeVisible({ timeout: 5000 });
   const closeBtn = page.getByTestId("events-close-btn");
   await expect(closeBtn).toBeVisible();
@@ -24,7 +24,7 @@ test("Event card preview shows formatted times, not raw ISO strings", async ({ p
     sleepDomainId: "slp_test123",
     endTime: "2026-03-23T18:30:00.000Z",
   });
-  await page.goto("/#/events");
+  await page.goto("/events");
   await expect(page.getByTestId("events-list")).toBeVisible({ timeout: 5000 });
   const cards = page.locator("[data-testid='event-card']");
   const count = await cards.count();

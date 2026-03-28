@@ -11,8 +11,8 @@ import {
   WAKE_WINDOWS,
   NAP_COUNTS,
   SLEEP_NEEDS,
-} from "../../src/engine/schedule.js";
-import type { SleepEntry } from "../../types.js";
+} from "$lib/engine/schedule.js";
+import type { SleepEntry } from "$lib/types.js";
 
 // --- helpers ---
 

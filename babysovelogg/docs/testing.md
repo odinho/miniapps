@@ -2,10 +2,15 @@
 
 ## Commands
 
-- `pnpm test` runs the Playwright E2E test suite
-- `pnpm test:unit` runs Vitest unit tests
-- `pnpm typecheck` runs the TypeScript typecheck (tsgo)
-- `pnpm check` runs typecheck + oxlint + oxfmt
+```bash
+bun run test:unit              # Vitest unit tests (405 tests, 17 files)
+bunx vitest run tests/integration/  # Vitest integration tests (72 tests, 10 files)
+bun run test:e2e               # Playwright E2E tests (112 tests, requires build)
+bun run typecheck              # svelte-check
+bun run lint                   # oxlint
+```
+
+E2E tests require a fresh build (`bun run build`) since they run against the production server.
 
 ## Principles
 
@@ -192,8 +197,9 @@ Default to these when they can express the behavior clearly.
 
 Relevant places in this repo:
 
-- [`tests/integration/`](../tests/integration/) — Vitest integration tests (API, event-sourcing, validation, dedup, rebuild, export, traceability)
+- [`tests/integration/`](../tests/integration/) — Vitest integration tests (API, event-sourcing, validation, dedup, rebuild, export, traceability, CLI)
 - [`tests/integration/harness.ts`](../tests/integration/harness.ts) — `post()`/`get()`/`postEvents()` wrappers around `fetch()`, re-exports DB helpers
+- [`tests/integration/cli.test.ts`](../tests/integration/cli.test.ts) — CLI integration tests (21 tests, runs `cli/baby.ts` via `tsx` against temp databases)
 - [`tests/fixtures.ts`](../tests/fixtures.ts) — Shared DB helpers and Playwright fixtures
 
 Use them to cover complete behavior chains with real DB state and realistic inputs.

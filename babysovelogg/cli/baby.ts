@@ -8,16 +8,16 @@
 //    or: pnpm baby [command] [options]
 
 import { randomBytes } from "node:crypto";
-import { db, closeDb } from "../server/db.js";
-import { processBatchTx } from "../server/events.js";
+import { db, closeDb } from "../src/lib/server/db.js";
+import { processBatchTx } from "../src/lib/server/events.js";
 import {
   calculateAgeMonths,
   predictNextNap,
   recommendBedtime,
   predictDayNaps,
-} from "../src/engine/schedule.js";
-import { getTodayStats, getWeekStats, getAverageWakeWindow } from "../src/engine/stats.js";
-import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry } from "../types.js";
+} from "../src/lib/engine/schedule.js";
+import { getTodayStats, getWeekStats, getAverageWakeWindow } from "../src/lib/engine/stats.js";
+import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry } from "../src/lib/types.js";
 
 process.on("exit", closeDb);
 db.pragma("busy_timeout = 3000");

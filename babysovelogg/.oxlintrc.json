@@ -12,5 +12,5 @@
     "no-extend-native": "off",
     "no-empty-pattern": "off"
   },
-  "ignorePatterns": ["dist/", "node_modules/"]
+  "ignorePatterns": ["dist/", "node_modules/", "src/app.d.ts"]
 }

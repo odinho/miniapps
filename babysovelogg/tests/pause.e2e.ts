@@ -7,7 +7,7 @@ import {
   dismissSheet,
   generateId,
 } from "./fixtures";
-import type { SleepPauseRow } from "../types";
+import type { SleepPauseRow } from "../src/lib/types";
 
 test("Pause button appears when sleeping", async ({ page }) => {
   const babyId = createBaby("Testa");
@@ -123,7 +123,7 @@ test("History shows pause info", async ({ page }) => {
     resumeTime2,
   );
 
-  await page.goto("/#/history");
+  await page.goto("/history");
   const sleepItem = page.locator(".sleep-log-item:not(.wakeup-log-item)").first();
   await expect(sleepItem).toBeVisible({ timeout: 5000 });
   await expect(sleepItem.locator(".log-meta").first()).toContainText("1 pause");

@@ -11,6 +11,6 @@ test("Stats page shows export buttons", async ({ page }) => {
     "nap",
   );
 
-  await page.goto("/#/stats");
+  await page.goto("/stats");
   await expect(page.getByTestId("export-btn")).toBeVisible({ timeout: 5000 });
 });

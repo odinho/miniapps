@@ -1,5 +1,5 @@
 import { test, expect, createBaby, setWakeUpTime, getDb, dismissSheet } from "./fixtures";
-import type { SleepLogRow } from "../types";
+import type { SleepLogRow } from "../src/lib/types";
 
 test("Tag sheet appears after starting sleep", async ({ page }) => {
   const babyId = createBaby("Testa");
@@ -60,7 +60,7 @@ test("Tags shown in history as emoji badges", async ({ page }) => {
     "INSERT INTO sleep_log (baby_id, start_time, end_time, type, mood, method, domain_id) VALUES (?, ?, ?, 'nap', 'happy', 'nursing', ?)",
   ).run(babyId, start, end, gid());
 
-  await page.goto("/#/history");
+  await page.goto("/history");
   await expect(page.locator(".tag-badge").first()).toBeVisible({ timeout: 5000 });
   const badges = page.locator(".tag-badges .tag-badge");
   await expect(badges).toHaveCount(2);

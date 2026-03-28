@@ -18,7 +18,7 @@ test("Stats page shows diaper statistics section", async ({ page }) => {
   addDiaper(babyId, new Date(now.getTime() - 3600000).toISOString(), "dirty", "lite");
   addDiaper(babyId, new Date(now.getTime() - 1800000).toISOString(), "both", "mykje");
 
-  await page.goto("/#/stats");
+  await page.goto("/stats");
   // Diaper section should show
   const diaperSection = page.getByRole("heading", { name: "Bleie/Do" });
   await expect(diaperSection).toBeVisible({ timeout: 5000 });
@@ -39,7 +39,7 @@ test("Stats page without diapers shows no diaper section", async ({ page }) => {
     "nap",
   );
 
-  await page.goto("/#/stats");
+  await page.goto("/stats");
   // Should NOT show Bleie/Do section
   await expect(page.getByRole("heading", { name: "Siste 7 dagar" })).toBeVisible({ timeout: 5000 });
   await expect(page.getByRole("heading", { name: "Bleie/Do" })).not.toBeVisible();
