@@ -2,6 +2,7 @@
 	import type { SleepLogRow } from '$lib/types.js';
 	import { sync } from '$lib/stores/sync.svelte.js';
 	import { WOKE_OPTIONS, buildWakeUpEvent, getBedtimeSummary } from '$lib/wake-sheet-actions.js';
+	import { formatDuration } from '$lib/utils.js';
 
 	interface Props {
 		sleepDomainId: string;
@@ -21,6 +22,13 @@
 	let busy = $state(false);
 
 	const summary = $derived(getBedtimeSummary(sleepSnapshot));
+
+	// Reactive sleep duration
+	const sleepDurationMs = $derived.by(() => {
+		const start = new Date(sleepSnapshot.start_time).getTime();
+		const end = new Date(`${wakeDate}T${wakeTime}:00`).getTime();
+		return Math.max(0, end - start);
+	});
 
 	// Did the user change the wake time?
 	const wakeTimeChanged = $derived.by(() => {
@@ -90,6 +98,11 @@
 				{/if}
 			</div>
 		{/if}
+
+		<!-- Sleep duration -->
+		<div style="text-align: center; margin: 4px 0 8px; font-size: 1.1rem; font-weight: 600; color: var(--text);" data-testid="sleep-duration">
+			Sov {formatDuration(sleepDurationMs)}
+		</div>
 
 		<!-- Wake time -->
 		<div class="form-group">

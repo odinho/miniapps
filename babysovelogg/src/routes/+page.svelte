@@ -410,6 +410,7 @@
 				{prediction}
 				{todayWakeUp}
 				{todaySleeps}
+				onEditStart={activeSleep && !activeSleep.end_time ? () => { editingSleep = activeSleep; } : undefined}
 			/>
 		</div>
 

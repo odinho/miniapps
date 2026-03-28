@@ -66,10 +66,29 @@ describe("assembleState", () => {
     expect(result.stats.totalNapMinutes).toBe(60);
   });
 
-  it("no prediction when there is an active sleep", () => {
+  it("keeps prediction during active nap sleep (bedtime estimate)", () => {
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-03-26",
+      wake_time: "2026-03-26T07:00:00.000Z",
+      created_at: "2026-03-26T07:00:00.000Z",
+      created_by_event_id: null,
+    };
+    const result = assembleState(
+      dayData({
+        activeSleep: sleepRow({ end_time: null, start_time: "2026-03-26T09:30:00.000Z" }),
+        todayWakeUp: wakeUp,
+        now: new Date("2026-03-26T10:00:00.000Z").getTime(),
+      }),
+    );
+    expect(result.prediction).not.toBeNull();
+    expect(result.prediction!.bedtime).toBeDefined();
+  });
+
+  it("no prediction when there is no wake time reference", () => {
     const result = assembleState(
       dayData({
         activeSleep: sleepRow({ end_time: null }),
+        now: new Date("2026-03-26T10:00:00.000Z").getTime(),
       }),
     );
     expect(result.prediction).toBeNull();
@@ -77,9 +96,7 @@ describe("assembleState", () => {
 
   it("generates prediction when no active sleep and wake-up time set", () => {
     const wakeUp: DayStartRow = {
-      id: 1,
-      baby_id: 1,
-      date: "2026-03-26",
+      id: 1, baby_id: 1, date: "2026-03-26",
       wake_time: "2026-03-26T07:00:00.000Z",
       created_at: "2026-03-26T07:00:00.000Z",
       created_by_event_id: null,
@@ -87,6 +104,7 @@ describe("assembleState", () => {
     const result = assembleState(
       dayData({
         todayWakeUp: wakeUp,
+        now: new Date("2026-03-26T08:00:00.000Z").getTime(),
       }),
     );
     expect(result.prediction).not.toBeNull();
@@ -209,6 +227,102 @@ describe("assembleState", () => {
     expect(result.prediction!.napsAllDone).toBe(true);
     // nextNap should be bedtime, not a new nap
     expect(result.prediction!.nextNap).toBe(result.prediction!.bedtime);
+  });
+
+  it("skipped nap: napsAllDone when predicted nap is >90 min overdue", () => {
+    // 9mo baby, 2 expected naps, only 1 done. At 18:17, the second predicted nap was hours ago.
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-03-28",
+      wake_time: "2026-03-28T06:15:00.000Z",
+      created_at: "2026-03-28T06:15:00.000Z",
+      created_by_event_id: null,
+    };
+    const longNap = sleepRow({
+      start_time: "2026-03-28T09:46:00.000Z",
+      end_time: "2026-03-28T12:22:00.000Z",
+      type: "nap",
+    });
+
+    const result = assembleState(
+      dayData({
+        todaySleeps: [longNap],
+        todayWakeUp: wakeUp,
+        now: new Date("2026-03-28T18:17:00.000Z").getTime(),
+      }),
+    );
+
+    expect(result.prediction!.napsAllDone).toBe(true);
+    expect(result.prediction!.nextNap).toBe(result.prediction!.bedtime);
+    expect(result.prediction!.predictedNaps).toBeNull();
+  });
+
+  it("stale predictions recalculated from actual wake time after long nap", () => {
+    // Nap ran much longer than predicted — remaining predictions should start from actual wake time
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-03-28",
+      wake_time: "2026-03-28T06:15:00.000Z",
+      created_at: "2026-03-28T06:15:00.000Z",
+      created_by_event_id: null,
+    };
+    const longNap = sleepRow({
+      start_time: "2026-03-28T09:46:00.000Z",
+      end_time: "2026-03-28T12:22:00.000Z",
+      type: "nap",
+    });
+
+    const result = assembleState(
+      dayData({
+        todaySleeps: [longNap],
+        todayWakeUp: wakeUp,
+        now: new Date("2026-03-28T12:49:00.000Z").getTime(),
+      }),
+    );
+
+    // Should have a prediction with next nap after 12:22 (not from the stale day schedule)
+    if (result.prediction!.predictedNaps && result.prediction!.predictedNaps.length > 0) {
+      const nextPredicted = new Date(result.prediction!.predictedNaps[0].startTime);
+      expect(nextPredicted.getTime()).toBeGreaterThan(
+        new Date("2026-03-28T12:22:00.000Z").getTime(),
+      );
+    }
+    expect(new Date(result.prediction!.nextNap).getTime()).toBeGreaterThan(
+      new Date("2026-03-28T12:22:00.000Z").getTime(),
+    );
+  });
+
+  it("active nap counts toward consumed slots (no predicted overlap)", () => {
+    // Baby is actively napping (nap 1). Predicted naps should not include nap 1's slot.
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-03-28",
+      wake_time: "2026-03-28T06:15:00.000Z",
+      created_at: "2026-03-28T06:15:00.000Z",
+      created_by_event_id: null,
+    };
+
+    const result = assembleState(
+      dayData({
+        activeSleep: sleepRow({
+          start_time: "2026-03-28T09:46:00.000Z",
+          end_time: null,
+          type: "nap",
+        }),
+        todayWakeUp: wakeUp,
+        now: new Date("2026-03-28T10:30:00.000Z").getTime(),
+      }),
+    );
+
+    // predictedNaps should only show remaining naps after the active one
+    // For a 9mo baby with 2 expected naps, 1 active → 1 remaining predicted
+    const remaining = result.prediction!.predictedNaps;
+    expect(remaining).not.toBeNull();
+    if (remaining && remaining.length > 0) {
+      // None should start before the baby woke up (06:15) → they're all future
+      for (const n of remaining) {
+        expect(new Date(n.startTime).getTime()).toBeGreaterThan(
+          new Date("2026-03-28T09:46:00.000Z").getTime(),
+        );
+      }
+    }
   });
 
   it("B11: napsAllDone flag set when all expected naps are completed", () => {

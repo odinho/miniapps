@@ -34,6 +34,9 @@
 	{#if mode.kind === 'sleeping'}
 		<div class="arc-center-label">{mode.label}</div>
 		<span class="countdown-value">{formatDurationLong(mode.elapsed)}</span>
+		{#if activeSleep?.type === 'nap' && prediction?.bedtime}
+			<div class="arc-sub-label">Leggetid ~{formatTime(prediction.bedtime)}</div>
+		{/if}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		{#if onEditStart}

@@ -182,4 +182,26 @@ describe("collectBubbles", () => {
     expect(bubbles).toHaveLength(1);
     expect(bubbles[0].status).toBe("active");
   });
+
+  it("shows bedtime ghost only when no predicted nap bubbles", () => {
+    // With predicted naps: bedtime ghost should NOT appear (avoids double dashed arcs)
+    const withNaps = collectBubbles([], null, {
+      nextNap: "2026-03-27T13:00:00",
+      bedtime: "2026-03-27T19:00:00",
+      predictedNaps: [
+        { startTime: "2026-03-27T13:00:00", endTime: "2026-03-27T13:45:00" },
+      ],
+    });
+    const nightBubbles = withNaps.filter((b) => b.type === "night");
+    expect(nightBubbles).toHaveLength(0);
+
+    // Without predicted naps: bedtime ghost SHOULD appear
+    const withoutNaps = collectBubbles([], null, {
+      nextNap: "2026-03-27T19:00:00",
+      bedtime: "2026-03-27T19:00:00",
+    });
+    const nightBubbles2 = withoutNaps.filter((b) => b.type === "night");
+    expect(nightBubbles2).toHaveLength(1);
+    expect(nightBubbles2[0].status).toBe("predicted");
+  });
 });
