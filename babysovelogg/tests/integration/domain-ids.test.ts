@@ -61,14 +61,14 @@ test("sleep.tagged with sleepDomainId updates the correct row", async () => {
   ]);
 
   const res = await postEvents([
-    makeEvent("sleep.tagged", { sleepDomainId: did, mood: "happy", method: "nursing" }),
+    makeEvent("sleep.tagged", { sleepDomainId: did, mood: "normal", method: "nursing" }),
   ]);
   expect(res.ok).toBe(true);
 
   expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
     "baby: Testa (2025-06-12)
     vekketid: 07:00
-    søvn: 09:00–pågår lur happy nursing
+    søvn: 09:00–pågår lur normal nursing
     bleier: (ingen)"
   `);
 });

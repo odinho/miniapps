@@ -1,7 +1,6 @@
 /** Mood options for sleep tagging */
 export const MOODS = [
-  { value: "happy", label: "😊", title: "Glad" },
-  { value: "normal", label: "😐", title: "Normal" },
+  { value: "normal", label: "😊", title: "Normal" },
   { value: "upset", label: "😢", title: "Uroleg" },
   { value: "fighting", label: "😤", title: "Kjempa mot" },
 ] as const;
@@ -17,8 +16,7 @@ export const METHODS = [
 ] as const;
 
 export const MOOD_EMOJI: Record<string, string> = {
-  happy: "😊",
-  normal: "😐",
+  normal: "😊",
   upset: "😢",
   fighting: "😤",
 };

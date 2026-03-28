@@ -38,7 +38,7 @@ test("After sleep.tagged, sleep_log row has updated_by_event_id", async () => {
   ]);
 
   const tagRes = await postEvents([
-    makeEvent("sleep.tagged", { sleepDomainId: did, mood: "happy" }),
+    makeEvent("sleep.tagged", { sleepDomainId: did, mood: "normal" }),
   ]);
   const tagData = await tagRes.json();
   const tagEventId = tagData.events[0].id;

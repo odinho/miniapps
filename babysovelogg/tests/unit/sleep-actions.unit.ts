@@ -90,7 +90,7 @@ describe('buildEndSleep', () => {
 	});
 
 	it('returns a snapshot of the sleep', () => {
-		const sleep = makeSleep({ mood: 'happy' });
+		const sleep = makeSleep({ mood: 'normal' });
 		const result = buildEndSleep(sleep, 1);
 		expect(result.sleepSnapshot).toEqual(sleep);
 		// Should be a copy, not the same reference

@@ -217,10 +217,10 @@ describe('applyOptimisticEvent', () => {
 		const state = makeState({ activeSleep: active });
 		const result = applyOptimisticEvent(state, 'sleep.tagged', {
 			sleepDomainId: 'slp_t',
-			mood: 'happy',
+			mood: 'normal',
 			method: 'breastfeed',
 		});
-		expect(result.activeSleep!.mood).toBe('happy');
+		expect(result.activeSleep!.mood).toBe('normal');
 		expect(result.activeSleep!.method).toBe('breastfeed');
 	});
 

@@ -388,7 +388,7 @@ describe('getSleepBadges', () => {
 	});
 
 	test('returns mood badge', () => {
-		const badges = getSleepBadges(makeSleep({ mood: 'happy' }));
+		const badges = getSleepBadges(makeSleep({ mood: 'normal' }));
 		expect(badges).toHaveLength(1);
 		expect(badges[0].emoji).toBe('😊');
 	});
@@ -537,13 +537,13 @@ describe('buildSleepUpdateEvent', () => {
 			sleepDomainId: 'sleep-001',
 			startTime: '2026-03-27T08:00:00.000Z',
 			type: 'nap',
-			mood: 'happy',
+			mood: 'normal',
 			method: 'bed',
 			fallAsleepTime: '<5',
 			notes: 'Sov godt',
 		});
 		expect(event.payload.notes).toBe('Sov godt');
-		expect(event.payload.mood).toBe('happy');
+		expect(event.payload.mood).toBe('normal');
 		expect(event.payload.method).toBe('bed');
 		expect(event.payload.fallAsleepTime).toBe('<5');
 	});

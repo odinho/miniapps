@@ -31,10 +31,10 @@ describe('buildTagEvent', () => {
 	});
 
 	it('builds event when mood is selected', () => {
-		const evt = buildTagEvent('slp_1', 'happy', null, null, '');
+		const evt = buildTagEvent('slp_1', 'normal', null, null, '');
 		expect(evt).not.toBeNull();
 		expect(evt!.type).toBe('sleep.tagged');
-		expect(evt!.payload.mood).toBe('happy');
+		expect(evt!.payload.mood).toBe('normal');
 		expect(evt!.payload.method).toBeNull();
 		expect(evt!.payload.fallAsleepTime).toBeNull();
 		expect(evt!.payload.notes).toBeNull();
@@ -186,7 +186,7 @@ describe('collectTagSheetEvents', () => {
 
 	it('returns only tag event when tags selected', () => {
 		const t = '2026-03-27T10:00:00.000Z';
-		const events = collectTagSheetEvents('slp_1', t, t, 'happy', 'bed', null, '');
+		const events = collectTagSheetEvents('slp_1', t, t, 'normal', 'bed', null, '');
 		expect(events).toHaveLength(1);
 		expect(events[0].type).toBe('sleep.tagged');
 	});

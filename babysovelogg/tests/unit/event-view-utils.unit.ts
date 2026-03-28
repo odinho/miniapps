@@ -60,7 +60,7 @@ describe('formatPayloadValue', () => {
 	});
 
 	it('returns short strings as-is', () => {
-		expect(formatPayloadValue('mood', 'happy')).toBe('happy');
+		expect(formatPayloadValue('mood', 'normal')).toBe('normal');
 	});
 
 	it('returns null for null and undefined', () => {
@@ -89,10 +89,10 @@ describe('buildPayloadPreview', () => {
 	it('skips hidden keys', () => {
 		const result = buildPayloadPreview({
 			sleepDomainId: 'abc',
-			mood: 'happy',
+			mood: 'normal',
 			clientId: 'c1',
 		});
-		expect(result).toBe('mood: happy');
+		expect(result).toBe('mood: normal');
 	});
 
 	it('shortens ISO dates in preview', () => {

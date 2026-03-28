@@ -111,11 +111,11 @@ describe('getBedtimeSummary', () => {
 	});
 
 	it('returns mood badge', () => {
-		const result = getBedtimeSummary(makeSleep({ mood: 'happy' }));
+		const result = getBedtimeSummary(makeSleep({ mood: 'normal' }));
 		expect(result.hasTags).toBe(true);
 		expect(result.badges).toHaveLength(1);
 		expect(result.badges[0].emoji).toBe('😊');
-		expect(result.badges[0].title).toBe('happy');
+		expect(result.badges[0].title).toBe('normal');
 	});
 
 	it('returns method badge', () => {
@@ -127,7 +127,7 @@ describe('getBedtimeSummary', () => {
 	});
 
 	it('returns both mood and method badges', () => {
-		const result = getBedtimeSummary(makeSleep({ mood: 'happy', method: 'nursing' }));
+		const result = getBedtimeSummary(makeSleep({ mood: 'normal', method: 'nursing' }));
 		expect(result.badges).toHaveLength(2);
 		expect(result.badges[0].emoji).toBe('😊');
 		expect(result.badges[1].emoji).toBe('🤱');
