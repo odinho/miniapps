@@ -25,6 +25,7 @@
 	let method = $state<string | null>(null);
 	let fallAsleepTime = $state<string | null>(null);
 	let notes = $state('');
+	// svelte-ignore state_referenced_locally — intentional: local copy of initial prop
 	let adjustedStartTime = $state(startTime);
 	let showDatePicker = $state(false);
 	let busy = $state(false);

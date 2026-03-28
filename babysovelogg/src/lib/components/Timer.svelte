@@ -34,8 +34,9 @@
 	{#if mode.kind === 'sleeping'}
 		<div class="arc-center-label">{mode.label}</div>
 		<span class="countdown-value">{formatDurationLong(mode.elapsed)}</span>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		{#if onEditStart}
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<span class="edit-start-link" onclick={onEditStart}>
 				Starta {formatTime(mode.startTime)}
 			</span>

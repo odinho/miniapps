@@ -11,7 +11,7 @@
 
 	let { sleepDomainId, sleepSnapshot, onClose }: Props = $props();
 
-	// Default wake time to the sleep's end_time (when VAKNE was pressed)
+	// svelte-ignore state_referenced_locally — intentional: snapshot is immutable once passed
 	const defaultWakeTime = sleepSnapshot.end_time ? new Date(sleepSnapshot.end_time) : new Date();
 	let wakeTime = $state(defaultWakeTime.toTimeString().slice(0, 5));
 	let wakeDate = $state(defaultWakeTime.toISOString().slice(0, 10));
