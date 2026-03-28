@@ -11,11 +11,29 @@
 
 	let { sleepDomainId, sleepSnapshot, onClose }: Props = $props();
 
+	// Default wake time to the sleep's end_time (when VAKNE was pressed)
+	const defaultWakeTime = sleepSnapshot.end_time ? new Date(sleepSnapshot.end_time) : new Date();
+	let wakeTime = $state(defaultWakeTime.toTimeString().slice(0, 5));
+	let wakeDate = $state(defaultWakeTime.toISOString().slice(0, 10));
+
 	let wokeBy = $state<string | null>(null);
 	let notes = $state('');
 	let busy = $state(false);
 
 	const summary = $derived(getBedtimeSummary(sleepSnapshot));
+
+	// Did the user change the wake time?
+	const wakeTimeChanged = $derived.by(() => {
+		const original = defaultWakeTime.toTimeString().slice(0, 5);
+		return wakeTime !== original;
+	});
+
+	function adjustWakeMinutes(delta: number) {
+		const d = new Date(`${wakeDate}T${wakeTime}:00`);
+		d.setMinutes(d.getMinutes() + delta);
+		wakeDate = d.toISOString().slice(0, 10);
+		wakeTime = d.toTimeString().slice(0, 5);
+	}
 
 	function toggleWokeBy(value: string) {
 		wokeBy = wokeBy === value ? null : value;
@@ -25,7 +43,10 @@
 		if (busy) return;
 		busy = true;
 		try {
-			const event = buildWakeUpEvent(sleepDomainId, wokeBy, notes);
+			const endTimeIso = wakeTimeChanged
+				? new Date(`${wakeDate}T${wakeTime}:00`).toISOString()
+				: null;
+			const event = buildWakeUpEvent(sleepDomainId, wokeBy, notes, endTimeIso);
 			if (event) {
 				await sync.sendEvents([event]);
 			}
@@ -69,6 +90,20 @@
 				{/if}
 			</div>
 		{/if}
+
+		<!-- Wake time -->
+		<div class="form-group">
+			<span class="form-label">Vaknetid</span>
+			<div class="datetime-row">
+				<input type="time" bind:value={wakeTime} data-testid="wake-time" />
+			</div>
+			<div style="display: flex; gap: 6px; margin-top: 6px; justify-content: center;">
+				<button class="btn btn-ghost" style="padding: 4px 10px; min-height: 0; font-size: 0.8rem;" onclick={() => adjustWakeMinutes(-5)}>-5 min</button>
+				<button class="btn btn-ghost" style="padding: 4px 10px; min-height: 0; font-size: 0.8rem;" onclick={() => adjustWakeMinutes(-1)}>-1 min</button>
+				<button class="btn btn-ghost" style="padding: 4px 10px; min-height: 0; font-size: 0.8rem;" onclick={() => adjustWakeMinutes(1)}>+1 min</button>
+				<button class="btn btn-ghost" style="padding: 4px 10px; min-height: 0; font-size: 0.8rem;" onclick={() => adjustWakeMinutes(5)}>+5 min</button>
+			</div>
+		</div>
 
 		<!-- Woke-by -->
 		<div class="form-group">

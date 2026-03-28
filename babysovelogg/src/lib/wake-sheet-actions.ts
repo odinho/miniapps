@@ -12,6 +12,7 @@ export type WakeUpPayload = {
 	sleepDomainId: string;
 	wokeBy?: string;
 	wakeNotes?: string;
+	endTime?: string;
 };
 
 /** Build a sleep.updated event with wake-up data. Returns null if nothing was entered. */
@@ -19,12 +20,14 @@ export function buildWakeUpEvent(
 	sleepDomainId: string,
 	wokeBy: string | null,
 	wakeNotes: string,
+	endTime?: string | null,
 ): { type: string; payload: WakeUpPayload } | null {
 	const trimmedNotes = wakeNotes.trim() || null;
-	if (!wokeBy && !trimmedNotes) return null;
+	if (!wokeBy && !trimmedNotes && !endTime) return null;
 	const payload: WakeUpPayload = { sleepDomainId };
 	if (wokeBy) payload.wokeBy = wokeBy;
 	if (trimmedNotes) payload.wakeNotes = trimmedNotes;
+	if (endTime) payload.endTime = endTime;
 	return { type: 'sleep.updated', payload };
 }
 

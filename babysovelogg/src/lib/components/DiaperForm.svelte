@@ -23,22 +23,24 @@
 	let selectedAmount = $state('middels');
 	let selectedPottyResult = $state('potty_wet');
 	let selectedDiaperStatus = $state('dry');
-	let time = $state(new Date().toISOString());
+	const now = new Date();
+	let timeDate = $state(now.toISOString().slice(0, 10));
+	let timeHM = $state(now.toTimeString().slice(0, 5));
 	let notes = $state('');
 	let busy = $state(false);
 
 	const hideDiaperStatus = $derived(shouldHideDiaperStatus(selectedPottyResult));
 
-	/** Convert ISO to local datetime-local input value */
-	function toDatetimeLocal(iso: string): string {
-		const d = new Date(iso);
-		return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-	}
+	/** Combine date + time into ISO string */
+	const time = $derived.by(() => {
+		return new Date(`${timeDate}T${timeHM}:00`).toISOString();
+	});
 
-	function handleTimeChange(e: Event) {
-		const input = e.target as HTMLInputElement;
-		if (!input.value) return;
-		time = new Date(input.value).toISOString();
+	function adjustMinutes(delta: number) {
+		const d = new Date(`${timeDate}T${timeHM}:00`);
+		d.setMinutes(d.getMinutes() + delta);
+		timeDate = d.toISOString().slice(0, 10);
+		timeHM = d.toTimeString().slice(0, 5);
 	}
 
 	async function save() {
@@ -145,14 +147,17 @@
 
 		<!-- Time -->
 		<div class="form-group">
-			<label for="diaper-time">Tid</label>
-			<input
-				id="diaper-time"
-				type="datetime-local"
-				value={toDatetimeLocal(time)}
-				onchange={handleTimeChange}
-				data-testid="diaper-time"
-			/>
+			<span class="form-label">Tid</span>
+			<div class="datetime-row" data-testid="diaper-time">
+				<input type="date" bind:value={timeDate} />
+				<input type="time" bind:value={timeHM} />
+			</div>
+			<div style="display: flex; gap: 6px; margin-top: 6px; justify-content: center;">
+				<button class="btn btn-ghost" style="padding: 4px 10px; min-height: 0; font-size: 0.8rem;" onclick={() => adjustMinutes(-5)}>-5 min</button>
+				<button class="btn btn-ghost" style="padding: 4px 10px; min-height: 0; font-size: 0.8rem;" onclick={() => adjustMinutes(-1)}>-1 min</button>
+				<button class="btn btn-ghost" style="padding: 4px 10px; min-height: 0; font-size: 0.8rem;" onclick={() => adjustMinutes(1)}>+1 min</button>
+				<button class="btn btn-ghost" style="padding: 4px 10px; min-height: 0; font-size: 0.8rem;" onclick={() => adjustMinutes(5)}>+5 min</button>
+			</div>
 		</div>
 
 		<!-- Notes -->

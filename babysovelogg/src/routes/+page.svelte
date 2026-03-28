@@ -80,7 +80,15 @@
 
 	const isNightMode = $derived.by(() => {
 		const h = new Date().getHours();
-		return h < 6 || h >= 18;
+		// Stay night while active night sleep (even after 06:00)
+		const activeNight = activeSleep && !activeSleep.end_time && activeSleep.type === 'night';
+		return activeNight || h < 6 || h >= 18;
+	});
+
+	// Apply theme based on night mode (keeps layout theme in sync with dashboard state)
+	$effect(() => {
+		const mode = isNightMode ? 'night' : 'day';
+		document.documentElement.setAttribute('data-theme', mode);
 	});
 
 	// Morning button visible at 4-5 AM (late night / early morning)
@@ -242,6 +250,28 @@
 		}
 	}
 
+	/** Arc start endpoint click: open the relevant sleep for editing */
+	function onArcStartClick() {
+		if (isNightMode) {
+			// Night mode start = bedtime → open active or last night sleep
+			const target = activeSleep ?? todaySleeps.toReversed().find(sl => sl.type === 'night');
+			if (target) editingSleep = target;
+		} else {
+			// Day mode start = wakeup → open last night sleep that ended this morning
+			const nightSleep = todaySleeps.toReversed().find(sl => sl.type === 'night');
+			if (nightSleep) editingSleep = nightSleep;
+		}
+	}
+
+	/** Arc end endpoint click: in day mode it's bedtime prediction (no-op), in night mode open wakeup */
+	function onArcEndClick() {
+		if (isNightMode) {
+			// Night mode end = morning → no action (prediction)
+		} else {
+			// Day mode end = bedtime prediction → no action
+		}
+	}
+
 	function onEditSleepClose() {
 		editingSleep = null;
 	}
@@ -250,6 +280,8 @@
 	// Shows when baby exists, no todayWakeUp, and it's morning (5-12)
 	const needsMorningPrompt = $derived.by(() => {
 		if (!baby || todayWakeUp) return false;
+		// Don't show while there's an active sleep (baby still sleeping)
+		if (activeSleep && !activeSleep.end_time) return false;
 		// If there are already sleeps today, skip prompt (wakeup was implicit)
 		if (todaySleeps.length > 0) return false;
 		const h = new Date().getHours();
@@ -370,6 +402,8 @@
 				startTimeLabel={arcStartLabel}
 				endTimeLabel={arcEndLabel}
 				onSleepClick={onArcBubbleClick}
+				onStartClick={onArcStartClick}
+				onEndClick={onArcEndClick}
 			/>
 			<Timer
 				{activeSleep}
