@@ -300,7 +300,7 @@
 		<div
 			style="margin-top: 32px; text-align: center; color: var(--text-light); font-size: 0.75rem;"
 		>
-			<div>Babysovelogg v0.2</div>
+			<div>Babysovelogg v{__APP_VERSION__}</div>
 			<div style="margin-top: 4px;">Søvnsporing for den vesle</div>
 		</div>
 	</div>

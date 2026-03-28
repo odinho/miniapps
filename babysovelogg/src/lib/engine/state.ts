@@ -38,8 +38,9 @@ export function assembleState(data: DayData) {
   }));
   const stats = getTodayStats(todaySleepsWithPauses);
 
+  // Calculate predictions even during active sleep so ghost arcs stay visible
   let prediction = null;
-  if (!activeSleep) {
+  {
     const lastCompleted = todaySleeps.find((s) => s.end_time);
     const wakeTimeForPrediction = lastCompleted?.end_time || todayWakeUp?.wake_time;
 

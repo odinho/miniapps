@@ -368,7 +368,9 @@
 
 		<!-- Header: baby info + sync badge -->
 		<div class="header-row">
-			<div class="baby-info">
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div class="baby-info" onclick={() => goto('/events')} style="cursor: pointer;">
 				<span class="baby-name" data-testid="baby-name">{baby.name}</span>
 				<span class="baby-age" data-testid="baby-age">{ageMonths} mnd</span>
 				{#if sync.pendingCount > 0}
