@@ -46,7 +46,7 @@ Each event has: `id` (auto-increment), `type`, `payload` (JSON), `client_id`, `c
 - `events` — append-only event log
 
 **Materialized views (rebuilt from events):**
-- `baby` — baby profile (name, birthdate, potty_mode, custom_nap_count)
+- `baby` — baby profile (name, birthdate, potty_mode, custom_nap_count, timezone)
 - `sleep_log` — sleep sessions with mood/method/woke-by metadata
 - `sleep_pauses` — pause/resume records per sleep
 - `diaper_log` — diaper changes and potty visits
@@ -72,7 +72,7 @@ SvelteKit with `adapter-node`. No external framework — SvelteKit handles routi
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/state` | Full current state (baby, active sleep, today's sleeps, predictions, stats) |
-| `GET` | `/api/events?limit=&offset=` | Event log with pagination |
+| `GET` | `/api/events?limit=&since=&type=&domainId=` | Event log with filtering |
 | `POST` | `/api/events` | Append event(s), returns updated state + broadcasts via SSE |
 | `GET` | `/api/sleeps?from=&to=&limit=` | Sleep log with filters |
 | `GET` | `/api/diapers?from=&to=&limit=` | Diaper log with filters |
@@ -101,6 +101,7 @@ SvelteKit 5 with Svelte's runes (`$state`, `$derived`, `$effect`). No external s
 - `DiaperForm.svelte` — Diaper/potty logging form
 - `EditSleepModal.svelte` — Full sleep edit modal (from history or arc tap)
 - `EditDiaperModal.svelte` — Diaper/potty edit modal
+- `ManualSleepModal.svelte` — Retroactive sleep entry modal
 
 ### Pages
 

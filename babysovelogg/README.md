@@ -18,8 +18,8 @@ Open `http://localhost:3200`. On first visit you'll be prompted to add a baby.
 
 ```bash
 bun run dev          # SvelteKit dev server with HMR
-bun run test:unit    # Vitest unit tests (405 tests)
-bun run test:e2e     # Playwright E2E tests (112 tests, requires build first)
+bun run test:unit    # Vitest unit tests
+bun run test:e2e     # Playwright E2E tests (requires build first)
 bun run lint         # oxlint
 bun run typecheck    # svelte-check
 ```

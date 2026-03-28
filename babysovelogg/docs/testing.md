@@ -3,9 +3,9 @@
 ## Commands
 
 ```bash
-bun run test:unit              # Vitest unit tests (405 tests, 17 files)
-bunx vitest run tests/integration/  # Vitest integration tests (72 tests, 10 files)
-bun run test:e2e               # Playwright E2E tests (112 tests, requires build)
+bun run test:unit              # Vitest unit tests
+bunx vitest run tests/integration/  # Vitest integration tests
+bun run test:e2e               # Playwright E2E tests (requires build)
 bun run typecheck              # svelte-check
 bun run lint                   # oxlint
 ```
