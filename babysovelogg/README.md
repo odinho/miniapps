@@ -29,10 +29,10 @@ bun run typecheck    # svelte-check
 There's a CLI for scripting and AI agents:
 
 ```bash
-npx tsx cli/baby.ts              # Quick status
-npx tsx cli/baby.ts nap          # Start a nap
-npx tsx cli/baby.ts up --mood happy  # Baby woke up
-npx tsx cli/baby.ts --help       # All commands
+bun cli/baby.ts              # Quick status
+bun cli/baby.ts nap          # Start a nap
+bun cli/baby.ts up --mood happy  # Baby woke up
+bun cli/baby.ts --help       # All commands
 ```
 
 Reads/writes the SQLite database directly — no server required.

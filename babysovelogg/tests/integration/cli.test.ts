@@ -3,11 +3,10 @@ import { execFileSync, type ExecFileSyncOptions } from "child_process";
 import { mkdtempSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import Database from "better-sqlite3";
+import { Database } from "bun:sqlite";
 
 const PROJECT_ROOT = join(import.meta.dirname, "../..");
 const CLI_PATH = join(PROJECT_ROOT, "cli/baby.ts");
-const TSX_PATH = join(PROJECT_ROOT, "node_modules/.bin/tsx");
 
 // Fixed mock time — all tests run at a deterministic point in time.
 // Saturday 2026-03-15 at 12:00 UTC. Testa is ~9 months old (born 2025-06-12).
@@ -98,13 +97,12 @@ function cli(
     cwd: tmpDir,
     env: {
       ...process.env,
-      NODE_NO_WARNINGS: "1",
       MOCK_TIME: opts?.mockTime ?? T,
     },
     timeout: 15_000,
   };
   try {
-    const stdout = execFileSync(TSX_PATH, [CLI_PATH, ...args], execOpts);
+    const stdout = execFileSync("bun", [CLI_PATH, ...args], execOpts);
     return { stdout: stdout.toString(), stderr: "", exitCode: 0 };
   } catch (err: unknown) {
     const e = err as { stdout?: Buffer; stderr?: Buffer; status?: number };

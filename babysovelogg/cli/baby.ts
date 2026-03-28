@@ -1,11 +1,10 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env bun
 // baby — CLI for babysovelogg baby sleep tracker
 //
 // Designed for both humans and AI agents. Reads/writes go through
 // the event-sourced database directly (no server required).
 //
-// Usage: tsx cli/baby.ts [command] [options]
-//    or: pnpm baby [command] [options]
+// Usage: bun cli/baby.ts [command] [options]
 
 import { randomBytes } from "node:crypto";
 import { db, closeDb } from "../src/lib/server/db.js";
@@ -20,7 +19,7 @@ import { getTodayStats, getWeekStats, getAverageWakeWindow } from "../src/lib/en
 import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry } from "../src/lib/types.js";
 
 process.on("exit", closeDb);
-db.pragma("busy_timeout = 3000");
+db.exec("PRAGMA busy_timeout = 3000");
 
 // ── Clock (mockable for tests via MOCK_TIME env var, e.g. "2026-03-15T12:00:00Z") ──
 

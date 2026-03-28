@@ -1,0 +1,19 @@
+#!/bin/sh
+# Pre-push hook: run lint, typecheck, and tests before pushing.
+# Install: git config core.hooksPath babysovelogg/.githooks
+# (automatically set by `bun install` via the prepare script)
+
+set -e
+
+# Find the repo root and cd to babysovelogg
+root="$(git rev-parse --show-toplevel)"
+cd "$root/babysovelogg"
+
+echo "pre-push: lint"
+bun run lint
+
+echo "pre-push: typecheck"
+bun run typecheck
+
+echo "pre-push: test"
+bun run test
