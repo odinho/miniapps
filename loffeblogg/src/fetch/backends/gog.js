@@ -13,14 +13,14 @@ export const name = 'gog';
 const ACCOUNT = 'odin.omdal@gmail.com';
 
 /**
- * Find gog binary - check ~/bin first, then PATH
+ * Find gog binary - check PATH first, then ~/bin as fallback
  */
 function findBinary() {
-  const homeBin = path.join(os.homedir(), 'bin', 'gog');
-  if (existsSync(homeBin)) return homeBin;
   try {
     return execSync('which gog', { encoding: 'utf-8', stdio: 'pipe', timeout: 5000 }).trim() || null;
   } catch {
+    const homeBin = path.join(os.homedir(), 'bin', 'gog');
+    if (existsSync(homeBin)) return homeBin;
     return null;
   }
 }

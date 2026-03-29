@@ -12,12 +12,12 @@ export const name = 'gdrive';
 const LOCAL_GDRIVE = path.resolve('cache/gdrive/gdrive');
 
 /**
- * Find gdrive binary - check local cache first, then global
+ * Find gdrive binary - check local cache first, then PATH
  */
 function findBinary() {
   if (existsSync(LOCAL_GDRIVE)) return LOCAL_GDRIVE;
   try {
-    return execSync('which gdrive', { encoding: 'utf-8' }).trim() || null;
+    return execSync('which gdrive', { encoding: 'utf-8', stdio: 'pipe', timeout: 5000 }).trim() || null;
   } catch {
     return null;
   }
