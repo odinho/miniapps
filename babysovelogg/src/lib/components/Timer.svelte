@@ -30,19 +30,14 @@
 	const awakeMs = $derived(getAwakeSince(input));
 </script>
 
-<div class="arc-center-text">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<div class="arc-center-text" style={onEditStart && mode.kind === 'sleeping' ? 'cursor: pointer;' : ''} onclick={mode.kind === 'sleeping' ? onEditStart : undefined}>
 	{#if mode.kind === 'sleeping'}
 		<div class="arc-center-label">{mode.label}</div>
 		<span class="countdown-value">{formatDurationLong(mode.elapsed)}</span>
 		{#if activeSleep?.type === 'nap' && prediction?.bedtime}
 			<div class="arc-sub-label">Leggetid ~{formatTime(prediction.bedtime)}</div>
-		{/if}
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<!-- svelte-ignore a11y_click_events_have_key_events -->
-		{#if onEditStart}
-			<span class="edit-start-link" onclick={onEditStart}>
-				Starta {formatTime(mode.startTime)}
-			</span>
 		{/if}
 	{:else if mode.kind === 'deep-night'}
 		<div class="arc-center-label">God natt 💤</div>
