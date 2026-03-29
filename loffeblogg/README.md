@@ -1,4 +1,4 @@
-# Løffeblogg
+# Loffeblogg
 
 Genererer ein statisk reiseblogg frå Google Docs.
 

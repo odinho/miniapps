@@ -1,5 +1,5 @@
 /**
- * Eleventy configuration for Løffeblogg
+ * Eleventy configuration for Loffeblogg
  */
 
 export default function(eleventyConfig) {
