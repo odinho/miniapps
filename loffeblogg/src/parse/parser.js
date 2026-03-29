@@ -186,6 +186,21 @@ export function cleanSection($) {
     const current = $(paragraphs[i]);
 
     if (current.find('img').length > 0) {
+      // Check if the image paragraph also contains inline text (caption alongside img)
+      const clone = current.clone();
+      clone.find('img').remove();
+      const inlineText = clone.text().trim();
+
+      if (inlineText.length > 0 && inlineText.length < 200) {
+        // Split: keep only <img> in the original <p>, move text to a new caption <p>
+        const inlineHtml = clone.html().trim();
+        const $imgs = current.find('img').clone();
+        current.empty().append($imgs);
+        const $caption = $('<p></p>').addClass('image-caption').html(inlineHtml);
+        current.after($caption);
+        continue; // Don't look at next paragraph for caption
+      }
+
       for (let j = i + 1; j < Math.min(i + 4, paragraphs.length); j++) {
         const candidate = $(paragraphs[j]);
         const candidateText = candidate.text().trim();
@@ -203,6 +218,25 @@ export function cleanSection($) {
   }
 
   return $('body').html() || $.html();
+}
+
+/**
+ * Check if the first non-empty paragraph looks like a location line
+ * (short, no date, no image) and extract it, removing it from the DOM.
+ */
+function extractLocationFromContent($) {
+  const paragraphs = $('p').toArray();
+  for (const p of paragraphs) {
+    const $p = $(p);
+    const text = $p.text().trim();
+    if (!text) continue;
+    if (text.length < 80 && $p.find('img').length === 0 && !containsDate(text)) {
+      $p.remove();
+      return text;
+    }
+    return null; // First non-empty paragraph isn't a location
+  }
+  return null;
 }
 
 /**
@@ -243,6 +277,12 @@ export function parseDocument(docId, html, name, imageMap = new Map(), modifiedT
       removeIntroTitle($, title);
     }
 
+    // Extract location from first content paragraph if not in heading
+    let location = section.dateInfo?.location || null;
+    if (!location && section.dateInfo?.date) {
+      location = extractLocationFromContent($);
+    }
+
     const cleanedContent = cleanSection($);
 
     return {
@@ -251,7 +291,7 @@ export function parseDocument(docId, html, name, imageMap = new Map(), modifiedT
       dateFormatted: section.dateInfo?.date ? formatDateNynorsk(section.dateInfo.date) : null,
       endDateFormatted: section.dateInfo?.endDate ? formatDateNynorsk(section.dateInfo.endDate) : null,
       isRange: section.dateInfo?.isRange || false,
-      location: section.dateInfo?.location || null,
+      location,
       heading: section.heading,
       content: cleanedContent,
       images
