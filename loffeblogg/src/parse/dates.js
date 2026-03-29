@@ -96,6 +96,11 @@ export function containsDate(text) {
 const WEEKDAYS = ['måndag', 'tysdag', 'onsdag', 'torsdag', 'fredag', 'laurdag', 'sundag',
                   'mandag', 'tirsdag', 'lørdag', 'søndag']; // Both nynorsk and bokmål
 
+/** Strip leading dash/en-dash separators from location text */
+function cleanLocation(loc) {
+  return loc?.replace(/^[-–]\s*/, '') || loc;
+}
+
 /**
  * Extract date range and optional location from a heading line
  * Examples:
@@ -119,7 +124,7 @@ export function extractDateRangeFromLine(text, _defaultYear = new Date().getFull
     const endMonth = parseInt(match[5], 10) - 1;
     let endYear = parseInt(match[6], 10);
 
-    const location = match[7].trim() || null;
+    const location = cleanLocation(match[7].trim()) || null;
 
     // Handle 2-digit years
     if (endYear < 100) {
@@ -177,7 +182,7 @@ export function extractTextDateRangeFromLine(text, defaultYear = new Date().getF
     let locationBefore = fullMatch[1].trim();
     let locationAfter = fullMatch[8].trim();
     if (WEEKDAYS.includes(locationBefore.toLowerCase())) locationBefore = '';
-    const location = locationBefore || locationAfter || null;
+    const location = cleanLocation(locationBefore || locationAfter) || null;
 
     return {
       date: new Date(startYear, startMonth, startDay),
@@ -204,7 +209,7 @@ export function extractTextDateRangeFromLine(text, defaultYear = new Date().getF
     let locationBefore = shortMatch[1].trim();
     let locationAfter = shortMatch[6].trim();
     if (WEEKDAYS.includes(locationBefore.toLowerCase())) locationBefore = '';
-    const location = locationBefore || locationAfter || null;
+    const location = cleanLocation(locationBefore || locationAfter) || null;
 
     return {
       date: new Date(year, month, startDay),
@@ -259,7 +264,7 @@ export function extractDateFromLine(text, defaultYear = new Date().getFullYear()
       locationBefore = '';
     }
 
-    const location = locationBefore || locationAfter || null;
+    const location = cleanLocation(locationBefore || locationAfter) || null;
 
     return {
       date: new Date(year, month, day),
@@ -276,7 +281,7 @@ export function extractDateFromLine(text, defaultYear = new Date().getFullYear()
     const day = parseInt(numericMatch4[2], 10);
     const month = parseInt(numericMatch4[3], 10) - 1;
     const year = parseInt(numericMatch4[4], 10);
-    const location = numericMatch4[5].trim() || null;
+    const location = cleanLocation(numericMatch4[5].trim()) || null;
 
     return {
       date: new Date(year, month, day),
@@ -294,7 +299,7 @@ export function extractDateFromLine(text, defaultYear = new Date().getFullYear()
     const month = parseInt(numericMatch2[3], 10) - 1;
     let year = parseInt(numericMatch2[4], 10);
     year = year + 2000; // Convert 2-digit to 4-digit year
-    const location = numericMatch2[5].trim() || null;
+    const location = cleanLocation(numericMatch2[5].trim()) || null;
 
     return {
       date: new Date(year, month, day),
