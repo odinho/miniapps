@@ -30,7 +30,7 @@ export function isAvailable() {
   const bin = findBinary();
   if (!bin) return false;
   try {
-    execSync(`${bin} account list`, { encoding: 'utf-8', stdio: 'pipe' });
+    execSync(`${bin} account list`, { encoding: 'utf-8', stdio: 'pipe', timeout: 5000 });
     return true;
   } catch {
     return false;
@@ -49,6 +49,7 @@ export function listDocuments(folderId) {
   const output = execSync(`${bin} files list --query "${query}"`, {
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
+    timeout: 30000,
   });
 
   // Parse gdrive output (skip header line)
@@ -83,6 +84,7 @@ function getModifiedTime(bin, docId) {
     const output = execSync(`${bin} files info ${docId}`, {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 15000,
     });
 
     const match = output.match(/^Modified:\s*(.+)$/im);

@@ -30,7 +30,7 @@ export function listDocuments(folderId) {
   try {
     const result = execSync(
       `gog drive ls --parent "${folderId}" --account "${ACCOUNT}" --json`,
-      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 30000 }
     );
     
     const data = JSON.parse(result);
