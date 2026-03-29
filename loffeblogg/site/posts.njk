@@ -38,11 +38,6 @@ isPost: true
     {% endif %}
 
     <div class="post-main">
-      <header class="post-header">
-        <h1>{{ post.title }}</h1>
-        {% if post.lastModified %}<p class="post-updated">Sist oppdatert {{ post.lastModified | datoTid }}</p>{% endif %}
-      </header>
-
       <div class="post-content">
         {% for day in post.days %}
         <section class="day-section" {% if day.date %}id="dag-{{ loop.index }}" data-day="{{ loop.index }}"{% endif %}>

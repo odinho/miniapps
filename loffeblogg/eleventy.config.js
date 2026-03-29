@@ -90,6 +90,15 @@ export default function(eleventyConfig) {
     return diffDays > 0 ? diffDays : 0;
   });
 
+  // Check if a date is within 8 days of now (build time)
+  eleventyConfig.addFilter("isRecent", function(dateStr) {
+    if (!dateStr) return false;
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffDays = (now - date) / (1000 * 60 * 60 * 24);
+    return diffDays <= 8;
+  });
+
   // Slugify filter
   eleventyConfig.addFilter("slugify", (text) => {
     return text

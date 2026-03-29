@@ -7,20 +7,41 @@
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body id="top">
-  <header class="site-header">
-    <nav>
-      <a href="/" class="site-title">Loffetur</a>
-      {% if not showHero %}<span class="site-tagline">90 dagar frå Thailand til Australia</span>{% endif %}
-    </nav>
-  </header>
-
   {% if showHero %}
-  <section class="hero">
-    <div class="hero-content">
-      <h1>Loffetur</h1>
-      <p class="tagline">Skjalg og Unni Elisabeth er på loffetur i rundt 90 dagar. Frå Thailand i nord til Australia i sør. Store delar av turen vert til undervegs.</p>
+  {# Homepage: big orange top + cream bridge #}
+  <div class="site-top">
+    <h1 class="site-top-title">Loffetur</h1>
+    <div class="site-top-sub">Skjalg og Unni Elisabeth &middot; 2026</div>
+  </div>
+  <div class="site-bridge">
+    <h2 class="bridge-tagline"><strong>90 dagar</strong> fr&aring; Thailand til Australia</h2>
+    <p class="bridge-desc">Store delar av turen vert til undervegs.</p>
+    <div class="bridge-rule"></div>
+  </div>
+  {% elif isPost %}
+  {# Post page: slim orange top + cream bridge with post info #}
+  <div class="site-top site-top-slim">
+    <a href="/" class="site-top-logo">Loffetur</a>
+    <span class="site-top-tagline">90 dagar fr&aring; Thailand til Australia</span>
+  </div>
+  <div class="site-bridge">
+    <h1 class="bridge-post-title">{{ post.title }}</h1>
+    <div class="bridge-post-meta">
+      {% set firstDay = post.days | selectattr("date") | first %}
+      {% set lastDay = post.days | selectattr("date") | last %}
+      {% if firstDay and lastDay %}
+        {{ firstDay.date | kortdato }} &ndash; {{ (lastDay.endDate or lastDay.date) | kortdato }} &middot; <span class="bridge-days">{{ post.days | countDays }} dagar</span>
+      {% endif %}
     </div>
-  </section>
+    {% if post.lastModified %}<div class="bridge-post-updated">Oppdatert {{ post.lastModified | dato }}</div>{% endif %}
+    <div class="bridge-rule"></div>
+  </div>
+  {% else %}
+  {# Other pages: slim header only #}
+  <div class="site-top site-top-slim">
+    <a href="/" class="site-top-logo">Loffetur</a>
+    <span class="site-top-tagline">90 dagar fr&aring; Thailand til Australia</span>
+  </div>
   {% endif %}
 
   <main>
@@ -38,43 +59,46 @@
             {% set hasImages = true %}
           {% endif %}
         {% endfor %}
-        
+
         {% if isPost and p.slug == post.slug %}
-        <span class="route-stop">{{ p.title }}</span>
+        <span class="route-stop route-stop-current">{{ p.title }}</span>
         {% elif hasImages %}
         <a href="/{{ p.slug }}/" class="route-stop">{{ p.title }}</a>
         {% else %}
         <span class="route-stop route-stop-future">{{ p.title }}</span>
         {% endif %}
-        {% if not loop.last %}<span class="route-arrow">→</span>{% endif %}
+        {% if not loop.last %}<span class="route-arrow">&rarr;</span>{% endif %}
         {% endfor %}
       </nav>
-      <p class="footer-links"><a href="/">Heim</a> · <a href="#top">Til toppen ↑</a></p>
-      {% if buildTime %}<p class="footer-updated">Sist oppdatert: {{ buildTime | datoTid }}</p>{% endif %}
+      <p class="footer-links"><a href="/">Heim</a> &middot; <a href="#top">Til toppen &uarr;</a></p>
+      {% if buildTime %}<p class="footer-updated">Oppdatert {{ buildTime | datoTid }}</p>{% endif %}
     </div>
   </footer>
 
   <script>
-    // Hide header on scroll down, show on scroll up
-    let lastScroll = 0;
-    const header = document.querySelector('.site-header');
+    // Hide header on scroll down, show on scroll up (only for slim header on post pages)
+    (function() {
+      const header = document.querySelector('.site-top-slim');
+      if (!header) return;
 
-    window.addEventListener('scroll', () => {
-      const currentScroll = window.scrollY;
+      let lastScroll = 0;
+      window.addEventListener('scroll', () => {
+        const currentScroll = window.scrollY;
 
-      if (currentScroll <= 0) {
-        header.classList.remove('hidden');
-        return;
-      }
+        if (currentScroll <= 0) {
+          header.classList.remove('hidden');
+          return;
+        }
 
-      if (currentScroll > lastScroll && currentScroll > 60) {
-        header.classList.add('hidden');
-      } else if (currentScroll < lastScroll) {
-        header.classList.remove('hidden');
-      }
+        if (currentScroll > lastScroll && currentScroll > 60) {
+          header.classList.add('hidden');
+        } else if (currentScroll < lastScroll) {
+          header.classList.remove('hidden');
+        }
 
-      lastScroll = currentScroll;
-    }, { passive: true });
+        lastScroll = currentScroll;
+      }, { passive: true });
+    })();
 
     {% if isPost %}
     // Day navigation - scroll tracking and mobile dropdown
