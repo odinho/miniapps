@@ -3,3 +3,6 @@ cache/
 
 # Built site
 _site/
+
+# Database (contains personal data)
+db.sqlite
