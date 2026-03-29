@@ -286,7 +286,14 @@ a.post-card:hover h2 {
 .post-summary {
   color: var(--color-text-light);
   font-size: 0.85rem;
-  margin: 0 0 0.8rem;
+  margin: 0 0 0.3rem;
+}
+
+.post-updated {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  margin: 0 0 0.6rem;
+  opacity: 0.8;
 }
 
 .read-more {

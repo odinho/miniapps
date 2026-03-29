@@ -75,6 +75,7 @@ showHero: true
       </p>
       {% endif %}
       <p class="post-summary">{{ post.days | countDays }} dagar</p>
+      {% if post.lastModified %}<p class="post-updated">Sist oppdatert {{ post.lastModified | datoTid }}</p>{% endif %}
       <span class="read-more">Les meir &rarr;</span>
     </div>
   </a>
