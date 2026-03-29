@@ -1,4 +1,4 @@
-import { test, expect } from "vitest";
+import { test, expect } from "bun:test";
 import {
   get,
   postEvents,
@@ -7,7 +7,9 @@ import {
   makeEvent,
   generateSleepId,
   generateDiaperId,
+  setupHarness,
 } from "./harness.js";
+setupHarness();
 
 test("GET /api/events with type filter narrows results", async () => {
   const babyId = createBaby("Testa");

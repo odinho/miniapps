@@ -1,4 +1,4 @@
-import { test, expect } from "vitest";
+import { test, expect } from "bun:test";
 import {
   post,
   db,
@@ -6,7 +6,9 @@ import {
   setWakeUpTime,
   generateId,
   generateSleepId,
+  setupHarness,
 } from "./harness.js";
+setupHarness();
 
 test("Duplicate events with same clientId+clientEventId are ignored", async () => {
   const babyId = createBaby("Testa");

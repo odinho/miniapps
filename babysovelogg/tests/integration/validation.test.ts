@@ -1,4 +1,4 @@
-import { test, expect } from "vitest";
+import { test, expect } from "bun:test";
 import {
   post,
   db,
@@ -7,7 +7,9 @@ import {
   generateId,
   generateSleepId,
   generateDiaperId,
+  setupHarness,
 } from "./harness.js";
+setupHarness();
 
 // --- Envelope validation ---
 

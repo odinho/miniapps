@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { getTimerMode, getAwakeSince, type TimerInput } from "$lib/timer-state.js";
 import type { SleepLogRow } from "$lib/types.js";
 

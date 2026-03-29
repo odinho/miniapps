@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { assembleState, type DayData } from "$lib/engine/state.js";
 import type { Baby, SleepLogRow, DayStartRow } from "$lib/types.js";
 

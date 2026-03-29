@@ -1,5 +1,6 @@
-import { describe, test, expect } from "vitest";
-import { db, postCsv, createBaby } from "./harness.js";
+import { describe, test, expect } from "bun:test";
+import { db, postCsv, createBaby, setupHarness } from "./harness.js";
+setupHarness();
 import { renderDayState } from "../helpers/render-state.js";
 
 const NAPPER_CSV = `start,end,category,overallHappiness,babyMoodOnWakeUp,diaperWeight,diaperContent,breastLeftMinutes,breastRightMinutes,amountPumpedLeft,amountPumpedRight,feedingAmount,temperature,bottleFeedingType,comment,createdAt,pauses
@@ -25,7 +26,7 @@ describe("POST /api/import/napper", () => {
     expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
       "baby: Halldis (2025-10-21)
       vekketid: 04:46
-      søvn: 08:00–08:45 lur 5 | 12:15–13:35 lur 3 | 17:26–04:46 natt 1 pause (16m) 3
+      søvn: 08:00–08:45 lur 5 | 12:15–13:35 lur 3 | 17:26–04:46 natt 1 pause (16m) 3 "With Rockit"
       bleier: (ingen)"
     `);
   });

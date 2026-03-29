@@ -1,4 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, setSystemTime, beforeEach, afterEach, afterAll } from 'bun:test';
+
+afterAll(() => setSystemTime());
 import {
 	buildStartSleep,
 	buildEndSleep,
@@ -31,10 +33,9 @@ function makeSleep(overrides: Partial<SleepLogRow> = {}): SleepLogRow {
 
 describe('buildStartSleep', () => {
 	beforeEach(() => {
-		vi.useFakeTimers();
-		vi.setSystemTime(new Date('2026-03-27T14:00:00.000Z'));
+		setSystemTime(new Date('2026-03-27T14:00:00.000Z'));
 	});
-	afterEach(() => vi.useRealTimers());
+	afterEach(() => setSystemTime());
 
 	it('creates a sleep.started event with correct payload', () => {
 		const result = buildStartSleep(1, [], 6, null);
@@ -44,7 +45,7 @@ describe('buildStartSleep', () => {
 		expect(result.events[0].payload.babyId).toBe(1);
 		expect(result.events[0].payload.startTime).toBe('2026-03-27T14:00:00.000Z');
 		expect(result.events[0].payload.sleepDomainId).toMatch(/^slp_/);
-		expect(result.sleepDomainId).toBe(result.events[0].payload.sleepDomainId);
+		expect(result.sleepDomainId).toBe(result.events[0].payload.sleepDomainId as string);
 		expect(result.startTime).toBe('2026-03-27T14:00:00.000Z');
 	});
 
@@ -54,13 +55,13 @@ describe('buildStartSleep', () => {
 	});
 
 	it('classifies late-night sleep as night', () => {
-		vi.setSystemTime(new Date('2026-03-27T22:00:00.000Z'));
+		setSystemTime(new Date('2026-03-27T22:00:00.000Z'));
 		const result = buildStartSleep(1, [], 6, null);
 		expect(result.events[0].payload.type).toBe('night');
 	});
 
 	it('classifies early-morning sleep as night', () => {
-		vi.setSystemTime(new Date('2026-03-27T03:00:00.000Z'));
+		setSystemTime(new Date('2026-03-27T03:00:00.000Z'));
 		const result = buildStartSleep(1, [], 6, null);
 		expect(result.events[0].payload.type).toBe('night');
 	});
@@ -74,10 +75,9 @@ describe('buildStartSleep', () => {
 
 describe('buildEndSleep', () => {
 	beforeEach(() => {
-		vi.useFakeTimers();
-		vi.setSystemTime(new Date('2026-03-27T15:00:00.000Z'));
+		setSystemTime(new Date('2026-03-27T15:00:00.000Z'));
 	});
-	afterEach(() => vi.useRealTimers());
+	afterEach(() => setSystemTime());
 
 	it('creates a sleep.ended event', () => {
 		const sleep = makeSleep();
@@ -116,10 +116,9 @@ describe('buildEndSleep', () => {
 
 describe('buildPause', () => {
 	beforeEach(() => {
-		vi.useFakeTimers();
-		vi.setSystemTime(new Date('2026-03-27T10:30:00.000Z'));
+		setSystemTime(new Date('2026-03-27T10:30:00.000Z'));
 	});
-	afterEach(() => vi.useRealTimers());
+	afterEach(() => setSystemTime());
 
 	it('creates a sleep.paused event', () => {
 		const event = buildPause('slp_test1');
@@ -131,10 +130,9 @@ describe('buildPause', () => {
 
 describe('buildResume', () => {
 	beforeEach(() => {
-		vi.useFakeTimers();
-		vi.setSystemTime(new Date('2026-03-27T10:45:00.000Z'));
+		setSystemTime(new Date('2026-03-27T10:45:00.000Z'));
 	});
-	afterEach(() => vi.useRealTimers());
+	afterEach(() => setSystemTime());
 
 	it('creates a sleep.resumed event', () => {
 		const event = buildResume('slp_test1');

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import {
 	DIAPER_TYPES,
 	DIAPER_AMOUNTS,
@@ -10,10 +10,7 @@ import {
 	isValidTime,
 } from '$lib/diaper-form-actions.js';
 
-// Mock generateDiaperId for deterministic tests
-vi.mock('$lib/identity.js', () => ({
-	generateDiaperId: () => 'dip_test123',
-}));
+const testId = () => 'dip_test123';
 
 describe('constants', () => {
 	it('DIAPER_TYPES has 4 options', () => {
@@ -62,39 +59,39 @@ describe('shouldHideDiaperStatus', () => {
 
 describe('buildDiaperEvent', () => {
 	it('builds diaper.logged event with correct type', () => {
-		const evt = buildDiaperEvent(1, '2026-03-27T12:00:00.000Z', 'wet', 'middels', '');
+		const evt = buildDiaperEvent(1, '2026-03-27T12:00:00.000Z', 'wet', 'middels', '', testId);
 		expect(evt.type).toBe('diaper.logged');
 	});
 
 	it('includes babyId and time in payload', () => {
-		const evt = buildDiaperEvent(42, '2026-03-27T12:00:00.000Z', 'dirty', 'lite', '');
+		const evt = buildDiaperEvent(42, '2026-03-27T12:00:00.000Z', 'dirty', 'lite', '', testId);
 		expect(evt.payload.babyId).toBe(42);
 		expect(evt.payload.time).toBe('2026-03-27T12:00:00.000Z');
 	});
 
 	it('includes type and amount', () => {
-		const evt = buildDiaperEvent(1, '2026-03-27T12:00:00.000Z', 'both', 'mykje', '');
+		const evt = buildDiaperEvent(1, '2026-03-27T12:00:00.000Z', 'both', 'mykje', '', testId);
 		expect(evt.payload.type).toBe('both');
 		expect(evt.payload.amount).toBe('mykje');
 	});
 
 	it('generates a diaperDomainId', () => {
-		const evt = buildDiaperEvent(1, '2026-03-27T12:00:00.000Z', 'wet', 'middels', '');
+		const evt = buildDiaperEvent(1, '2026-03-27T12:00:00.000Z', 'wet', 'middels', '', testId);
 		expect(evt.payload.diaperDomainId).toBe('dip_test123');
 	});
 
 	it('sets note to null when empty', () => {
-		const evt = buildDiaperEvent(1, '2026-03-27T12:00:00.000Z', 'wet', 'middels', '');
+		const evt = buildDiaperEvent(1, '2026-03-27T12:00:00.000Z', 'wet', 'middels', '', testId);
 		expect(evt.payload.note).toBeNull();
 	});
 
 	it('sets note to null when whitespace only', () => {
-		const evt = buildDiaperEvent(1, '2026-03-27T12:00:00.000Z', 'wet', 'middels', '   ');
+		const evt = buildDiaperEvent(1, '2026-03-27T12:00:00.000Z', 'wet', 'middels', '   ', testId);
 		expect(evt.payload.note).toBeNull();
 	});
 
 	it('trims note whitespace', () => {
-		const evt = buildDiaperEvent(1, '2026-03-27T12:00:00.000Z', 'wet', 'middels', '  runny  ');
+		const evt = buildDiaperEvent(1, '2026-03-27T12:00:00.000Z', 'wet', 'middels', '  runny  ', testId);
 		expect(evt.payload.note).toBe('runny');
 	});
 
@@ -105,6 +102,7 @@ describe('buildDiaperEvent', () => {
 			'dirty',
 			'lite',
 			'after feeding',
+			testId,
 		);
 		expect(evt.payload.note).toBe('after feeding');
 	});
@@ -112,32 +110,32 @@ describe('buildDiaperEvent', () => {
 
 describe('buildPottyEvent', () => {
 	it('builds diaper.logged event', () => {
-		const evt = buildPottyEvent(1, '2026-03-27T12:00:00.000Z', 'potty_wet', 'dry', '');
+		const evt = buildPottyEvent(1, '2026-03-27T12:00:00.000Z', 'potty_wet', 'dry', '', testId);
 		expect(evt.type).toBe('diaper.logged');
 	});
 
 	it('uses potty result as type', () => {
-		const evt = buildPottyEvent(1, '2026-03-27T12:00:00.000Z', 'potty_dirty', 'damp', '');
+		const evt = buildPottyEvent(1, '2026-03-27T12:00:00.000Z', 'potty_dirty', 'damp', '', testId);
 		expect(evt.payload.type).toBe('potty_dirty');
 	});
 
 	it('uses diaper status as amount', () => {
-		const evt = buildPottyEvent(1, '2026-03-27T12:00:00.000Z', 'potty_wet', 'wet', '');
+		const evt = buildPottyEvent(1, '2026-03-27T12:00:00.000Z', 'potty_wet', 'wet', '', testId);
 		expect(evt.payload.amount).toBe('wet');
 	});
 
 	it('sets amount to null for diaper_only', () => {
-		const evt = buildPottyEvent(1, '2026-03-27T12:00:00.000Z', 'diaper_only', 'dry', '');
+		const evt = buildPottyEvent(1, '2026-03-27T12:00:00.000Z', 'diaper_only', 'dry', '', testId);
 		expect(evt.payload.amount).toBeNull();
 	});
 
 	it('generates a diaperDomainId', () => {
-		const evt = buildPottyEvent(1, '2026-03-27T12:00:00.000Z', 'potty_wet', 'dry', '');
+		const evt = buildPottyEvent(1, '2026-03-27T12:00:00.000Z', 'potty_wet', 'dry', '', testId);
 		expect(evt.payload.diaperDomainId).toBe('dip_test123');
 	});
 
 	it('trims and nullifies empty notes', () => {
-		const evt = buildPottyEvent(1, '2026-03-27T12:00:00.000Z', 'potty_wet', 'dry', '  ');
+		const evt = buildPottyEvent(1, '2026-03-27T12:00:00.000Z', 'potty_wet', 'dry', '  ', testId);
 		expect(evt.payload.note).toBeNull();
 	});
 
@@ -148,12 +146,13 @@ describe('buildPottyEvent', () => {
 			'potty_nothing',
 			'dry',
 			'tried for 5 min',
+			testId,
 		);
 		expect(evt.payload.note).toBe('tried for 5 min');
 	});
 
 	it('includes correct babyId and time', () => {
-		const evt = buildPottyEvent(7, '2026-03-27T08:30:00.000Z', 'potty_wet', 'damp', '');
+		const evt = buildPottyEvent(7, '2026-03-27T08:30:00.000Z', 'potty_wet', 'damp', '', testId);
 		expect(evt.payload.babyId).toBe(7);
 		expect(evt.payload.time).toBe('2026-03-27T08:30:00.000Z');
 	});

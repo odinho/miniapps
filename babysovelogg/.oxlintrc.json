@@ -10,7 +10,14 @@
     "@typescript-eslint/no-explicit-any": "error",
     "oxc/no-map-spread": "off",
     "no-extend-native": "off",
-    "no-empty-pattern": "off"
+    "no-empty-pattern": "off",
+    "no-restricted-imports": ["error", {
+      "paths": [{
+        "name": "bun:test",
+        "importNames": ["mock"],
+        "message": "Use dependency injection instead of mocking."
+      }]
+    }]
   },
   "ignorePatterns": ["dist/", "node_modules/", "src/app.d.ts"]
 }

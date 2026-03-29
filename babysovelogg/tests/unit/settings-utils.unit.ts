@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, setSystemTime } from 'bun:test';
 import {
 	NAP_OPTIONS,
 	POTTY_OPTIONS,
@@ -266,22 +266,19 @@ describe('buildPredictionRows', () => {
 // --- Age formatting ---
 
 describe('formatAge', () => {
+	// Pin to the 15th to avoid month-boundary flakiness (e.g. Mar 31 - 1 month = Mar 3)
+	beforeAll(() => setSystemTime(new Date('2026-03-15T12:00:00Z')));
+	afterAll(() => setSystemTime());
+
 	it('returns nyfødd for less than 1 month', () => {
-		// Use a date very close to now
-		const recent = new Date();
-		recent.setDate(recent.getDate() - 10);
-		expect(formatAge(recent.toISOString().slice(0, 10))).toBe('nyfødd');
+		expect(formatAge('2026-03-05')).toBe('nyfødd');
 	});
 
 	it('returns singular for 1 month', () => {
-		const d = new Date();
-		d.setMonth(d.getMonth() - 1);
-		expect(formatAge(d.toISOString().slice(0, 10))).toBe('1 månad');
+		expect(formatAge('2026-02-15')).toBe('1 månad');
 	});
 
 	it('returns plural for 6 months', () => {
-		const d = new Date();
-		d.setMonth(d.getMonth() - 6);
-		expect(formatAge(d.toISOString().slice(0, 10))).toBe('6 månader');
+		expect(formatAge('2025-09-15')).toBe('6 månader');
 	});
 });

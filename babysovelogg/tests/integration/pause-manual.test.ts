@@ -1,11 +1,13 @@
-import { test, expect } from "vitest";
+import { test, expect } from "bun:test";
 import {
   postEvents,
   createBaby,
   makeEvent,
   generateSleepId,
   db,
+  setupHarness,
 } from "./harness.js";
+setupHarness();
 import { renderDayState, renderCounts } from "../helpers/render-state.js";
 
 test("sleep.pause_deleted removes a pause by index", async () => {
