@@ -81,6 +81,30 @@ export async function listDocuments() {
     return config.documents;
   }
 
+  // Fallback to cached metadata (offline/parse-only builds)
+  const cached = await getCachedMeta();
+  const docsDir = path.resolve('cache/docs');
+  // Merge documents.json with per-doc .meta.json files
+  try {
+    const files = await fs.readdir(docsDir);
+    for (const f of files) {
+      if (!f.endsWith('.meta.json')) continue;
+      const id = f.replace('.meta.json', '');
+      if (cached[id]) continue;
+      const meta = JSON.parse(await fs.readFile(path.join(docsDir, f), 'utf-8'));
+      cached[id] = { name: meta.name, modifiedTime: meta.sourceModifiedTime };
+    }
+  } catch {}
+  const cachedDocs = Object.entries(cached).map(([id, meta]) => ({
+    id,
+    name: meta.name,
+    modifiedTime: meta.modifiedTime,
+  }));
+  if (cachedDocs.length > 0) {
+    console.log(`ℹ Using cached metadata (${cachedDocs.length} documents, offline mode)\n`);
+    return cachedDocs;
+  }
+
   console.error('❌ No documents found');
   console.error('   Install rclone: sudo apt install rclone && rclone config');
   return [];
