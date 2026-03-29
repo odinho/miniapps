@@ -109,6 +109,13 @@ describe('extractDateFromLine', () => {
     expect(result.location).toBe('Houayxay til Pakbeng');
   });
 
+  it('strips leading dash from location in "17. mars - Kitty Karina kjem"', () => {
+    const result = extractDateFromLine('17. mars - Kitty Karina kjem');
+    expect(result.date.getDate()).toBe(17);
+    expect(result.date.getMonth()).toBe(2);
+    expect(result.location).toBe('Kitty Karina kjem');
+  });
+
   it('returns null for non-date lines', () => {
     expect(extractDateFromLine('Me åt middag')).toBeNull();
   });
