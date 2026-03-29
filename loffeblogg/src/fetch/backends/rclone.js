@@ -15,6 +15,7 @@ export function isAvailable() {
     const remotes = execSync('rclone listremotes', {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 5000,
     });
     return remotes.includes('drive:');
   } catch {
@@ -30,7 +31,7 @@ export function isAvailable() {
 export function listDocuments(folderId) {
   const output = execSync(
     `rclone lsjson --drive-root-folder-id "${folderId}" drive:`,
-    { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+    { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 30000 }
   );
 
   const files = JSON.parse(output);

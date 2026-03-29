@@ -4,21 +4,32 @@
  */
 
 import { execSync } from 'child_process';
+import { existsSync } from 'fs';
+import os from 'os';
+import path from 'path';
 
 export const name = 'gog';
 
 const ACCOUNT = 'odin.omdal@gmail.com';
 
 /**
+ * Find gog binary - check PATH first, then ~/bin as fallback
+ */
+function findBinary() {
+  try {
+    return execSync('which gog', { encoding: 'utf-8', stdio: 'pipe', timeout: 5000 }).trim() || null;
+  } catch {
+    const homeBin = path.join(os.homedir(), 'bin', 'gog');
+    if (existsSync(homeBin)) return homeBin;
+    return null;
+  }
+}
+
+/**
  * Check if gog is available
  */
 export function isAvailable() {
-  try {
-    execSync('which gog', { stdio: 'pipe' });
-    return true;
-  } catch {
-    return false;
-  }
+  return !!findBinary();
 }
 
 /**
@@ -28,9 +39,10 @@ export function isAvailable() {
  */
 export function listDocuments(folderId) {
   try {
+    const bin = findBinary();
     const result = execSync(
-      `gog drive ls --parent "${folderId}" --account "${ACCOUNT}" --json`,
-      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+      `${bin} drive ls --parent "${folderId}" --account "${ACCOUNT}" --json`,
+      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 30000 }
     );
     
     const data = JSON.parse(result);
