@@ -1,8 +1,8 @@
-import type Database from "better-sqlite3";
+import type { SqliteDb } from "$lib/server/db.js";
 import type { SleepLogRow, DiaperLogRow, DayStartRow, Baby, SleepPauseRow } from "$lib/types.js";
 
 /** Render a compact, readable summary of a baby's current day state from the DB. */
-export function renderDayState(db: Database.Database, babyId: number): string {
+export function renderDayState(db: SqliteDb, babyId: number): string {
   const baby = db.prepare("SELECT * FROM baby WHERE id = ?").get(babyId) as Baby | undefined;
   if (!baby) return "(no baby)";
 
@@ -47,7 +47,7 @@ export function renderDayState(db: Database.Database, babyId: number): string {
 }
 
 /** Render the full event log as a compact summary. */
-export function renderEventLog(db: Database.Database): string {
+export function renderEventLog(db: SqliteDb): string {
   const events = db.prepare("SELECT type, payload, domain_id FROM events ORDER BY id").all() as {
     type: string;
     payload: string;
@@ -70,7 +70,7 @@ export function renderEventLog(db: Database.Database): string {
 }
 
 /** Render projection row counts — useful for rebuild tests. */
-export function renderCounts(db: Database.Database): string {
+export function renderCounts(db: SqliteDb): string {
   const counts = {
     events: (db.prepare("SELECT COUNT(*) as c FROM events").get() as { c: number }).c,
     sleeps: (

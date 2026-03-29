@@ -199,7 +199,7 @@ Relevant places in this repo:
 
 - [`tests/integration/`](../tests/integration/) — Vitest integration tests (API, event-sourcing, validation, dedup, rebuild, export, traceability, CLI)
 - [`tests/integration/harness.ts`](../tests/integration/harness.ts) — `post()`/`get()`/`postEvents()` wrappers around `fetch()`, re-exports DB helpers
-- [`tests/integration/cli.test.ts`](../tests/integration/cli.test.ts) — CLI integration tests (21 tests, runs `cli/baby.ts` via `tsx` against temp databases)
+- [`tests/integration/cli.test.ts`](../tests/integration/cli.test.ts) — CLI integration tests (21 tests, runs `cli/baby.ts` via `bun` against temp databases)
 - [`tests/fixtures.ts`](../tests/fixtures.ts) — Shared DB helpers and Playwright fixtures
 
 Use them to cover complete behavior chains with real DB state and realistic inputs.

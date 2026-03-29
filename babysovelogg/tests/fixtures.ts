@@ -1,6 +1,7 @@
 import { test as base, expect, type Page } from "@playwright/test";
 import { spawn, type ChildProcess } from "child_process";
-import Database from "better-sqlite3";
+import { Database } from "bun:sqlite";
+import type { SqliteDb } from "$lib/server/db.js";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
@@ -9,7 +10,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let _db: Database.Database;
+let _db: SqliteDb;
 
 // Worker-scoped fixture: one built SvelteKit server per Playwright worker
 export const test = base.extend<
@@ -26,7 +27,7 @@ export const test = base.extend<
 
       // Spawn the built SvelteKit server
       const buildDir = path.join(__dirname, "..", "build", "index.js");
-      const proc = spawn("node", [buildDir], {
+      const proc = spawn("bun", [buildDir], {
         env: { ...process.env, PORT: String(port), DB_PATH: dbPath },
         stdio: ["pipe", "pipe", "pipe"],
       });
@@ -51,9 +52,9 @@ export const test = base.extend<
       await fetch(`${baseURL}/api/state`);
 
       // Open a separate DB connection for test code (seeding + assertions)
-      _db = new Database(dbPath);
-      _db.pragma("foreign_keys = ON");
-      _db.pragma("busy_timeout = 5000");
+      _db = new Database(dbPath) as unknown as SqliteDb;
+      _db.exec("PRAGMA foreign_keys = ON");
+      _db.exec("PRAGMA busy_timeout = 5000");
 
       await use({ proc, baseURL, dbPath });
 

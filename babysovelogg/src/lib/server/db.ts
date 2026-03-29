@@ -1,9 +1,23 @@
-import Database from "better-sqlite3";
+import { Database as BunDatabase } from "bun:sqlite";
 import path from "path";
 
-export let db: Database.Database;
+/** Minimal SQLite interface matching the subset used by this app. */
+export interface SqliteStatement {
+  run(...params: unknown[]): { changes: number; lastInsertRowid: number | bigint };
+  get(...params: unknown[]): unknown;
+  all(...params: unknown[]): unknown[];
+}
 
-function initSchema(database: Database.Database) {
+export interface SqliteDb {
+  exec(sql: string): void;
+  prepare(sql: string): SqliteStatement;
+  transaction<T, A extends unknown[]>(fn: (...args: A) => T): (...args: A) => T;
+  close(): void;
+}
+
+export let db: SqliteDb;
+
+function initSchema(database: SqliteDb) {
   database.exec(`
     CREATE TABLE IF NOT EXISTS events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,14 +120,14 @@ function initSchema(database: Database.Database) {
 }
 
 /** Initialize (or re-initialize) the database. Defaults to file-based db.sqlite. */
-export function initDb(dbPath?: string): Database.Database {
+export function initDb(dbPath?: string): SqliteDb {
   if (db) try { db.close(); } catch {}
   const finalPath = dbPath ?? process.env.DB_PATH ?? path.join(process.cwd(), "db.sqlite");
-  db = new Database(finalPath);
-  db.pragma("journal_mode = DELETE");
-  db.pragma("foreign_keys = ON");
+  db = new BunDatabase(finalPath) as unknown as SqliteDb;
+  db.exec("PRAGMA journal_mode = DELETE");
+  db.exec("PRAGMA foreign_keys = ON");
   if (finalPath !== ":memory:") {
-    db.pragma("busy_timeout = 5000");
+    db.exec("PRAGMA busy_timeout = 5000");
   }
   initSchema(db);
   return db;
