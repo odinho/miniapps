@@ -134,7 +134,12 @@
 			const d = describeArc(cx, cy, r, startFrac, endFrac);
 			const tapD = describeArc(cx, cy, r, startFrac, endFrac);
 			const midFrac = (startFrac + endFrac) / 2;
-			const labelPt = fracToPoint(midFrac, cx, cy, r + 24);
+			const midPt = fracToPoint(midFrac, cx, cy, r + 24);
+			// For start/end labels, offset slightly from the bubble edge
+			const startLabelFrac = Math.min(startFrac + 0.02, midFrac);
+			const startLabelPt = fracToPoint(startLabelFrac, cx, cy, r + 24);
+			const endLabelFrac = Math.max(endFrac - 0.02, midFrac);
+			const endLabelPt = fracToPoint(endLabelFrac, cx, cy, r + 24);
 
 			let stroke: string;
 			let strokeWidth: number;
@@ -164,23 +169,26 @@
 			if (bubble.status === 'completed' && bubble.endTime) {
 				const durationMs = bubble.endTime.getTime() - bubble.startTime.getTime();
 				if (durationMs > 10 * 60000) {
-					label = { x: labelPt.x, y: labelPt.y, text: formatDuration(durationMs), opacity: 1 };
+					label = { x: midPt.x, y: midPt.y, text: formatDuration(durationMs), opacity: 1 };
 				}
 			} else if (bubble.status === 'active') {
-				// Show start time label once active sleep has been going for 3+ minutes
+				// Show start time label at the start of the bubble (not middle)
 				const elapsed = now.getTime() - bubble.startTime.getTime();
-				if (elapsed > 3 * 60000) {
+				const startTimeStr = formatTime(bubble.startTime);
+				// Suppress if it duplicates the arc start endpoint label
+				const duplicatesEndpoint = startTimeLabel === startTimeStr;
+				if (elapsed > 3 * 60000 && !duplicatesEndpoint) {
 					label = {
-						x: labelPt.x,
-						y: labelPt.y,
-						text: formatTime(bubble.startTime),
+						x: startLabelPt.x,
+						y: startLabelPt.y,
+						text: startTimeStr,
 						opacity: 0.8,
 					};
 				}
 			} else if (bubble.status === 'predicted') {
 				label = {
-					x: labelPt.x,
-					y: labelPt.y,
+					x: startLabelPt.x,
+					y: startLabelPt.y,
 					text: formatTime(bubble.startTime),
 					opacity: 0.6,
 				};

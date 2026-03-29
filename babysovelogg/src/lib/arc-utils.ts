@@ -118,10 +118,17 @@ export function collectBubbles(
     });
   }
 
-  // Show predicted nap ghosts (but not during active sleep — the active bubble covers it)
+  // Show predicted nap ghosts (skip any that overlap with the active sleep)
   const hasPredictedNaps = prediction?.predictedNaps && prediction.predictedNaps.length > 0;
-  if (hasPredictedNaps && !activeSleep) {
+  if (hasPredictedNaps) {
+    const activeEndMs = activeSleep
+      ? (activeSleep.isPaused && activeSleep.pauseTime
+          ? new Date(activeSleep.pauseTime).getTime()
+          : Date.now())
+      : 0;
     prediction!.predictedNaps!.forEach((pred, idx) => {
+      // Skip predictions that overlap with the active sleep
+      if (activeSleep && new Date(pred.startTime).getTime() < activeEndMs) return;
       bubbles.push({
         startTime: new Date(pred.startTime),
         endTime: new Date(pred.endTime),
@@ -130,7 +137,7 @@ export function collectBubbles(
         predictionIndex: idx,
       });
     });
-  } else if (prediction?.nextNap && !activeSleep && !hasPredictedNaps) {
+  } else if (prediction?.nextNap && !activeSleep) {
     const predTime = new Date(prediction.nextNap);
     bubbles.push({
       startTime: predTime,
@@ -140,16 +147,19 @@ export function collectBubbles(
     });
   }
 
-  // Show bedtime ghost only when no predicted nap bubbles (avoids double dashed arcs)
-  if (prediction?.bedtime && !hasPredictedNaps && !activeSleep) {
+  // Show bedtime ghost when no predicted nap bubbles remain
+  if (prediction?.bedtime && !hasPredictedNaps) {
     const bedtime = new Date(prediction.bedtime);
-    bubbles.push({
-      startTime: bedtime,
-      endTime: new Date(bedtime.getTime() + 45 * 60000),
-      type: "night",
-      status: "predicted",
-      predictionIndex: 0,
-    });
+    // Don't show bedtime ghost during active night sleep
+    if (!(activeSleep && activeSleep.type === "night")) {
+      bubbles.push({
+        startTime: bedtime,
+        endTime: new Date(bedtime.getTime() + 45 * 60000),
+        type: "night",
+        status: "predicted",
+        predictionIndex: 0,
+      });
+    }
   }
 
   return bubbles;
