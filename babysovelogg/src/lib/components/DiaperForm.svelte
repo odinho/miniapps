@@ -19,10 +19,10 @@
 
 	let { babyId, pottyMode = false, onClose }: Props = $props();
 
-	let selectedType = $state('wet');
-	let selectedAmount = $state('middels');
-	let selectedPottyResult = $state('potty_wet');
-	let selectedDiaperStatus = $state('dry');
+	let selectedType = $state<string | null>(null);
+	let selectedAmount = $state<string | null>(null);
+	let selectedPottyResult = $state<string | null>(null);
+	let selectedDiaperStatus = $state<string | null>(null);
 	const now = new Date();
 	let timeDate = $state(now.toISOString().slice(0, 10));
 	let timeHM = $state(now.toTimeString().slice(0, 5));
@@ -43,14 +43,18 @@
 		timeHM = d.toTimeString().slice(0, 5);
 	}
 
+	const canSave = $derived(
+		pottyMode ? selectedPottyResult != null : selectedType != null,
+	);
+
 	async function save() {
-		if (busy) return;
+		if (busy || !canSave) return;
 		if (!isValidTime(time)) return;
 		busy = true;
 		try {
 			const event = pottyMode
-				? buildPottyEvent(babyId, time, selectedPottyResult, selectedDiaperStatus, notes)
-				: buildDiaperEvent(babyId, time, selectedType, selectedAmount, notes);
+				? buildPottyEvent(babyId, time, selectedPottyResult!, selectedDiaperStatus ?? 'dry', notes)
+				: buildDiaperEvent(babyId, time, selectedType!, selectedAmount ?? 'middels', notes);
 			await sync.sendEvents([event]);
 		} finally {
 			busy = false;
@@ -175,7 +179,7 @@
 		<!-- Buttons -->
 		<div class="btn-row">
 			<button class="btn btn-ghost" onclick={cancel}>Avbryt</button>
-			<button class="btn btn-primary" onclick={save} disabled={busy} data-testid="diaper-save">
+			<button class="btn btn-primary" onclick={save} disabled={busy || !canSave} data-testid="diaper-save">
 				Lagra
 			</button>
 		</div>

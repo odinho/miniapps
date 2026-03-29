@@ -30,6 +30,7 @@ export const DIAPER_STATUS_LABELS: Record<string, string> = {
 	dry: 'Tørr bleie',
 	damp: 'Litt våt bleie',
 	wet: 'Våt bleie',
+	full: 'Full bleie',
 };
 
 export const SLEEP_TYPES = [
@@ -61,6 +62,7 @@ export const POTTY_EDIT_STATUSES = [
 	{ value: 'dry', label: 'Tørr ✨' },
 	{ value: 'damp', label: 'Litt våt 💧' },
 	{ value: 'wet', label: 'Våt 💧💧' },
+	{ value: 'full', label: 'Full 💧💧💧' },
 	{ value: 'dirty', label: 'Skitten 💩' },
 ] as const;
 

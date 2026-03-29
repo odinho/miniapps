@@ -688,6 +688,10 @@ html, body {
   min-height: 48px;
 }
 
+.type-pill:active {
+  transform: scale(0.93);
+}
+
 .type-pill.active {
   border-color: var(--moon);
   background: var(--lavender);
@@ -795,6 +799,7 @@ html, body {
   min-height: 48px;
 }
 
+.tag-pill:active { transform: scale(0.93); }
 .tag-pill .tag-emoji { font-size: 1.4rem; }
 .tag-pill .tag-label { font-size: 0.65rem; color: var(--text-light); }
 

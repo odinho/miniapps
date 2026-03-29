@@ -28,6 +28,7 @@ export const POTTY_DIAPER_STATUSES = [
 	{ value: 'dry', label: 'Tørr ✨' },
 	{ value: 'damp', label: 'Litt 💧' },
 	{ value: 'wet', label: 'Våt 💧💧' },
+	{ value: 'full', label: 'Full 💧💧💧' },
 ] as const;
 
 /** Payload for a diaper.logged event. */
