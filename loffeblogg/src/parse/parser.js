@@ -34,6 +34,7 @@ function stripTags(html) {
 function isDateHeading(pInnerHtml) {
   const text = stripTags(pInnerHtml);
   if (!text || text.length > 100) return null;
+  if (/oppdatert/i.test(text)) return null;
   if (!containsDate(text)) return null;
   const dateInfo = extractDateFromLine(text);
   return dateInfo ? text : null;
