@@ -1,4 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, setSystemTime, beforeEach, afterEach, afterAll } from 'bun:test';
+
+afterAll(() => setSystemTime());
 import {
 	buildTagEvent,
 	buildTimeAdjustEvent,
@@ -118,10 +120,9 @@ describe('nudgeTime', () => {
 
 describe('shouldShowDiaperNudge', () => {
 	beforeEach(() => {
-		vi.useFakeTimers();
-		vi.setSystemTime(new Date('2026-03-27T14:00:00.000Z'));
+		setSystemTime(new Date('2026-03-27T14:00:00.000Z'));
 	});
-	afterEach(() => vi.useRealTimers());
+	afterEach(() => setSystemTime());
 
 	it('shows nudge when no diapers exist', () => {
 		expect(shouldShowDiaperNudge([])).toBe(true);

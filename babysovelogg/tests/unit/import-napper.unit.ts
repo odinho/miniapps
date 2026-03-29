@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { parseNapperCsv, mapNapperToEvents } from "$lib/server/import-napper.js";
 
 // --- DSL helpers for building CSV strings ---

@@ -1,5 +1,5 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "http";
-import { beforeAll, afterAll, beforeEach } from "vitest";
+import { beforeAll, afterAll, beforeEach } from "bun:test";
 import { db, initDb, closeDb } from "$lib/server/db.js";
 
 // Import SvelteKit route handlers
@@ -88,34 +88,37 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
 let server: Server;
 let baseUrl: string;
 
-beforeAll(async () => {
-  initDb(":memory:");
-  server = createServer(handleRequest);
-  await new Promise<void>((resolve) => {
-    server.listen(0, () => {
-      const addr = server.address() as { port: number };
-      baseUrl = `http://localhost:${addr.port}`;
-      resolve();
+/** Register lifecycle hooks for integration tests. Call this at the top level of each test file. */
+export function setupHarness() {
+  beforeAll(async () => {
+    initDb(":memory:");
+    server = createServer(handleRequest);
+    await new Promise<void>((resolve) => {
+      server.listen(0, () => {
+        const addr = server.address() as { port: number };
+        baseUrl = `http://localhost:${addr.port}`;
+        resolve();
+      });
     });
   });
-});
 
-afterAll(async () => {
-  await new Promise<void>((resolve) => server.close(() => resolve()));
-  closeDb();
-});
+  afterAll(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    closeDb();
+  });
 
-beforeEach(() => {
-  db.prepare("DELETE FROM sleep_pauses").run();
-  db.prepare("DELETE FROM diaper_log").run();
-  db.prepare("DELETE FROM sleep_log").run();
-  db.prepare("DELETE FROM day_start").run();
-  db.prepare("DELETE FROM baby").run();
-  db.prepare("DELETE FROM events").run();
-  try {
-    db.prepare("DELETE FROM sqlite_sequence").run();
-  } catch {}
-});
+  beforeEach(() => {
+    db.prepare("DELETE FROM sleep_pauses").run();
+    db.prepare("DELETE FROM diaper_log").run();
+    db.prepare("DELETE FROM sleep_log").run();
+    db.prepare("DELETE FROM day_start").run();
+    db.prepare("DELETE FROM baby").run();
+    db.prepare("DELETE FROM events").run();
+    try {
+      db.prepare("DELETE FROM sqlite_sequence").run();
+    } catch {}
+  });
+}
 
 // --- HTTP helpers ---
 

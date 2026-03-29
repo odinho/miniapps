@@ -1,4 +1,4 @@
-import { test, expect, beforeEach, afterEach } from "vitest";
+import { test, expect, beforeEach, afterEach } from "bun:test";
 import { execFileSync, type ExecFileSyncOptions } from "child_process";
 import { mkdtempSync, rmSync } from "fs";
 import { join } from "path";

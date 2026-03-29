@@ -1,4 +1,4 @@
-import { test, expect } from "vitest";
+import { test, expect } from "bun:test";
 import {
   get,
   postEvents,
@@ -7,7 +7,9 @@ import {
   generateSleepId,
   generateDiaperId,
   db,
+  setupHarness,
 } from "./harness.js";
+setupHarness();
 import { renderDayState } from "../helpers/render-state.js";
 
 // --- B12: Wakeup time visible in API ---
@@ -205,7 +207,7 @@ test("B6: diaper note is stored and returned", async () => {
   expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
     "baby: Testa (2025-06-12)
     søvn: (ingen)
-    bleier: 10:00 wet middels"
+    bleier: 10:00 wet middels "Litt raudt utslett""
   `);
 
   // Pin: note is queryable from API
@@ -239,7 +241,7 @@ test("B6: diaper note survives update", async () => {
   expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
     "baby: Testa (2025-06-12)
     søvn: (ingen)
-    bleier: 10:00 dirty"
+    bleier: 10:00 dirty "Oppdatert notat""
   `);
 
   // Pin: note was updated

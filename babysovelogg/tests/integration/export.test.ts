@@ -1,11 +1,13 @@
-import { test, expect } from "vitest";
+import { test, expect } from "bun:test";
 import {
   get,
   createBaby,
   setWakeUpTime,
   addCompletedSleep,
   addDiaper,
+  setupHarness,
 } from "./harness.js";
+setupHarness();
 
 test("Export JSON endpoint returns sleep and diaper data", async () => {
   const babyId = createBaby("Testa");

@@ -1,4 +1,4 @@
-import { test, expect } from "vitest";
+import { test, expect } from "bun:test";
 import {
   db,
   post,
@@ -8,7 +8,9 @@ import {
   makeEvent,
   generateSleepId,
   generateDiaperId,
+  setupHarness,
 } from "./harness.js";
+setupHarness();
 import { renderDayState } from "../helpers/render-state.js";
 
 test("sleep.started with sleepDomainId creates row with domain_id set", async () => {

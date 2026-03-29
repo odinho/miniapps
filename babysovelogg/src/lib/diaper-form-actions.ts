@@ -52,6 +52,7 @@ export function buildDiaperEvent(
 	type: string,
 	amount: string,
 	note: string,
+	idFn: () => string = generateDiaperId,
 ): { type: string; payload: DiaperLoggedPayload } {
 	return {
 		type: 'diaper.logged',
@@ -59,7 +60,7 @@ export function buildDiaperEvent(
 			babyId,
 			time,
 			type,
-			diaperDomainId: generateDiaperId(),
+			diaperDomainId: idFn(),
 			amount,
 			note: note.trim() || null,
 		},
@@ -73,6 +74,7 @@ export function buildPottyEvent(
 	pottyResult: string,
 	diaperStatus: string,
 	note: string,
+	idFn: () => string = generateDiaperId,
 ): { type: string; payload: DiaperLoggedPayload } {
 	return {
 		type: 'diaper.logged',
@@ -80,7 +82,7 @@ export function buildPottyEvent(
 			babyId,
 			time,
 			type: pottyResult,
-			diaperDomainId: generateDiaperId(),
+			diaperDomainId: idFn(),
 			amount: shouldHideDiaperStatus(pottyResult) ? null : diaperStatus,
 			note: note.trim() || null,
 		},

@@ -1,4 +1,4 @@
-import { test, expect } from "vitest";
+import { test, expect } from "bun:test";
 import {
   post,
   get,
@@ -9,7 +9,9 @@ import {
   makeEvent,
   generateSleepId,
   generateDiaperId,
+  setupHarness,
 } from "./harness.js";
+setupHarness();
 
 test("After sleep.started, sleep_log row has created_by_event_id", async () => {
   const babyId = createBaby("Testa");

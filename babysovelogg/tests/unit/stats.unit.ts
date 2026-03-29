@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { getTodayStats, getWeekStats, getAverageWakeWindow } from "$lib/engine/stats.js";
 import type { SleepEntry } from "$lib/types.js";
 
