@@ -4,7 +4,6 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import { load } from 'cheerio';
 import crypto from 'crypto';
 
 const IMAGES_DIR = path.resolve('cache/images');
@@ -18,24 +17,21 @@ function generateImageId(url) {
 }
 
 /**
- * Extract all image URLs from HTML
+ * Extract all image URLs from HTML using regex (no DOM parsing).
+ * This avoids loading multi-MB Google Docs HTML into Cheerio.
  */
 export function extractImageUrls(html) {
-  const $ = load(html);
   const images = [];
-
-  $('img').each((i, el) => {
-    const src = $(el).attr('src');
+  const imgRegex = /<img[^>]+src="([^"]+)"[^>]*>/gi;
+  let match;
+  let i = 0;
+  while ((match = imgRegex.exec(html)) !== null) {
+    const src = match[1];
     if (src) {
       const id = generateImageId(src);
-      images.push({
-        url: src,
-        id,
-        originalIndex: i
-      });
+      images.push({ url: src, id, originalIndex: i++ });
     }
-  });
-
+  }
   return images;
 }
 

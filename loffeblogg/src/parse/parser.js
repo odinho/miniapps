@@ -1,168 +1,112 @@
 /**
  * Main document parser
  * Converts Google Docs HTML export to structured JSON
+ *
+ * Memory-efficient: never calls cheerio.load() on the full document.
+ * Date headings are found by regex, the HTML is split into small
+ * sections by string index, and only individual sections are parsed
+ * with Cheerio.
  */
 
 import { load } from 'cheerio';
-import { containsDate, extractDateFromLine, formatDateISO, formatDateNynorsk } from './dates.js';
+import { containsDate, extractDateFromLine } from './dates.js';
 
 /**
- * Extract title from Google Docs HTML
+ * Extract title from HTML using regex (no DOM parsing).
  */
 export function extractTitle(html) {
-  const $ = load(html);
-  // Google Docs puts title in <title> tag
-  const title = $('title').text().trim();
-  // Remove " - Google Docs" suffix if present
+  const match = html.match(/<title[^>]*>(.*?)<\/title>/i);
+  const title = match ? match[1].trim() : '';
   return title.replace(/\s*-\s*Google Docs$/i, '').trim() || 'Utan tittel';
 }
 
 /**
- * Check if a paragraph element looks like a date heading
- * Date headings are typically short paragraphs that start with a date
+ * Extract text content from an HTML fragment by stripping tags.
  */
-function isDateHeadingParagraph($, el) {
-  const $el = $(el);
-  const text = $el.text().trim();
-
-  // Skip empty or very long paragraphs (likely content, not headings)
-  if (!text || text.length > 100) {
-    return null;
-  }
-
-  // Check if the text starts with or contains a date pattern
-  if (containsDate(text)) {
-    // Additional check: the paragraph should be primarily the date
-    // (not a sentence that happens to mention a date)
-    const dateInfo = extractDateFromLine(text);
-    if (dateInfo) {
-      return text;
-    }
-  }
-
-  return null;
+function stripTags(html) {
+  return html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '\u00A0').replace(/&ndash;/g, '–').replace(/&amp;/g, '&').trim();
 }
 
 /**
- * Check if an element contains bold text with a date
+ * Check if a paragraph's text looks like a date heading.
+ * A date heading is short, contains a parseable date, and may be bold.
  */
-function isBoldDateElement($, el) {
-  const $el = $(el);
-
-  // Check for <b> or <strong> tags
-  const boldText = $el.find('b, strong').text().trim();
-  if (boldText && containsDate(boldText)) {
-    return boldText;
-  }
-
-  // Check for inline style font-weight: bold or font-weight: 700
-  const style = $el.attr('style') || '';
-  if (style.includes('font-weight') && (style.includes('bold') || style.includes('700'))) {
-    const text = $el.text().trim();
-    if (containsDate(text)) {
-      return text;
-    }
-  }
-
-  // Check direct bold element
-  if (el.tagName === 'b' || el.tagName === 'strong') {
-    const text = $el.text().trim();
-    if (containsDate(text)) {
-      return text;
-    }
-  }
-
-  return null;
+function isDateHeading(pInnerHtml) {
+  const text = stripTags(pInnerHtml);
+  if (!text || text.length > 100) return null;
+  if (!containsDate(text)) return null;
+  const dateInfo = extractDateFromLine(text);
+  return dateInfo ? text : null;
 }
 
 /**
- * Find all date headings in the document
- * Returns array of { index, text, element } where index is the position in body children
- */
-export function findDateHeadings(html) {
-  const $ = load(html);
-  const headings = [];
-
-  // Get all elements in body
-  const body = $('body');
-  const elements = body.children().toArray();
-
-  elements.forEach((el, index) => {
-    const $el = $(el);
-
-    // First, check for bold date text (traditional approach)
-    const boldDate = isBoldDateElement($, el);
-    if (boldDate) {
-      headings.push({
-        index,
-        text: boldDate,
-        element: el
-      });
-      return;
-    }
-
-    // Check first-level children for bold dates
-    let foundBold = false;
-    $el.children().each((i, child) => {
-      const childBoldDate = isBoldDateElement($, child);
-      if (childBoldDate) {
-        headings.push({
-          index,
-          text: childBoldDate,
-          element: el
-        });
-        foundBold = true;
-        return false; // Break inner loop
-      }
-    });
-
-    if (foundBold) return;
-
-    // NEW: Check if this paragraph itself is a date heading (plain text)
-    // Only for <p> elements that look like date headers
-    if (el.tagName === 'p' || el.name === 'p') {
-      const dateHeading = isDateHeadingParagraph($, el);
-      if (dateHeading) {
-        headings.push({
-          index,
-          text: dateHeading,
-          element: el
-        });
-      }
-    }
-  });
-
-  return headings;
-}
-
-/**
- * Split document into day sections based on date headings
+ * Split document into day sections using regex to find date headings.
+ *
+ * This replaces the old findDateHeadings + splitIntoDays pair which
+ * each called cheerio.load() on the full document.
+ *
+ * Strategy: scan for top-level <p> tags, check if their text is a
+ * date heading (bold or plain), record positions, then split the
+ * HTML string at those positions.
  */
 export function splitIntoDays(html, defaultYear = 2026) {
-  const $ = load(html);
-  const body = $('body');
-  const elements = body.children().toArray();
-  const headings = findDateHeadings(html);
+  // Find the <body> content boundaries
+  const bodyStart = html.indexOf('<body');
+  const bodyEnd = html.lastIndexOf('</body>');
+  if (bodyStart === -1) {
+    // No <body> tag — treat the whole string as body content
+    return [{ heading: null, dateInfo: null, content: html }];
+  }
+
+  // Find the end of <body ...> opening tag
+  const bodyContentStart = html.indexOf('>', bodyStart) + 1;
+  const bodyContent = html.slice(bodyContentStart, bodyEnd === -1 ? undefined : bodyEnd);
+
+  // Find all top-level <p> tags and check for date headings.
+  // We match <p ...>content</p> — this works on stripped HTML where
+  // paragraphs are not deeply nested inside other <p> tags.
+  const headings = [];
+  const pRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
+  let match;
+
+  while ((match = pRegex.exec(bodyContent)) !== null) {
+    const innerHtml = match[1];
+    const fullText = stripTags(innerHtml);
+
+    // Check for bold date: <b>date text</b> possibly nested in other inline tags
+    const boldMatch = innerHtml.match(/<b>([\s\S]*?)<\/b>/);
+    let dateText = null;
+
+    if (boldMatch && isDateHeading(boldMatch[1])) {
+      // Bold contains a date — use the full paragraph text as heading
+      // (location text may be outside the <b> tag)
+      dateText = fullText;
+    }
+    if (!dateText) {
+      // Check the whole paragraph text (plain, non-bold date headings)
+      dateText = isDateHeading(innerHtml);
+    }
+
+    if (dateText) {
+      headings.push({
+        text: dateText,
+        // Position of this <p> tag within bodyContent
+        startIndex: match.index,
+        endIndex: match.index + match[0].length
+      });
+    }
+  }
 
   if (headings.length === 0) {
-    // No date headings found, return entire content as single section
-    return [{
-      heading: null,
-      dateInfo: null,
-      content: body.html()
-    }];
+    return [{ heading: null, dateInfo: null, content: bodyContent }];
   }
 
   const sections = [];
 
   // Content before first heading (intro)
-  if (headings[0].index > 0) {
-    const introElements = elements.slice(0, headings[0].index);
-    const introContent = introElements.map(el => $.html(el)).join('\n');
-
-    // Check if intro has actual text content (not just empty tags)
-    const introText = introElements.map(el => $(el).text()).join('').trim();
-
+  if (headings[0].startIndex > 0) {
+    const introContent = bodyContent.slice(0, headings[0].startIndex);
+    const introText = stripTags(introContent);
     if (introText) {
       sections.push({
         heading: 'Intro',
@@ -172,17 +116,14 @@ export function splitIntoDays(html, defaultYear = 2026) {
     }
   }
 
-  // Process each date section
+  // Process each date section: content between this heading and the next
   headings.forEach((heading, i) => {
-    const startIndex = heading.index;
-    const endIndex = i < headings.length - 1 ? headings[i + 1].index : elements.length;
+    const contentStart = heading.endIndex;
+    const contentEnd = i < headings.length - 1
+      ? headings[i + 1].startIndex
+      : bodyContent.length;
 
-    // Skip the heading element itself (startIndex + 1) to avoid duplicate date display
-    const sectionContent = elements
-      .slice(startIndex + 1, endIndex)
-      .map(el => $.html(el))
-      .join('\n');
-
+    const sectionContent = bodyContent.slice(contentStart, contentEnd);
     const dateInfo = extractDateFromLine(heading.text, defaultYear);
 
     sections.push({
@@ -196,18 +137,14 @@ export function splitIntoDays(html, defaultYear = 2026) {
 }
 
 /**
- * Extract images from HTML section
+ * Extract images from a Cheerio instance of a section.
  */
-export function extractImagesFromSection(html, imageMap = new Map()) {
-  const $ = load(html);
+export function extractImagesFromSection($, imageMap = new Map()) {
   const images = [];
 
   $('img').each((i, el) => {
     const src = $(el).attr('src');
     if (src) {
-      // After replaceImageUrls, src is the local webThumbnail path.
-      // Check _byThumb first (set by processImages), then fall back to
-      // direct imageMap lookup, then use src as-is.
       const mapped = imageMap._byThumb?.get(src) ?? imageMap.get(src);
       if (mapped) {
         images.push({
@@ -229,36 +166,14 @@ export function extractImagesFromSection(html, imageMap = new Map()) {
 }
 
 /**
- * Clean up Google Docs HTML
- * Removes unnecessary styles and classes while preserving structure
- * Also detects and marks image captions
+ * Clean up a section's HTML using a Cheerio instance.
+ *
+ * After stripDocHtml has already removed classes, styles, and scripts,
+ * this handles structural cleanup that benefits from DOM traversal:
+ * unwrapping image wrapper spans and detecting image captions.
  */
-export function cleanHtml(html) {
-  const $ = load(html);
-
-  // Remove Google-specific classes
-  $('[class]').each((i, el) => {
-    const $el = $(el);
-    $el.removeAttr('class');
-  });
-
-  // Remove empty style attributes
-  $('[style=""]').removeAttr('style');
-
-  // Remove Google tracking/metadata
-  $('style').remove();
-  $('script').remove();
-
-  // Remove specific Google artifacts
-  $('a[id^="cmnt"]').parent().remove(); // Comment links
-  $('sup').has('a[id^="cmnt"]').remove(); // Comment reference superscripts
-
-  // Clean up images - remove all inline styles
-  $('img').each((i, el) => {
-    $(el).removeAttr('style');
-  });
-
-  // Unwrap image wrapper spans (Google Docs wraps images in styled spans)
+export function cleanSection($) {
+  // Unwrap image wrapper spans
   $('span').has('img').each((i, el) => {
     const $span = $(el);
     const $img = $span.find('img');
@@ -266,86 +181,69 @@ export function cleanHtml(html) {
   });
 
   // Detect and mark image captions
-  // A caption is a short paragraph that follows a paragraph containing an image
-  // (may have empty paragraphs in between)
   const paragraphs = $('p').toArray();
   for (let i = 0; i < paragraphs.length - 1; i++) {
     const current = $(paragraphs[i]);
 
-    // Check if current paragraph has an image (can be nested in spans)
     if (current.find('img').length > 0) {
-      // Look for caption in next few paragraphs (skip empty ones)
       for (let j = i + 1; j < Math.min(i + 4, paragraphs.length); j++) {
         const candidate = $(paragraphs[j]);
         const candidateText = candidate.text().trim();
 
-        // Skip empty paragraphs
         if (candidateText.length === 0) continue;
 
-        // Check if this looks like a caption:
-        // - Reasonably short (< 200 chars)
-        // - Doesn't contain an image
-        // - Doesn't look like a date heading
         if (candidateText.length < 200 &&
             candidate.find('img').length === 0 &&
             !containsDate(candidateText)) {
           candidate.addClass('image-caption');
         }
-        // Stop looking after first non-empty paragraph
         break;
       }
     }
   }
 
-  // Return just the body content, not the html wrapper
   return $('body').html() || $.html();
 }
 
 /**
- * Remove title text from intro content if it matches the document title
- * This prevents showing the title twice (once in h1, once in content)
+ * Remove title text from intro content if it matches the document title.
  */
-function removeIntroTitle(html, title) {
-  const $ = load(html);
+function removeIntroTitle($, title) {
   const titleLower = title.toLowerCase();
 
-  // Check first few paragraphs for title-only content
   $('p').each((i, el) => {
-    if (i > 2) return false; // Only check first 3 paragraphs
+    if (i > 2) return false;
     const $el = $(el);
     const text = $el.text().trim();
-    // Remove if text matches title (case-insensitive)
     if (text.toLowerCase() === titleLower) {
       $el.remove();
     }
   });
-
-  return $('body').html() || $.html();
 }
 
 /**
- * Check if HTML content has any actual text (not just empty tags)
- */
-function hasTextContent(html) {
-  const $ = load(html);
-  return $('body').text().trim().length > 0 || $('img').length > 0;
-}
-
-/**
- * Parse a complete document into structured format
+ * Parse a complete document into structured format.
+ *
+ * All heavy work (date heading detection, section splitting) is done
+ * via regex on the (stripped) HTML string.  Cheerio is only used on
+ * individual sections which are typically 5-20 KB each.
  */
 export function parseDocument(docId, html, name, imageMap = new Map(), modifiedTime = null) {
   const title = name || extractTitle(html);
   const sections = splitIntoDays(html);
 
   const days = sections.map(section => {
-    const images = extractImagesFromSection(section.content, imageMap);
+    // Parse this small section with Cheerio
+    const $ = load(section.content);
+
+    const images = extractImagesFromSection($, imageMap);
 
     // For intro sections, remove title if it appears in content
-    let cleanedContent = cleanHtml(section.content);
     if (section.heading === 'Intro') {
-      cleanedContent = removeIntroTitle(cleanedContent, title);
+      removeIntroTitle($, title);
     }
+
+    const cleanedContent = cleanSection($);
 
     return {
       date: section.dateInfo?.date ? formatDateISO(section.dateInfo.date) : null,
@@ -359,9 +257,10 @@ export function parseDocument(docId, html, name, imageMap = new Map(), modifiedT
       images
     };
   }).filter(day => {
-    // Filter out empty intro sections (no text and no images)
     if (day.heading === 'Intro') {
-      return hasTextContent(day.content) || day.images.length > 0;
+      // Check for actual content (text or images)
+      const $ = load(day.content);
+      return $('body').text().trim().length > 0 || $('img').length > 0;
     }
     return true;
   });
@@ -387,11 +286,11 @@ function slugify(text) {
     .replace(/^-+|-+$/g, '');
 }
 
-/**
- * Save parsed document to cache
- */
+// --- Persistence ---
+
 import fs from 'fs/promises';
 import path from 'path';
+import { formatDateISO, formatDateNynorsk } from './dates.js';
 
 const PARSED_DIR = path.resolve('cache/parsed');
 
