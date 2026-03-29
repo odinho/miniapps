@@ -289,6 +289,16 @@ export function applyEvent(event: AppEvent): void {
       ).run(payload.babyId, dateStr, payload.wakeTime, eventId);
       break;
     }
+
+    case "day.deleted": {
+      const result = db
+        .prepare("DELETE FROM day_start WHERE baby_id = ? AND date = ?")
+        .run(payload.babyId, payload.date);
+      if (result.changes === 0) {
+        // Silently ignore if already deleted
+      }
+      break;
+    }
   }
 }
 

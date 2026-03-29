@@ -125,6 +125,10 @@ const payloadSchemas: Record<string, v.BaseSchema<unknown, unknown, v.BaseIssue<
     babyId: v.number(),
     wakeTime: isoDateTime,
   }),
+  "day.deleted": v.object({
+    babyId: v.number(),
+    date: v.string(),
+  }),
 };
 
 function summarizeIssues(issues: v.BaseIssue<unknown>[]): string {

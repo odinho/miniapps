@@ -1,10 +1,11 @@
 <script lang="ts">
-	import type { SleepLogRow, DiaperLogRow } from '$lib/types.js';
+	import type { SleepLogRow, DiaperLogRow, DayStartRow } from '$lib/types.js';
 	import { formatTime } from '$lib/utils.js';
 	import EditSleepModal from '$lib/components/EditSleepModal.svelte';
 	import EditDiaperModal from '$lib/components/EditDiaperModal.svelte';
 	import ManualSleepModal from '$lib/components/ManualSleepModal.svelte';
 	import { appState } from '$lib/stores/app.svelte.js';
+	import { sync } from '$lib/stores/sync.svelte.js';
 	import {
 		type HistoryEntry,
 		fetchHistory,
@@ -66,6 +67,16 @@
 
 	function closeManualSleep() {
 		showManualSleep = false;
+		load();
+	}
+
+	async function deleteWakeup(entry: DayStartRow & { _kind: 'wakeup'; _sortTime: string }) {
+		if (!baby) return;
+		const dateStr = entry.date;
+		await sync.sendEvents([{
+			type: 'day.deleted',
+			payload: { babyId: baby.id, date: dateStr },
+		}]);
 		load();
 	}
 
@@ -169,7 +180,13 @@
 								<div class="log-times">{formatTime(entry.wake_time)}</div>
 								<div class="log-meta">Vakna</div>
 							</div>
-							<span class="log-duration">Morgon</span>
+							<button
+								class="btn btn-ghost"
+								style="padding: 4px 8px; min-height: 0; font-size: 0.75rem; color: var(--text-light);"
+								onclick={() => deleteWakeup(entry)}
+							>
+								Slett
+							</button>
 						</div>
 					{/if}
 				{/each}
