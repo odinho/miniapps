@@ -16,8 +16,9 @@ showHero: true
       {% set hasContent = true %}
     {% endif %}
   {% endfor %}
+  {% set hasDates = (post.days | selectattr("date") | list | length) > 0 %}
 
-  {% if post.slug == "tankar-pa-vegen" %}
+  {% if hasContent and not hasDates %}
     {% set undervegsPosts = (undervegsPosts.push(post), undervegsPosts) %}
   {% elif hasContent %}
     {% set regularPosts = (regularPosts.push(post), regularPosts) %}
@@ -170,7 +171,9 @@ showHero: true
     {% endif %}
     <div class="compact-text">
       <h4>{{ post.title }}</h4>
-      <span class="compact-meta">Tankar p&aring; vegen</span>
+      <span class="compact-meta">
+        {% if post.lastModified %}Oppdatert {{ post.lastModified | kortdato }}{% endif %}
+      </span>
     </div>
   </a>
   {% endfor %}

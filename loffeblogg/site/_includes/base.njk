@@ -29,13 +29,13 @@
   </div>
   <div class="site-bridge">
     <h1 class="bridge-post-title">{{ post.title }}</h1>
+    {% set firstDay = post.days | selectattr("date") | first %}
+    {% set lastDay = post.days | selectattr("date") | last %}
+    {% if firstDay and lastDay %}
     <div class="bridge-post-meta">
-      {% set firstDay = post.days | selectattr("date") | first %}
-      {% set lastDay = post.days | selectattr("date") | last %}
-      {% if firstDay and lastDay %}
-        {{ firstDay.date | kortdato }} &ndash; {{ (lastDay.endDate or lastDay.date) | kortdato }} &middot; <span class="bridge-days">{{ post.days | countDays }} dagar</span>
-      {% endif %}
+      {{ firstDay.date | kortdato }} &ndash; {{ (lastDay.endDate or lastDay.date) | kortdato }} &middot; <span class="bridge-days">{{ post.days | countDays }} dagar</span>
     </div>
+    {% endif %}
     {% if post.lastModified %}<div class="bridge-post-updated">Oppdatert {{ post.lastModified | dato }}</div>{% endif %}
     <div class="bridge-rule"></div>
   </div>
@@ -55,6 +55,9 @@
     <div class="footer-content">
       <nav class="footer-route">
         {% for p in posts | reverse %}
+        {# Only show posts with date sections in route #}
+        {% if (p.days | selectattr("date") | list | length) > 0 %}
+
         {# Check if post has images (content) #}
         {% set hasImages = false %}
         {% for day in p.days %}
@@ -71,6 +74,8 @@
         <span class="route-stop route-stop-future">{{ p.title }}</span>
         {% endif %}
         {% if not loop.last %}<span class="route-arrow">&rarr;</span>{% endif %}
+
+        {% endif %}
         {% endfor %}
       </nav>
       {% if isPost %}<p class="footer-links"><a href="/">Heim</a> &middot; <a href="#top">Til toppen &uarr;</a></p>{% endif %}
