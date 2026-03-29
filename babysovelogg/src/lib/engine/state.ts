@@ -112,11 +112,16 @@ export function assembleState(data: DayData) {
         predictedNaps = null;
       }
 
+      // During active night sleep, don't show stale daytime nap predictions
+      if (activeSleep && activeSleep.type === "night") {
+        predictedNaps = null;
+      }
+
       prediction = {
         nextNap,
         bedtime,
         predictedNaps,
-        napsAllDone,
+        napsAllDone: napsAllDone || (activeSleep?.type === "night" ? true : false),
       };
     }
   }

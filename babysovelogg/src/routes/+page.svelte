@@ -105,6 +105,21 @@
 		}
 	});
 
+	// Periodically refresh state during active sleep so predictions stay current
+	$effect(() => {
+		if (!activeSleep || activeSleep.end_time) return;
+		const iv = setInterval(async () => {
+			try {
+				const res = await fetch('/api/state');
+				if (res.ok) {
+					const data = await res.json();
+					appState.set(data);
+				}
+			} catch { /* offline — skip refresh */ }
+		}, 5 * 60_000); // every 5 minutes
+		return () => clearInterval(iv);
+	});
+
 	// Adapt types for Arc.svelte which expects narrower types than AppState provides
 	const arcSleeps = $derived(
 		todaySleeps.map((sl) => ({
