@@ -40,7 +40,7 @@ export function dayLabel(dateStr: string): string {
 }
 
 export function fmtDate(d: string): string {
-	return new Date(d + "T12:00:00").toLocaleDateString([], {
+	return new Date(d + "T12:00:00").toLocaleDateString("nb-NO", {
 		weekday: "short",
 		month: "short",
 		day: "numeric",
