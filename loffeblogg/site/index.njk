@@ -74,8 +74,7 @@ showHero: true
         {% if firstDay.location %} · {{ firstDay.location }}{% endif %}
       </p>
       {% endif %}
-      <p class="post-summary">{{ post.days | countDays }} dagar</p>
-      {% if post.lastModified %}<p class="post-updated">Sist oppdatert {{ post.lastModified | datoTid }}</p>{% endif %}
+      <p class="post-summary">{{ post.days | countDays }} dagar{% if post.lastModified %} · oppdatert {{ post.lastModified | kortdato }}{% endif %}</p>
       <span class="read-more">Les meir &rarr;</span>
     </div>
   </a>
