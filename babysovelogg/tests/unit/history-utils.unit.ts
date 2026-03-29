@@ -128,8 +128,8 @@ describe('constants', () => {
 		expect(POTTY_EDIT_RESULTS).toHaveLength(4);
 	});
 
-	test('POTTY_EDIT_STATUSES has 4 options', () => {
-		expect(POTTY_EDIT_STATUSES).toHaveLength(4);
+	test('POTTY_EDIT_STATUSES has 5 options', () => {
+		expect(POTTY_EDIT_STATUSES).toHaveLength(5);
 	});
 });
 

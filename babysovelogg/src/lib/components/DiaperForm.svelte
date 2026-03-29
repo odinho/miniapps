@@ -29,7 +29,7 @@
 	let notes = $state('');
 	let busy = $state(false);
 
-	const hideDiaperStatus = $derived(shouldHideDiaperStatus(selectedPottyResult));
+	const hideDiaperStatus = $derived(selectedPottyResult ? shouldHideDiaperStatus(selectedPottyResult) : false);
 
 	/** Combine date + time into ISO string */
 	const time = $derived.by(() => {

@@ -33,9 +33,9 @@ describe('constants', () => {
 		]);
 	});
 
-	it('POTTY_DIAPER_STATUSES has 3 options', () => {
-		expect(POTTY_DIAPER_STATUSES).toHaveLength(3);
-		expect(POTTY_DIAPER_STATUSES.map((s) => s.value)).toEqual(['dry', 'damp', 'wet']);
+	it('POTTY_DIAPER_STATUSES has 4 options', () => {
+		expect(POTTY_DIAPER_STATUSES).toHaveLength(4);
+		expect(POTTY_DIAPER_STATUSES.map((s) => s.value)).toEqual(['dry', 'damp', 'wet', 'full']);
 	});
 });
 

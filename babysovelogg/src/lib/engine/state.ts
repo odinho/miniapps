@@ -121,7 +121,7 @@ export function assembleState(data: DayData) {
         nextNap,
         bedtime,
         predictedNaps,
-        napsAllDone: napsAllDone || (activeSleep?.type === "night" ? true : false),
+        napsAllDone: napsAllDone || activeSleep?.type === "night",
       };
     }
   }
