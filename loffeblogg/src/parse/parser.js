@@ -334,7 +334,7 @@ function hasTextContent(html) {
 /**
  * Parse a complete document into structured format
  */
-export function parseDocument(docId, html, name, imageMap = new Map()) {
+export function parseDocument(docId, html, name, imageMap = new Map(), modifiedTime = null) {
   const title = name || extractTitle(html);
   const sections = splitIntoDays(html);
 
@@ -370,7 +370,7 @@ export function parseDocument(docId, html, name, imageMap = new Map()) {
     id: docId,
     title,
     slug: slugify(title),
-    lastModified: new Date().toISOString(),
+    lastModified: modifiedTime || new Date().toISOString(),
     days
   };
 }

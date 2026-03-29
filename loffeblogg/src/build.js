@@ -54,7 +54,7 @@ async function main() {
 
       // Parse document into structured format
       console.log('Tolkar innhald...');
-      const parsed = parseDocument(doc.id, htmlWithLocalImages, doc.name, imageMap);
+      const parsed = parseDocument(doc.id, htmlWithLocalImages, doc.name, imageMap, doc.modifiedTime);
 
       // Save parsed document
       await saveParsedDocument(parsed);
