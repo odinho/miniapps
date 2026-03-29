@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Main build script for Løffeblogg
+ * Main build script for Loffeblogg
  * Fetches documents from Google Drive, processes images, and parses content
  */
 
@@ -53,7 +53,7 @@ async function deleteRawCache(docId) {
 }
 
 async function main() {
-  console.log('🌍 Løffeblogg - Byggjer reiseblogg frå Google Drive\n');
+  console.log('🌍 Loffeblogg - Byggjer reiseblogg frå Google Drive\n');
 
   // Get list of documents
   const documents = await listDocuments();
