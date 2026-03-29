@@ -695,6 +695,13 @@ a.route-stop:hover {
   color: var(--color-text-light);
 }
 
+.footer-updated {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  opacity: 0.7;
+}
+
 .footer-links a {
   color: var(--color-text-muted);
 }

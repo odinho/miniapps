@@ -18,6 +18,18 @@ export default function(eleventyConfig) {
     return `${date.getDate()}. ${months[date.getMonth()]} ${date.getFullYear()}`;
   });
 
+  // Date + time filter (Norwegian)
+  eleventyConfig.addFilter("datoTid", (dateStr) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const months = [
+      'januar', 'februar', 'mars', 'april', 'mai', 'juni',
+      'juli', 'august', 'september', 'oktober', 'november', 'desember'
+    ];
+    const pad = n => String(n).padStart(2, '0');
+    return `${date.getDate()}. ${months[date.getMonth()]} ${date.getFullYear()} kl. ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  });
+
   // Short date filter (day and month only)
   eleventyConfig.addFilter("kortdato", (dateStr) => {
     if (!dateStr) return '';
