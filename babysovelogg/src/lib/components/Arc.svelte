@@ -122,6 +122,9 @@
 				? timeToArcFraction(bubble.endTime, config)
 				: timeToArcFraction(now, config);
 
+			// Sleep is outside this arc's time window (clamping inverted start/end)
+			if (endFrac < startFrac) continue;
+
 			if (bubble.status === 'active' && endFrac - startFrac < 0.015) {
 				endFrac = Math.min(1, startFrac + 0.015);
 			}

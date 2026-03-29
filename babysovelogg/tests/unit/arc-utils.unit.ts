@@ -65,6 +65,19 @@ describe("timeToArcFractionRaw", () => {
     const d = new Date("2026-03-27T02:00:00");
     expect(timeToArcFractionRaw(d, config)).toBeCloseTo(8 / 12, 5);
   });
+
+  it("inverts daytime nap fractions on night arc (hour-wrap edge case)", () => {
+    const config = getNightArcConfig(); // 18–30
+    // 10am: h=10 < 12 → wrapped to 34 → frac (34-18)/12 = 1.33 (past arc end)
+    const start = new Date("2026-03-27T10:00:00");
+    // 1pm: h=13 >= 12 → stays 13 → frac (13-18)/12 = -0.42 (before arc start)
+    const end = new Date("2026-03-27T13:00:00");
+    const startFrac = timeToArcFractionRaw(start, config);
+    const endFrac = timeToArcFractionRaw(end, config);
+    // Start > end: inverted — this sleep doesn't belong on the night arc
+    expect(startFrac).toBeGreaterThan(1);
+    expect(endFrac).toBeLessThan(0);
+  });
 });
 
 describe("fracToPoint", () => {
