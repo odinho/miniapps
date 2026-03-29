@@ -540,6 +540,11 @@ a.compact-card:hover h4 {
   max-width: var(--content-width);
 }
 
+/* Center content when there's no sidebar */
+.post-layout > .post-main:only-child {
+  margin: 0 auto;
+}
+
 /* ===== Day Sidebar ===== */
 .day-sidebar {
   position: sticky;
