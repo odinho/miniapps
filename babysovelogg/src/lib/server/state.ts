@@ -21,7 +21,13 @@ export function getState() {
     activeSleep = { ...activeSleep, pauses };
   }
 
-  const tz = baby.timezone || "UTC";
+  // Backfill timezone from server locale if not set (single-tenant: server TZ = baby TZ)
+  if (!baby.timezone) {
+    const serverTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    db.prepare("UPDATE baby SET timezone = ? WHERE id = ?").run(serverTz, baby.id);
+    baby.timezone = serverTz;
+  }
+  const tz = baby.timezone;
   const { dateStr: todayDateStr, midnightIso } = todayInTz(tz);
 
   const todaySleeps = db
