@@ -172,7 +172,8 @@ export function buildPredictionRows(opts: {
 			opts.recentSleeps,
 			opts.napCount ?? undefined,
 		);
-		const bedtime = recommendBedtime(opts.recentSleeps, opts.ageMonths, opts.napCount ?? undefined);
+		const todayNaps = opts.recentSleeps.filter(s => s.type === "nap" && s.end_time);
+		const bedtime = recommendBedtime(todayNaps, opts.ageMonths, opts.napCount ?? undefined, opts.recentSleeps);
 		for (let i = 0; i < predicted.length; i++) {
 			const actual = opts.recentSleeps.filter(s => s.type === 'nap' && s.end_time)[i];
 			const predictedStr = `${formatTime(predicted[i].startTime)}–${formatTime(predicted[i].endTime)}`;
