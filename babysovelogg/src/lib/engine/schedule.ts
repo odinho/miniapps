@@ -257,16 +257,20 @@ function getPositionalWakeWindows(recentSleeps?: SleepEntry[], ageMonths?: numbe
 }
 
 /**
- * Learn nap count from recent sleep data. Returns the most common nap count
- * if it dominates (>60% of days), or null to fall back to age default.
- * Requires 5+ days with naps to produce a result.
+ * Learn nap count from recent sleep data using probability-weighted hypothesis scoring.
+ *
+ * Instead of a hard >60% mode switch, this keeps multiple hypotheses alive
+ * and uses recency-weighted scoring to pick the best one. During transitions
+ * (e.g. 2→1 naps), recent days get more weight so the engine adapts faster.
+ *
+ * Returns null only when there's too little data to form any opinion.
  */
 function getLearnedNapCount(recentSleeps?: SleepEntry[], tz?: string): number | null {
   if (!recentSleeps || recentSleeps.length < 4) return null;
 
   const timezone = resolveTz(tz);
 
-  // Group completed naps by baby-local day
+  // Group completed naps by baby-local day, preserving chronological order
   const napsByDay = new Map<string, number>();
   for (const s of recentSleeps) {
     if (s.type !== "nap" || !s.end_time) continue;
@@ -274,20 +278,46 @@ function getLearnedNapCount(recentSleeps?: SleepEntry[], tz?: string): number | 
     napsByDay.set(day, (napsByDay.get(day) ?? 0) + 1);
   }
 
-  if (napsByDay.size < 5) return null;
+  if (napsByDay.size < 3) return null;
 
-  // Find the mode (most common nap count)
-  const freq = new Map<number, number>();
-  for (const n of napsByDay.values()) {
-    freq.set(n, (freq.get(n) ?? 0) + 1);
-  }
-  let mode = 0, modeCount = 0;
-  for (const [n, c] of freq) {
-    if (c > modeCount) { mode = n; modeCount = c; }
+  // Sort days chronologically and apply recency weights.
+  // Most recent day gets weight 1.0, each prior day decays by 0.8x.
+  const sortedDays = [...napsByDay.entries()]
+    .toSorted(([a], [b]) => a.localeCompare(b));
+
+  const weightedFreq = new Map<number, number>();
+  let totalWeight = 0;
+  for (let i = 0; i < sortedDays.length; i++) {
+    const [, count] = sortedDays[i];
+    const recencyWeight = Math.pow(0.8, sortedDays.length - 1 - i);
+    weightedFreq.set(count, (weightedFreq.get(count) ?? 0) + recencyWeight);
+    totalWeight += recencyWeight;
   }
 
-  // Only override age default if the mode is clearly dominant
-  return modeCount / napsByDay.size > 0.6 ? mode : null;
+  // Find the hypothesis with the highest weighted score
+  let bestCount = 0, bestScore = 0;
+  for (const [count, score] of weightedFreq) {
+    if (score > bestScore) {
+      bestCount = count;
+      bestScore = score;
+    }
+  }
+
+  // With enough data (5+ days) and strong dominance (>60%), always trust the mode.
+  // With less dominance, still return the recency-weighted winner — this lets
+  // the engine adapt faster during transitions instead of falling back to age defaults.
+  if (napsByDay.size >= 5 && bestScore / totalWeight > 0.6) {
+    return bestCount;
+  }
+
+  // During transition (no clear winner), use recency-weighted best if it has
+  // reasonable support (>40% weighted). This avoids age-default fallback during
+  // the messy transition period.
+  if (bestScore / totalWeight > 0.4) {
+    return bestCount;
+  }
+
+  return null;
 }
 
 /** Learn the bedtime wake window (last nap end → night start) from recent data. */
