@@ -129,9 +129,9 @@ export function recommendBedtime(
     .toSorted((a, b) => new Date(b.end_time!).getTime() - new Date(a.end_time!).getTime())[0];
 
   if (!lastSleep?.end_time) {
-    // Default: 19:00 UTC today
+    // Default: 19:00 server-local (= baby's timezone) today
     const today = new Date();
-    today.setUTCHours(19, 0, 0, 0);
+    today.setHours(19, 0, 0, 0);
     return today.toISOString();
   }
 
@@ -144,10 +144,10 @@ export function recommendBedtime(
     new Date(lastSleep.end_time).getTime() + bedtimeWW * multiplier * 60 * 1000,
   );
 
-  // Clamp using UTC — keeps behavior consistent regardless of server timezone
-  const hour = bedtime.getUTCHours() + bedtime.getUTCMinutes() / 60;
-  if (hour < 18) bedtime.setUTCHours(18, 0, 0, 0);
-  if (hour > 20.5) bedtime.setUTCHours(20, 30, 0, 0);
+  // Clamp to baby's local 18:00–20:30. Server TZ = baby's TZ by design (single-tenant).
+  const hour = bedtime.getHours() + bedtime.getMinutes() / 60;
+  if (hour < 18) bedtime.setHours(18, 0, 0, 0);
+  if (hour > 20.5) bedtime.setHours(20, 30, 0, 0);
 
   return bedtime.toISOString();
 }
