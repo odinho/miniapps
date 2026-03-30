@@ -2,7 +2,17 @@ import { WAKE_WINDOWS, NAP_COUNTS, findByAge } from "./constants.js";
 export { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, findByAge } from "./constants.js";
 export type { SleepEntry } from "$lib/types.js";
 import type { SleepEntry } from "$lib/types.js";
-import { getHourInTz, setHourInTz } from "$lib/tz.js";
+import { getHourInTz, setHourInTz, isoToDateInTz } from "$lib/tz.js";
+
+/** Resolve baby's timezone. Defaults to server-local (= baby's TZ in production). */
+function resolveTz(tz?: string): string {
+  return tz ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+/** Get the baby-local date (YYYY-MM-DD) for a UTC ISO timestamp. */
+function localDate(iso: string, tz: string): string {
+  return isoToDateInTz(iso, tz);
+}
 
 /** Calculate age in months from birthdate ISO string. */
 export function calculateAgeMonths(birthdate: string, now?: Date): number {
@@ -14,7 +24,7 @@ export function calculateAgeMonths(birthdate: string, now?: Date): number {
 }
 
 /** Get recommended wake window in minutes. If recentSleeps provided, adapts using 7-day average. */
-export function getWakeWindow(ageMonths: number, recentSleeps?: SleepEntry[]): number {
+export function getWakeWindow(ageMonths: number, recentSleeps?: SleepEntry[], tz?: string): number {
   const range = findByAge(WAKE_WINDOWS, ageMonths);
   const defaultWW = (range.minMinutes + range.maxMinutes) / 2;
 
@@ -23,9 +33,7 @@ export function getWakeWindow(ageMonths: number, recentSleeps?: SleepEntry[]): n
   const avgWW = getAverageWakeWindowFromSleeps(recentSleeps);
   if (avgWW === null) return defaultWW;
 
-  // If the baby's actual nap count differs from age default, the age-based
-  // wake window range is wrong. Use a wider range based on the actual pattern.
-  const clampRange = getAdaptedWakeWindowRange(ageMonths, recentSleeps);
+  const clampRange = getAdaptedWakeWindowRange(ageMonths, recentSleeps, tz);
   return Math.max(clampRange.minMinutes, Math.min(clampRange.maxMinutes, avgWW));
 }
 
@@ -33,9 +41,10 @@ export function getWakeWindow(ageMonths: number, recentSleeps?: SleepEntry[]): n
 function getAdaptedWakeWindowRange(
   ageMonths: number,
   recentSleeps: SleepEntry[],
+  tz?: string,
 ): { minMinutes: number; maxMinutes: number } {
   const ageRange = findByAge(WAKE_WINDOWS, ageMonths);
-  const learnedNaps = getLearnedNapCount(recentSleeps);
+  const learnedNaps = getLearnedNapCount(recentSleeps, tz);
   if (learnedNaps === null) return ageRange;
 
   const ageNaps = findByAge(NAP_COUNTS, ageMonths).naps;
@@ -84,13 +93,14 @@ export function predictDayNaps(
   ageMonths: number,
   recentSleeps?: SleepEntry[],
   customNapCount?: number | null,
+  tz?: string,
 ): PredictedNap[] {
-  const defaultWW = getWakeWindow(ageMonths, recentSleeps);
+  const defaultWW = getWakeWindow(ageMonths, recentSleeps, tz);
   const expectedNaps =
     customNapCount != null
       ? customNapCount
-      : getLearnedNapCount(recentSleeps) ?? findByAge(NAP_COUNTS, ageMonths).naps;
-  const positionalWWs = getPositionalWakeWindows(recentSleeps, ageMonths);
+      : getLearnedNapCount(recentSleeps, tz) ?? findByAge(NAP_COUNTS, ageMonths).naps;
+  const positionalWWs = getPositionalWakeWindows(recentSleeps, ageMonths, tz);
 
   const predictions: PredictedNap[] = [];
   let currentWake = new Date(wakeUpTime);
@@ -191,16 +201,17 @@ export function detectNapTransition(
  * First WW is typically shorter, last WW is typically longer.
  * Returns a sparse array indexed by position (0-based).
  */
-function getPositionalWakeWindows(recentSleeps?: SleepEntry[], ageMonths?: number): number[] {
+function getPositionalWakeWindows(recentSleeps?: SleepEntry[], ageMonths?: number, tz?: string): number[] {
   if (!recentSleeps || recentSleeps.length < 4) return [];
 
   const range = ageMonths != null ? findByAge(WAKE_WINDOWS, ageMonths) : null;
+  const timezone = resolveTz(tz);
 
-  // Group sleeps by day
+  // Group sleeps by baby-local day
   const byDay = new Map<string, SleepEntry[]>();
   for (const s of recentSleeps) {
     if (!s.end_time) continue;
-    const day = s.start_time.slice(0, 10);
+    const day = localDate(s.start_time, timezone);
     if (!byDay.has(day)) byDay.set(day, []);
     byDay.get(day)!.push(s);
   }
@@ -250,14 +261,16 @@ function getPositionalWakeWindows(recentSleeps?: SleepEntry[], ageMonths?: numbe
  * if it dominates (>60% of days), or null to fall back to age default.
  * Requires 5+ days with naps to produce a result.
  */
-function getLearnedNapCount(recentSleeps?: SleepEntry[]): number | null {
+function getLearnedNapCount(recentSleeps?: SleepEntry[], tz?: string): number | null {
   if (!recentSleeps || recentSleeps.length < 4) return null;
 
-  // Group completed naps by day
+  const timezone = resolveTz(tz);
+
+  // Group completed naps by baby-local day
   const napsByDay = new Map<string, number>();
   for (const s of recentSleeps) {
     if (s.type !== "nap" || !s.end_time) continue;
-    const day = s.start_time.slice(0, 10);
+    const day = localDate(s.start_time, timezone);
     napsByDay.set(day, (napsByDay.get(day) ?? 0) + 1);
   }
 

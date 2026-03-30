@@ -39,6 +39,7 @@ export type NapPredictor = (
   ageMonths: number,
   recentSleeps: SleepEntry[],
   customNapCount?: number | null,
+  tz?: string,
 ) => PredictedNap[];
 
 /** Bedtime predictor function signature. */
@@ -90,7 +91,7 @@ export function backtest(
     if (i < 1) continue;
 
     // Predict naps
-    const predictedNaps = predict(day.wakeTime, ageMonths, recentSleeps, customNapCount);
+    const predictedNaps = predict(day.wakeTime, ageMonths, recentSleeps, customNapCount, options?.tz);
 
     // Predict bedtime using today's actual nap data (as if naps happened)
     const actualNaps = day.sleeps.filter((s) => s.type === "nap" && s.end_time);
@@ -109,9 +110,11 @@ export function backtest(
       napStartErrors.push((predictedStart - actualStart) / 60000);
     }
 
-    // Bedtime error
+    // Bedtime error — only score when we have both naps and a bedtime.
+    // Without naps, the predictor falls back to "19:00 today" which uses
+    // the current date (wrong for historical backtest days).
     let bedtimeError: number | null = null;
-    if (actualBedtime) {
+    if (actualBedtime && actualNaps.length > 0) {
       bedtimeError =
         (new Date(predictedBedtime).getTime() - new Date(actualBedtime).getTime()) / 60000;
     }
