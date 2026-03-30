@@ -140,7 +140,7 @@ export function recommendBedtime(
 
   // Use the bedtime wake window (nap→night gap) — typically longer than nap wake windows.
   const bedtimeWW = getLearnedBedtimeWakeWindow(recentSleeps, ageMonths);
-  const hasEnoughNaps = todaySleeps.filter((s) => s.type === "nap").length >= targetNaps;
+  const hasEnoughNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time).length >= targetNaps;
   const multiplier = hasEnoughNaps ? 1.0 : 0.85;
   const bedtime = new Date(
     new Date(lastSleep.end_time).getTime() + bedtimeWW * multiplier * 60 * 1000,

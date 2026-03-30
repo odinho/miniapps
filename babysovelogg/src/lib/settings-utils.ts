@@ -3,8 +3,6 @@ import {
 	WAKE_WINDOWS,
 	findByAge,
 	getExpectedNapCount,
-	predictDayNaps,
-	recommendBedtime,
 	type PredictedNap,
 } from './engine/schedule.js';
 import type { SleepEntry } from './types.js';
@@ -165,15 +163,11 @@ export function buildPredictionRows(opts: {
 		{ label: 'Forventa lurar i dag', value: `${opts.completedNaps} av ${expected}` },
 	];
 
-	if (opts.wakeTime) {
-		const predicted = predictDayNaps(
-			opts.wakeTime,
-			opts.ageMonths,
-			opts.recentSleeps,
-			opts.napCount ?? undefined,
-		);
-		const todayNaps = opts.recentSleeps.filter(s => s.type === "nap" && s.end_time);
-		const bedtime = recommendBedtime(todayNaps, opts.ageMonths, opts.napCount ?? undefined, opts.recentSleeps);
+	if (opts.wakeTime && opts.serverPrediction?.predictedNaps) {
+		// Use server prediction (computed with full 7-day history) rather than
+		// recomputing locally with only today's data.
+		const predicted = opts.serverPrediction.predictedNaps;
+		const bedtime = opts.serverPrediction.bedtime;
 		for (let i = 0; i < predicted.length; i++) {
 			const actual = opts.recentSleeps.filter(s => s.type === 'nap' && s.end_time)[i];
 			const predictedStr = `${formatTime(predicted[i].startTime)}–${formatTime(predicted[i].endTime)}`;

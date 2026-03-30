@@ -224,14 +224,20 @@ describe('buildPredictionRows', () => {
 		expect(sleepRow!.value).toBe('1h 30m');
 	});
 
-	it('computes predictions from wakeTime when available', () => {
+	it('uses server prediction when wakeTime and serverPrediction available', () => {
 		const rows = buildPredictionRows({
 			ageMonths: 6,
 			napCount: 2,
 			completedNaps: 0,
 			wakeTime: '2026-03-27T06:00:00.000Z',
 			recentSleeps: [],
-			serverPrediction: null,
+			serverPrediction: {
+				predictedNaps: [
+					{ startTime: '2026-03-27T08:30:00Z', endTime: '2026-03-27T09:15:00Z' },
+					{ startTime: '2026-03-27T12:00:00Z', endTime: '2026-03-27T12:45:00Z' },
+				],
+				bedtime: '2026-03-27T18:00:00Z',
+			},
 			totalSleepMinutes: 0,
 		});
 		// Should include Lur 1, Lur 2, Leggetid
