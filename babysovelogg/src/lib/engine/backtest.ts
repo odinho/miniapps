@@ -96,19 +96,9 @@ export function backtest(
     const actualNaps = day.sleeps.filter((s) => s.type === "nap" && s.end_time);
     const predictedBedtime = bedtimePredict(actualNaps, ageMonths, customNapCount, recentSleeps, options?.tz);
 
-    // Find actual bedtime: tonight's night sleep start.
-    // In Kaggle fixtures, night sleep is assigned to the WAKE-UP day,
-    // so today's bedtime is in tomorrow's record. Check both.
-    const tonightSleep = day.sleeps.find(
-      (s) => s.type === "night" && s.start_time.slice(0, 10) === day.date,
-    );
-    const tomorrowNight =
-      i + 1 < days.length
-        ? days[i + 1].sleeps.find(
-            (s) => s.type === "night" && s.start_time.slice(0, 10) === day.date,
-          )
-        : undefined;
-    const actualBedtime = (tonightSleep ?? tomorrowNight)?.start_time ?? null;
+    // Find actual bedtime (tonight's night sleep start)
+    const nightSleep = day.sleeps.find((s) => s.type === "night");
+    const actualBedtime = nightSleep?.start_time ?? null;
 
     // Match predicted naps to actual naps by order
     const napStartErrors: number[] = [];

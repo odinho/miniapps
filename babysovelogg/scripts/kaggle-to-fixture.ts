@@ -91,54 +91,61 @@ function classifySleep(entry: SleepEntry, hour: number): "nap" | "night" {
 }
 
 function entriesToDays(entries: SleepEntry[]): DayRecord[] {
-  // Sort chronologically
   const sorted = [...entries].sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
 
-  // Group by calendar date of wake-up (end time for night sleep, start time for naps)
-  const dayMap = new Map<string, SleepEntry[]>();
-  for (const e of sorted) {
-    const hour = e.startTime.getUTCHours();
-    const type = classifySleep(e, hour);
+  // Classify all entries
+  const classified = sorted.map((e) => ({
+    ...e,
+    type: classifySleep(e, e.startTime.getUTCHours()),
+  }));
 
-    // For night sleep, assign to the NEXT day (when baby wakes up)
-    const assignDate =
-      type === "night"
-        ? e.endTime.toISOString().slice(0, 10)
-        : e.startTime.toISOString().slice(0, 10);
-
-    if (!dayMap.has(assignDate)) dayMap.set(assignDate, []);
-    dayMap.get(assignDate)!.push(e);
+  // Group naps by start date
+  const napsByDate = new Map<string, typeof classified>();
+  for (const e of classified) {
+    if (e.type !== "nap") continue;
+    const date = e.startTime.toISOString().slice(0, 10);
+    if (!napsByDate.has(date)) napsByDate.set(date, []);
+    napsByDate.get(date)!.push(e);
   }
 
+  // Index night sleeps by start date (= bedtime day) and end date (= wake-up day)
+  const nightByStartDate = new Map<string, typeof classified[0]>();
+  const nightByEndDate = new Map<string, typeof classified[0]>();
+  for (const e of classified) {
+    if (e.type !== "night") continue;
+    nightByStartDate.set(e.startTime.toISOString().slice(0, 10), e);
+    nightByEndDate.set(e.endTime.toISOString().slice(0, 10), e);
+  }
+
+  // Build day records: wake-up from last night ending today,
+  // naps from today, bedtime from tonight starting today.
   const days: DayRecord[] = [];
-  for (const [date, daySleeps] of [...dayMap.entries()].sort()) {
-    const chronological = daySleeps.sort(
-      (a, b) => a.startTime.getTime() - b.startTime.getTime(),
-    );
+  for (const [date, naps] of [...napsByDate.entries()].sort()) {
+    if (naps.length === 0) continue;
 
-    // Find night sleep (should end in this day = wake-up)
-    const nightSleep = chronological.find(
-      (e) => classifySleep(e, e.startTime.getUTCHours()) === "night",
-    );
+    // Wake-up: end of the night that ended today
+    const morningNight = nightByEndDate.get(date);
+    const wakeTime = morningNight
+      ? morningNight.endTime.toISOString()
+      : naps[0].startTime.toISOString();
 
-    // Wake time: end of night sleep, or earliest entry
-    const wakeTime = nightSleep
-      ? nightSleep.endTime.toISOString()
-      : chronological[0].startTime.toISOString();
+    // Tonight's bedtime: night sleep starting today
+    const tonightNight = nightByStartDate.get(date);
 
-    // Build sleep entries
-    const sleeps = chronological.map((e) => {
-      const hour = e.startTime.getUTCHours();
-      return {
+    const sleeps = [
+      ...naps.map((e) => ({
         start_time: e.startTime.toISOString(),
         end_time: e.endTime.toISOString(),
-        type: classifySleep(e, hour),
-      };
-    });
-
-    // Skip days with no naps — they have no prediction target
-    const naps = sleeps.filter((s) => s.type === "nap");
-    if (naps.length === 0) continue;
+        type: "nap" as const,
+      })),
+      ...(tonightNight
+        ? [{
+            start_time: tonightNight.startTime.toISOString(),
+            end_time: tonightNight.endTime.toISOString(),
+            type: "night" as const,
+          }]
+        : []),
+    ];
 
     days.push({ date, wakeTime, sleeps });
   }
