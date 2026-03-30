@@ -6,6 +6,8 @@ import {
   getExpectedNapCount,
 } from "./schedule.js";
 import { getTodayStats } from "./stats.js";
+import { computeConfidence } from "./confidence.js";
+import { calibrate } from "./calibration.js";
 import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry, BabyContext } from "$lib/types.js";
 import type { PredictedNap } from "./schedule.js";
 
@@ -120,11 +122,22 @@ export function assembleState(data: DayData) {
         predictedNaps = null;
       }
 
+      // Compute confidence intervals and calibration
+      const allPredictedForConf = todayWakeUp
+        ? predictDayNaps(todayWakeUp.wake_time, ctx)
+        : [];
+      const confidence = allPredictedForConf.length > 0
+        ? computeConfidence(allPredictedForConf, bedtime, ctx.ageMonths, ctx.recentSleeps, ctx.tz)
+        : null;
+      const calibration = calibrate(ctx.ageMonths, ctx.recentSleeps, ctx.customNapCount, ctx.tz);
+
       prediction = {
         nextNap,
         bedtime,
         predictedNaps,
         napsAllDone: napsAllDone || activeSleep?.type === "night",
+        confidence,
+        calibration,
       };
     }
   }

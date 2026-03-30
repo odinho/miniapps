@@ -147,6 +147,8 @@ describe("getTimerMode", () => {
           bedtime: "2026-03-27T19:00:00.000Z",
           predictedNaps: null,
           napsAllDone: false,
+          confidence: null,
+          calibration: null,
         },
       });
       const mode = getTimerMode(input);
@@ -166,6 +168,8 @@ describe("getTimerMode", () => {
           bedtime: "2026-03-27T19:00:00.000Z",
           predictedNaps: null,
           napsAllDone: false,
+          confidence: null,
+          calibration: null,
         },
       });
       const mode = getTimerMode(input);
@@ -185,6 +189,8 @@ describe("getTimerMode", () => {
           bedtime: "2026-03-27T19:00:00.000Z",
           predictedNaps: null,
           napsAllDone: true,
+          confidence: null,
+          calibration: null,
         },
       });
       const mode = getTimerMode(input);
@@ -202,6 +208,8 @@ describe("getTimerMode", () => {
           bedtime: "2026-03-27T19:00:00.000Z",
           predictedNaps: null,
           napsAllDone: true,
+          confidence: null,
+          calibration: null,
         },
       });
       const mode = getTimerMode(input);
@@ -227,6 +235,8 @@ describe("getTimerMode", () => {
           bedtime: bedtime.toISOString(),
           predictedNaps: null,
           napsAllDone: false,
+          confidence: null,
+          calibration: null,
         },
       });
       const mode = getTimerMode(input);

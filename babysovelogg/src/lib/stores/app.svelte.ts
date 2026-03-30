@@ -1,12 +1,18 @@
 import type { Baby, SleepLogRow, DayStartRow } from "$lib/types.js";
 import type { DayStats } from "$lib/engine/stats.js";
 import type { PredictedNap } from "$lib/engine/schedule.js";
+import type { PredictionRange, ConfidenceResult } from "$lib/engine/confidence.js";
+import type { CalibrationReport } from "$lib/engine/calibration.js";
 
 export interface Prediction {
 	nextNap: string;
 	bedtime: string;
 	predictedNaps: PredictedNap[] | null;
 	napsAllDone: boolean;
+	/** Confidence intervals for nap/bedtime predictions (null when no data) */
+	confidence: ConfidenceResult | null;
+	/** Calibration report: what's learned vs age-default */
+	calibration: CalibrationReport | null;
 }
 
 export interface AppState {
