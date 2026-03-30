@@ -131,11 +131,15 @@ Client auto-reconnects with exponential backoff (1s → 30s max). A 1-second sup
 
 ## Prediction Engine
 
-Located in `src/lib/engine/schedule.ts`. Uses age-based wake window tables from `constants.ts` to predict:
+Located in `src/lib/engine/schedule.ts` with age-based priors from `constants.ts`. Adapts to the individual baby using recent sleep data.
 
-- **Next nap** — based on time since last wake-up and age
-- **Day's nap schedule** — all predicted naps anchored on morning wake-up time
-- **Bedtime** — recommended based on last nap end and age
+- **Nap count** — learned from recent 5+ days (mode with >60% dominance), falls back to age default
+- **Wake windows** — learned from gaps between consecutive sleeps (nap-only, excluding bedtime gap), clamped to an adapted range that widens when the baby's nap count differs from age default
+- **Nap timing** — positional wake windows (1st WW typically shorter than 2nd) anchored on morning wake-up
+- **Bedtime** — separate learned bedtime wake window (nap→night gap), wide sanity clamp (16:00-23:00 local)
+- **Population norms** — Galland 2012 regression equations and SHINE 2021 actigraphy stats in `src/lib/data/`
+
+Backtest harness in `src/lib/engine/backtest.ts` replays historical data day-by-day and measures MAE/bias/accuracy. Golden datasets in `tests/fixtures/` (Halldis 83 days + 5 Kaggle babies). See `docs/prediction-next-steps.md` for roadmap.
 
 The 12-hour arc visualizes completed sleeps and predictions on a semicircular timeline.
 
