@@ -17,12 +17,13 @@ export function getHourInTz(date: Date, tz: string): number {
 /** Set a Date to a specific local hour in the given IANA timezone, preserving the date. */
 export function setHourInTz(date: Date, hour: number, minute: number, tz: string): Date {
 	const dateStr = date.toLocaleDateString("en-CA", { timeZone: tz });
-	// Build an ISO string for the target local time, then compute the UTC offset
-	const targetLocal = new Date(`${dateStr}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`);
-	const utcStr = targetLocal.toLocaleString("en-US", { timeZone: "UTC" });
-	const localStr = targetLocal.toLocaleString("en-US", { timeZone: tz });
-	const offsetMs = new Date(localStr).getTime() - new Date(utcStr).getTime();
-	return new Date(targetLocal.getTime() - offsetMs);
+	// Treat the target time as UTC, then subtract the TZ offset to get the real UTC instant.
+	// Same pattern as todayInTz for midnight.
+	const asUtc = new Date(`${dateStr}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00Z`);
+	const utcRef = asUtc.toLocaleString("en-US", { timeZone: "UTC" });
+	const localRef = asUtc.toLocaleString("en-US", { timeZone: tz });
+	const offsetMs = new Date(localRef).getTime() - new Date(utcRef).getTime();
+	return new Date(asUtc.getTime() - offsetMs);
 }
 
 /** Get today's date (YYYY-MM-DD) and the UTC ISO string for midnight in the given timezone.

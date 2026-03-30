@@ -3,7 +3,9 @@
  * Convert Kaggle "Tracking Babies Daily" sleep CSV to backtest fixtures.
  *
  * Usage:
- *   bun scripts/kaggle-to-fixture.ts <input.csv> <output-dir>
+ *   bun scripts/kaggle-to-fixture.ts <input.csv> <output-dir> [timezone]
+ *
+ * Timezone defaults to America/New_York. The CSV times are local to the family.
  *
  * Outputs one JSON file per baby in the output directory.
  * Each file is a { birthdate, days: DayRecord[] } object.
@@ -24,7 +26,7 @@ interface SleepEntry {
   endTime: Date;
 }
 
-function parseKaggleCsv(csv: string): SleepEntry[] {
+function parseKaggleCsv(csv: string, sourceTz: string): SleepEntry[] {
   // Remove BOM and normalize unicode narrow no-break spaces
   const clean = csv.replace(/^\uFEFF/, "").replace(/\u202F/g, " ");
   const lines = clean.trim().split(/\r?\n/).slice(1);
@@ -66,7 +68,13 @@ function parseKaggleCsv(csv: string): SleepEntry[] {
     if (ampm === "PM" && hour !== 12) hour += 12;
     if (ampm === "AM" && hour === 12) hour = 0;
 
-    const startTime = new Date(Date.UTC(year, month, day, hour, min));
+    // Parse as local time in the baby's timezone, then convert to UTC.
+    // Construct an ISO string as if UTC, then subtract the TZ offset.
+    const asUtc = new Date(Date.UTC(year, month, day, hour, min));
+    const utcRef = asUtc.toLocaleString("en-US", { timeZone: "UTC" });
+    const localRef = asUtc.toLocaleString("en-US", { timeZone: sourceTz });
+    const offsetMs = new Date(localRef).getTime() - new Date(utcRef).getTime();
+    const startTime = new Date(asUtc.getTime() - offsetMs);
     const endTime = new Date(startTime.getTime() + totalMin * 60000);
 
     entries.push({ baby, startTime, durationMin: totalMin, endTime });
@@ -139,14 +147,15 @@ function entriesToDays(entries: SleepEntry[]): DayRecord[] {
 }
 
 // --- main ---
-const [inputPath, outputDir] = process.argv.slice(2);
+const [inputPath, outputDir, tzArg] = process.argv.slice(2);
 if (!inputPath || !outputDir) {
-  console.error("Usage: bun scripts/kaggle-to-fixture.ts <input.csv> <output-dir>");
+  console.error("Usage: bun scripts/kaggle-to-fixture.ts <input.csv> <output-dir> [timezone]");
   process.exit(1);
 }
+const sourceTz = tzArg ?? "America/New_York";
 
 const csv = await Bun.file(inputPath).text();
-const allEntries = parseKaggleCsv(csv);
+const allEntries = parseKaggleCsv(csv, sourceTz);
 
 // Group by baby
 const byBaby = new Map<string, SleepEntry[]>();
