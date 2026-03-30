@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { backtest, formatReport } from "$lib/engine/backtest.js";
+import { backtest, bucketByAge, formatReport } from "$lib/engine/backtest.js";
 import type { DayRecord } from "$lib/engine/backtest.js";
 import type { SleepEntry } from "$lib/types.js";
 
@@ -13,14 +13,17 @@ function sleep(start: string, end: string, type: "nap" | "night" = "nap"): Sleep
 // GOLDEN DATASET: Halldis (born 2025-06-12)
 //
 // Real sleep data from db.sqlite (March 22-29, 2026) + napper export (Jan 6-7).
-// All times are UTC. Halldis is ~9 months during the March period.
-// Pattern: mostly 1 nap/day (early nap dropper), bedtime ~16:50-17:40 UTC.
+// All times are UTC instants — DST does not affect predictions.
+//
+// Add more data here as it becomes available (e.g. re-export from Napper with
+// full history). The bucketByAge helper will automatically segment by period.
 // =============================================================================
 
 const HALLDIS_BIRTHDATE = "2025-06-12";
 
 const HALLDIS_DAYS: DayRecord[] = [
-  // --- From napper export (January, ~7 months) ---
+  // ── Napper export (January 2026, ~7 months, 2-nap pattern) ──
+  // Only 2 days available — re-export from Napper for full history!
   {
     date: "2026-01-06",
     wakeTime: "2026-01-06T05:00:00.000Z", // 06:00 CET
@@ -33,12 +36,11 @@ const HALLDIS_DAYS: DayRecord[] = [
   {
     date: "2026-01-07",
     wakeTime: "2026-01-07T04:46:00.000Z", // 05:46 CET
-    sleeps: [
-      // Only wake-up recorded, no nap data for this day
-    ],
+    sleeps: [], // Only wake-up recorded, no further data for this day
   },
 
-  // --- From db.sqlite (March 22-29, ~9 months) ---
+  // ── db.sqlite (March 22-29, 2026, ~9 months, 1-nap pattern) ──
+  // Note: she's an early nap dropper — mostly 1 nap at 9mo where default is 2
   {
     date: "2026-03-22",
     wakeTime: "2026-03-22T04:45:00.000Z",
@@ -49,7 +51,7 @@ const HALLDIS_DAYS: DayRecord[] = [
   },
   {
     date: "2026-03-23",
-    wakeTime: "2026-03-23T04:45:00.000Z", // night ended at 04:45
+    wakeTime: "2026-03-23T04:45:00.000Z",
     sleeps: [
       sleep("2026-03-23T11:00:00.000Z", "2026-03-23T12:50:00.000Z", "nap"), // 110 min
       sleep("2026-03-23T16:55:00.000Z", "2026-03-24T04:50:02.021Z", "night"),
@@ -106,14 +108,16 @@ const HALLDIS_DAYS: DayRecord[] = [
   },
 ];
 
+// Extract just the March days (9mo period, enough for meaningful backtest)
+const MARCH_DAYS = HALLDIS_DAYS.filter((d) => d.date.startsWith("2026-03"));
+
 // =============================================================================
 // TESTS
 // =============================================================================
 
-describe("backtest", () => {
+describe("backtest mechanics", () => {
   it("runs on golden dataset and produces metrics", () => {
     const result = backtest(HALLDIS_DAYS, HALLDIS_BIRTHDATE);
-
     expect(result.totalDays).toBeGreaterThan(0);
     expect(result.napCountAccuracy).toBeGreaterThanOrEqual(0);
     expect(result.napCountAccuracy).toBeLessThanOrEqual(1);
@@ -123,12 +127,10 @@ describe("backtest", () => {
 
   it("skips first day (no prior data)", () => {
     const result = backtest(HALLDIS_DAYS, HALLDIS_BIRTHDATE);
-    // First day (Jan 6) should be skipped — no prior data to learn from
     expect(result.days[0].date).not.toBe("2026-01-06");
   });
 
   it("handles days with no naps gracefully", () => {
-    // Jan 7 has no naps recorded — should still produce a result
     const result = backtest(HALLDIS_DAYS, HALLDIS_BIRTHDATE);
     const jan7 = result.days.find((d) => d.date === "2026-01-07");
     if (jan7) {
@@ -139,42 +141,121 @@ describe("backtest", () => {
 
   it("accepts custom predictor function", () => {
     const result = backtest(HALLDIS_DAYS, HALLDIS_BIRTHDATE, { predict: () => [] });
-    // Should have 0 predicted naps for all days
     for (const day of result.days) {
       expect(day.predictedNaps).toHaveLength(0);
     }
   });
+
+  it("all times in golden dataset are UTC instants", () => {
+    for (const day of HALLDIS_DAYS) {
+      expect(day.wakeTime).toMatch(/Z$/);
+      for (const s of day.sleeps) {
+        expect(s.start_time).toMatch(/Z$/);
+        if (s.end_time) expect(s.end_time).toMatch(/Z$/);
+      }
+    }
+  });
 });
 
-describe("baseline: current algorithm on Halldis data", () => {
+describe("bucketByAge", () => {
+  it("groups Halldis data into age periods", () => {
+    const buckets = bucketByAge(HALLDIS_DAYS, HALLDIS_BIRTHDATE);
+    expect(buckets.length).toBeGreaterThanOrEqual(1);
+
+    // January data (~7 months) should be in 6-9mo bucket
+    const bucket7 = buckets.find((b) => b.label === "6-9mo");
+    expect(bucket7).toBeDefined();
+    expect(bucket7!.days.some((d) => d.date === "2026-01-06")).toBe(true);
+
+    // March data (~9 months) should be in 9-12mo bucket
+    const bucket9 = buckets.find((b) => b.label === "9-12mo");
+    expect(bucket9).toBeDefined();
+    expect(bucket9!.days.length).toBe(8);
+  });
+});
+
+// =============================================================================
+// BASELINE: Full dataset (all ages combined)
+// =============================================================================
+
+describe("baseline: all data, auto nap count", () => {
   const result = backtest(HALLDIS_DAYS, HALLDIS_BIRTHDATE);
 
   it("prints report", () => {
-    const report = formatReport(result, "Halldis baseline (current algorithm)");
-    console.log("\n" + report + "\n");
+    console.log("\n" + formatReport(result, "ALL DATA — auto nap count") + "\n");
   });
 
-  // ── Regression guards ──
-  // Baseline established 2026-03-30 with current algorithm on Halldis data.
-  // As we improve the algorithm, tighten these numbers.
-  // If a change makes things WORSE, these tests will catch it.
-  //
-  // Current baseline:
-  //   Nap count accuracy: 11% (1/9) — predicts 2 naps, she mostly does 1
+  // Regression guards (baseline 2026-03-30)
+  //   Nap count accuracy: 11% — predicts 2, she does 1
   //   Nap start MAE: 90 min
-  //   Nap start bias: -73.8 min (predicting too early)
   //   Bedtime MAE: 60.3 min
-  //   Nap count bias: +1 (over-predicting nap count)
+  it("nap start MAE ≤ 95 min", () => expect(result.napStartMAE).toBeLessThan(95));
+  it("bedtime MAE ≤ 65 min", () => expect(result.bedtimeMAE).toBeLessThan(65));
+  it("nap count accuracy ≥ 10%", () => expect(result.napCountAccuracy).toBeGreaterThanOrEqual(0.1));
+});
 
-  it("nap start MAE stays below 95 min", () => {
-    expect(result.napStartMAE).toBeLessThan(95);
+// =============================================================================
+// BASELINE: 9-month period (March), auto vs manual nap count
+//
+// This is the core comparison: how much does just knowing the correct nap count
+// improve predictions? The gap between these two is the "nap count penalty".
+// =============================================================================
+
+describe("baseline: 9mo period, auto nap count", () => {
+  const result = backtest(MARCH_DAYS, HALLDIS_BIRTHDATE);
+
+  it("prints report", () => {
+    console.log("\n" + formatReport(result, "9 MONTHS — auto nap count (predicts 2)") + "\n");
   });
 
-  it("bedtime MAE stays below 65 min", () => {
-    expect(result.bedtimeMAE).toBeLessThan(65);
+  // At 9mo the algorithm predicts 2 naps, but Halldis mostly does 1.
+  // This is the "worst case" — the nap count is wrong.
+  it("nap start MAE ≤ 85 min", () => expect(result.napStartMAE).toBeLessThan(85));
+  it("bedtime MAE ≤ 70 min", () => expect(result.bedtimeMAE).toBeLessThan(70));
+});
+
+describe("baseline: 9mo period, manual nap count = 1", () => {
+  const result = backtest(MARCH_DAYS, HALLDIS_BIRTHDATE, { customNapCount: 1 });
+
+  it("prints report", () => {
+    console.log(
+      "\n" + formatReport(result, "9 MONTHS — manual nap count = 1 (user override)") + "\n",
+    );
   });
 
-  it("nap count accuracy stays above 10%", () => {
-    expect(result.napCountAccuracy).toBeGreaterThanOrEqual(0.1);
+  // With correct nap count, nap count accuracy jumps from 14% to 86%.
+  // Mar 27 was an unusual 2-nap day, so not 100%.
+  it("nap count accuracy ≥ 80%", () => {
+    expect(result.napCountAccuracy).toBeGreaterThanOrEqual(0.8);
+  });
+
+  // KEY INSIGHT: nap start MAE barely changes (81.4 → 81.2) because the
+  // wake window constants are calibrated for 2-nap babies. A 1-nap baby
+  // needs ~6h wake window but the 9-12mo range caps at 210 min (3.5h).
+  // Early days have huge errors (-165 min) because no prior data to learn from.
+  // Later days (Mar 26-29) learn from data and get much closer (-1 to -29 min).
+  // → Next improvement: wake windows must adapt to actual nap count.
+  it("nap start MAE ≤ 85 min", () => {
+    expect(result.napStartMAE).toBeLessThan(85);
+  });
+
+  it("bedtime MAE ≤ 70 min", () => expect(result.bedtimeMAE).toBeLessThan(70));
+});
+
+// =============================================================================
+// BASELINE: 7-month period (January) — needs more data
+// Only 2 days from napper export. Will become useful after re-export.
+// =============================================================================
+
+describe("baseline: 7mo period (needs more napper data)", () => {
+  const janDays = HALLDIS_DAYS.filter((d) => d.date.startsWith("2026-01"));
+
+  it("has too few days for meaningful backtest", () => {
+    const result = backtest(janDays, HALLDIS_BIRTHDATE);
+    // Only 1 testable day (Jan 7, which has no naps) — not meaningful yet
+    expect(result.totalDays).toBeLessThanOrEqual(1);
+    console.log(
+      `\n7 MONTHS — only ${janDays.length} days available, need more napper data\n`,
+    );
   });
 });

@@ -177,6 +177,31 @@ function summarize(days: DayResult[]): BacktestResult {
   };
 }
 
+/** Group day records into age-period buckets (e.g. "6-8mo", "9-12mo"). */
+export function bucketByAge(
+  days: DayRecord[],
+  birthdate: string,
+): { label: string; ageRange: [number, number]; days: DayRecord[] }[] {
+  const brackets = [
+    [0, 3], [3, 6], [6, 9], [9, 12], [12, 18], [18, 24],
+  ] as const;
+
+  const buckets = brackets.map(([lo, hi]) => ({
+    label: `${lo}-${hi}mo`,
+    ageRange: [lo, hi] as [number, number],
+    days: [] as DayRecord[],
+  }));
+
+  for (const day of days) {
+    const age = calculateAgeMonths(birthdate, new Date(day.date + "T12:00:00Z"));
+    const bucket = buckets.find((b) => age >= b.ageRange[0] && age < b.ageRange[1]);
+    if (bucket) bucket.days.push(day);
+    else buckets[buckets.length - 1].days.push(day); // overflow into last bucket
+  }
+
+  return buckets.filter((b) => b.days.length > 0);
+}
+
 /** Format a backtest result as a human-readable report string. */
 export function formatReport(result: BacktestResult, label?: string): string {
   const lines: string[] = [];
