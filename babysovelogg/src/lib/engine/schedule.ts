@@ -2,6 +2,7 @@ import { WAKE_WINDOWS, NAP_COUNTS, findByAge } from "./constants.js";
 export { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, findByAge } from "./constants.js";
 export type { SleepEntry } from "$lib/types.js";
 import type { SleepEntry } from "$lib/types.js";
+import { getHourInTz, setHourInTz } from "$lib/tz.js";
 
 /** Calculate age in months from birthdate ISO string. */
 export function calculateAgeMonths(birthdate: string, now?: Date): number {
@@ -115,42 +116,40 @@ export function predictDayNaps(
   return predictions;
 }
 
-/** Recommend bedtime based on today's sleeps and age. */
+/**
+ * Recommend bedtime based on today's sleeps and age.
+ * @param tz - IANA timezone for the baby. Defaults to server-local (= baby's TZ in production).
+ */
 export function recommendBedtime(
   todaySleeps: SleepEntry[],
   ageMonths: number,
   customNapCount?: number | null,
   recentSleeps?: SleepEntry[],
+  tz?: string,
 ): string {
   const targetNaps = getExpectedNapCount(ageMonths, customNapCount);
+  const timezone = tz ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const lastSleep = [...todaySleeps]
     .filter((s) => s.end_time)
     .toSorted((a, b) => new Date(b.end_time!).getTime() - new Date(a.end_time!).getTime())[0];
 
   if (!lastSleep?.end_time) {
-    // Default: 19:00 server-local (= baby's timezone) today
-    const today = new Date();
-    today.setHours(19, 0, 0, 0);
-    return today.toISOString();
+    return setHourInTz(new Date(), 19, 0, timezone).toISOString();
   }
 
   // Use the bedtime wake window (nap→night gap) — typically longer than nap wake windows.
-  // Learn from recent data if available, otherwise use age default × 1.15.
   const bedtimeWW = getLearnedBedtimeWakeWindow(recentSleeps, ageMonths);
   const hasEnoughNaps = todaySleeps.filter((s) => s.type === "nap").length >= targetNaps;
-  const multiplier = hasEnoughNaps ? 1.0 : 0.85; // shorter if naps incomplete
+  const multiplier = hasEnoughNaps ? 1.0 : 0.85;
   const bedtime = new Date(
     new Date(lastSleep.end_time).getTime() + bedtimeWW * multiplier * 60 * 1000,
   );
 
-  // Only clamp as a cold-start safety net. Once we have learned data,
-  // the bedtime WW already reflects the baby's actual rhythm.
-  // Wide sanity clamp: no earlier than 16:00, no later than 23:00 local.
-  // Server TZ = baby's TZ by design (single-tenant).
-  const hour = bedtime.getHours() + bedtime.getMinutes() / 60;
-  if (hour < 16) bedtime.setHours(16, 0, 0, 0);
-  if (hour > 23) bedtime.setHours(23, 0, 0, 0);
+  // Wide sanity clamp in the baby's local time
+  const hour = getHourInTz(bedtime, timezone);
+  if (hour < 16) return setHourInTz(bedtime, 16, 0, timezone).toISOString();
+  if (hour > 23) return setHourInTz(bedtime, 23, 0, timezone).toISOString();
 
   return bedtime.toISOString();
 }

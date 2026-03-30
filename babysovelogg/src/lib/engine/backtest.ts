@@ -47,6 +47,7 @@ export type BedtimePredictor = (
   ageMonths: number,
   customNapCount?: number | null,
   recentSleeps?: SleepEntry[],
+  tz?: string,
 ) => string;
 
 /**
@@ -65,6 +66,7 @@ export function backtest(
     predict?: NapPredictor;
     predictBedtime?: BedtimePredictor;
     customNapCount?: number | null;
+    tz?: string;
   },
 ): BacktestResult {
   const lookback = options?.lookbackDays ?? 7;
@@ -92,7 +94,7 @@ export function backtest(
 
     // Predict bedtime using today's actual nap data (as if naps happened)
     const actualNaps = day.sleeps.filter((s) => s.type === "nap" && s.end_time);
-    const predictedBedtime = bedtimePredict(actualNaps, ageMonths, customNapCount, recentSleeps);
+    const predictedBedtime = bedtimePredict(actualNaps, ageMonths, customNapCount, recentSleeps, options?.tz);
 
     // Find actual bedtime (first night sleep start)
     const nightSleep = day.sleeps.find((s) => s.type === "night");
