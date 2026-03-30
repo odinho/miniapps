@@ -128,10 +128,9 @@ function entriesToDays(entries: SleepEntry[]): DayRecord[] {
       };
     });
 
-    // Skip days with no naps (only night data)
+    // Skip days with no naps — they have no prediction target
     const naps = sleeps.filter((s) => s.type === "nap");
-    const night = sleeps.find((s) => s.type === "night");
-    if (naps.length === 0 && !night) continue;
+    if (naps.length === 0) continue;
 
     days.push({ date, wakeTime, sleeps });
   }

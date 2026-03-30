@@ -41,13 +41,13 @@ function getAdaptedWakeWindowRange(
   if (learnedNaps === ageNaps) return ageRange;
 
   // Baby does fewer/more naps than age default. Find ALL age brackets where
-  // this nap count is within the acceptable range, and union their wake windows.
+  // this nap count is within the acceptable range, and look up the CORRESPONDING
+  // wake window range by age (not by array index — the two tables have different sizes).
   let minWW = ageRange.minMinutes;
   let maxWW = ageRange.maxMinutes;
-  for (let i = 0; i < NAP_COUNTS.length; i++) {
-    const nc = NAP_COUNTS[i];
+  for (const nc of NAP_COUNTS) {
     if (learnedNaps >= nc.range[0] && learnedNaps <= nc.range[1]) {
-      const ww = WAKE_WINDOWS[i] ?? WAKE_WINDOWS[WAKE_WINDOWS.length - 1];
+      const ww = findByAge(WAKE_WINDOWS, nc.minMonths);
       minWW = Math.min(minWW, ww.minMinutes);
       maxWW = Math.max(maxWW, ww.maxMinutes);
     }

@@ -86,14 +86,8 @@ function napperToDays(csv: string): DayRecord[] {
     }
   }
 
-  // Close trailing night if bedtime was last event
-  if (pendingBedtime && current) {
-    current.sleeps.push({
-      start_time: pendingBedtime,
-      end_time: pendingBedtime, // no end time available
-      type: "night",
-    });
-  }
+  // Trailing bedtime with no following WOKE_UP — don't create a bogus
+  // zero-length night. The bedtime is real but we don't know the end time.
 
   return days;
 }
