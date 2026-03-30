@@ -16,7 +16,7 @@ import {
   predictDayNaps,
 } from "../src/lib/engine/schedule.js";
 import { getTodayStats, getWeekStats, getAverageWakeWindow } from "../src/lib/engine/stats.js";
-import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry } from "../src/lib/types.js";
+import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry, BabyContext } from "../src/lib/types.js";
 
 process.on("exit", closeDb);
 db.exec("PRAGMA busy_timeout = 3000");
@@ -156,6 +156,16 @@ function toSleepEntry(s: SleepLogRow): SleepEntry {
     end_time: s.end_time,
     type: s.type as "nap" | "night",
     pauses: s.pauses?.map((p) => ({ pause_time: p.pause_time, resume_time: p.resume_time })),
+  };
+}
+
+function buildCtx(baby: Baby, recentSleeps: SleepEntry[]): BabyContext {
+  return {
+    birthdate: baby.birthdate,
+    ageMonths: calculateAgeMonths(baby.birthdate),
+    tz: baby.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+    customNapCount: baby.custom_nap_count ?? null,
+    recentSleeps,
   };
 }
 
@@ -326,7 +336,8 @@ function cmdDefault() {
         )
         .all(baby.id, weekAgo) as SleepLogRow[];
       attachPauses(recentSleeps);
-      const nextNap = predictNextNap(wakeTime, ageMonths, recentSleeps.map(toSleepEntry));
+      const ctx = buildCtx(baby, recentSleeps.map(toSleepEntry));
+      const nextNap = predictNextNap(wakeTime, ctx);
       parts.push(`Next nap: ~${fmtTime(nextNap)}`);
     }
   }
@@ -380,14 +391,13 @@ function cmdStatus() {
         )
         .all(baby.id, weekAgo) as SleepLogRow[];
       attachPauses(recentSleeps);
-      const entries = recentSleeps.map(toSleepEntry);
-      const customNaps = baby.custom_nap_count ?? null;
+      const ctx = buildCtx(baby, recentSleeps.map(toSleepEntry));
       prediction = {
-        nextNap: predictNextNap(wakeTime, ageMonths, entries),
-        bedtime: recommendBedtime(todaySleeps.map(toSleepEntry), ageMonths, customNaps),
+        nextNap: predictNextNap(wakeTime, ctx),
+        bedtime: recommendBedtime(todaySleeps.map(toSleepEntry), ctx),
       };
       if (wakeUp) {
-        const allPredicted = predictDayNaps(wakeUp.wake_time, ageMonths, entries, customNaps);
+        const allPredicted = predictDayNaps(wakeUp.wake_time, ctx);
         const completedNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time);
         prediction.predictedNaps = allPredicted.slice(completedNaps.length);
       }

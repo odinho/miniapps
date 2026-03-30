@@ -74,6 +74,15 @@ export interface SleepPause {
   resume_time: string | null;
 }
 
+/** Everything the prediction engine needs to know about a baby. */
+export interface BabyContext {
+  birthdate: string;          // ISO date
+  ageMonths: number;          // pre-computed age in months
+  tz: string;                 // IANA timezone (e.g. "Europe/Oslo")
+  customNapCount: number | null;
+  recentSleeps: SleepEntry[]; // last 7 days of completed sleeps
+}
+
 export interface EventRow {
   id: number;
   type: string;

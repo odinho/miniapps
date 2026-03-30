@@ -51,11 +51,11 @@ describe("multi-baby backtest", () => {
     const lines = results.map((r) => renderSummary(r.result, r.name));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "halldis: 82 days, count 80% (66/82), nap MAE 58.3 min, bed MAE 39.7 min, nap bias +3.8, count bias +0.07
-      baby_1: 803 days, count 72% (576/803), nap MAE 127.5 min, bed MAE 326.7 min, nap bias +110.1, count bias -0.7
-      baby_2: 147 days, count 37% (55/147), nap MAE 112.5 min, bed MAE 175.8 min, nap bias +64, count bias -0.29
-      baby_3: 70 days, count 24% (17/70), nap MAE 132.6 min, bed MAE 1318.5 min, nap bias +50.9, count bias -0.24
+      baby_1: 803 days, count 72% (576/803), nap MAE 127.6 min, bed MAE 326.7 min, nap bias +110.2, count bias -0.7
+      baby_2: 147 days, count 37% (55/147), nap MAE 112.2 min, bed MAE 175.8 min, nap bias +64.2, count bias -0.29
+      baby_3: 70 days, count 24% (17/70), nap MAE 134.8 min, bed MAE 1318.5 min, nap bias +51.9, count bias -0.24
       baby_4: 25 days, count 20% (5/25), nap MAE 93.5 min, bed MAE 0 min, nap bias +80, count bias +0.16
-      baby_5: 41 days, count 5% (2/41), nap MAE 142.4 min, bed MAE 892.8 min, nap bias +134.9, count bias -1.02"
+      baby_5: 41 days, count 5% (2/41), nap MAE 142.5 min, bed MAE 892.8 min, nap bias +135, count bias -1.02"
     `);
   });
 
@@ -69,8 +69,8 @@ describe("multi-baby backtest", () => {
       3mo: 30 days, count 10% (3/30), nap MAE 99.3 min, bed MAE 330 min, nap bias +85.2, count bias -2.33
       4mo: 31 days, count 10% (3/31), nap MAE 181.7 min, bed MAE 891.9 min, nap bias +181.7, count bias -2.06
       5mo: 30 days, count 3% (1/30), nap MAE 213.3 min, bed MAE 851.4 min, nap bias +212.3, count bias -2.57
-      6mo: 31 days, count 19% (6/31), nap MAE 344.5 min, bed MAE 1227.7 min, nap bias +344.5, count bias -1.81
-      7mo: 30 days, count 33% (10/30), nap MAE 162.8 min, bed MAE 1119 min, nap bias +150.7, count bias -1.97
+      6mo: 31 days, count 19% (6/31), nap MAE 347 min, bed MAE 1227.7 min, nap bias +347, count bias -1.81
+      7mo: 30 days, count 33% (10/30), nap MAE 160.9 min, bed MAE 1119 min, nap bias +148.7, count bias -1.97
       8mo: 31 days, count 77% (24/31), nap MAE 30.7 min, bed MAE 872.1 min, nap bias +7.1, count bias -0.03
       9mo: 31 days, count 87% (27/31), nap MAE 21.2 min, bed MAE 918.3 min, nap bias -12.6, count bias +0.13
       10mo: 28 days, count 64% (18/28), nap MAE 38.4 min, bed MAE 308.8 min, nap bias -11.6, count bias 0
@@ -101,7 +101,7 @@ describe("multi-baby backtest", () => {
     const buckets = bucketResultsByAge(results[2].result, results[2].birthdate);
     const lines = buckets.map((b) => renderSummary(b.result, b.label));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "0mo: 16 days, count 19% (3/16), nap MAE 163 min, bed MAE 771.8 min, nap bias +90.1, count bias -2.19
+      "0mo: 16 days, count 19% (3/16), nap MAE 161.7 min, bed MAE 771.8 min, nap bias +91, count bias -2.19
       1mo: 14 days, count 14% (2/14), nap MAE 135 min, bed MAE 1147.3 min, nap bias +135, count bias +0.93
       2mo: 10 days, count 20% (2/10), nap MAE 49.9 min, bed MAE 113.3 min, nap bias +20.9, count bias -0.3
       3mo: 23 days, count 48% (11/23), nap MAE 82.8 min, bed MAE 135.9 min, nap bias +46.9, count bias -0.7

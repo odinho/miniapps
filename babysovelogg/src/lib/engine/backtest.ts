@@ -1,4 +1,4 @@
-import type { SleepEntry } from "$lib/types.js";
+import type { SleepEntry, BabyContext } from "$lib/types.js";
 import type { PredictedNap } from "./schedule.js";
 import { predictDayNaps, recommendBedtime, calculateAgeMonths } from "./schedule.js";
 
@@ -33,23 +33,11 @@ export interface BacktestResult {
   napStartBias: number; // mean signed error (positive = predicting too late)
 }
 
-/** Predictor function signature — matches predictDayNaps interface. */
-export type NapPredictor = (
-  wakeUpTime: string,
-  ageMonths: number,
-  recentSleeps: SleepEntry[],
-  customNapCount?: number | null,
-  tz?: string,
-) => PredictedNap[];
+/** Predictor function signature — takes wake time and baby context. */
+export type NapPredictor = (wakeUpTime: string, ctx: BabyContext) => PredictedNap[];
 
-/** Bedtime predictor function signature. */
-export type BedtimePredictor = (
-  todaySleeps: SleepEntry[],
-  ageMonths: number,
-  customNapCount?: number | null,
-  recentSleeps?: SleepEntry[],
-  tz?: string,
-) => string;
+/** Bedtime predictor function signature — takes today's sleeps and baby context. */
+export type BedtimePredictor = (todaySleeps: SleepEntry[], ctx: BabyContext) => string;
 
 /**
  * Run a backtest: replay historical sleep data day-by-day, predict each day
@@ -74,12 +62,12 @@ export function backtest(
   const predict = options?.predict ?? predictDayNaps;
   const bedtimePredict = options?.predictBedtime ?? recommendBedtime;
   const customNapCount = options?.customNapCount ?? null;
+  const tz = options?.tz ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const results: DayResult[] = [];
 
   for (let i = 0; i < days.length; i++) {
     const day = days[i];
-    const ageMonths = calculateAgeMonths(birthdate, new Date(day.date + "T12:00:00Z"));
 
     // Collect recent sleeps from prior days (lookback window)
     const recentSleeps: SleepEntry[] = [];
@@ -90,12 +78,21 @@ export function backtest(
     // Need at least 1 prior day to have any learning signal
     if (i < 1) continue;
 
+    // Build context for this day
+    const ctx: BabyContext = {
+      birthdate,
+      ageMonths: calculateAgeMonths(birthdate, new Date(day.date + "T12:00:00Z")),
+      tz,
+      customNapCount,
+      recentSleeps,
+    };
+
     // Predict naps
-    const predictedNaps = predict(day.wakeTime, ageMonths, recentSleeps, customNapCount, options?.tz);
+    const predictedNaps = predict(day.wakeTime, ctx);
 
     // Predict bedtime using today's actual nap data (as if naps happened)
     const actualNaps = day.sleeps.filter((s) => s.type === "nap" && s.end_time);
-    const predictedBedtime = bedtimePredict(actualNaps, ageMonths, customNapCount, recentSleeps, options?.tz);
+    const predictedBedtime = bedtimePredict(actualNaps, ctx);
 
     // Find actual bedtime (tonight's night sleep start)
     const nightSleep = day.sleeps.find((s) => s.type === "night");

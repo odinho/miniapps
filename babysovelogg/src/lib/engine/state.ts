@@ -6,7 +6,7 @@ import {
   getExpectedNapCount,
 } from "./schedule.js";
 import { getTodayStats } from "./stats.js";
-import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry } from "$lib/types.js";
+import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry, BabyContext } from "$lib/types.js";
 import type { PredictedNap } from "./schedule.js";
 
 export interface DayData {
@@ -26,11 +26,23 @@ function toSleepEntry(s: SleepLogRow): SleepEntry {
   return { start_time: s.start_time, end_time: s.end_time, type: s.type as SleepEntry["type"] };
 }
 
+/** Build a BabyContext from a Baby record and recent sleep data. */
+function buildContext(baby: Baby, recentSleeps: SleepEntry[]): BabyContext {
+  return {
+    birthdate: baby.birthdate,
+    ageMonths: calculateAgeMonths(baby.birthdate),
+    tz: baby.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+    customNapCount: baby.custom_nap_count ?? null,
+    recentSleeps,
+  };
+}
+
 /** Pure state assembly — takes fetched data, returns the API response shape. */
 export function assembleState(data: DayData) {
   const { baby, activeSleep, todaySleeps, recentSleeps, todayWakeUp, pausesBySleep } = data;
 
-  const ageMonths = calculateAgeMonths(baby.birthdate);
+  const recentEntries = recentSleeps.map(toSleepEntry);
+  const ctx = buildContext(baby, recentEntries);
 
   const todaySleepsWithPauses = todaySleeps.map((s) => ({
     ...toSleepEntry(s),
@@ -46,24 +58,17 @@ export function assembleState(data: DayData) {
     const wakeTimeForPrediction = lastCompleted?.end_time || todayWakeUp?.wake_time;
 
     if (wakeTimeForPrediction) {
-      const customNaps = baby.custom_nap_count ?? null;
-      const recentEntries = recentSleeps.map(toSleepEntry);
-      const bedtime = recommendBedtime(todaySleeps.map(toSleepEntry), ageMonths, customNaps, recentEntries);
+      const bedtime = recommendBedtime(todaySleeps.map(toSleepEntry), ctx);
       const bedtimeMs = new Date(bedtime).getTime();
       const completedNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time);
       // During active nap, count it toward consumed slots
       const consumedNaps = completedNaps.length + (activeSleep?.type === "nap" ? 1 : 0);
-      const expectedNapCount = getExpectedNapCount(ageMonths, customNaps);
+      const expectedNapCount = getExpectedNapCount(ctx.ageMonths, ctx.customNapCount);
 
       // Build predicted naps from day schedule (accounts for custom nap count)
       let predictedNaps: PredictedNap[] | null = null;
       if (todayWakeUp) {
-        const allPredicted = predictDayNaps(
-          todayWakeUp.wake_time,
-          ageMonths,
-          recentEntries,
-          customNaps,
-        );
+        const allPredicted = predictDayNaps(todayWakeUp.wake_time, ctx);
         let remaining = allPredicted.slice(consumedNaps);
 
         // If remaining predictions are stale (actual last wake is past the predicted
@@ -74,9 +79,7 @@ export function assembleState(data: DayData) {
           if (actualWakeMs > predictedStartMs) {
             remaining = predictDayNaps(
               wakeTimeForPrediction,
-              ageMonths,
-              recentEntries,
-              remaining.length,
+              { ...ctx, customNapCount: remaining.length },
             );
           }
         }
@@ -92,7 +95,7 @@ export function assembleState(data: DayData) {
       if (predictedNaps && predictedNaps.length > 0) {
         nextNap = predictedNaps[0].startTime;
       } else {
-        nextNap = predictNextNap(wakeTimeForPrediction, ageMonths, recentEntries);
+        nextNap = predictNextNap(wakeTimeForPrediction, ctx);
       }
 
       // Detect skipped naps: if the predicted next nap is >90 min overdue (same day), it was skipped
@@ -132,7 +135,7 @@ export function assembleState(data: DayData) {
     todaySleeps,
     stats,
     prediction,
-    ageMonths,
+    ageMonths: ctx.ageMonths,
     diaperCount: data.diaperCount,
     lastDiaperTime: data.lastDiaperTime,
     todayWakeUp,

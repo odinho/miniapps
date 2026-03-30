@@ -1,13 +1,8 @@
 import { WAKE_WINDOWS, NAP_COUNTS, findByAge } from "./constants.js";
 export { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, findByAge } from "./constants.js";
 export type { SleepEntry } from "$lib/types.js";
-import type { SleepEntry } from "$lib/types.js";
+import type { SleepEntry, BabyContext } from "$lib/types.js";
 import { getHourInTz, setHourInTz, isoToDateInTz } from "$lib/tz.js";
-
-/** Resolve baby's timezone. Defaults to server-local (= baby's TZ in production). */
-function resolveTz(tz?: string): string {
-  return tz ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
-}
 
 /** Get the baby-local date (YYYY-MM-DD) for a UTC ISO timestamp. */
 function localDate(iso: string, tz: string): string {
@@ -23,31 +18,27 @@ export function calculateAgeMonths(birthdate: string, now?: Date): number {
   return Math.max(0, months);
 }
 
-/** Get recommended wake window in minutes. If recentSleeps provided, adapts using 7-day average. */
-export function getWakeWindow(ageMonths: number, recentSleeps?: SleepEntry[], tz?: string): number {
-  const range = findByAge(WAKE_WINDOWS, ageMonths);
+/** Get recommended wake window in minutes. Adapts using 7-day average when recent sleeps available. */
+export function getWakeWindow(ctx: BabyContext): number {
+  const range = findByAge(WAKE_WINDOWS, ctx.ageMonths);
   const defaultWW = (range.minMinutes + range.maxMinutes) / 2;
 
-  if (!recentSleeps || recentSleeps.length < 2) return defaultWW;
+  if (ctx.recentSleeps.length < 2) return defaultWW;
 
-  const avgWW = getAverageWakeWindowFromSleeps(recentSleeps);
+  const avgWW = getAverageWakeWindowFromSleeps(ctx.recentSleeps);
   if (avgWW === null) return defaultWW;
 
-  const clampRange = getAdaptedWakeWindowRange(ageMonths, recentSleeps, tz);
+  const clampRange = getAdaptedWakeWindowRange(ctx);
   return Math.max(clampRange.minMinutes, Math.min(clampRange.maxMinutes, avgWW));
 }
 
 /** Get wake window range adapted to the baby's actual nap pattern. */
-function getAdaptedWakeWindowRange(
-  ageMonths: number,
-  recentSleeps: SleepEntry[],
-  tz?: string,
-): { minMinutes: number; maxMinutes: number } {
-  const ageRange = findByAge(WAKE_WINDOWS, ageMonths);
-  const learnedNaps = getLearnedNapCount(recentSleeps, tz);
+function getAdaptedWakeWindowRange(ctx: BabyContext): { minMinutes: number; maxMinutes: number } {
+  const ageRange = findByAge(WAKE_WINDOWS, ctx.ageMonths);
+  const learnedNaps = getLearnedNapCount(ctx);
   if (learnedNaps === null) return ageRange;
 
-  const ageNaps = findByAge(NAP_COUNTS, ageMonths).naps;
+  const ageNaps = findByAge(NAP_COUNTS, ctx.ageMonths).naps;
   if (learnedNaps === ageNaps) return ageRange;
 
   // Baby does fewer/more naps than age default. Find ALL age brackets where
@@ -66,12 +57,8 @@ function getAdaptedWakeWindowRange(
 }
 
 /** Predict next nap time as ISO string. */
-export function predictNextNap(
-  lastWakeTime: string,
-  ageMonths: number,
-  recentSleeps?: SleepEntry[],
-): string {
-  const ww = getWakeWindow(ageMonths, recentSleeps);
+export function predictNextNap(lastWakeTime: string, ctx: BabyContext): string {
+  const ww = getWakeWindow(ctx);
   const wake = new Date(lastWakeTime);
   return new Date(wake.getTime() + ww * 60 * 1000).toISOString();
 }
@@ -88,25 +75,19 @@ export function getExpectedNapCount(ageMonths: number, customNapCount?: number |
 }
 
 /** Predict all naps for the day based on wake-up time and recent sleep patterns. */
-export function predictDayNaps(
-  wakeUpTime: string,
-  ageMonths: number,
-  recentSleeps?: SleepEntry[],
-  customNapCount?: number | null,
-  tz?: string,
-): PredictedNap[] {
-  const defaultWW = getWakeWindow(ageMonths, recentSleeps, tz);
+export function predictDayNaps(wakeUpTime: string, ctx: BabyContext): PredictedNap[] {
+  const defaultWW = getWakeWindow(ctx);
   const expectedNaps =
-    customNapCount != null
-      ? customNapCount
-      : getLearnedNapCount(recentSleeps, tz) ?? findByAge(NAP_COUNTS, ageMonths).naps;
-  const positionalWWs = getPositionalWakeWindows(recentSleeps, ageMonths, tz);
+    ctx.customNapCount != null
+      ? ctx.customNapCount
+      : getLearnedNapCount(ctx) ?? findByAge(NAP_COUNTS, ctx.ageMonths).naps;
+  const positionalWWs = getPositionalWakeWindows(ctx);
 
   const predictions: PredictedNap[] = [];
   let currentWake = new Date(wakeUpTime);
 
   // Learn nap duration from recent data, fallback to age-based defaults
-  const napDurationMinutes = getLearnedNapDuration(recentSleeps, ageMonths);
+  const napDurationMinutes = getLearnedNapDuration(ctx);
 
   for (let i = 0; i < expectedNaps; i++) {
     // Use positional wake window if available, otherwise fall back to global average
@@ -126,30 +107,20 @@ export function predictDayNaps(
   return predictions;
 }
 
-/**
- * Recommend bedtime based on today's sleeps and age.
- * @param tz - IANA timezone for the baby. Defaults to server-local (= baby's TZ in production).
- */
-export function recommendBedtime(
-  todaySleeps: SleepEntry[],
-  ageMonths: number,
-  customNapCount?: number | null,
-  recentSleeps?: SleepEntry[],
-  tz?: string,
-): string {
-  const targetNaps = getExpectedNapCount(ageMonths, customNapCount);
-  const timezone = tz ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+/** Recommend bedtime based on today's sleeps and baby context. */
+export function recommendBedtime(todaySleeps: SleepEntry[], ctx: BabyContext): string {
+  const targetNaps = getExpectedNapCount(ctx.ageMonths, ctx.customNapCount);
 
   const lastSleep = [...todaySleeps]
     .filter((s) => s.end_time)
     .toSorted((a, b) => new Date(b.end_time!).getTime() - new Date(a.end_time!).getTime())[0];
 
   if (!lastSleep?.end_time) {
-    return setHourInTz(new Date(), 19, 0, timezone).toISOString();
+    return setHourInTz(new Date(), 19, 0, ctx.tz).toISOString();
   }
 
-  // Use the bedtime wake window (nap→night gap) — typically longer than nap wake windows.
-  const bedtimeWW = getLearnedBedtimeWakeWindow(recentSleeps, ageMonths);
+  // Use the bedtime wake window (nap->night gap) — typically longer than nap wake windows.
+  const bedtimeWW = getLearnedBedtimeWakeWindow(ctx);
   const hasEnoughNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time).length >= targetNaps;
   const multiplier = hasEnoughNaps ? 1.0 : 0.85;
   const bedtime = new Date(
@@ -157,9 +128,9 @@ export function recommendBedtime(
   );
 
   // Wide sanity clamp in the baby's local time
-  const hour = getHourInTz(bedtime, timezone);
-  if (hour < 16) return setHourInTz(bedtime, 16, 0, timezone).toISOString();
-  if (hour > 23) return setHourInTz(bedtime, 23, 0, timezone).toISOString();
+  const hour = getHourInTz(bedtime, ctx.tz);
+  if (hour < 16) return setHourInTz(bedtime, 16, 0, ctx.tz).toISOString();
+  if (hour > 23) return setHourInTz(bedtime, 23, 0, ctx.tz).toISOString();
 
   return bedtime.toISOString();
 }
@@ -201,23 +172,20 @@ export function detectNapTransition(
  * First WW is typically shorter, last WW is typically longer.
  * Returns a sparse array indexed by position (0-based).
  */
-function getPositionalWakeWindows(recentSleeps?: SleepEntry[], ageMonths?: number, tz?: string): number[] {
-  if (!recentSleeps || recentSleeps.length < 4) return [];
-
-  const range = ageMonths != null ? findByAge(WAKE_WINDOWS, ageMonths) : null;
-  const timezone = resolveTz(tz);
+function getPositionalWakeWindows(ctx: BabyContext): number[] {
+  if (ctx.recentSleeps.length < 4) return [];
 
   // Group sleeps by baby-local day
   const byDay = new Map<string, SleepEntry[]>();
-  for (const s of recentSleeps) {
+  for (const s of ctx.recentSleeps) {
     if (!s.end_time) continue;
-    const day = localDate(s.start_time, timezone);
+    const day = localDate(s.start_time, ctx.tz);
     if (!byDay.has(day)) byDay.set(day, []);
     byDay.get(day)!.push(s);
   }
 
   // Collect wake windows by position across all days.
-  // Only count gaps before naps (excludes nap→night evening gap).
+  // Only count gaps before naps (excludes nap->night evening gap).
   const gapsByPosition = new Map<number, number[]>();
   for (const daySleeps of byDay.values()) {
     const sorted = [...daySleeps]
@@ -239,17 +207,12 @@ function getPositionalWakeWindows(recentSleeps?: SleepEntry[], ageMonths?: numbe
   }
 
   // Average each position, clamped to adapted range
-  const adaptedRange = ageMonths != null
-    ? getAdaptedWakeWindowRange(ageMonths, recentSleeps)
-    : null;
+  const adaptedRange = getAdaptedWakeWindowRange(ctx);
   const result: number[] = [];
   for (const [pos, gaps] of gapsByPosition) {
     if (gaps.length < 2) continue;
     let avg = gaps.reduce((a, b) => a + b, 0) / gaps.length;
-    const r = adaptedRange ?? range;
-    if (r) {
-      avg = Math.max(r.minMinutes, Math.min(r.maxMinutes, avg));
-    }
+    avg = Math.max(adaptedRange.minMinutes, Math.min(adaptedRange.maxMinutes, avg));
     result[pos] = Math.round(avg);
   }
 
@@ -265,16 +228,14 @@ function getPositionalWakeWindows(recentSleeps?: SleepEntry[], ageMonths?: numbe
  *
  * Returns null only when there's too little data to form any opinion.
  */
-function getLearnedNapCount(recentSleeps?: SleepEntry[], tz?: string): number | null {
-  if (!recentSleeps || recentSleeps.length < 4) return null;
-
-  const timezone = resolveTz(tz);
+function getLearnedNapCount(ctx: BabyContext): number | null {
+  if (ctx.recentSleeps.length < 4) return null;
 
   // Group completed naps by baby-local day, preserving chronological order
   const napsByDay = new Map<string, number>();
-  for (const s of recentSleeps) {
+  for (const s of ctx.recentSleeps) {
     if (s.type !== "nap" || !s.end_time) continue;
-    const day = localDate(s.start_time, timezone);
+    const day = localDate(s.start_time, ctx.tz);
     napsByDay.set(day, (napsByDay.get(day) ?? 0) + 1);
   }
 
@@ -320,19 +281,18 @@ function getLearnedNapCount(recentSleeps?: SleepEntry[], tz?: string): number | 
   return null;
 }
 
-/** Learn the bedtime wake window (last nap end → night start) from recent data. */
-function getLearnedBedtimeWakeWindow(recentSleeps?: SleepEntry[], ageMonths?: number): number {
-  const defaultWW = ageMonths != null
-    ? (findByAge(WAKE_WINDOWS, ageMonths).minMinutes + findByAge(WAKE_WINDOWS, ageMonths).maxMinutes) / 2 * 1.15
-    : 210;
+/** Learn the bedtime wake window (last nap end -> night start) from recent data. */
+function getLearnedBedtimeWakeWindow(ctx: BabyContext): number {
+  const wwRange = findByAge(WAKE_WINDOWS, ctx.ageMonths);
+  const defaultWW = (wwRange.minMinutes + wwRange.maxMinutes) / 2 * 1.15;
 
-  if (!recentSleeps || recentSleeps.length < 4) return defaultWW;
+  if (ctx.recentSleeps.length < 4) return defaultWW;
 
-  const sorted = [...recentSleeps]
+  const sorted = [...ctx.recentSleeps]
     .filter((s) => s.end_time)
     .toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
-  // Collect gaps where the next sleep is a night (nap→night = bedtime gap)
+  // Collect gaps where the next sleep is a night (nap->night = bedtime gap)
   const gaps: number[] = [];
   for (let i = 1; i < sorted.length; i++) {
     if (sorted[i].type !== "night") continue;
@@ -350,12 +310,13 @@ function getLearnedBedtimeWakeWindow(recentSleeps?: SleepEntry[], ageMonths?: nu
 }
 
 /** Learn average nap duration from recent completed naps, fallback to age-based defaults. */
-function getLearnedNapDuration(recentSleeps?: SleepEntry[], ageMonths?: number): number {
-  const defaultDuration = !ageMonths ? 45 : ageMonths < 6 ? 60 : ageMonths < 12 ? 45 : 30;
+function getLearnedNapDuration(ctx: BabyContext): number {
+  const ageMonths = ctx.ageMonths;
+  const defaultDuration = ageMonths < 6 ? 60 : ageMonths < 12 ? 45 : 30;
 
-  if (!recentSleeps || recentSleeps.length === 0) return defaultDuration;
+  if (ctx.recentSleeps.length === 0) return defaultDuration;
 
-  const naps = recentSleeps.filter((s) => s.type === "nap" && s.end_time);
+  const naps = ctx.recentSleeps.filter((s) => s.type === "nap" && s.end_time);
   if (naps.length < 3) return defaultDuration;
 
   const durations = naps

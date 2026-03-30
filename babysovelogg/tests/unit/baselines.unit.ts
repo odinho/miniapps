@@ -28,8 +28,8 @@ const days = halldisData as DayRecord[];
 
 function runBaseline(
   label: string,
-  predict: Parameters<typeof backtest>[2]["predict"],
-  predictBedtime: Parameters<typeof backtest>[2]["predictBedtime"],
+  predict: NonNullable<Parameters<typeof backtest>[2]>["predict"],
+  predictBedtime: NonNullable<Parameters<typeof backtest>[2]>["predictBedtime"],
 ) {
   const result = backtest(days, BIRTHDATE, { predict, predictBedtime, tz: TZ });
   const buckets = bucketResultsByAge(result, BIRTHDATE);

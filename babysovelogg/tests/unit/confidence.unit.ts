@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { computeConfidence } from "$lib/engine/confidence.js";
 import { predictDayNaps, recommendBedtime, calculateAgeMonths } from "$lib/engine/schedule.js";
 import type { DayRecord } from "$lib/engine/backtest.js";
-import type { SleepEntry } from "$lib/types.js";
+import type { SleepEntry, BabyContext } from "$lib/types.js";
 
 import halldisData from "../fixtures/halldis-sleep.json";
 
@@ -18,42 +18,49 @@ function collectRecent(dayIndex: number, lookback = 7): SleepEntry[] {
   return sleeps;
 }
 
+function makeCtx(dayIndex: number): BabyContext {
+  const day = days[dayIndex];
+  return {
+    birthdate: BIRTHDATE,
+    ageMonths: calculateAgeMonths(BIRTHDATE, new Date(day.date + "T12:00:00Z")),
+    tz: TZ,
+    customNapCount: null,
+    recentSleeps: collectRecent(dayIndex),
+  };
+}
+
 describe("confidence intervals", () => {
   it("cold start (day 2) has low confidence with wide ranges", () => {
+    const ctx = makeCtx(1);
     const day = days[1];
-    const ageMonths = calculateAgeMonths(BIRTHDATE, new Date(day.date + "T12:00:00Z"));
-    const recent = collectRecent(1);
-    const naps = predictDayNaps(day.wakeTime, ageMonths, recent, null, TZ);
+    const naps = predictDayNaps(day.wakeTime, ctx);
     const bedtime = recommendBedtime(
       day.sleeps.filter((s) => s.type === "nap" && s.end_time),
-      ageMonths, null, recent, TZ,
+      ctx,
     );
 
-    const conf = computeConfidence(naps, bedtime, ageMonths, recent, TZ);
+    const conf = computeConfidence(naps, bedtime, ctx.ageMonths, ctx.recentSleeps, TZ);
 
     expect(conf.level).toBe("low");
     expect(conf.dataPoints).toBeLessThanOrEqual(1);
-    // Wide ranges when no data
     for (const nap of conf.napRanges) {
       expect(nap.startRange.sdMinutes).toBeGreaterThanOrEqual(10);
     }
   });
 
   it("warm state (day 40) has reasonable confidence", () => {
+    const ctx = makeCtx(40);
     const day = days[40];
-    const ageMonths = calculateAgeMonths(BIRTHDATE, new Date(day.date + "T12:00:00Z"));
-    const recent = collectRecent(40);
-    const naps = predictDayNaps(day.wakeTime, ageMonths, recent, null, TZ);
+    const naps = predictDayNaps(day.wakeTime, ctx);
     const bedtime = recommendBedtime(
       day.sleeps.filter((s) => s.type === "nap" && s.end_time),
-      ageMonths, null, recent, TZ,
+      ctx,
     );
 
-    const conf = computeConfidence(naps, bedtime, ageMonths, recent, TZ);
+    const conf = computeConfidence(naps, bedtime, ctx.ageMonths, ctx.recentSleeps, TZ);
 
     expect(conf.dataPoints).toBeGreaterThan(3);
     expect(conf.napRanges.length).toBeGreaterThan(0);
-    // Ranges should be tighter than cold start
     for (const nap of conf.napRanges) {
       expect(nap.startRange.sdMinutes).toBeGreaterThanOrEqual(10);
       expect(nap.startRange.sdMinutes).toBeLessThan(120);
@@ -62,16 +69,15 @@ describe("confidence intervals", () => {
   });
 
   it("later naps have wider ranges (uncertainty compounds)", () => {
+    const ctx = makeCtx(50);
     const day = days[50];
-    const ageMonths = calculateAgeMonths(BIRTHDATE, new Date(day.date + "T12:00:00Z"));
-    const recent = collectRecent(50);
-    const naps = predictDayNaps(day.wakeTime, ageMonths, recent, null, TZ);
+    const naps = predictDayNaps(day.wakeTime, ctx);
     const bedtime = recommendBedtime(
       day.sleeps.filter((s) => s.type === "nap" && s.end_time),
-      ageMonths, null, recent, TZ,
+      ctx,
     );
 
-    const conf = computeConfidence(naps, bedtime, ageMonths, recent, TZ);
+    const conf = computeConfidence(naps, bedtime, ctx.ageMonths, ctx.recentSleeps, TZ);
 
     if (conf.napRanges.length >= 2) {
       expect(conf.napRanges[1].startRange.sdMinutes).toBeGreaterThanOrEqual(
@@ -82,18 +88,17 @@ describe("confidence intervals", () => {
 
   it("snapshot of confidence at various points", () => {
     const snapshots = [10, 30, 50, 70].map((i) => {
+      const ctx = makeCtx(i);
       const day = days[i];
-      const ageMonths = calculateAgeMonths(BIRTHDATE, new Date(day.date + "T12:00:00Z"));
-      const recent = collectRecent(i);
-      const naps = predictDayNaps(day.wakeTime, ageMonths, recent, null, TZ);
+      const naps = predictDayNaps(day.wakeTime, ctx);
       const bedtime = recommendBedtime(
         day.sleeps.filter((s) => s.type === "nap" && s.end_time),
-        ageMonths, null, recent, TZ,
+        ctx,
       );
-      const conf = computeConfidence(naps, bedtime, ageMonths, recent, TZ);
+      const conf = computeConfidence(naps, bedtime, ctx.ageMonths, ctx.recentSleeps, TZ);
 
       const napSDs = conf.napRanges.map((n) => n.startRange.sdMinutes).join("/");
-      return `day ${i} (${ageMonths}mo): level=${conf.level}, nap SDs=[${napSDs}], bed SD=${conf.bedtimeRange.sdMinutes}, data=${conf.dataPoints}d`;
+      return `day ${i} (${ctx.ageMonths}mo): level=${conf.level}, nap SDs=[${napSDs}], bed SD=${conf.bedtimeRange.sdMinutes}, data=${conf.dataPoints}d`;
     });
 
     expect(snapshots.join("\n")).toMatchInlineSnapshot(`

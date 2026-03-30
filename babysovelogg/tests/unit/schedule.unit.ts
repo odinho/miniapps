@@ -12,7 +12,7 @@ import {
   NAP_COUNTS,
   SLEEP_NEEDS,
 } from "$lib/engine/schedule.js";
-import type { SleepEntry } from "$lib/types.js";
+import type { SleepEntry, BabyContext } from "$lib/types.js";
 
 // --- helpers ---
 
@@ -24,6 +24,11 @@ function sleep(start: string, end: string, type: "nap" | "night" = "nap"): Sleep
 /** Make an ISO timestamp for a given hour:minute on 2026-03-26 (UTC). */
 function t(hour: number, min = 0): string {
   return `2026-03-26T${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}:00.000Z`;
+}
+
+/** Build a minimal BabyContext for tests. */
+function ctx(ageMonths: number, recentSleeps: SleepEntry[] = [], customNapCount: number | null = null): BabyContext {
+  return { birthdate: "2025-06-12", ageMonths, tz: "UTC", customNapCount, recentSleeps };
 }
 
 // --- calculateAgeMonths ---
@@ -75,9 +80,9 @@ describe("findByAge", () => {
 
 describe("getWakeWindow", () => {
   it("returns midpoint for age bracket without recent sleeps", () => {
-    expect(getWakeWindow(0)).toBe(75); // (60+90)/2
-    expect(getWakeWindow(5)).toBe(127.5); // (105+150)/2
-    expect(getWakeWindow(10)).toBe(210); // (180+240)/2
+    expect(getWakeWindow(ctx(0))).toBe(75); // (60+90)/2
+    expect(getWakeWindow(ctx(5))).toBe(127.5); // (105+150)/2
+    expect(getWakeWindow(ctx(10))).toBe(210); // (180+240)/2
   });
 
   it("adapts to recent sleep patterns", () => {
@@ -86,14 +91,14 @@ describe("getWakeWindow", () => {
       sleep(t(10, 0), t(11, 0)),
       sleep(t(13, 0), t(14, 0)),
     ];
-    // Wake windows: 10:00-8:00=120min, 13:00-11:00=120min → avg 120
-    const ww = getWakeWindow(6, recentSleeps);
-    // Should be clamped to [120, 180] range for 6 months → 120
+    // Wake windows: 10:00-8:00=120min, 13:00-11:00=120min -> avg 120
+    const ww = getWakeWindow(ctx(6, recentSleeps));
+    // Should be clamped to [120, 180] range for 6 months -> 120
     expect(ww).toBe(120);
   });
 
   it("ignores recent sleeps with fewer than 2 entries", () => {
-    const ww = getWakeWindow(6, [sleep(t(7, 0), t(8, 0))]);
+    const ww = getWakeWindow(ctx(6, [sleep(t(7, 0), t(8, 0))]));
     expect(ww).toBe(150); // midpoint, no adaptation
   });
 });
@@ -122,8 +127,8 @@ describe("getExpectedNapCount", () => {
 
 describe("predictNextNap", () => {
   it("predicts based on wake window after last wake time", () => {
-    const next = predictNextNap(t(7, 0), 6);
-    // 6 months → ww midpoint 150min → 07:00 + 2h30m = 09:30
+    const next = predictNextNap(t(7, 0), ctx(6));
+    // 6 months -> ww midpoint 150min -> 07:00 + 2h30m = 09:30
     expect(next).toBe(t(9, 30));
   });
 });
@@ -132,17 +137,17 @@ describe("predictNextNap", () => {
 
 describe("predictDayNaps", () => {
   it("predicts correct number of naps for age", () => {
-    const naps = predictDayNaps(t(7, 0), 7);
-    expect(naps).toHaveLength(2); // 7 months → 2 naps
+    const naps = predictDayNaps(t(7, 0), ctx(7));
+    expect(naps).toHaveLength(2); // 7 months -> 2 naps
   });
 
   it("respects custom nap count", () => {
-    const naps = predictDayNaps(t(7, 0), 7, undefined, 3);
+    const naps = predictDayNaps(t(7, 0), ctx(7, [], 3));
     expect(naps).toHaveLength(3);
   });
 
   it("each nap starts after wake window and has duration", () => {
-    const naps = predictDayNaps(t(7, 0), 14); // 14 months → 1 nap
+    const naps = predictDayNaps(t(7, 0), ctx(14)); // 14 months -> 1 nap
     expect(naps).toHaveLength(1);
     const nap = naps[0];
     expect(new Date(nap.startTime).getTime()).toBeGreaterThan(new Date(t(7, 0)).getTime());
@@ -154,18 +159,18 @@ describe("predictDayNaps", () => {
 
 describe("recommendBedtime", () => {
   it("defaults to 19:00 when no completed sleeps", () => {
-    const bt = recommendBedtime([], 9);
+    const bt = recommendBedtime([], ctx(9));
     expect(new Date(bt).getHours()).toBe(19);
   });
 
   it("clamps bedtime to no earlier than 16:00", () => {
-    const bt = recommendBedtime([sleep(t(6, 0), t(6, 30))], 9);
+    const bt = recommendBedtime([sleep(t(6, 0), t(6, 30))], ctx(9));
     const hour = new Date(bt).getHours();
     expect(hour).toBeGreaterThanOrEqual(16);
   });
 
   it("clamps bedtime to no later than 23:00", () => {
-    const bt = recommendBedtime([sleep(t(17, 0), t(18, 0))], 9);
+    const bt = recommendBedtime([sleep(t(17, 0), t(18, 0))], ctx(9));
     const d = new Date(bt);
     expect(d.getHours()).toBeLessThanOrEqual(23);
   });
