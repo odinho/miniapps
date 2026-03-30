@@ -178,31 +178,27 @@ function summarize(days: DayResult[]): BacktestResult {
 }
 
 /**
- * Split a full BacktestResult into age-period buckets.
+ * Split a full BacktestResult into per-month age buckets.
  * Runs on the RESULTS, not the input — so each day retains its full lookback.
  */
 export function bucketResultsByAge(
   result: BacktestResult,
   birthdate: string,
 ): { label: string; result: BacktestResult }[] {
-  const brackets = [
-    [0, 3], [3, 6], [6, 9], [9, 12], [12, 18], [18, 24],
-  ] as const;
-
-  const bucketDays = brackets.map(() => [] as DayResult[]);
+  const byMonth = new Map<number, DayResult[]>();
 
   for (const day of result.days) {
     const age = calculateAgeMonths(birthdate, new Date(day.date + "T12:00:00Z"));
-    const idx = brackets.findIndex(([lo, hi]) => age >= lo && age < hi);
-    bucketDays[idx >= 0 ? idx : brackets.length - 1].push(day);
+    if (!byMonth.has(age)) byMonth.set(age, []);
+    byMonth.get(age)!.push(day);
   }
 
-  return brackets
-    .map(([lo, hi], i) => ({
-      label: `${lo}-${hi}mo`,
-      result: summarize(bucketDays[i]),
-    }))
-    .filter((b) => b.result.totalDays > 0);
+  return [...byMonth.entries()]
+    .toSorted(([a], [b]) => a - b)
+    .map(([age, days]) => ({
+      label: `${age}mo`,
+      result: summarize(days),
+    }));
 }
 
 /** Compact one-line summary for snapshot assertions. */
