@@ -35,14 +35,21 @@ function parseKaggleCsv(csv: string): SleepEntry[] {
     if (!m) continue;
 
     const baby = m[1];
+    const combinedTime = m[2]; // "8/5/20, 6:10 PM" — always has correct date
     const dateStr = m[3].trim();
     const timeStr = m[4].trim();
     const totalMin = parseInt(m[5]);
     if (totalMin <= 0 || totalMin > 1440) continue; // skip unreasonable values
+    if (totalMin < 15) continue; // skip micro-sleeps (< 15 min) — not parent-loggable
 
-    // Parse date: "4/17/23" or "12/19/22" (M/D/YY)
-    const dateMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-    if (!dateMatch) continue;
+    // Parse date: try M/D/YY from date column, fall back to combined_time
+    let dateMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if (!dateMatch) {
+      // Fall back to combined_time for Excel serial date columns
+      const ctMatch = combinedTime.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+      if (!ctMatch) continue;
+      dateMatch = ctMatch;
+    }
 
     const month = parseInt(dateMatch[1]) - 1;
     const day = parseInt(dateMatch[2]);
