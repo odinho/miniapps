@@ -19,6 +19,7 @@ Open `http://localhost:3200`. On first visit you'll be prompted to add a baby.
 ```bash
 bun run dev          # SvelteKit dev server with HMR
 bun run test:unit    # Vitest unit tests
+bun run test:integration  # Vitest integration tests
 bun run test:e2e     # Playwright E2E tests (requires build first)
 bun run lint         # oxlint
 bun run typecheck    # svelte-check
@@ -109,5 +110,17 @@ See [docs/deployment.md](docs/deployment.md) for systemd + nginx setup.
 ## Docs
 
 - [Architecture](docs/architecture.md) — event sourcing, database schema, API, sync
+- [Agent Guide](docs/agent-guide.md) — repo map and common change paths for cross-cutting work
 - [Testing](docs/testing.md) — test philosophy, layers, harness patterns
 - [Deployment](docs/deployment.md) — systemd, nginx, production setup
+
+## Local Working Data
+
+Use `local/` for untracked working material that should not compete with app source during search:
+
+- `local/imports/` — temporary CSVs and app exports
+- `local/datasets/` — research datasets and fixture-generation inputs
+- `local/exports/` — generated JSON/CSV output
+- `local/tmp/` — scratch files and one-off experiments
+
+This folder is gitignored.
