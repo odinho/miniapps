@@ -107,6 +107,61 @@ export function predictDayNaps(wakeUpTime: string, ctx: BabyContext): PredictedN
   return predictions;
 }
 
+/**
+ * Plan naps backward from a target bedtime.
+ * Given a target bedtime and wake-up time, spaces naps optimally working
+ * backward from the bedtime. Uses the same wake window and nap duration
+ * learning as forward planning, but anchored to the desired bedtime.
+ */
+export function planBackwardFromBedtime(
+  wakeUpTime: string,
+  targetBedtime: string,
+  ctx: BabyContext,
+): PredictedNap[] {
+  const napCount =
+    ctx.customNapCount != null
+      ? ctx.customNapCount
+      : getLearnedNapCount(ctx) ?? findByAge(NAP_COUNTS, ctx.ageMonths).naps;
+  if (napCount === 0) return [];
+
+  const bedtimeWW = getLearnedBedtimeWakeWindow(ctx);
+  const defaultWW = getWakeWindow(ctx);
+  const positionalWWs = getPositionalWakeWindows(ctx);
+  const napDuration = getLearnedNapDuration(ctx);
+
+  const bedtimeMs = new Date(targetBedtime).getTime();
+  const wakeMs = new Date(wakeUpTime).getTime();
+
+  const naps: { startMs: number; endMs: number }[] = [];
+  let cursor = bedtimeMs;
+
+  for (let i = napCount - 1; i >= 0; i--) {
+    const ww = i === napCount - 1
+      ? bedtimeWW
+      : positionalWWs[i + 1] ?? defaultWW;
+
+    const napEnd = cursor - ww * 60_000;
+    const napStart = napEnd - napDuration * 60_000;
+
+    if (napStart < wakeMs) {
+      const firstWW = positionalWWs[0] ?? defaultWW;
+      const adjustedStart = wakeMs + firstWW * 60_000;
+      if (adjustedStart < napEnd) {
+        naps.unshift({ startMs: adjustedStart, endMs: napEnd });
+      }
+      break;
+    }
+
+    naps.unshift({ startMs: napStart, endMs: napEnd });
+    cursor = napStart;
+  }
+
+  return naps.map((n) => ({
+    startTime: new Date(n.startMs).toISOString(),
+    endTime: new Date(n.endMs).toISOString(),
+  }));
+}
+
 /** Recommend bedtime based on today's sleeps and baby context. */
 export function recommendBedtime(todaySleeps: SleepEntry[], ctx: BabyContext): string {
   const targetNaps = getExpectedNapCount(ctx.ageMonths, ctx.customNapCount);

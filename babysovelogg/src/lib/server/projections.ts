@@ -42,6 +42,10 @@ export function applyEvent(event: AppEvent): void {
         sets.push("timezone = ?");
         vals.push(payload.timezone);
       }
+      if (payload.targetBedtime !== undefined) {
+        sets.push("target_bedtime = ?");
+        vals.push(payload.targetBedtime);
+      }
       vals.push(baby.id);
       db.prepare(`UPDATE baby SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
       break;

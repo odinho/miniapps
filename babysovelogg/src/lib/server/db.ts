@@ -103,6 +103,13 @@ function initSchema(database: SqliteDb) {
     // Column already exists — ignore
   }
 
+  // Migration: add target_bedtime column
+  try {
+    database.exec("ALTER TABLE baby ADD COLUMN target_bedtime TEXT");
+  } catch {
+    // Column already exists — ignore
+  }
+
   // Migration: merge "happy" mood into "normal"
   database.exec("UPDATE sleep_log SET mood = 'normal' WHERE mood = 'happy'");
 

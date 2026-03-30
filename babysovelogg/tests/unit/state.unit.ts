@@ -10,6 +10,7 @@ const baseBaby: Baby = {
   custom_nap_count: null,
   potty_mode: 0,
   timezone: null,
+  target_bedtime: null,
   created_by_event_id: null,
   updated_by_event_id: null,
 };

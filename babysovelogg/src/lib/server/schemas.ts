@@ -49,6 +49,7 @@ const payloadSchemas: Record<string, v.BaseSchema<unknown, unknown, v.BaseIssue<
     customNapCount: optNum,
     pottyMode: v.nullish(v.boolean()),
     timezone: optStr,
+    targetBedtime: optStr, // "HH:MM" or null to clear
   }),
   "sleep.started": v.object({
     babyId: v.number(),
