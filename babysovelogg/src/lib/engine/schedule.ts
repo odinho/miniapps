@@ -56,24 +56,9 @@ function getAdaptedWakeWindowRange(ctx: BabyContext): { minMinutes: number; maxM
   return { minMinutes: minWW, maxMinutes: maxWW };
 }
 
-/**
- * Adjust wake window based on the previous nap's actual duration.
- * Short nap (≤30 min, 1 sleep cycle) → 15% shorter WW (baby is still tired).
- * Long nap (≥90 min, multi-cycle) → 10% longer WW (baby is well-rested).
- * Normal range (31-89 min) → no adjustment.
- */
-export function adjustWakeWindowForNapQuality(wakeWindowMin: number, napDurationMin: number): number {
-  if (napDurationMin <= 30) return Math.round(wakeWindowMin * 0.85);
-  if (napDurationMin >= 90) return Math.round(wakeWindowMin * 1.10);
-  return wakeWindowMin;
-}
-
-/** Predict next nap time as ISO string. Optionally adjusts for previous nap quality. */
-export function predictNextNap(lastWakeTime: string, ctx: BabyContext, prevNapDurationMin?: number): string {
-  let ww = getWakeWindow(ctx);
-  if (prevNapDurationMin != null) {
-    ww = adjustWakeWindowForNapQuality(ww, prevNapDurationMin);
-  }
+/** Predict next nap time as ISO string. */
+export function predictNextNap(lastWakeTime: string, ctx: BabyContext): string {
+  const ww = getWakeWindow(ctx);
   const wake = new Date(lastWakeTime);
   return new Date(wake.getTime() + ww * 60 * 1000).toISOString();
 }
