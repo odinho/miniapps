@@ -75,8 +75,8 @@ Already have `fall_asleep_time` field. Add in-app explanation:
 - Normal (10-20 min): good timing (Galland 2012: infant mean 19 min)
 - Long (>30 min): possibly undertired
 
-### Nap quality signal
-Short nap (30 min = 1 sleep cycle) vs long (90+ min = multi-cycle). Could adjust next wake window: short nap → shorter next WW, long nap → normal/longer.
+### ~~Nap quality signal~~ — tested and rejected (2026-03-31)
+Hypothesis: short nap → shorter next WW, long nap → longer. Tested via intra-day replay harness across 6 babies (2448 nap-to-nap gaps). Result: no adjustment wins on 5/6 babies and every nap-duration bucket. After short naps (≤30m), actual gap averaged 104 min — shorter than after normal naps (114 min) but the engine's base prediction already accounts for this via learned positional wake windows. Adding an explicit adjustment (both 15% and 7% variants) makes MAE worse. "Stick to the plan" is the right default. Revisit only with significantly more parent-logged data.
 
 ## Reference data in the codebase
 
@@ -91,3 +91,4 @@ Short nap (30 min = 1 sleep cycle) vs long (90+ min = multi-cycle). Could adjust
 - **Age-based constants are good priors but bad ceilings.** The index-alignment bug capped 1-nap babies at 240 min when they needed 360. Population data (SHINE/Galland) validates the age defaults as reasonable starting points.
 - **The data source matters more than the algorithm.** Auto-tracked data (Kaggle) gives 8+ naps/day at 3 months where parent-logged data gives 3-4. The algorithm can't compensate for input granularity mismatch.
 - **Server TZ = baby TZ is a pragmatic single-tenant design**, but tests are multi-tenant. Threading TZ properly through the engine (and eventually via BabyContext) solves this cleanly.
+- **Adjusting wake windows after short naps doesn't help.** Tested across 2448 gaps on 6 babies — "stick to the plan" beats both 15% and 7% adjustments. The engine's learned positional wake windows already capture the pattern implicitly.
