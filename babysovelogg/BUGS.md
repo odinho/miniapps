@@ -2,12 +2,8 @@
 
 ## Must fix
 
-### B20: Baby timezone is null in production
-The `baby.timezone` column is null. All TZ-aware calculations (day boundaries, bedtime clamp, arc positions) fall back to server locale or UTC instead of using the baby's actual timezone. Should be "Europe/Oslo".
-
-**Impact**: Predictions could be off by 1-2 hours near DST transitions. Day boundary calculations may group sleeps to the wrong day.
-
-**Fix**: Set timezone in settings, or auto-detect from server locale on baby creation.
+### ~~B20: Baby timezone is null in production~~ — fixed (1727dba)
+Auto-backfills from server locale on first state fetch. Production will set "Europe/Oslo" on next app load.
 
 ### B21: No DST awareness or warnings
 DST transition (March 29 CET→CEST) caused real-world harm — parent put baby down too early both days because the internal clock shifted but the app didn't warn or adjust. The app should:
