@@ -138,9 +138,7 @@ describe("backtest", () => {
   });
 
   it("accepts custom predictor function", () => {
-    // A dummy predictor that always returns 0 naps
-    const noNaps = () => [];
-    const result = backtest(HALLDIS_DAYS, HALLDIS_BIRTHDATE, { predict: noNaps });
+    const result = backtest(HALLDIS_DAYS, HALLDIS_BIRTHDATE, { predict: () => [] });
     // Should have 0 predicted naps for all days
     for (const day of result.days) {
       expect(day.predictedNaps).toHaveLength(0);
