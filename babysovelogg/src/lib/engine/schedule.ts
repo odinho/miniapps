@@ -120,32 +120,34 @@ export function recommendBedtime(
   todaySleeps: SleepEntry[],
   ageMonths: number,
   customNapCount?: number | null,
+  recentSleeps?: SleepEntry[],
 ): string {
   const targetNaps = getExpectedNapCount(ageMonths, customNapCount);
 
-  // If baby has had enough naps, recommend bedtime after last wake window
   const lastSleep = [...todaySleeps]
     .filter((s) => s.end_time)
     .toSorted((a, b) => new Date(b.end_time!).getTime() - new Date(a.end_time!).getTime())[0];
 
   if (!lastSleep?.end_time) {
-    // Default: 19:00 today
+    // Default: 19:00 UTC today
     const today = new Date();
-    today.setHours(19, 0, 0, 0);
+    today.setUTCHours(19, 0, 0, 0);
     return today.toISOString();
   }
 
-  const ww = getWakeWindow(ageMonths);
-  // Last wake window of the day is typically longer
-  const lastWWMultiplier = todaySleeps.length >= targetNaps ? 1.15 : 1.0;
+  // Use the bedtime wake window (nap→night gap) — typically longer than nap wake windows.
+  // Learn from recent data if available, otherwise use age default × 1.15.
+  const bedtimeWW = getLearnedBedtimeWakeWindow(recentSleeps, ageMonths);
+  const hasEnoughNaps = todaySleeps.filter((s) => s.type === "nap").length >= targetNaps;
+  const multiplier = hasEnoughNaps ? 1.0 : 0.85; // shorter if naps incomplete
   const bedtime = new Date(
-    new Date(lastSleep.end_time).getTime() + ww * lastWWMultiplier * 60 * 1000,
+    new Date(lastSleep.end_time).getTime() + bedtimeWW * multiplier * 60 * 1000,
   );
 
-  // Clamp bedtime between 18:00 and 20:30
-  const hour = bedtime.getHours() + bedtime.getMinutes() / 60;
-  if (hour < 18) bedtime.setHours(18, 0, 0, 0);
-  if (hour > 20.5) bedtime.setHours(20, 30, 0, 0);
+  // Clamp using UTC — keeps behavior consistent regardless of server timezone
+  const hour = bedtime.getUTCHours() + bedtime.getUTCMinutes() / 60;
+  if (hour < 18) bedtime.setUTCHours(18, 0, 0, 0);
+  if (hour > 20.5) bedtime.setUTCHours(20, 30, 0, 0);
 
   return bedtime.toISOString();
 }
@@ -201,21 +203,25 @@ function getPositionalWakeWindows(recentSleeps?: SleepEntry[], ageMonths?: numbe
     byDay.get(day)!.push(s);
   }
 
-  // Collect wake windows by position across all days
+  // Collect wake windows by position across all days.
+  // Only count gaps before naps (excludes nap→night evening gap).
   const gapsByPosition = new Map<number, number[]>();
   for (const daySleeps of byDay.values()) {
     const sorted = [...daySleeps]
       .filter((s) => s.end_time)
       .toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+    let napPosition = 0;
     for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i].type !== "nap") continue; // skip gaps before night sleep
       const prevEnd = new Date(sorted[i - 1].end_time!).getTime();
       const nextStart = new Date(sorted[i].start_time).getTime();
       const gapMin = (nextStart - prevEnd) / 60000;
       if (gapMin >= 10 && gapMin <= 480) {
-        const position = i - 1; // 0 = first wake window
-        if (!gapsByPosition.has(position)) gapsByPosition.set(position, []);
-        gapsByPosition.get(position)!.push(gapMin);
+        if (!gapsByPosition.has(napPosition)) gapsByPosition.set(napPosition, []);
+        gapsByPosition.get(napPosition)!.push(gapMin);
       }
+      napPosition++;
     }
   }
 
@@ -269,6 +275,35 @@ function getLearnedNapCount(recentSleeps?: SleepEntry[]): number | null {
   return modeCount / napsByDay.size > 0.6 ? mode : null;
 }
 
+/** Learn the bedtime wake window (last nap end → night start) from recent data. */
+function getLearnedBedtimeWakeWindow(recentSleeps?: SleepEntry[], ageMonths?: number): number {
+  const defaultWW = ageMonths != null
+    ? (findByAge(WAKE_WINDOWS, ageMonths).minMinutes + findByAge(WAKE_WINDOWS, ageMonths).maxMinutes) / 2 * 1.15
+    : 210;
+
+  if (!recentSleeps || recentSleeps.length < 4) return defaultWW;
+
+  const sorted = [...recentSleeps]
+    .filter((s) => s.end_time)
+    .toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+  // Collect gaps where the next sleep is a night (nap→night = bedtime gap)
+  const gaps: number[] = [];
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].type !== "night") continue;
+    if (sorted[i - 1].type !== "nap") continue;
+    const prevEnd = new Date(sorted[i - 1].end_time!).getTime();
+    const nextStart = new Date(sorted[i].start_time).getTime();
+    const gapMin = (nextStart - prevEnd) / 60000;
+    if (gapMin >= 60 && gapMin <= 600) {
+      gaps.push(gapMin);
+    }
+  }
+
+  if (gaps.length < 2) return defaultWW;
+  return gaps.reduce((a, b) => a + b, 0) / gaps.length;
+}
+
 /** Learn average nap duration from recent completed naps, fallback to age-based defaults. */
 function getLearnedNapDuration(recentSleeps?: SleepEntry[], ageMonths?: number): number {
   const defaultDuration = !ageMonths ? 45 : ageMonths < 6 ? 60 : ageMonths < 12 ? 45 : 30;
@@ -289,7 +324,11 @@ function getLearnedNapDuration(recentSleeps?: SleepEntry[], ageMonths?: number):
   return Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);
 }
 
-/** Helper: compute average wake window from a list of sleeps (in minutes). */
+/**
+ * Compute average wake window before NAPS from a list of sleeps (in minutes).
+ * Only counts gaps where the next sleep is a nap — excludes the evening
+ * nap-to-bedtime gap which inflates the average for nap prediction.
+ */
 function getAverageWakeWindowFromSleeps(sleeps: SleepEntry[]): number | null {
   const sorted = [...sleeps]
     .filter((s) => s.end_time)
@@ -299,10 +338,11 @@ function getAverageWakeWindowFromSleeps(sleeps: SleepEntry[]): number | null {
 
   const gaps: number[] = [];
   for (let i = 1; i < sorted.length; i++) {
+    // Only count gaps before naps (not before night sleep)
+    if (sorted[i].type !== "nap") continue;
     const prevEnd = new Date(sorted[i - 1].end_time!).getTime();
     const nextStart = new Date(sorted[i].start_time).getTime();
     const gapMin = (nextStart - prevEnd) / 60000;
-    // Only count reasonable gaps (10 min to 8 hours)
     if (gapMin >= 10 && gapMin <= 480) {
       gaps.push(gapMin);
     }

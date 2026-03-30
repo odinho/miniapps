@@ -66,10 +66,10 @@ describe("baseline", () => {
   it("per-month breakdown", () => {
     const lines = buckets.map((b) => renderSummary(b.result, b.label));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "6mo: 5 days, count 20% (1/5), nap MAE 47.3 min, bed MAE 38.1 min, nap bias +28.8, count bias -0.8
-      7mo: 31 days, count 81% (25/31), nap MAE 47.8 min, bed MAE 44.7 min, nap bias -12.7, count bias +0.13
-      8mo: 28 days, count 89% (25/28), nap MAE 34 min, bed MAE 43.1 min, nap bias +16, count bias +0.11
-      9mo: 18 days, count 72% (13/18), nap MAE 164.6 min, bed MAE 53.7 min, nap bias -19.4, count bias +0.17"
+      "6mo: 5 days, count 20% (1/5), nap MAE 48 min, bed MAE 63.7 min, nap bias +24.2, count bias -0.8
+      7mo: 31 days, count 81% (25/31), nap MAE 49.4 min, bed MAE 50.8 min, nap bias -15.3, count bias +0.13
+      8mo: 28 days, count 89% (25/28), nap MAE 32.7 min, bed MAE 43.8 min, nap bias +8.7, count bias +0.11
+      9mo: 18 days, count 72% (13/18), nap MAE 173.4 min, bed MAE 53.7 min, nap bias -29.7, count bias +0.17"
     `);
   });
 
@@ -83,25 +83,25 @@ describe("baseline", () => {
       return renderSummary(manualBucket.result, `${b.label} manual=${n}`);
     });
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "6mo manual=3: 5 days, count 80% (4/5), nap MAE 59.5 min, bed MAE 38.1 min, nap bias +46.3, count bias +0.2
-      7mo manual=2: 31 days, count 84% (26/31), nap MAE 47.8 min, bed MAE 44.7 min, nap bias -12.7, count bias +0.1
-      8mo manual=2: 28 days, count 89% (25/28), nap MAE 34 min, bed MAE 43.1 min, nap bias +16, count bias +0.11
-      9mo manual=1: 18 days, count 89% (16/18), nap MAE 172.5 min, bed MAE 53.7 min, nap bias -21.7, count bias -0.11"
+      "6mo manual=3: 5 days, count 80% (4/5), nap MAE 55.1 min, bed MAE 63.7 min, nap bias +38.1, count bias +0.2
+      7mo manual=2: 31 days, count 84% (26/31), nap MAE 49.4 min, bed MAE 50.8 min, nap bias -15.3, count bias +0.1
+      8mo manual=2: 28 days, count 89% (25/28), nap MAE 32.7 min, bed MAE 43.8 min, nap bias +8.7, count bias +0.11
+      9mo manual=1: 18 days, count 89% (16/18), nap MAE 182.5 min, bed MAE 55.7 min, nap bias -31.9, count bias -0.11"
     `);
   });
 
   it("combined summary", () => {
-    expect(renderSummary(auto, "all")).toMatchInlineSnapshot(`"all: 82 days, count 78% (64/82), nap MAE 58.4 min, bed MAE 45.7 min, nap bias +0.2, count bias +0.07"`);
+    expect(renderSummary(auto, "all")).toMatchInlineSnapshot(`"all: 82 days, count 78% (64/82), nap MAE 59.8 min, bed MAE 49.9 min, nap bias -5.4, count bias +0.07"`);
   });
 
   it("warm-up curve", () => {
     const warmup = bucketByWarmup(auto);
     const lines = warmup.map((b) => renderSummary(b.result, b.label));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "day 1-3: 3 days, count 33% (1/3), nap MAE 67.7 min, bed MAE 37.6 min, nap bias +41.3, count bias -0.67
-      day 4-7: 4 days, count 25% (1/4), nap MAE 28.5 min, bed MAE 25.1 min, nap bias -6.5, count bias -0.25
-      day 8-14: 7 days, count 86% (6/7), nap MAE 64.1 min, bed MAE 43.2 min, nap bias -49.9, count bias +0.14
-      day 15+: 68 days, count 82% (56/68), nap MAE 59.4 min, bed MAE 47.6 min, nap bias +4.3, count bias +0.12"
+      "day 1-3: 3 days, count 33% (1/3), nap MAE 68.8 min, bed MAE 58.7 min, nap bias +33.6, count bias -0.67
+      day 4-7: 4 days, count 25% (1/4), nap MAE 30 min, bed MAE 41.4 min, nap bias -9.2, count bias -0.25
+      day 8-14: 7 days, count 86% (6/7), nap MAE 70.7 min, bed MAE 52.9 min, nap bias -58.3, count bias +0.14
+      day 15+: 68 days, count 82% (56/68), nap MAE 60.2 min, bed MAE 49.7 min, nap bias -1.1, count bias +0.12"
     `);
   });
 

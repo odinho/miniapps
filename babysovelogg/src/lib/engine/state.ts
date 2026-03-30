@@ -48,7 +48,7 @@ export function assembleState(data: DayData) {
     if (wakeTimeForPrediction) {
       const customNaps = baby.custom_nap_count ?? null;
       const recentEntries = recentSleeps.map(toSleepEntry);
-      const bedtime = recommendBedtime(todaySleeps.map(toSleepEntry), ageMonths, customNaps);
+      const bedtime = recommendBedtime(todaySleeps.map(toSleepEntry), ageMonths, customNaps, recentEntries);
       const bedtimeMs = new Date(bedtime).getTime();
       const completedNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time);
       // During active nap, count it toward consumed slots
