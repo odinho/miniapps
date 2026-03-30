@@ -177,29 +177,47 @@ function summarize(days: DayResult[]): BacktestResult {
   };
 }
 
-/** Group day records into age-period buckets (e.g. "6-8mo", "9-12mo"). */
-export function bucketByAge(
-  days: DayRecord[],
+/**
+ * Split a full BacktestResult into age-period buckets.
+ * Runs on the RESULTS, not the input — so each day retains its full lookback.
+ */
+export function bucketResultsByAge(
+  result: BacktestResult,
   birthdate: string,
-): { label: string; ageRange: [number, number]; days: DayRecord[] }[] {
+): { label: string; result: BacktestResult }[] {
   const brackets = [
     [0, 3], [3, 6], [6, 9], [9, 12], [12, 18], [18, 24],
   ] as const;
 
-  const buckets = brackets.map(([lo, hi]) => ({
-    label: `${lo}-${hi}mo`,
-    ageRange: [lo, hi] as [number, number],
-    days: [] as DayRecord[],
-  }));
+  const bucketDays = brackets.map(() => [] as DayResult[]);
 
-  for (const day of days) {
+  for (const day of result.days) {
     const age = calculateAgeMonths(birthdate, new Date(day.date + "T12:00:00Z"));
-    const bucket = buckets.find((b) => age >= b.ageRange[0] && age < b.ageRange[1]);
-    if (bucket) bucket.days.push(day);
-    else buckets[buckets.length - 1].days.push(day); // overflow into last bucket
+    const idx = brackets.findIndex(([lo, hi]) => age >= lo && age < hi);
+    bucketDays[idx >= 0 ? idx : brackets.length - 1].push(day);
   }
 
-  return buckets.filter((b) => b.days.length > 0);
+  return brackets
+    .map(([lo, hi], i) => ({
+      label: `${lo}-${hi}mo`,
+      result: summarize(bucketDays[i]),
+    }))
+    .filter((b) => b.result.totalDays > 0);
+}
+
+/** Compact one-line summary for snapshot assertions. */
+export function renderSummary(result: BacktestResult, label: string): string {
+  const pct = Math.round(result.napCountAccuracy * 100);
+  const correct = result.days.filter((d) => d.napCountError === 0).length;
+  return [
+    `${label}:`,
+    `${result.totalDays} days,`,
+    `count ${pct}% (${correct}/${result.totalDays}),`,
+    `nap MAE ${result.napStartMAE} min,`,
+    `bed MAE ${result.bedtimeMAE} min,`,
+    `nap bias ${result.napStartBias > 0 ? "+" : ""}${result.napStartBias},`,
+    `count bias ${result.napCountBias > 0 ? "+" : ""}${result.napCountBias}`,
+  ].join(" ");
 }
 
 /** Format a backtest result as a human-readable report string. */

@@ -1,0 +1,13 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`baseline all data, auto nap count 1`] = `"all-auto: 82 days, count 66% (54/82), nap MAE 60.3 min, bed MAE 45.7 min, nap bias -2, count bias +0.22"`;
+
+exports[`baseline 6-9mo auto vs manual 1`] = `
+"auto: 64 days, count 81% (52/64), nap MAE 41.7 min, bed MAE 43.5 min, nap bias +3.3, count bias +0.03
+manual=2: 64 days, count 81% (52/64), nap MAE 41.7 min, bed MAE 43.5 min, nap bias +3.3, count bias +0.03"
+`;
+
+exports[`baseline 9-12mo auto vs manual 1`] = `
+"auto: 18 days, count 11% (2/18), nap MAE 172.5 min, bed MAE 53.7 min, nap bias -33.8, count bias +0.89
+manual=1: 18 days, count 89% (16/18), nap MAE 185.8 min, bed MAE 53.7 min, nap bias -43.4, count bias -0.11"
+`;
