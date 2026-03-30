@@ -144,10 +144,13 @@ export function recommendBedtime(
     new Date(lastSleep.end_time).getTime() + bedtimeWW * multiplier * 60 * 1000,
   );
 
-  // Clamp to baby's local 18:00–20:30. Server TZ = baby's TZ by design (single-tenant).
+  // Only clamp as a cold-start safety net. Once we have learned data,
+  // the bedtime WW already reflects the baby's actual rhythm.
+  // Wide sanity clamp: no earlier than 16:00, no later than 23:00 local.
+  // Server TZ = baby's TZ by design (single-tenant).
   const hour = bedtime.getHours() + bedtime.getMinutes() / 60;
-  if (hour < 18) bedtime.setHours(18, 0, 0, 0);
-  if (hour > 20.5) bedtime.setHours(20, 30, 0, 0);
+  if (hour < 16) bedtime.setHours(16, 0, 0, 0);
+  if (hour > 23) bedtime.setHours(23, 0, 0, 0);
 
   return bedtime.toISOString();
 }

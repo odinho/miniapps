@@ -158,19 +158,16 @@ describe("recommendBedtime", () => {
     expect(new Date(bt).getHours()).toBe(19);
   });
 
-  it("clamps bedtime to no earlier than 18:00", () => {
-    // A very early last nap end should still produce bedtime >= 18:00
+  it("clamps bedtime to no earlier than 16:00", () => {
     const bt = recommendBedtime([sleep(t(6, 0), t(6, 30))], 9);
     const hour = new Date(bt).getHours();
-    expect(hour).toBeGreaterThanOrEqual(18);
+    expect(hour).toBeGreaterThanOrEqual(16);
   });
 
-  it("clamps bedtime to no later than 20:30", () => {
-    // A very late last nap end should still produce bedtime <= 20:30
+  it("clamps bedtime to no later than 23:00", () => {
     const bt = recommendBedtime([sleep(t(17, 0), t(18, 0))], 9);
     const d = new Date(bt);
-    const hourMin = d.getHours() + d.getMinutes() / 60;
-    expect(hourMin).toBeLessThanOrEqual(20.5);
+    expect(d.getHours()).toBeLessThanOrEqual(23);
   });
 });
 
