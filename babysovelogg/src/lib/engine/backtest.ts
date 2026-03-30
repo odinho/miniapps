@@ -12,6 +12,7 @@ export interface DayRecord {
 /** Per-day comparison result. */
 export interface DayResult {
   date: string;
+  dayIndex: number; // 0-based index in the input array (how many prior days of data)
   predictedNaps: PredictedNap[];
   actualNaps: SleepEntry[];
   predictedBedtime: string;
@@ -114,6 +115,7 @@ export function backtest(
 
     results.push({
       date: day.date,
+      dayIndex: i,
       predictedNaps,
       actualNaps,
       predictedBedtime,
@@ -199,6 +201,25 @@ export function bucketResultsByAge(
       label: `${age}mo`,
       result: summarize(days),
     }));
+}
+
+/**
+ * Split results by how many prior days of data were available.
+ * Shows cold-start penalty and how quickly predictions stabilize.
+ */
+export function bucketByWarmup(
+  result: BacktestResult,
+  brackets: [number, number][] = [[1, 3], [4, 7], [8, 14], [15, Infinity]],
+): { label: string; result: BacktestResult }[] {
+  return brackets
+    .map(([lo, hi]) => {
+      const days = result.days.filter((d) => d.dayIndex >= lo && d.dayIndex <= hi);
+      return {
+        label: hi === Infinity ? `day ${lo}+` : `day ${lo}-${hi}`,
+        result: summarize(days),
+      };
+    })
+    .filter((b) => b.result.totalDays > 0);
 }
 
 /** Compact one-line summary for snapshot assertions. */

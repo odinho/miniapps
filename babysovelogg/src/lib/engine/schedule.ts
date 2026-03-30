@@ -22,8 +22,37 @@ export function getWakeWindow(ageMonths: number, recentSleeps?: SleepEntry[]): n
   const avgWW = getAverageWakeWindowFromSleeps(recentSleeps);
   if (avgWW === null) return defaultWW;
 
-  // Clamp to age-appropriate range
-  return Math.max(range.minMinutes, Math.min(range.maxMinutes, avgWW));
+  // If the baby's actual nap count differs from age default, the age-based
+  // wake window range is wrong. Use a wider range based on the actual pattern.
+  const clampRange = getAdaptedWakeWindowRange(ageMonths, recentSleeps);
+  return Math.max(clampRange.minMinutes, Math.min(clampRange.maxMinutes, avgWW));
+}
+
+/** Get wake window range adapted to the baby's actual nap pattern. */
+function getAdaptedWakeWindowRange(
+  ageMonths: number,
+  recentSleeps: SleepEntry[],
+): { minMinutes: number; maxMinutes: number } {
+  const ageRange = findByAge(WAKE_WINDOWS, ageMonths);
+  const learnedNaps = getLearnedNapCount(recentSleeps);
+  if (learnedNaps === null) return ageRange;
+
+  const ageNaps = findByAge(NAP_COUNTS, ageMonths).naps;
+  if (learnedNaps === ageNaps) return ageRange;
+
+  // Baby does fewer/more naps than age default. Find ALL age brackets where
+  // this nap count is within the acceptable range, and union their wake windows.
+  let minWW = ageRange.minMinutes;
+  let maxWW = ageRange.maxMinutes;
+  for (let i = 0; i < NAP_COUNTS.length; i++) {
+    const nc = NAP_COUNTS[i];
+    if (learnedNaps >= nc.range[0] && learnedNaps <= nc.range[1]) {
+      const ww = WAKE_WINDOWS[i] ?? WAKE_WINDOWS[WAKE_WINDOWS.length - 1];
+      minWW = Math.min(minWW, ww.minMinutes);
+      maxWW = Math.max(maxWW, ww.maxMinutes);
+    }
+  }
+  return { minMinutes: minWW, maxMinutes: maxWW };
 }
 
 /** Predict next nap time as ISO string. */
@@ -56,7 +85,10 @@ export function predictDayNaps(
   customNapCount?: number | null,
 ): PredictedNap[] {
   const defaultWW = getWakeWindow(ageMonths, recentSleeps);
-  const expectedNaps = getExpectedNapCount(ageMonths, customNapCount);
+  const expectedNaps =
+    customNapCount != null
+      ? customNapCount
+      : getLearnedNapCount(recentSleeps) ?? findByAge(NAP_COUNTS, ageMonths).naps;
   const positionalWWs = getPositionalWakeWindows(recentSleeps, ageMonths);
 
   const predictions: PredictedNap[] = [];
@@ -187,18 +219,54 @@ function getPositionalWakeWindows(recentSleeps?: SleepEntry[], ageMonths?: numbe
     }
   }
 
-  // Average each position, clamped to age-appropriate range
+  // Average each position, clamped to adapted range
+  const adaptedRange = ageMonths != null
+    ? getAdaptedWakeWindowRange(ageMonths, recentSleeps)
+    : null;
   const result: number[] = [];
   for (const [pos, gaps] of gapsByPosition) {
     if (gaps.length < 2) continue;
     let avg = gaps.reduce((a, b) => a + b, 0) / gaps.length;
-    if (range) {
-      avg = Math.max(range.minMinutes, Math.min(range.maxMinutes, avg));
+    const r = adaptedRange ?? range;
+    if (r) {
+      avg = Math.max(r.minMinutes, Math.min(r.maxMinutes, avg));
     }
     result[pos] = Math.round(avg);
   }
 
   return result;
+}
+
+/**
+ * Learn nap count from recent sleep data. Returns the most common nap count
+ * if it dominates (>60% of days), or null to fall back to age default.
+ * Requires 5+ days with naps to produce a result.
+ */
+function getLearnedNapCount(recentSleeps?: SleepEntry[]): number | null {
+  if (!recentSleeps || recentSleeps.length < 4) return null;
+
+  // Group completed naps by day
+  const napsByDay = new Map<string, number>();
+  for (const s of recentSleeps) {
+    if (s.type !== "nap" || !s.end_time) continue;
+    const day = s.start_time.slice(0, 10);
+    napsByDay.set(day, (napsByDay.get(day) ?? 0) + 1);
+  }
+
+  if (napsByDay.size < 5) return null;
+
+  // Find the mode (most common nap count)
+  const freq = new Map<number, number>();
+  for (const n of napsByDay.values()) {
+    freq.set(n, (freq.get(n) ?? 0) + 1);
+  }
+  let mode = 0, modeCount = 0;
+  for (const [n, c] of freq) {
+    if (c > modeCount) { mode = n; modeCount = c; }
+  }
+
+  // Only override age default if the mode is clearly dominant
+  return modeCount / napsByDay.size > 0.6 ? mode : null;
 }
 
 /** Learn average nap duration from recent completed naps, fallback to age-based defaults. */
