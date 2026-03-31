@@ -57,6 +57,7 @@ describe('buildBabyEvent', () => {
 			birthdate: '2025-06-15',
 			customNapCount: 2,
 			pottyMode: true,
+			targetBedtime: null,
 		});
 	});
 

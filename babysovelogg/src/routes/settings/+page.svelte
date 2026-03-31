@@ -197,7 +197,7 @@
 						Fast tid
 					</button>
 				</div>
-				{#if bedtimeEnabled}
+				{#if bedtimeEnabled && targetBedtime != null}
 					<div style="margin-top: 8px; display: flex; justify-content: center;">
 						<TimeInput bind:value={targetBedtime} data-testid="target-bedtime" />
 					</div>
