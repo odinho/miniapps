@@ -13,6 +13,7 @@
 	import { formatDuration, formatTime } from '$lib/utils.js';
 	import { calcPauseMs } from '$lib/engine/classification.js';
 	import { buildPause, buildResume, isPaused } from '$lib/sleep-actions.js';
+	import { buildSleepInfoRows } from '$lib/settings-utils.js';
 	import TimeInput from '$lib/components/TimeInput.svelte';
 	import DateInput from '$lib/components/DateInput.svelte';
 
@@ -65,6 +66,8 @@
 	const pottyMode = $derived(baby?.potty_mode === 1);
 
 	const paused = $derived(isPaused(activeSleep?.pauses));
+	const showPopulationNorms = $derived(prediction?.calibration?.trust === 'age-default');
+	const populationNormsRows = $derived(showPopulationNorms ? buildSleepInfoRows(ageMonths) : []);
 	let pauseBusy = $state(false);
 
 	async function handlePauseToggle() {
@@ -453,6 +456,23 @@
 				{pottyMode ? '🚽 Do' : '🧷 Bleie'}
 			</button>
 		</div>
+
+		{#if showPopulationNorms}
+			<div class="population-norms" data-testid="population-norms">
+				<div class="population-norms-title">Typisk for {ageMonths} mnd</div>
+				{#each populationNormsRows as row}
+					<div class="population-norms-row">
+						<span class="population-norms-label">{row.label}</span>
+						<span class="population-norms-value">{row.value}</span>
+					</div>
+				{/each}
+				{#if prediction?.calibration?.warnings?.length}
+					<div class="population-norms-hint">
+						{prediction.calibration.warnings[prediction.calibration.warnings.length - 1]}
+					</div>
+				{/if}
+			</div>
+		{/if}
 
 		<!-- Spacer to push stats down -->
 		<div style="flex: 1;"></div>
