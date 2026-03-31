@@ -157,10 +157,6 @@ describe("getDstAdjustedTime", () => {
 describe("formatDstDate", () => {
 	it("formats date in Nynorsk style", () => {
 		const date = new Date("2026-03-29T00:00:00");
-		const formatted = formatDstDate(date);
-		// Should contain day number and month
-		expect(formatted).toContain("29");
-		// Should contain some form of "mars" (March in Norwegian)
-		expect(formatted.toLowerCase()).toContain("mars");
+		expect(formatDstDate(date)).toBe("sundag 29. mars");
 	});
 });

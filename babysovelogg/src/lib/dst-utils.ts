@@ -133,11 +133,12 @@ export function getDstAdjustedTime(
 	return `${String(clampedH).padStart(2, '0')}:${String(clampedM).padStart(2, '0')}`;
 }
 
-/** Format a Date as "sundag 29. mars" in Nynorsk style. */
+const NN_WEEKDAYS = ['sundag', 'måndag', 'tysdag', 'onsdag', 'torsdag', 'fredag', 'laurdag'];
+const NN_MONTHS = ['januar', 'februar', 'mars', 'april', 'mai', 'juni', 'juli', 'august', 'september', 'oktober', 'november', 'desember'];
+
+/** Format a Date as "sundag 29. mars" in Nynorsk style.
+ *  Uses manual lookup instead of toLocaleDateString because nn-NO
+ *  locale data is missing in Bun's SSR runtime. */
 export function formatDstDate(date: Date): string {
-	return date.toLocaleDateString('nn-NO', {
-		weekday: 'long',
-		day: 'numeric',
-		month: 'long',
-	});
+	return `${NN_WEEKDAYS[date.getDay()]} ${date.getDate()}. ${NN_MONTHS[date.getMonth()]}`;
 }
