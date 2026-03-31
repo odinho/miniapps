@@ -95,7 +95,7 @@ test("Short naps do NOT shrink the next wake window", async ({ page }) => {
   // The prediction should still exist and the next nap shouldn't be significantly earlier
   // (short nap shouldn't shrink the wake window)
   if (baseNextNap && afterNextNap) {
-    const baseDelta = new Date(baseNextNap).getTime() - now.getTime();
+    const _baseDelta = new Date(baseNextNap).getTime() - now.getTime();
     const afterDelta = new Date(afterNextNap).getTime() - now.getTime();
     // After a short nap, the next nap should be based on wake time from the short nap end,
     // not a drastically shorter window. The wake window itself should not shrink.
@@ -180,7 +180,7 @@ test("Target bedtime in settings affects predictions", async ({ page }) => {
 
   // Get baseline prediction
   const baseline = await page.evaluate(() => fetch("/api/state").then((r) => r.json()));
-  const baseBedtime = baseline.prediction?.bedtime;
+  const _baseBedtime = baseline.prediction?.bedtime;
 
   // Go to settings and set target bedtime to 20:00
   await page.locator(".nav-bar").getByText("Innstillingar").click();
