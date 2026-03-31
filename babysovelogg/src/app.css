@@ -699,6 +699,14 @@ html, body {
   font-weight: 600;
 }
 
+/* --- Latency feedback --- */
+.latency-feedback {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
 /* --- FAB button --- */
 .fab {
   position: fixed;

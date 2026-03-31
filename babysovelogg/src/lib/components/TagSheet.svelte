@@ -33,6 +33,22 @@
 	const displayTime = $derived(formatTime(adjustedStartTime));
 	const showDiaperNudge = $derived(shouldShowDiaperNudge(diapers));
 
+	const latencyFeedback = $derived.by(() => {
+		if (!fallAsleepTime) return null;
+		switch (fallAsleepTime) {
+			case '<5':
+				return { text: 'Raskt innsovning', color: 'var(--lavender)' };
+			case '5-15':
+				return { text: 'Normal innsovning', color: 'var(--lavender)' };
+			case '15-30':
+				return { text: 'Litt lang innsovning — vurder seinare leggetid', color: 'var(--peach)' };
+			case '30+':
+				return { text: 'Lang innsovning — babyen var truleg ikkje trøytt nok', color: 'var(--peach)' };
+			default:
+				return null;
+		}
+	});
+
 	function toggleMood(value: string) {
 		mood = mood === value ? null : value;
 	}
@@ -172,6 +188,11 @@
 					</button>
 				{/each}
 			</div>
+			{#if latencyFeedback}
+				<p class="latency-feedback" style="background: {latencyFeedback.color};" data-testid="latency-feedback">
+					{latencyFeedback.text}
+				</p>
+			{/if}
 		</div>
 
 		<!-- Notes -->
