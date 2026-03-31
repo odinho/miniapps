@@ -26,6 +26,7 @@ test("Diaper shows in history", async ({ page }) => {
   await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
 
   await page.getByRole("button", { name: /Bleie/ }).click();
+  await page.getByRole("button", { name: /Våt/ }).click();
   await page.getByRole("button", { name: "Lagra" }).click();
   await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });
 
@@ -42,11 +43,13 @@ test("Multiple diapers can be logged", async ({ page }) => {
 
   // Log first diaper
   await page.getByRole("button", { name: /Bleie/ }).click();
+  await page.getByRole("button", { name: /Våt/ }).click();
   await page.getByRole("button", { name: "Lagra" }).click();
   await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });
 
   // Log second diaper
   await page.getByRole("button", { name: /Bleie/ }).click();
+  await page.getByRole("button", { name: /Våt/ }).click();
   await page.getByRole("button", { name: "Lagra" }).click();
   await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });
 
@@ -62,6 +65,7 @@ test("Can delete a diaper entry", async ({ page }) => {
   await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
 
   await page.getByRole("button", { name: /Bleie/ }).click();
+  await page.getByRole("button", { name: /Våt/ }).click();
   await page.getByRole("button", { name: "Lagra" }).click();
   await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });
 
@@ -71,9 +75,9 @@ test("Can delete a diaper entry", async ({ page }) => {
   await page.locator(".diaper-log-item").click();
   await expect(page.getByRole("heading", { name: "Bleiedetaljar" })).toBeVisible();
   // Click Slett in diaper details — opens custom confirm dialog
-  await page.getByRole("button", { name: "Slett" }).first().click();
+  await page.getByTestId("edit-diaper-modal").getByRole("button", { name: "Slett" }).click();
   // Click Slett in confirm dialog
-  await page.locator(".modal-overlay").last().getByRole("button", { name: "Slett" }).click();
+  await page.getByTestId("confirm-delete").getByRole("button", { name: "Slett" }).click();
 
   await expect(page.locator(".diaper-log-item")).toHaveCount(0, { timeout: 5000 });
 });
@@ -147,6 +151,7 @@ test("Dashboard shows potty count in summary", async ({ page }) => {
 
   // Log a potty visit
   await page.getByRole("button", { name: /Do/ }).click();
+  await page.getByRole("button", { name: /Tiss/ }).click();
   await page.getByRole("button", { name: "Lagra" }).click();
   await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });
 

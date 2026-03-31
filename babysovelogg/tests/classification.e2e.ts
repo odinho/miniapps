@@ -40,26 +40,24 @@ test("At 17:45 with nap quota met, sleep is classified as night", async ({ page 
   const babyId = createBaby("Testa", "2025-06-12");
   setWakeUpTime(babyId);
 
-  // Add 2 completed naps to meet quota
-  const now = new Date();
-  addCompletedSleep(
-    babyId,
-    new Date(now.getTime() - 6 * 3600000).toISOString(),
-    new Date(now.getTime() - 5 * 3600000).toISOString(),
-    "nap",
-  );
-  addCompletedSleep(
-    babyId,
-    new Date(now.getTime() - 3 * 3600000).toISOString(),
-    new Date(now.getTime() - 2 * 3600000).toISOString(),
-    "nap",
-  );
+  // Add 2 completed naps to meet quota (explicit today times to avoid midnight boundary)
+  const t = new Date();
+  t.setHours(9, 0, 0, 0);
+  const nap1Start = t.toISOString();
+  t.setHours(10, 0, 0, 0);
+  const nap1End = t.toISOString();
+  t.setHours(13, 0, 0, 0);
+  const nap2Start = t.toISOString();
+  t.setHours(14, 0, 0, 0);
+  const nap2End = t.toISOString();
+  addCompletedSleep(babyId, nap1Start, nap1End, "nap");
+  addCompletedSleep(babyId, nap2Start, nap2End, "nap");
 
   await page.goto("/");
   await page.getByTestId("sleep-button").click();
   await expect(page.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 5000 });
 
-  expect(renderDayState(getDb(), babyId)).toMatch(/søvn:.*natt$/m);
+  expect(renderDayState(getDb(), babyId)).toMatch(/pågår natt/);
 });
 
 test("At 17:00 with nap quota NOT met, sleep is classified as nap", async ({ page }) => {

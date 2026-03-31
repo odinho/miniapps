@@ -26,7 +26,7 @@ test("B11: shows overtime when predicted nap time has passed", async ({ page }) 
   // By the time this test runs (any time after 05:00), the nap will be overdue.
   const today = new Date();
   today.setHours(1, 0, 0, 0);
-  const dateStr = today.toISOString().split("T")[0];
+  const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
     babyId,
     dateStr,
@@ -201,12 +201,12 @@ test("B18: ending night sleep auto-sets wakeup, no morning prompt", async ({ pag
 
 // --- B19: Settings prediction shows all naps and reacts to nap count change ---
 
-test("B19: settings shows all predicted nap times", async ({ page }) => {
+test("B19: stats shows all predicted nap times", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
 
   // Default nap count for 9 months = 2
-  await page.goto("/settings");
+  await page.goto("/stats");
   await expect(page.getByText("Appen reknar med")).toBeVisible({ timeout: 5000 });
 
   // Should show "Lur 1" and "Lur 2" (two predicted naps)
@@ -215,26 +215,27 @@ test("B19: settings shows all predicted nap times", async ({ page }) => {
   await expect(predPanel).toContainText("Lur 2");
 });
 
-test("B19: settings prediction updates reactively when changing nap count", async ({ page }) => {
+test("B19: stats prediction updates when nap count is changed in settings", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
 
-  await page.goto("/settings");
+  // Verify initial prediction (auto = 2 naps for 9 months)
+  await page.goto("/stats");
   await expect(page.getByText("Appen reknar med")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByTestId("pred-panel")).toContainText("Lur 2");
 
-  const predPanel = page.getByTestId("pred-panel");
-
-  // Initially auto = 2 naps for 9 months
-  await expect(predPanel).toContainText("Lur 2");
-
-  // Change to 1 nap
+  // Change nap count to 1 on settings page
+  await page.goto("/settings");
+  await expect(page.getByRole("heading", { name: "Innstillingar" })).toBeVisible();
   await page.locator(".type-pill", { hasText: "1" }).first().click();
+  await page.getByRole("button", { name: "Lagra" }).click();
+  await expect(page.getByTestId("baby-name")).toBeVisible({ timeout: 5000 });
 
-  // Should now show only "Lur 1", not "Lur 2"
+  // Stats should now show only 1 nap
+  await page.goto("/stats");
+  const predPanel = page.getByTestId("pred-panel");
   await expect(predPanel).toContainText("Lur 1");
   await expect(predPanel).not.toContainText("Lur 2");
-
-  // And "0 av 1" expected naps
   await expect(predPanel).toContainText("0 av 1");
 });
 

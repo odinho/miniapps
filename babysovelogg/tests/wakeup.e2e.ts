@@ -34,7 +34,7 @@ test("Can set wake-up time via morning prompt", async ({ page }) => {
   await expect(page.getByTestId("morning-prompt")).toBeVisible();
 
   const today = new Date();
-  const dateStr = today.toISOString().split("T")[0];
+  const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   await page.getByTestId("morning-prompt").locator('input[type="date"]').fill(dateStr);
   await page.getByTestId("morning-prompt").locator('input[type="time"]').fill("07:30");
 
@@ -169,7 +169,7 @@ test("Morning prompt only shows once per day", async ({ page }) => {
   await expect(page.getByTestId("morning-prompt")).toBeVisible();
 
   const today = new Date();
-  const dateStr = today.toISOString().split("T")[0];
+  const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   await page.getByTestId("morning-prompt").locator('input[type="date"]').fill(dateStr);
   await page.getByTestId("morning-prompt").locator('input[type="time"]').fill("07:00");
   await page.getByRole("button", { name: "Sett vaknetid" }).click();

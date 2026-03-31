@@ -308,8 +308,9 @@
 	let morningBusy = $state(false);
 
 	$effect(() => {
-		// Pre-fill date with today
-		morningDate = new Date().toISOString().split('T')[0];
+		// Pre-fill date with today (local, not UTC)
+		const d = new Date();
+		morningDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 	});
 
 	async function setMorningWakeTime() {
@@ -333,7 +334,7 @@
 		try {
 			const today = new Date();
 			today.setHours(6, 0, 0, 0);
-			const dateStr = today.toISOString().split('T')[0];
+			const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 			const event = {
 				type: 'day.started',
 				payload: { babyId: baby.id, date: dateStr, wakeTime: today.toISOString() },

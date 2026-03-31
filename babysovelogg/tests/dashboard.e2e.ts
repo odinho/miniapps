@@ -79,19 +79,15 @@ test('Pluralization: 1 nap shows "1 lur"', async ({ page }) => {
 test('Pluralization: 2 naps shows "2 lurar"', async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
-  const now = new Date();
-  addCompletedSleep(
-    babyId,
-    new Date(now.getTime() - 4 * 3600000).toISOString(),
-    new Date(now.getTime() - 3 * 3600000).toISOString(),
-    "nap",
-  );
-  addCompletedSleep(
-    babyId,
-    new Date(now.getTime() - 2 * 3600000).toISOString(),
-    new Date(now.getTime() - 1 * 3600000).toISOString(),
-    "nap",
-  );
+  // Use explicit today-morning timestamps to avoid crossing midnight boundary
+  const today = new Date();
+  today.setHours(9, 0, 0, 0);
+  const nap1Start = new Date(today);
+  const nap1End = new Date(today); nap1End.setHours(10, 0, 0, 0);
+  const nap2Start = new Date(today); nap2Start.setHours(13, 0, 0, 0);
+  const nap2End = new Date(today); nap2End.setHours(14, 0, 0, 0);
+  addCompletedSleep(babyId, nap1Start.toISOString(), nap1End.toISOString(), "nap");
+  addCompletedSleep(babyId, nap2Start.toISOString(), nap2End.toISOString(), "nap");
 
   await page.goto("/");
   await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
@@ -221,6 +217,7 @@ test("Dashboard shows diaper count in summary", async ({ page }) => {
 
   // Log a diaper
   await page.getByRole("button", { name: /Bleie/ }).click();
+  await page.getByRole("button", { name: /Våt/ }).click();
   await page.getByRole("button", { name: "Lagra" }).click();
   await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });
 

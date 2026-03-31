@@ -57,8 +57,9 @@ test("Predicted nap shown with dashed outline", async ({ page }) => {
 
 test("Active sleep has pulsing animation class", async ({ page }) => {
   const babyId = createBaby("Testa");
-  const start = new Date(Date.now() - 20 * 60000);
-  addActiveSleep(babyId, start.toISOString(), "nap");
+  setWakeUpTime(babyId);
+  const today = new Date(); today.setHours(12, 0, 0, 0);
+  addActiveSleep(babyId, today.toISOString(), "nap");
 
   await page.goto("/");
   await expect(page.locator(".sleep-arc")).toBeVisible();
@@ -68,9 +69,12 @@ test("Active sleep has pulsing animation class", async ({ page }) => {
 
 test("Arc center shows countdown when not sleeping", async ({ page }) => {
   const babyId = createBaby("Testa");
-  const now = new Date();
-  const start = new Date(now.getTime() - 2 * 3600000);
-  const end = new Date(now.getTime() - 30 * 60000);
+  setWakeUpTime(babyId);
+  // Seed a completed nap earlier today (explicit times to avoid midnight boundary)
+  const today = new Date();
+  today.setHours(9, 0, 0, 0);
+  const start = new Date(today);
+  const end = new Date(today); end.setHours(10, 0, 0, 0);
   addCompletedSleep(babyId, start.toISOString(), end.toISOString(), "nap");
 
   await page.goto("/");
@@ -133,7 +137,8 @@ test("Active bubble persists after navigating away and back", async ({ page }) =
   await forceMorning(page);
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
-  addActiveSleep(babyId, new Date(Date.now() - 20 * 60000).toISOString(), "nap");
+  const today = new Date(); today.setHours(12, 0, 0, 0);
+  addActiveSleep(babyId, today.toISOString(), "nap");
 
   await page.goto("/");
   await expect(page.locator(".arc-bubble-active")).toHaveCount(1);

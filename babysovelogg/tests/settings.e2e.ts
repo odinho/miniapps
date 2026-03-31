@@ -1,11 +1,11 @@
 import { test, expect, createBaby, setWakeUpTime } from "./fixtures";
 
-test("Settings shows sleep info panel with wake window format", async ({ page }) => {
+test("Stats shows sleep info panel with wake window format", async ({ page }) => {
   // 12-month baby has wake windows >= 60 min (210-300 min = 3h 30m – 5h)
-  createBaby("Testa", "2025-03-12");
-  await page.goto("/settings");
+  const babyId = createBaby("Testa", "2025-03-12");
+  setWakeUpTime(babyId);
+  await page.goto("/stats");
 
-  await expect(page.getByRole("heading", { name: "Innstillingar" })).toBeVisible();
   await expect(page.getByText("Søvninfo for")).toBeVisible({ timeout: 5000 });
 
   // Wake windows >= 60 min should show "Xh Ym" format
@@ -14,19 +14,21 @@ test("Settings shows sleep info panel with wake window format", async ({ page })
   expect(text).toMatch(/\dh \d+m/); // e.g., "3h 30m"
 });
 
-test("Settings shows correct pluralization for nap count", async ({ page }) => {
+test("Stats shows correct pluralization for nap count", async ({ page }) => {
   // 18-month baby has "1 lur"
-  createBaby("Testa", "2024-09-12");
-  await page.goto("/settings");
+  const babyId = createBaby("Testa", "2024-09-12");
+  setWakeUpTime(babyId);
+  await page.goto("/stats");
 
   await expect(page.getByText("Søvninfo for")).toBeVisible({ timeout: 5000 });
   await expect(page.locator(".sleep-info-panel")).toContainText("1 lur");
 });
 
-test('Settings shows "lurar" for multiple naps', async ({ page }) => {
+test('Stats shows "lurar" for multiple naps', async ({ page }) => {
   // 6-month baby has "2–3 lurar"
-  createBaby("Testa", "2025-09-12");
-  await page.goto("/settings");
+  const babyId = createBaby("Testa", "2025-09-12");
+  setWakeUpTime(babyId);
+  await page.goto("/stats");
 
   await expect(page.getByText("Søvninfo for")).toBeVisible({ timeout: 5000 });
   await expect(page.locator(".sleep-info-panel")).toContainText("lurar");

@@ -1,7 +1,11 @@
 import { test as base, expect, type Page } from "@playwright/test";
 import { spawn, type ChildProcess } from "child_process";
-import { Database } from "bun:sqlite";
 import type { SqliteDb } from "$lib/server/db.js";
+
+// Playwright runs under Node.js, not Bun — use node:sqlite there
+const Database: { new (path: string): SqliteDb } = globalThis.Bun
+  ? (await import("bun:sqlite")).Database
+  : (await import("node:sqlite")).DatabaseSync;
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
@@ -34,16 +38,16 @@ export const test = base.extend<
 
       // Wait for server to start
       await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("Server startup timeout")), 15000);
         const onData = (data: Buffer) => {
           if (data.toString().includes("Listening")) {
+            clearTimeout(timer);
             proc.stdout?.off("data", onData);
             resolve();
           }
         };
         proc.stdout?.on("data", onData);
-        proc.on("error", reject);
-        const timer = setTimeout(() => reject(new Error("Server startup timeout")), 10000);
-        proc.stdout?.once("data", () => clearTimeout(timer));
+        proc.on("error", (err) => { clearTimeout(timer); reject(err); });
       });
 
       // Trigger a request to force lazy-loaded DB module initialization.
@@ -146,7 +150,7 @@ export function createBaby(name = "Testa", birthdate = "2025-06-12"): number {
 export function setWakeUpTime(babyId: number, wakeTime?: Date) {
   const wake = wakeTime || new Date();
   wake.setHours(7, 0, 0, 0);
-  const dateStr = wake.toISOString().split("T")[0];
+  const dateStr = `${wake.getFullYear()}-${String(wake.getMonth() + 1).padStart(2, '0')}-${String(wake.getDate()).padStart(2, '0')}`;
   _db
     .prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)")
     .run(babyId, dateStr, wake.toISOString());
