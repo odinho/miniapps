@@ -38,7 +38,7 @@ export const test = base.extend<
 
       // Wait for server to start
       await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("Server startup timeout")), 15000);
+        const timer = setTimeout(() => reject(new Error("Server startup timeout")), 30000);
         const onData = (data: Buffer) => {
           if (data.toString().includes("Listening")) {
             clearTimeout(timer);
@@ -260,6 +260,25 @@ export async function forceHour(page: Page, hour: number) {
       return h;
     };
   }, hour);
+}
+
+/** Force a specific time in the browser — overrides Date.now() and getHours(). */
+export async function forceTime(page: Page, isoOrDate: string | Date) {
+  const ts = typeof isoOrDate === "string" ? new Date(isoOrDate).getTime() : isoOrDate.getTime();
+  await page.addInitScript((frozenTs: number) => {
+    const _origNow = Date.now;
+    const offset = frozenTs - _origNow();
+    Date.now = () => _origNow() + offset;
+    const _origGetHours = Date.prototype.getHours;
+    Date.prototype.getHours = function () {
+      return new Date(this.getTime() + offset - (this.getTime() - _origNow())).getUTCHours();
+    };
+    // Override getHours to return the shifted hour
+    Date.prototype.getHours = function () {
+      const shifted = new Date(_origNow() + offset);
+      return _origGetHours.call(shifted);
+    };
+  }, ts);
 }
 
 /** Dismiss any visible modal sheet by clicking "Ferdig" */

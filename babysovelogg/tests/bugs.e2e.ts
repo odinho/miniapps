@@ -21,25 +21,28 @@ test("B11: shows overtime when predicted nap time has passed", async ({ page }) 
   // Set custom_nap_count = 1 so prediction expects exactly 1 nap
   db.prepare("UPDATE baby SET custom_nap_count = 1 WHERE id = ?").run(babyId);
 
-  // Set wake time to very early today so the predicted nap is guaranteed in the past.
-  // For a 9-month-old: WW ≈ 180 min. Wake at 01:00 → predicted nap at ~04:00.
-  // By the time this test runs (any time after 05:00), the nap will be overdue.
-  const today = new Date();
-  today.setHours(1, 0, 0, 0);
-  const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  // Strategy: set wake time so the predicted nap is 30 min before server's real time.
+  // 9-month-old with no history: default WW = (150+210)/2 = 180 min.
+  // We want: predicted_nap = now - 30 min, so wakeTime = now - 210 min.
+  // The 90-min skip threshold means 30 min overdue will show "Overtid" (not bedtime).
+  const now = Date.now();
+  const wakeTime = new Date(now - 210 * 60000);
+  const dateStr = `${wakeTime.getFullYear()}-${String(wakeTime.getMonth() + 1).padStart(2, '0')}-${String(wakeTime.getDate()).padStart(2, '0')}`;
   db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
     babyId,
     dateStr,
-    today.toISOString(),
+    wakeTime.toISOString(),
   );
 
-  // Force browser to 10 AM — well past the predicted nap, but not evening
+  // Force browser to daytime hour (avoids deep-night mode at 0-5 AM)
+  // getHours() is used for night mode check; Date.now() remains real time
+  // which matches the server's predictions.
   await forceHour(page, 10);
 
   await page.goto("/");
   await expect(page.getByTestId("dashboard")).toBeVisible({ timeout: 5000 });
 
-  // Should show "Overtid" (overtime), not "Leggetid om" (bedtime countdown)
+  // Nap is ~30 min overdue (< 90 min skip threshold) → should show "Overtid"
   await expect(page.locator(".arc-center-label")).toContainText("Overtid", { timeout: 5000 });
 });
 
