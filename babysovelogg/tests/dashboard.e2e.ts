@@ -42,8 +42,8 @@ test("Dashboard shows stats section", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
 
-  await expect(page.getByText("lurar")).toBeVisible();
-  await expect(page.getByText("lurtid")).toBeVisible();
+  await expect(page.locator(".summary-row").getByText("lurar")).toBeVisible();
+  await expect(page.locator(".summary-row").getByText("lurtid")).toBeVisible();
   // "totalt" is only shown when night sleep differs from nap time
 });
 

@@ -239,3 +239,32 @@ test("Dismissing tag sheet auto-saves entered data", async ({ page }) => {
   expect(state).toContain('normal');
   expect(state).toContain('"Viktig notat"');
 });
+
+test("Latency feedback appears when fall-asleep time is selected", async ({ page }) => {
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
+  await page.goto("/");
+
+  // Start sleep — tag sheet appears
+  await page.getByTestId("sleep-button").click();
+  await expect(page.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 5000 });
+  await expect(page.getByRole("heading", { name: "Korleis gjekk legginga?" })).toBeVisible({
+    timeout: 5000,
+  });
+
+  // No latency feedback initially
+  await expect(page.getByTestId("latency-feedback")).not.toBeVisible();
+
+  // Select "< 5 min" fall-asleep time
+  await page.getByRole("button", { name: "< 5 min" }).click();
+  await expect(page.getByTestId("latency-feedback")).toBeVisible();
+  await expect(page.getByTestId("latency-feedback")).toContainText("Raskt innsovning");
+
+  // Select "30+ min" — should show warning
+  await page.getByRole("button", { name: "30+ min" }).click();
+  await expect(page.getByTestId("latency-feedback")).toContainText("ikkje trøytt nok");
+
+  // Deselect — latency feedback disappears
+  await page.getByRole("button", { name: "30+ min" }).click();
+  await expect(page.getByTestId("latency-feedback")).not.toBeVisible();
+});
