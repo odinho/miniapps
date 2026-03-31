@@ -11,6 +11,8 @@
 		isoToTimeInput,
 		dateTimeToIso,
 	} from '$lib/history-utils.js';
+	import TimeInput from './TimeInput.svelte';
+	import DateInput from './DateInput.svelte';
 
 	interface Props {
 		entry: SleepLogRow;
@@ -138,8 +140,8 @@
 		<div class="form-group">
 			<span class="form-label">Start</span>
 			<div class="datetime-row">
-				<input type="date" bind:value={startDate} />
-				<input type="time" bind:value={startTime} />
+				<DateInput bind:value={startDate} />
+				<TimeInput bind:value={startTime} />
 			</div>
 		</div>
 
@@ -147,8 +149,8 @@
 		<div class="form-group">
 			<span class="form-label">Slutt</span>
 			<div class="datetime-row">
-				<input type="date" bind:value={endDate} />
-				<input type="time" bind:value={endTime} />
+				<DateInput bind:value={endDate} />
+				<TimeInput bind:value={endTime} />
 			</div>
 		</div>
 

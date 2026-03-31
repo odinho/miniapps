@@ -43,6 +43,7 @@ export interface SettingsPayload {
 	birthdate: string;
 	customNapCount?: number | null;
 	pottyMode?: boolean;
+	targetBedtime?: string | null;
 }
 
 export function buildBabyEvent(
@@ -61,6 +62,7 @@ export function buildBabyEvent(
 	} else {
 		p.customNapCount = payload.customNapCount ?? null;
 		p.pottyMode = payload.pottyMode ?? false;
+		p.targetBedtime = payload.targetBedtime ?? null;
 	}
 	return {
 		type: isNew ? 'baby.created' : 'baby.updated',

@@ -7,6 +7,8 @@ import {
   forceMorning,
   forceHour,
   generateId,
+  fillDateInput,
+  fillTimeInput,
 } from "./fixtures";
 import type { Baby, DayStartRow } from "../src/lib/types";
 
@@ -19,8 +21,8 @@ test("Shows morning prompt when no wake-up time and no sleeps", async ({ page })
   await expect(page.getByRole("heading", { name: "God morgon!" })).toBeVisible();
   await expect(page.getByTestId("morning-icon")).toHaveText("🌅");
 
-  await expect(page.getByTestId("morning-prompt").locator('input[type="date"]')).toBeVisible();
-  await expect(page.getByTestId("morning-prompt").locator('input[type="time"]')).toBeVisible();
+  await expect(page.getByTestId("morning-prompt").locator('input.date-input')).toBeVisible();
+  await expect(page.getByTestId("morning-prompt").locator('input.time-input')).toBeVisible();
 
   await expect(page.getByRole("button", { name: "Sett vaknetid" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Hopp over" })).toBeVisible();
@@ -35,8 +37,8 @@ test("Can set wake-up time via morning prompt", async ({ page }) => {
 
   const today = new Date();
   const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  await page.getByTestId("morning-prompt").locator('input[type="date"]').fill(dateStr);
-  await page.getByTestId("morning-prompt").locator('input[type="time"]').fill("07:30");
+  await fillDateInput(page.getByTestId("morning-prompt").locator('input.date-input'), dateStr);
+  await fillTimeInput(page.getByTestId("morning-prompt").locator('input.time-input'), "07:30");
 
   const responsePromise = page.waitForResponse(
     (resp) => resp.url().includes("/api/events") && resp.request().method() === "POST",
@@ -170,8 +172,8 @@ test("Morning prompt only shows once per day", async ({ page }) => {
 
   const today = new Date();
   const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  await page.getByTestId("morning-prompt").locator('input[type="date"]').fill(dateStr);
-  await page.getByTestId("morning-prompt").locator('input[type="time"]').fill("07:00");
+  await fillDateInput(page.getByTestId("morning-prompt").locator('input.date-input'), dateStr);
+  await fillTimeInput(page.getByTestId("morning-prompt").locator('input.time-input'), "07:00");
   await page.getByRole("button", { name: "Sett vaknetid" }).click();
 
   await expect(page.getByTestId("dashboard")).toBeVisible({ timeout: 5000 });

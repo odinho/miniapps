@@ -3,6 +3,7 @@ import {
   classifySleepType,
   classifySleepTypeByHour,
   calcPauseMs,
+  shouldReclassifyAsNight,
 } from "$lib/engine/classification.js";
 import type { SleepLogRow, SleepPauseRow } from "$lib/types.js";
 
@@ -93,6 +94,34 @@ describe("classifySleepType", () => {
     ];
     // 9 months → 2 expected, 0 completed (in-progress doesn't count) → nap
     expect(classifySleepType(todaySleeps, 9, null, 17)).toBe("nap");
+  });
+});
+
+// --- shouldReclassifyAsNight ---
+
+describe("shouldReclassifyAsNight", () => {
+  it("14h sleep starting at 19:18 → reclassify", () => {
+    expect(shouldReclassifyAsNight("2026-03-27T19:18:00.000Z", "2026-03-28T09:21:00.000Z")).toBe(true);
+  });
+
+  it("7h sleep starting at 17:00 → reclassify", () => {
+    expect(shouldReclassifyAsNight("2026-03-27T17:00:00.000Z", "2026-03-28T00:00:00.000Z")).toBe(true);
+  });
+
+  it("1h nap starting at 19:00 → no reclassify", () => {
+    expect(shouldReclassifyAsNight("2026-03-27T19:00:00.000Z", "2026-03-27T20:00:00.000Z")).toBe(false);
+  });
+
+  it("7h sleep starting at 10:00 → no reclassify (daytime)", () => {
+    expect(shouldReclassifyAsNight("2026-03-27T10:00:00.000Z", "2026-03-27T17:00:00.000Z")).toBe(false);
+  });
+
+  it("5h sleep starting at 18:00 → no reclassify (under 6h)", () => {
+    expect(shouldReclassifyAsNight("2026-03-27T18:00:00.000Z", "2026-03-27T23:00:00.000Z")).toBe(false);
+  });
+
+  it("exactly 6h starting at 17:00 → no reclassify (not > 6h)", () => {
+    expect(shouldReclassifyAsNight("2026-03-27T17:00:00.000Z", "2026-03-27T23:00:00.000Z")).toBe(false);
   });
 });
 

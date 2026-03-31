@@ -3,6 +3,7 @@
 	import { sync } from '$lib/stores/sync.svelte.js';
 	import { WOKE_OPTIONS, buildWakeUpEvent, getBedtimeSummary } from '$lib/wake-sheet-actions.js';
 	import { formatDuration } from '$lib/utils.js';
+	import TimeInput from './TimeInput.svelte';
 
 	interface Props {
 		sleepDomainId: string;
@@ -15,7 +16,7 @@
 	// svelte-ignore state_referenced_locally — intentional: snapshot is immutable once passed
 	const defaultWakeTime = sleepSnapshot.end_time ? new Date(sleepSnapshot.end_time) : new Date();
 	let wakeTime = $state(defaultWakeTime.toTimeString().slice(0, 5));
-	let wakeDate = $state(defaultWakeTime.toISOString().slice(0, 10));
+	let wakeDate = $state(`${defaultWakeTime.getFullYear()}-${String(defaultWakeTime.getMonth() + 1).padStart(2, '0')}-${String(defaultWakeTime.getDate()).padStart(2, '0')}`);
 
 	let wokeBy = $state<string | null>(null);
 	let notes = $state('');
@@ -39,7 +40,7 @@
 	function adjustWakeMinutes(delta: number) {
 		const d = new Date(`${wakeDate}T${wakeTime}:00`);
 		d.setMinutes(d.getMinutes() + delta);
-		wakeDate = d.toISOString().slice(0, 10);
+		wakeDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 		wakeTime = d.toTimeString().slice(0, 5);
 	}
 
@@ -119,7 +120,7 @@
 		<div class="form-group">
 			<span class="form-label">Vaknetid</span>
 			<div class="datetime-row">
-				<input type="time" bind:value={wakeTime} data-testid="wake-time" />
+				<TimeInput bind:value={wakeTime} data-testid="wake-time" />
 			</div>
 			<div style="display: flex; gap: 6px; margin-top: 6px; justify-content: center;">
 				<button class="btn btn-ghost" style="padding: 4px 10px; min-height: 0; font-size: 0.8rem;" onclick={() => adjustWakeMinutes(-5)}>-5 min</button>

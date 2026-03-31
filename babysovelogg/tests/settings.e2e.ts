@@ -52,7 +52,7 @@ test("Can edit baby name", async ({ page }) => {
   await page.goto("/settings");
 
   await expect(page.getByRole("heading", { name: "Innstillingar" })).toBeVisible();
-  const nameInput = page.locator('input[type="text"]');
+  const nameInput = page.locator('#baby-name');
   await nameInput.fill("Veslemøy");
   await fillDateInput(page.locator('input.date-input'), "2025-06-12");
   await page.getByRole("button", { name: "Lagra" }).click();

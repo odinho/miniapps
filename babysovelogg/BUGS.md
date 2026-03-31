@@ -16,22 +16,22 @@ DST transition (March 29 CET→CEST) caused real-world harm — parent put baby 
 
 ## Should fix
 
-### B23: Misclassified 14h "nap" on Friday March 27
-History shows `19:18 — 09:21 Lur 14h 3m` — clearly a night sleep that was entered/classified as a nap. The classification engine should flag sleeps >6h starting after 17:00 as likely night sleeps.
+### ~~B23: Misclassified 14h "nap" on Friday March 27~~ — fixed
+Auto-reclassifies sleeps >6h starting after 17:00 as night in projections (sleep.ended + sleep.manual). Existing data fixed on next rebuild.
 
-### B24: Diaper count doesn't update immediately on dashboard
-After saving a diaper entry, the dashboard still showed 0 dobesøk. The SSE push may not be triggering a re-render, or the state fetch has a race condition. Navigating away and back updates correctly.
+### ~~B24: Diaper count doesn't update immediately on dashboard~~ — fixed
+Root cause: DiaperForm and WakeUpSheet used `toISOString().slice(0,10)` (UTC date) but local time, causing wrong-day timestamps late at night. Fixed to use local date formatting.
 
 ## Nice to have
 
-### B25: Native time input shows AM/PM
-The browser's `<input type="time">` renders in AM/PM format based on system locale. The user wants 24h clock always. May need a custom time picker component instead of native.
+### ~~B25: Native time input shows AM/PM~~ — fixed
+Replaced all native `<input type="time">` with custom `TimeInput` component (always 24h HH:MM).
 
-### B26: Native date input shows US format (MM/DD/YYYY)
-Settings page date input shows month-first format. Norwegian convention is DD.MM.YYYY. Same locale issue as B25.
+### ~~B26: Native date input shows US format (MM/DD/YYYY)~~ — fixed
+Replaced all native `<input type="date">` with custom `DateInput` component (always DD.MM.YYYY).
 
-### B27: Target bedtime UI not yet in settings
-The backend plumbing (DB column, event schema, projection) is in place but the settings page doesn't have a field to set `target_bedtime`. Needed to complete the backward planning feature end-to-end.
+### ~~B27: Target bedtime UI not yet in settings~~ — fixed
+Added Auto/Fast tid toggle with TimeInput to settings. Saves as `targetBedtime` in baby.updated event.
 
 ## Observations (not bugs)
 

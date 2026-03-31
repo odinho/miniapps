@@ -274,6 +274,27 @@ export async function dismissSheet(page: Page) {
   }
 }
 
+/** Fill a custom DateInput component (DD.MM.YYYY text input) with an ISO date string (YYYY-MM-DD).
+ *  Sets the display value directly and triggers blur to convert to ISO internally. */
+export async function fillDateInput(locator: import("@playwright/test").Locator, isoDate: string) {
+  const [y, m, d] = isoDate.split("-");
+  const display = `${d}.${m}.${y}`;
+  await locator.evaluate((el: HTMLInputElement, val: string) => {
+    el.value = val;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("blur", { bubbles: true }));
+  }, display);
+}
+
+/** Fill a custom TimeInput component (HH:MM text input). */
+export async function fillTimeInput(locator: import("@playwright/test").Locator, time: string) {
+  await locator.evaluate((el: HTMLInputElement, val: string) => {
+    el.value = val;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("blur", { bubbles: true }));
+  }, time);
+}
+
 export { generateId, generateSleepId, generateDiaperId };
 
 export { expect };

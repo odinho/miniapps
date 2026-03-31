@@ -9,7 +9,7 @@ async function dismissMorningPrompt(page: Page) {
 
 test("Second browser context sees baby created in first", async ({ page, browser }) => {
   await page.goto("/");
-  await page.locator('input[type="text"]').fill("Testa");
+  await page.locator('#baby-name').fill("Testa");
   await fillDateInput(page.locator('input.date-input'), "2025-06-12");
   await page.getByRole("button", { name: "Kom i gang ✨" }).click();
   await dismissMorningPrompt(page);
@@ -29,7 +29,7 @@ test("Sleep started in one client is visible in another after reload", async ({
   browser,
 }) => {
   await page.goto("/");
-  await page.locator('input[type="text"]').fill("Testa");
+  await page.locator('#baby-name').fill("Testa");
   await fillDateInput(page.locator('input.date-input'), "2025-06-12");
   await page.getByRole("button", { name: "Kom i gang ✨" }).click();
   await dismissMorningPrompt(page);

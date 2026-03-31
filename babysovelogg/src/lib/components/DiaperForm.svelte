@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { sync } from '$lib/stores/sync.svelte.js';
+	import TimeInput from './TimeInput.svelte';
+	import DateInput from './DateInput.svelte';
 	import {
 		DIAPER_TYPES,
 		DIAPER_AMOUNTS,
@@ -24,7 +26,7 @@
 	let selectedPottyResult = $state<string | null>(null);
 	let selectedDiaperStatus = $state<string | null>(null);
 	const now = new Date();
-	let timeDate = $state(now.toISOString().slice(0, 10));
+	let timeDate = $state(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`);
 	let timeHM = $state(now.toTimeString().slice(0, 5));
 	let notes = $state('');
 	let busy = $state(false);
@@ -39,7 +41,7 @@
 	function adjustMinutes(delta: number) {
 		const d = new Date(`${timeDate}T${timeHM}:00`);
 		d.setMinutes(d.getMinutes() + delta);
-		timeDate = d.toISOString().slice(0, 10);
+		timeDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 		timeHM = d.toTimeString().slice(0, 5);
 	}
 
@@ -153,8 +155,8 @@
 		<div class="form-group">
 			<span class="form-label">Tid</span>
 			<div class="datetime-row" data-testid="diaper-time">
-				<input type="date" bind:value={timeDate} />
-				<input type="time" bind:value={timeHM} />
+				<DateInput bind:value={timeDate} />
+				<TimeInput bind:value={timeHM} />
 			</div>
 			<div style="display: flex; gap: 6px; margin-top: 6px; justify-content: center;">
 				<button class="btn btn-ghost" style="padding: 4px 10px; min-height: 0; font-size: 0.8rem;" onclick={() => adjustMinutes(-5)}>-5 min</button>

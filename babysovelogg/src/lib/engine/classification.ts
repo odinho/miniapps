@@ -30,6 +30,17 @@ export function classifySleepType(
   return "night";
 }
 
+/** Check if a completed sleep should be reclassified as night based on duration and start time.
+ *  Sleeps >6h starting after 17:00 are almost certainly night sleeps. */
+export function shouldReclassifyAsNight(startTime: string, endTime: string): boolean {
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  const durationMs = end.getTime() - start.getTime();
+  const durationHours = durationMs / (1000 * 60 * 60);
+  const startHour = start.getHours();
+  return durationHours > 6 && startHour >= 17;
+}
+
 /** Total pause duration in milliseconds. */
 export function calcPauseMs(pauses: SleepPauseRow[]): number {
   let total = 0;

@@ -13,6 +13,8 @@
 	import { formatDuration, formatTime } from '$lib/utils.js';
 	import { calcPauseMs } from '$lib/engine/classification.js';
 	import { buildPause, buildResume, isPaused } from '$lib/sleep-actions.js';
+	import TimeInput from '$lib/components/TimeInput.svelte';
+	import DateInput from '$lib/components/DateInput.svelte';
 
 	// --- modal state ---
 	let showTagSheet = $state(false);
@@ -368,8 +370,8 @@
 				<h2>God morgon!</h2>
 				<p>Når vakna {baby.name}?</p>
 				<div style="display: flex; gap: 8px; margin: 8px 0;">
-					<input type="date" bind:value={morningDate} />
-					<input type="time" bind:value={morningTime} />
+					<DateInput bind:value={morningDate} />
+					<TimeInput bind:value={morningTime} />
 				</div>
 				<div style="display: flex; gap: 8px;">
 					<button class="btn btn-primary" onclick={setMorningWakeTime} disabled={morningBusy}>

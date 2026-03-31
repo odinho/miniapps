@@ -8,6 +8,8 @@
 		buildBabyEvent,
 		validateSettings,
 	} from '$lib/settings-utils.js';
+	import DateInput from '$lib/components/DateInput.svelte';
+	import TimeInput from '$lib/components/TimeInput.svelte';
 
 	// --- derived state ---
 	const s = $derived(appState.state);
@@ -19,6 +21,8 @@
 	let birthdate = $state('');
 	let selectedNapCount = $state<number | null>(null);
 	let pottyEnabled = $state(false);
+	let targetBedtime = $state<string | null>(null);
+	let bedtimeEnabled = $state(false);
 	let nameError = $state(false);
 	let dateError = $state(false);
 	let saving = $state(false);
@@ -31,6 +35,8 @@
 			birthdate = baby.birthdate;
 			selectedNapCount = baby.custom_nap_count;
 			pottyEnabled = baby.potty_mode === 1;
+			targetBedtime = baby.target_bedtime;
+			bedtimeEnabled = !!baby.target_bedtime;
 		}
 	});
 
@@ -62,6 +68,7 @@
 				birthdate,
 				customNapCount: selectedNapCount,
 				pottyMode: pottyEnabled,
+				targetBedtime: bedtimeEnabled ? (targetBedtime || '19:00') : null,
 			},
 			isOnboarding,
 		);
@@ -138,11 +145,9 @@
 		<!-- Birth date -->
 		<div class="form-group">
 			<label for="baby-date">Termindato</label>
-			<input
-				id="baby-date"
-				type="date"
+			<DateInput
 				bind:value={birthdate}
-				style:border-color={dateError ? 'var(--danger)' : ''}
+				data-testid="baby-date"
 			/>
 			<div style="font-size: 0.75rem; color: var(--text-light); margin-top: 4px;">
 				Brukt for å rekna ut søvnbehov etter alder
@@ -167,6 +172,36 @@
 						</button>
 					{/each}
 				</div>
+			</div>
+
+			<!-- Target bedtime -->
+			<div class="form-group">
+				<span class="form-label">Mål-leggetid</span>
+				<div style="font-size: 0.75rem; color: var(--text-light); margin-bottom: 8px;">
+					Set ein fast leggetid for bakoverplanlegging av lurar. Auto følgjer babyen sin rytme.
+				</div>
+				<div class="type-pills">
+					<button
+						class="type-pill"
+						class:active={!bedtimeEnabled}
+						onclick={() => { bedtimeEnabled = false; targetBedtime = null; }}
+					>
+						Auto
+					</button>
+					<button
+						class="type-pill"
+						class:active={bedtimeEnabled}
+						onclick={() => { bedtimeEnabled = true; targetBedtime = targetBedtime || '19:00'; }}
+						data-testid="bedtime-custom"
+					>
+						Fast tid
+					</button>
+				</div>
+				{#if bedtimeEnabled}
+					<div style="margin-top: 8px; display: flex; justify-content: center;">
+						<TimeInput bind:value={targetBedtime} data-testid="target-bedtime" />
+					</div>
+				{/if}
 			</div>
 
 			<!-- Potty mode toggle -->

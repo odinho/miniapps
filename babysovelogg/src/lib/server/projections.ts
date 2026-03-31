@@ -3,6 +3,7 @@ import type { AppEvent } from "./events.js";
 import type { EventRow } from "$lib/types.js";
 import { validateEventPayload } from "./schemas.js";
 import { isoToDateInTz } from "$lib/tz.js";
+import { shouldReclassifyAsNight } from "$lib/engine/classification.js";
 
 export function applyEvent(event: AppEvent): void {
   const { type, payload } = event;
@@ -70,6 +71,11 @@ export function applyEvent(event: AppEvent): void {
       if (result.changes === 0) {
         throw new Error(`sleep.ended: no sleep found with domain_id ${payload.sleepDomainId}`);
       }
+      // Auto-reclassify long evening sleeps as night (B23)
+      const sleep = db.prepare("SELECT start_time, type FROM sleep_log WHERE domain_id = ?").get(payload.sleepDomainId) as { start_time: string; type: string } | undefined;
+      if (sleep && sleep.type === "nap" && shouldReclassifyAsNight(sleep.start_time, payload.endTime as string)) {
+        db.prepare("UPDATE sleep_log SET type = 'night' WHERE domain_id = ?").run(payload.sleepDomainId);
+      }
       break;
     }
 
@@ -122,18 +128,24 @@ export function applyEvent(event: AppEvent): void {
       break;
     }
 
-    case "sleep.manual":
+    case "sleep.manual": {
+      let manualType = (payload.type as string) || "nap";
+      // Auto-reclassify long evening sleeps as night (B23)
+      if (manualType === "nap" && payload.endTime && shouldReclassifyAsNight(payload.startTime as string, payload.endTime as string)) {
+        manualType = "night";
+      }
       db.prepare(
         "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id, created_by_event_id) VALUES (?, ?, ?, ?, ?, ?)",
       ).run(
         payload.babyId,
         payload.startTime,
         payload.endTime,
-        payload.type || "nap",
+        manualType,
         payload.sleepDomainId,
         eventId,
       );
       break;
+    }
 
     case "sleep.deleted": {
       const result = db
