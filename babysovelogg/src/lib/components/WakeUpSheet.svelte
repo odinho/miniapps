@@ -2,6 +2,7 @@
 	import type { SleepLogRow } from '$lib/types.js';
 	import { sync } from '$lib/stores/sync.svelte.js';
 	import { WOKE_OPTIONS, buildWakeUpEvent, getBedtimeSummary } from '$lib/wake-sheet-actions.js';
+	import { WAKE_MOODS } from '$lib/constants.js';
 	import { formatDuration } from '$lib/utils.js';
 	import TimeInput from './TimeInput.svelte';
 
@@ -19,6 +20,7 @@
 	let wakeDate = $state(`${defaultWakeTime.getFullYear()}-${String(defaultWakeTime.getMonth() + 1).padStart(2, '0')}-${String(defaultWakeTime.getDate()).padStart(2, '0')}`);
 
 	let wokeBy = $state<string | null>(null);
+	let wakeMood = $state<string | null>(null);
 	let notes = $state('');
 	let busy = $state(false);
 
@@ -48,6 +50,10 @@
 		wokeBy = wokeBy === value ? null : value;
 	}
 
+	function toggleWakeMood(value: string) {
+		wakeMood = wakeMood === value ? null : value;
+	}
+
 	async function save() {
 		if (busy) return;
 		busy = true;
@@ -55,7 +61,7 @@
 			const endTimeIso = wakeTimeChanged
 				? new Date(`${wakeDate}T${wakeTime}:00`).toISOString()
 				: null;
-			const event = buildWakeUpEvent(sleepDomainId, wokeBy, notes, endTimeIso);
+			const event = buildWakeUpEvent(sleepDomainId, wokeBy, notes, endTimeIso, wakeMood);
 			const events: Array<{ type: string; payload: Record<string, unknown> }> = [];
 			if (event) events.push(event);
 
@@ -142,6 +148,27 @@
 						data-testid="woke-{option.value}"
 					>
 						{option.label}
+					</button>
+				{/each}
+			</div>
+		</div>
+
+		<!-- Wake mood -->
+		<div class="form-group">
+			<span class="form-label">Humør etter ~5 min</span>
+			<p style="font-size: 0.75rem; color: var(--text-light); margin: 0 0 6px;">
+				Ikkje gråten med ein gong — det er berre kommunikasjon!
+			</p>
+			<div class="tag-pills">
+				{#each WAKE_MOODS as m}
+					<button
+						class="tag-pill"
+						class:active={wakeMood === m.value}
+						onclick={() => toggleWakeMood(m.value)}
+						data-testid="wake-mood-{m.value}"
+					>
+						<span class="tag-emoji">{m.label}</span>
+						<span class="tag-label">{m.title}</span>
 					</button>
 				{/each}
 			</div>

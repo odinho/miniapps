@@ -32,14 +32,25 @@ export const METHOD_EMOJI: Record<string, string> = {
 
 export const FALL_ASLEEP_LABELS: Record<string, string> = {
   "<5": "< 5 min",
-  "5-15": "5–15 min",
-  "15-30": "15–30 min",
-  "30+": "30+ min",
+  "5-20": "5–20 min",
+  "20+": "20+ min",
 };
 
 export const FALL_ASLEEP_BUCKETS = [
   { value: "<5", label: "< 5 min" },
-  { value: "5-15", label: "5–15 min" },
-  { value: "15-30", label: "15–30 min" },
-  { value: "30+", label: "30+ min" },
+  { value: "5-20", label: "5–20 min" },
+  { value: "20+", label: "20+ min" },
 ] as const;
+
+/** Wake mood options — assessed ~5 min after waking, not the initial cry. */
+export const WAKE_MOODS = [
+  { value: "happy", label: "😊", title: "Blid" },
+  { value: "tired", label: "😴", title: "Trøytt" },
+  { value: "cranky", label: "😫", title: "Gretten" },
+] as const;
+
+export const WAKE_MOOD_EMOJI: Record<string, string> = {
+  happy: "😊",
+  tired: "😴",
+  cranky: "😫",
+};

@@ -3,7 +3,7 @@ import type { Prediction } from '$lib/stores/app.svelte.js';
 import { calcPauseMs } from '$lib/engine/classification.js';
 
 export type TimerMode =
-	| { kind: 'sleeping'; label: string; elapsed: number; startTime: string }
+	| { kind: 'sleeping'; label: string; elapsed: number; startTime: string; expectedWake: string | null; expectedWakeCountdown: number | null }
 	| { kind: 'deep-night'; wakeCountdown: number | null; wakeTime: string | null }
 	| { kind: 'next-nap'; countdown: number }
 	| { kind: 'overtime'; overtime: number }
@@ -36,7 +36,15 @@ export function getTimerMode(input: TimerInput): TimerMode {
 		else if (activeSleep.type === 'night') label = '💤 Søv';
 		else label = '😴 Lurar';
 
-		return { kind: 'sleeping', label, elapsed, startTime: activeSleep.start_time };
+		// Expected wake time for naps
+		const expectedWake = activeSleep.type === 'nap' && prediction?.expectedNapEnd
+			? prediction.expectedNapEnd
+			: null;
+		const expectedWakeCountdown = expectedWake
+			? Math.max(0, new Date(expectedWake).getTime() - now)
+			: null;
+
+		return { kind: 'sleeping', label, elapsed, startTime: activeSleep.start_time, expectedWake, expectedWakeCountdown };
 	}
 
 	const currentHour = new Date(now).getHours();

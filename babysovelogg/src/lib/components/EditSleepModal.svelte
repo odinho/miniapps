@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { SleepLogRow } from '$lib/types.js';
 	import { sync } from '$lib/stores/sync.svelte.js';
-	import { MOODS, METHODS, FALL_ASLEEP_BUCKETS } from '$lib/constants.js';
+	import { MOODS, METHODS, FALL_ASLEEP_BUCKETS, WAKE_MOODS } from '$lib/constants.js';
 	import { formatTime, formatDuration } from '$lib/utils.js';
 	import {
 		SLEEP_TYPES,
@@ -30,6 +30,8 @@
 	let selectedMood = $state<string | null>(null);
 	let selectedMethod = $state<string | null>(null);
 	let selectedFallAsleep = $state<string | null>(null);
+	let onsetNote = $state('');
+	let selectedWakeMood = $state<string | null>(null);
 	let notes = $state('');
 	let busy = $state(false);
 	let confirmDelete = $state(false);
@@ -44,6 +46,8 @@
 		selectedMood = entry.mood || null;
 		selectedMethod = entry.method || null;
 		selectedFallAsleep = entry.fall_asleep_time || null;
+		onsetNote = entry.onset_note || '';
+		selectedWakeMood = entry.wake_mood || null;
 		notes = entry.notes || '';
 	});
 
@@ -59,6 +63,10 @@
 		selectedFallAsleep = selectedFallAsleep === value ? null : value;
 	}
 
+	function toggleWakeMood(value: string) {
+		selectedWakeMood = selectedWakeMood === value ? null : value;
+	}
+
 	async function save() {
 		if (busy) return;
 		busy = true;
@@ -71,6 +79,8 @@
 				mood: selectedMood,
 				method: selectedMethod,
 				fallAsleepTime: selectedFallAsleep,
+				onsetNote: onsetNote.trim() || undefined,
+				wakeMood: selectedWakeMood,
 				notes: notes.trim() || undefined,
 			});
 			await sync.sendEvents([event]);
@@ -203,6 +213,31 @@
 				{/each}
 			</div>
 		</div>
+
+		<!-- Onset note -->
+		<div class="form-group">
+			<label for="edit-onset-note">Kva skjedde ved legging?</label>
+			<input id="edit-onset-note" type="text" placeholder="T.d. vondt i magen, svolten..." bind:value={onsetNote} />
+		</div>
+
+		<!-- Wake mood -->
+		{#if entry.end_time}
+			<div class="form-group">
+				<span class="form-label">Humør ved oppvakning</span>
+				<div class="tag-pills">
+					{#each WAKE_MOODS as m}
+						<button
+							class="tag-pill"
+							class:active={selectedWakeMood === m.value}
+							onclick={() => toggleWakeMood(m.value)}
+						>
+							<span class="tag-emoji">{m.label}</span>
+							<span class="tag-label">{m.title}</span>
+						</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
 
 		<!-- Notes -->
 		<div class="form-group">

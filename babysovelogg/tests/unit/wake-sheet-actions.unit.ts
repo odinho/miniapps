@@ -17,8 +17,10 @@ function makeSleep(overrides: Partial<SleepLogRow> = {}): SleepLogRow {
 		mood: null,
 		method: null,
 		fall_asleep_time: null,
+		onset_note: null,
 		woke_by: null,
 		wake_notes: null,
+		wake_mood: null,
 		deleted: 0,
 		domain_id: 'slp_test1',
 		created_by_event_id: null,
@@ -134,9 +136,9 @@ describe('getBedtimeSummary', () => {
 	});
 
 	it('returns fall asleep label with known bucket', () => {
-		const result = getBedtimeSummary(makeSleep({ fall_asleep_time: '5-15' }));
+		const result = getBedtimeSummary(makeSleep({ fall_asleep_time: '5-20' }));
 		expect(result.hasTags).toBe(true);
-		expect(result.fallAsleepLabel).toBe('5–15 min');
+		expect(result.fallAsleepLabel).toBe('5–20 min');
 	});
 
 	it('returns fall asleep label with unknown bucket', () => {
@@ -155,13 +157,13 @@ describe('getBedtimeSummary', () => {
 			makeSleep({
 				mood: 'upset',
 				method: 'held',
-				fall_asleep_time: '15-30',
+				fall_asleep_time: '20+',
 				notes: 'Tung kveld',
 			}),
 		);
 		expect(result.hasTags).toBe(true);
 		expect(result.badges).toHaveLength(2);
-		expect(result.fallAsleepLabel).toBe('15–30 min');
+		expect(result.fallAsleepLabel).toBe('20+ min');
 		expect(result.notes).toBe('Tung kveld');
 	});
 

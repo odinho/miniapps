@@ -1,6 +1,6 @@
 import type { SleepLogRow, DiaperLogRow, DayStartRow } from '$lib/types.js';
 import { toLocal, toLocalDate, formatTime, formatDuration } from '$lib/utils.js';
-import { MOOD_EMOJI, METHOD_EMOJI, FALL_ASLEEP_LABELS } from '$lib/constants.js';
+import { MOOD_EMOJI, METHOD_EMOJI, FALL_ASLEEP_LABELS, WAKE_MOOD_EMOJI } from '$lib/constants.js';
 
 // ── Constants ────────────────────────────────────────────────────
 
@@ -214,6 +214,11 @@ export function getWokeByLabel(value: string | null): string | null {
 	return value === 'self' ? 'Vakna sjølv' : 'Vekt av oss';
 }
 
+export function getWakeMoodEmoji(value: string | null): string | null {
+	if (!value) return null;
+	return WAKE_MOOD_EMOJI[value] || null;
+}
+
 // ── Diaper entry formatting ──────────────────────────────────────
 
 export function isPottyEntry(type: string): boolean {
@@ -249,6 +254,8 @@ export interface SleepUpdatePayload {
 	mood: string | null;
 	method: string | null;
 	fallAsleepTime: string | null;
+	onsetNote?: string;
+	wakeMood: string | null;
 	notes?: string;
 }
 
@@ -263,6 +270,8 @@ export function buildSleepUpdateEvent(payload: SleepUpdatePayload) {
 			mood: payload.mood,
 			method: payload.method,
 			fallAsleepTime: payload.fallAsleepTime,
+			...(payload.onsetNote ? { onsetNote: payload.onsetNote } : {}),
+			wakeMood: payload.wakeMood,
 			...(payload.notes ? { notes: payload.notes } : {}),
 		},
 		domainId: payload.sleepDomainId,

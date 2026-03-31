@@ -7,6 +7,7 @@ export type TagPayload = {
 	method: string | null;
 	fallAsleepTime: string | null;
 	notes: string | null;
+	onsetNote: string | null;
 };
 
 /** Payload for a sleep.updated event (start time adjustment). */
@@ -22,9 +23,11 @@ export function buildTagEvent(
 	method: string | null,
 	fallAsleepTime: string | null,
 	notes: string,
+	onsetNote: string = '',
 ): { type: string; payload: TagPayload } | null {
 	const trimmedNotes = notes.trim() || null;
-	if (!mood && !method && !fallAsleepTime && !trimmedNotes) return null;
+	const trimmedOnsetNote = onsetNote.trim() || null;
+	if (!mood && !method && !fallAsleepTime && !trimmedNotes && !trimmedOnsetNote) return null;
 	return {
 		type: 'sleep.tagged',
 		payload: {
@@ -33,6 +36,7 @@ export function buildTagEvent(
 			method,
 			fallAsleepTime,
 			notes: trimmedNotes,
+			onsetNote: trimmedOnsetNote,
 		},
 	};
 }
@@ -83,13 +87,14 @@ export function collectTagSheetEvents(
 	method: string | null,
 	fallAsleepTime: string | null,
 	notes: string,
+	onsetNote: string = '',
 ): Array<{ type: string; payload: Record<string, unknown> }> {
 	const events: Array<{ type: string; payload: Record<string, unknown> }> = [];
 
 	const timeEvt = buildTimeAdjustEvent(sleepDomainId, originalStartTime, adjustedStartTime);
 	if (timeEvt) events.push(timeEvt);
 
-	const tagEvt = buildTagEvent(sleepDomainId, mood, method, fallAsleepTime, notes);
+	const tagEvt = buildTagEvent(sleepDomainId, mood, method, fallAsleepTime, notes, onsetNote);
 	if (tagEvt) events.push(tagEvt);
 
 	return events;

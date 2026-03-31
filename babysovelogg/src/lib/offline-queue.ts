@@ -95,8 +95,10 @@ export function applyOptimisticEvent(
 				mood: null,
 				method: null,
 				fall_asleep_time: null,
+				onset_note: null,
 				woke_by: null,
 				wake_notes: null,
+				wake_mood: null,
 				deleted: 0,
 				domain_id: payload.sleepDomainId as string,
 				created_by_event_id: null,
@@ -174,6 +176,8 @@ export function applyOptimisticEvent(
 				if (payload.fallAsleepTime !== undefined)
 					target.fall_asleep_time = payload.fallAsleepTime as string | null;
 				if (payload.notes !== undefined) target.notes = (payload.notes as string) || null;
+				if (payload.onsetNote !== undefined)
+					target.onset_note = (payload.onsetNote as string) || null;
 			}
 			break;
 		}
@@ -186,6 +190,10 @@ export function applyOptimisticEvent(
 				if (payload.wokeBy !== undefined) target.woke_by = (payload.wokeBy as string) || null;
 				if (payload.wakeNotes !== undefined)
 					target.wake_notes = (payload.wakeNotes as string) || null;
+				if (payload.wakeMood !== undefined)
+					target.wake_mood = (payload.wakeMood as string) || null;
+				if (payload.onsetNote !== undefined)
+					target.onset_note = (payload.onsetNote as string) || null;
 				if (payload.type !== undefined) target.type = payload.type as string;
 			}
 			break;
@@ -202,8 +210,10 @@ export function applyOptimisticEvent(
 				mood: null,
 				method: null,
 				fall_asleep_time: null,
+				onset_note: null,
 				woke_by: null,
 				wake_notes: null,
+				wake_mood: null,
 				deleted: 0,
 				domain_id: (payload.sleepDomainId as string) || `slp_optimistic_${Date.now()}`,
 				created_by_event_id: null,

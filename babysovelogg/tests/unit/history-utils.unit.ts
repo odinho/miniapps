@@ -47,8 +47,10 @@ function makeSleep(overrides: Partial<SleepLogRow> = {}): SleepLogRow {
 		mood: null,
 		method: null,
 		fall_asleep_time: null,
+		onset_note: null,
 		woke_by: null,
 		wake_notes: null,
+		wake_mood: null,
 		deleted: 0,
 		domain_id: 'sleep-001',
 		created_by_event_id: null,
@@ -408,7 +410,7 @@ describe('getFallAsleepLabel', () => {
 
 	test('returns label for known value', () => {
 		expect(getFallAsleepLabel('<5')).toBe('< 5 min');
-		expect(getFallAsleepLabel('30+')).toBe('30+ min');
+		expect(getFallAsleepLabel('20+')).toBe('20+ min');
 	});
 
 	test('returns value itself for unknown', () => {
@@ -499,6 +501,7 @@ describe('buildSleepUpdateEvent', () => {
 			mood: null,
 			method: null,
 			fallAsleepTime: null,
+			wakeMood: null,
 		});
 		expect(event.type).toBe('sleep.updated');
 		expect(event.domainId).toBe('sleep-001');
@@ -516,6 +519,7 @@ describe('buildSleepUpdateEvent', () => {
 			mood: null,
 			method: null,
 			fallAsleepTime: null,
+			wakeMood: null,
 		});
 		expect(event.payload.endTime).toBe('2026-03-27T09:30:00.000Z');
 	});
@@ -528,6 +532,7 @@ describe('buildSleepUpdateEvent', () => {
 			mood: null,
 			method: null,
 			fallAsleepTime: null,
+			wakeMood: null,
 		});
 		expect(event.payload).not.toHaveProperty('endTime');
 	});
@@ -540,6 +545,7 @@ describe('buildSleepUpdateEvent', () => {
 			mood: 'normal',
 			method: 'bed',
 			fallAsleepTime: '<5',
+			wakeMood: null,
 			notes: 'Sov godt',
 		});
 		expect(event.payload.notes).toBe('Sov godt');

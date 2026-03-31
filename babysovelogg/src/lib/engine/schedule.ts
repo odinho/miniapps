@@ -365,7 +365,7 @@ function getLearnedBedtimeWakeWindow(ctx: BabyContext): number {
 }
 
 /** Learn average nap duration from recent completed naps, fallback to age-based defaults. */
-function getLearnedNapDuration(ctx: BabyContext): number {
+export function getLearnedNapDuration(ctx: BabyContext): number {
   const ageMonths = ctx.ageMonths;
   const defaultDuration = ageMonths < 6 ? 60 : ageMonths < 12 ? 45 : 30;
 

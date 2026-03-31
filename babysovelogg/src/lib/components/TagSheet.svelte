@@ -24,6 +24,7 @@
 	let mood = $state<string | null>(null);
 	let method = $state<string | null>(null);
 	let fallAsleepTime = $state<string | null>(null);
+	let onsetNote = $state('');
 	let notes = $state('');
 	// svelte-ignore state_referenced_locally — intentional: local copy of initial prop
 	let adjustedStartTime = $state(startTime);
@@ -38,16 +39,19 @@
 		switch (fallAsleepTime) {
 			case '<5':
 				return { text: 'Raskt innsovning', color: 'var(--lavender)' };
-			case '5-15':
+			case '5-20':
 				return { text: 'Normal innsovning', color: 'var(--lavender)' };
-			case '15-30':
-				return { text: 'Litt lang innsovning — vurder seinare leggetid', color: 'var(--peach)' };
-			case '30+':
+			case '20+':
 				return { text: 'Lang innsovning — babyen var truleg ikkje trøytt nok', color: 'var(--peach)' };
 			default:
 				return null;
 		}
 	});
+
+	// Show onset note when something went wrong (upset/fighting mood or long latency)
+	const showOnsetNote = $derived(
+		mood === 'upset' || mood === 'fighting' || fallAsleepTime === '20+',
+	);
 
 	function toggleMood(value: string) {
 		mood = mood === value ? null : value;
@@ -83,6 +87,7 @@
 				method,
 				fallAsleepTime,
 				notes,
+				onsetNote,
 			);
 			if (events.length > 0) {
 				await sync.sendEvents(events);
@@ -194,6 +199,20 @@
 				</p>
 			{/if}
 		</div>
+
+		<!-- Onset note (conditional — shown when mood or latency indicates difficulty) -->
+		{#if showOnsetNote}
+			<div class="form-group" data-testid="onset-note-group">
+				<label for="onset-note">Kva skjedde?</label>
+				<input
+					id="onset-note"
+					type="text"
+					placeholder="T.d. vondt i magen, svolten, uroleg..."
+					bind:value={onsetNote}
+					data-testid="onset-note"
+				/>
+			</div>
+		{/if}
 
 		<!-- Notes -->
 		<div class="form-group">

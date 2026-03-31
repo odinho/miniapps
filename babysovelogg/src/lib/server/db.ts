@@ -113,6 +113,22 @@ function initSchema(database: SqliteDb) {
   // Migration: merge "happy" mood into "normal"
   database.exec("UPDATE sleep_log SET mood = 'normal' WHERE mood = 'happy'");
 
+  // Migration: add onset_note and wake_mood columns
+  try {
+    database.exec("ALTER TABLE sleep_log ADD COLUMN onset_note TEXT");
+  } catch {
+    // Column already exists — ignore
+  }
+  try {
+    database.exec("ALTER TABLE sleep_log ADD COLUMN wake_mood TEXT");
+  } catch {
+    // Column already exists — ignore
+  }
+
+  // Migration: simplify latency buckets (4→3, aligned with Galland 2012)
+  database.exec("UPDATE sleep_log SET fall_asleep_time = '5-20' WHERE fall_asleep_time = '5-15'");
+  database.exec("UPDATE sleep_log SET fall_asleep_time = '20+' WHERE fall_asleep_time IN ('15-30', '30+')");
+
   database.exec(`
     CREATE TABLE IF NOT EXISTS day_start (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

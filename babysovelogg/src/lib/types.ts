@@ -23,8 +23,10 @@ export interface SleepLogRow {
   mood: string | null;
   method: string | null;
   fall_asleep_time: string | null;
+  onset_note: string | null;
   woke_by: string | null;
   wake_notes: string | null;
+  wake_mood: string | null;
   deleted: number;
   domain_id: string;
   created_by_event_id: number | null;

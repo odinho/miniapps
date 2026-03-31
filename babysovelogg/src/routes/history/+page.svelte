@@ -20,6 +20,7 @@
 		getSleepBadges,
 		getFallAsleepLabel,
 		getWokeByLabel,
+		getWakeMoodEmoji,
 		getDiaperIcon,
 		getDiaperMeta,
 		getDiaperCategoryLabel,
@@ -125,6 +126,7 @@
 						{@const badges = getSleepBadges(entry)}
 						{@const fallAsleep = getFallAsleepLabel(entry.fall_asleep_time)}
 						{@const wokeBy = getWokeByLabel(entry.woke_by)}
+						{@const wakeMoodEmoji = getWakeMoodEmoji(entry.wake_mood)}
 						<!-- svelte-ignore a11y_click_events_have_key_events -->
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<div class="sleep-log-item" onclick={() => openSleepEdit(entry)}>
@@ -149,9 +151,15 @@
 									{#if wokeBy}
 										 · {wokeBy}
 									{/if}
+									{#if wakeMoodEmoji}
+										 · {wakeMoodEmoji}
+									{/if}
 								</div>
 								{#if entry.notes}
 									<div class="log-meta" style="font-style: italic;">{entry.notes}</div>
+								{/if}
+								{#if entry.onset_note}
+									<div class="log-meta" style="font-style: italic;">Legging: {entry.onset_note}</div>
 								{/if}
 								{#if entry.wake_notes}
 									<div class="log-meta" style="font-style: italic;">Oppvakning: {entry.wake_notes}</div>

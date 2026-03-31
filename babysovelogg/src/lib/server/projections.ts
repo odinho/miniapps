@@ -110,6 +110,10 @@ export function applyEvent(event: AppEvent): void {
         sets.push("fall_asleep_time = ?");
         vals.push(payload.fallAsleepTime);
       }
+      if (payload.onsetNote !== undefined) {
+        sets.push("onset_note = ?");
+        vals.push(payload.onsetNote);
+      }
       if (payload.wokeBy !== undefined) {
         sets.push("woke_by = ?");
         vals.push(payload.wokeBy);
@@ -117,6 +121,10 @@ export function applyEvent(event: AppEvent): void {
       if (payload.wakeNotes !== undefined) {
         sets.push("wake_notes = ?");
         vals.push(payload.wakeNotes);
+      }
+      if (payload.wakeMood !== undefined) {
+        sets.push("wake_mood = ?");
+        vals.push(payload.wakeMood);
       }
       vals.push(payload.sleepDomainId);
       const result = db
@@ -185,6 +193,10 @@ export function applyEvent(event: AppEvent): void {
       if (payload.notes !== undefined) {
         sets.push("notes = ?");
         vals.push(payload.notes);
+      }
+      if (payload.onsetNote !== undefined) {
+        sets.push("onset_note = ?");
+        vals.push(payload.onsetNote);
       }
       vals.push(payload.sleepDomainId);
       const result = db

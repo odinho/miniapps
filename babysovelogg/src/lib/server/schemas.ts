@@ -70,8 +70,10 @@ const payloadSchemas: Record<string, v.BaseSchema<unknown, unknown, v.BaseIssue<
     mood: optStr,
     method: optStr,
     fallAsleepTime: optStr,
+    onsetNote: optStr,
     wokeBy: optStr,
     wakeNotes: optStr,
+    wakeMood: optStr,
   }),
   "sleep.manual": v.object({
     babyId: v.number(),
@@ -92,6 +94,7 @@ const payloadSchemas: Record<string, v.BaseSchema<unknown, unknown, v.BaseIssue<
     method: optStr,
     fallAsleepTime: optStr,
     notes: optStr,
+    onsetNote: optStr,
   }),
   "sleep.paused": v.object({
     sleepDomainId: domainId,

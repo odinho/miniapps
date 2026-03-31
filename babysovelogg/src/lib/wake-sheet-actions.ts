@@ -12,6 +12,7 @@ export type WakeUpPayload = {
 	sleepDomainId: string;
 	wokeBy?: string;
 	wakeNotes?: string;
+	wakeMood?: string;
 	endTime?: string;
 };
 
@@ -21,12 +22,14 @@ export function buildWakeUpEvent(
 	wokeBy: string | null,
 	wakeNotes: string,
 	endTime?: string | null,
+	wakeMood?: string | null,
 ): { type: string; payload: WakeUpPayload } | null {
 	const trimmedNotes = wakeNotes.trim() || null;
-	if (!wokeBy && !trimmedNotes && !endTime) return null;
+	if (!wokeBy && !trimmedNotes && !endTime && !wakeMood) return null;
 	const payload: WakeUpPayload = { sleepDomainId };
 	if (wokeBy) payload.wokeBy = wokeBy;
 	if (trimmedNotes) payload.wakeNotes = trimmedNotes;
+	if (wakeMood) payload.wakeMood = wakeMood;
 	if (endTime) payload.endTime = endTime;
 	return { type: 'sleep.updated', payload };
 }
