@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, fillDateInput } from "./fixtures";
 import type { Page } from "@playwright/test";
 
 async function dismissMorningPrompt(page: Page) {
@@ -13,7 +13,7 @@ test("SSE: Context B sees sleep started in Context A without refresh", async ({
 }) => {
   await page.goto("/");
   await page.locator('input[type="text"]').fill("SSE-Baby");
-  await page.locator('input[type="date"]').fill("2025-06-12");
+  await fillDateInput(page.locator('input.date-input'), "2025-06-12");
   await page.getByRole("button", { name: "Kom i gang ✨" }).click();
   await dismissMorningPrompt(page);
   await expect(page.getByTestId("baby-name")).toHaveText("SSE-Baby", { timeout: 5000 });
@@ -36,7 +36,7 @@ test("SSE: Context B sees sleep started in Context A without refresh", async ({
 test("SSE: Both contexts work independently", async ({ page, browser }) => {
   await page.goto("/");
   await page.locator('input[type="text"]').fill("SSE-Baby2");
-  await page.locator('input[type="date"]').fill("2025-06-12");
+  await fillDateInput(page.locator('input.date-input'), "2025-06-12");
   await page.getByRole("button", { name: "Kom i gang ✨" }).click();
   await dismissMorningPrompt(page);
   await expect(page.getByTestId("baby-name")).toHaveText("SSE-Baby2", { timeout: 5000 });

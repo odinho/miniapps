@@ -1,4 +1,4 @@
-import { test, expect, createBaby, setWakeUpTime } from "./fixtures";
+import { test, expect, createBaby, setWakeUpTime, fillDateInput } from "./fixtures";
 
 test("Stats shows sleep info panel with wake window format", async ({ page }) => {
   // 12-month baby has wake windows >= 60 min (210-300 min = 3h 30m – 5h)
@@ -54,7 +54,7 @@ test("Can edit baby name", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Innstillingar" })).toBeVisible();
   const nameInput = page.locator('input[type="text"]');
   await nameInput.fill("Veslemøy");
-  await page.locator('input[type="date"]').fill("2025-06-12");
+  await fillDateInput(page.locator('input.date-input'), "2025-06-12");
   await page.getByRole("button", { name: "Lagra" }).click();
 
   // Should navigate to dashboard with new name

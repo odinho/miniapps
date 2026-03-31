@@ -1,4 +1,4 @@
-import { test, expect, generateId } from "./fixtures";
+import { test, expect, generateId, fillDateInput } from "./fixtures";
 
 test("Get Started button creates baby and navigates to dashboard", async ({ page }) => {
   await page.goto("/");
@@ -7,7 +7,7 @@ test("Get Started button creates baby and navigates to dashboard", async ({ page
   await expect(page.getByRole("button", { name: "Kom i gang ✨" })).toBeVisible();
 
   await page.locator('input[type="text"]').fill("Halldis");
-  await page.locator('input[type="date"]').fill("2025-06-12");
+  await fillDateInput(page.locator('input.date-input'), "2025-06-12");
 
   await page.getByRole("button", { name: "Kom i gang ✨" }).click();
 
@@ -29,7 +29,7 @@ test("Get Started validates required fields", async ({ page }) => {
   await page.getByRole("button", { name: "Kom i gang ✨" }).click();
   await expect(page.getByRole("heading", { name: "Velkomen til Babysovelogg" })).toBeVisible();
 
-  await page.locator('input[type="date"]').fill("2025-06-12");
+  await fillDateInput(page.locator('input.date-input'), "2025-06-12");
   await page.getByRole("button", { name: "Kom i gang ✨" }).click();
   await expect(page.getByTestId("morning-prompt")).toBeVisible({ timeout: 5000 });
   await page.getByRole("button", { name: "Sett vaknetid" }).click();
