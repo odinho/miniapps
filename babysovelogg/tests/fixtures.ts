@@ -3,9 +3,9 @@ import { spawn, type ChildProcess } from "child_process";
 import type { SqliteDb } from "$lib/server/db.js";
 
 // Playwright runs under Node.js, not Bun — use node:sqlite there
-const Database: { new (path: string): SqliteDb } = globalThis.Bun
+const Database: { new (path: string): SqliteDb } = (globalThis as Record<string, unknown>).Bun
   ? (await import("bun:sqlite")).Database
-  : (await import("node:sqlite")).DatabaseSync;
+  : (await import("node:sqlite")).DatabaseSync as unknown as { new (path: string): SqliteDb };
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";

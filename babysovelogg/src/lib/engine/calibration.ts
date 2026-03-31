@@ -6,7 +6,7 @@
  * or falling back to age defaults.
  */
 
-import { WAKE_WINDOWS, NAP_COUNTS, findByAge } from "./constants.js";
+import { NAP_COUNTS, findByAge } from "./constants.js";
 import type { SleepEntry } from "$lib/types.js";
 import { isoToDateInTz } from "$lib/tz.js";
 
@@ -151,7 +151,7 @@ function calibrateNapCount(
 
 function calibrateWakeWindows(
   recentSleeps: SleepEntry[] | undefined,
-  tz: string,
+  _tz: string,
 ): DataSource {
   if (!recentSleeps || recentSleeps.length < 2) {
     return { source: "age-default", sampleCount: 0 };

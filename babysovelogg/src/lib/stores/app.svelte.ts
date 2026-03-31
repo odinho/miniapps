@@ -1,7 +1,7 @@
 import type { Baby, SleepLogRow, DayStartRow } from "$lib/types.js";
 import type { DayStats } from "$lib/engine/stats.js";
 import type { PredictedNap } from "$lib/engine/schedule.js";
-import type { PredictionRange, ConfidenceResult } from "$lib/engine/confidence.js";
+import type { ConfidenceResult } from "$lib/engine/confidence.js";
 import type { CalibrationReport } from "$lib/engine/calibration.js";
 
 export interface Prediction {

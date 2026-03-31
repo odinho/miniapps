@@ -6,7 +6,7 @@
  * Falls back to age-based ranges when data is sparse.
  */
 
-import { WAKE_WINDOWS, NAP_COUNTS, findByAge } from "./constants.js";
+import { WAKE_WINDOWS, findByAge } from "./constants.js";
 import type { SleepEntry } from "$lib/types.js";
 import type { PredictedNap } from "./schedule.js";
 import { isoToDateInTz } from "$lib/tz.js";
@@ -57,11 +57,11 @@ export function computeConfidence(
     const compoundedSD = Math.sqrt(
       posSD ** 2 * (i + 1) + napDurationStats.sd ** 2 * i,
     );
-    const sd = Math.max(MIN_SD_MINUTES, compoundedSD);
+    const napSD = Math.max(MIN_SD_MINUTES, compoundedSD);
 
     return {
       ...nap,
-      startRange: makeRange(nap.startTime, sd),
+      startRange: makeRange(nap.startTime, napSD),
     };
   });
 
