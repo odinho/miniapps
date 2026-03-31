@@ -16,6 +16,7 @@
 	import { buildSleepInfoRows } from '$lib/settings-utils.js';
 	import TimeInput from '$lib/components/TimeInput.svelte';
 	import DateInput from '$lib/components/DateInput.svelte';
+	import DstBanner from '$lib/components/DstBanner.svelte';
 
 	// --- modal state ---
 	let showTagSheet = $state(false);
@@ -386,6 +387,8 @@
 				</div>
 			</div>
 		{/if}
+
+		<DstBanner timezone={baby.timezone} bedtime={prediction?.bedtime} />
 
 		<!-- Header: baby info + sync badge -->
 		<div class="header-row">

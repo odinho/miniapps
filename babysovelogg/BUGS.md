@@ -5,11 +5,8 @@
 ### ~~B20: Baby timezone is null in production~~ — fixed (1727dba)
 Auto-backfills from server locale on first state fetch. Production will set "Europe/Oslo" on next app load.
 
-### B21: No DST awareness or warnings
-DST transition (March 29 CET→CEST) caused real-world harm — parent put baby down too early both days because the internal clock shifted but the app didn't warn or adjust. The app should:
-1. Detect upcoming DST transitions and show a banner/warning
-2. Optionally show "yesterday's bedtime was 18:20, today accounting for DST that's 19:20"
-3. At minimum, the prediction engine should be aware of DST shifts in the wake window calculation
+### ~~B21: No DST awareness or warnings~~ — fixed
+Added DST transition detection (`dst-utils.ts`) that shows a banner on the dashboard within 3 days of any DST change. Shows Nynorsk guidance: "Sommartid startar [dato] — legg babyen 60 min seinare" or similar for fall-back.
 
 ### B22: E2E tests broken (pre-existing)
 `tests/fixtures.ts` imports `bun:sqlite` but Playwright runs under Node.js. All E2E tests fail with `Error: Only URLs with a scheme in: file, data, and node are supported`. This predates our changes (from the bun runtime migration).

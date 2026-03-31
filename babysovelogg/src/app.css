@@ -1008,6 +1008,16 @@ html, body {
   color: var(--peach-dark, #c77c3a);
 }
 
+.dst-banner {
+  background: var(--lavender, #e6e0f3);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm, 8px);
+  font-size: 0.8rem;
+  margin: 0 0 8px;
+  text-align: center;
+}
+
 /* --- Population norms card (new babies with <3 days data) --- */
 .population-norms {
   background: var(--peach-light, #ffe8d6);
