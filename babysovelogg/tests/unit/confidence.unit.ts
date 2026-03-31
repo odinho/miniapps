@@ -105,7 +105,7 @@ describe("confidence intervals", () => {
       "day 10 (7mo): level=low, nap SDs=[28/45], bed SD=55, data=7d
       day 30 (7mo): level=low, nap SDs=[25/47], bed SD=25, data=7d
       day 50 (8mo): level=low, nap SDs=[33/49], bed SD=30, data=7d
-      day 70 (9mo): level=high, nap SDs=[15], bed SD=82, data=7d"
+      day 70 (9mo): level=low, nap SDs=[15], bed SD=82, data=7d"
     `);
   });
 });

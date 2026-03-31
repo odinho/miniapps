@@ -107,6 +107,13 @@ export function backtest(
       napStartErrors.push((predictedStart - actualStart) / 60000);
     }
 
+    // Penalize unmatched naps: 60 min per extra/missing nap so count errors
+    // are reflected in timing MAE rather than silently dropped
+    const unmatchedCount = Math.abs(predictedNaps.length - actualNaps.length);
+    for (let k = 0; k < unmatchedCount; k++) {
+      napStartErrors.push(60);
+    }
+
     // Bedtime error — only score when we have both naps and a bedtime.
     // Without naps, the predictor falls back to "19:00 today" which uses
     // the current date (wrong for historical backtest days).

@@ -3,7 +3,7 @@ import {
   predictNextNap,
   recommendBedtime,
   predictDayNaps,
-  getExpectedNapCount,
+  resolveNapCount,
 } from "./schedule.js";
 import { getTodayStats } from "./stats.js";
 import { computeConfidence } from "./confidence.js";
@@ -65,7 +65,7 @@ export function assembleState(data: DayData) {
       const completedNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time);
       // During active nap, count it toward consumed slots
       const consumedNaps = completedNaps.length + (activeSleep?.type === "nap" ? 1 : 0);
-      const expectedNapCount = getExpectedNapCount(ctx.ageMonths, ctx.customNapCount);
+      const expectedNapCount = resolveNapCount(ctx);
 
       // Build predicted naps from day schedule (accounts for custom nap count)
       let predictedNaps: PredictedNap[] | null = null;

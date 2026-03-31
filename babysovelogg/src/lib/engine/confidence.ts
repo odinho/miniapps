@@ -68,16 +68,17 @@ export function computeConfidence(
   const bedtimeSD = Math.max(MIN_SD_MINUTES, bedtimeWWStats.sd);
   const bedtimeRange = makeRange(predictedBedtime, bedtimeSD);
 
-  // Overall confidence from median nap SD + data scarcity
+  // Overall confidence from worst of (median nap SD, bedtime SD) + data scarcity
   const allSDs = napRanges.map((n) => n.startRange.sdMinutes);
   const medianSD = allSDs.length > 0
     ? allSDs.toSorted((a, b) => a - b)[Math.floor(allSDs.length / 2)]
     : bedtimeSD;
+  const worstSD = Math.max(medianSD, bedtimeSD);
   // Thresholds calibrated to typical baby sleep variability (~20-35 min SD is normal)
   const level: ConfidenceResult["level"] =
     napWWStats.dataPoints < 3 ? "low"
-    : medianSD < 20 ? "high"
-    : medianSD < 40 ? "medium"
+    : worstSD < 20 ? "high"
+    : worstSD < 40 ? "medium"
     : "low";
 
   return {

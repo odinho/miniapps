@@ -68,19 +68,22 @@ export interface PredictedNap {
   endTime: string;
 }
 
-/** Get expected nap count, using custom override if set. */
+/** Get expected nap count, using custom override if set. Does NOT use learned data. */
 export function getExpectedNapCount(ageMonths: number, customNapCount?: number | null): number {
   if (customNapCount != null) return customNapCount;
   return findByAge(NAP_COUNTS, ageMonths).naps;
 }
 
+/** Resolve nap count using the full learning chain: custom override → learned → age default. */
+export function resolveNapCount(ctx: BabyContext): number {
+  if (ctx.customNapCount != null) return ctx.customNapCount;
+  return getLearnedNapCount(ctx) ?? findByAge(NAP_COUNTS, ctx.ageMonths).naps;
+}
+
 /** Predict all naps for the day based on wake-up time and recent sleep patterns. */
 export function predictDayNaps(wakeUpTime: string, ctx: BabyContext): PredictedNap[] {
   const defaultWW = getWakeWindow(ctx);
-  const expectedNaps =
-    ctx.customNapCount != null
-      ? ctx.customNapCount
-      : getLearnedNapCount(ctx) ?? findByAge(NAP_COUNTS, ctx.ageMonths).naps;
+  const expectedNaps = resolveNapCount(ctx);
   const positionalWWs = getPositionalWakeWindows(ctx);
 
   const predictions: PredictedNap[] = [];
@@ -118,10 +121,7 @@ export function planBackwardFromBedtime(
   targetBedtime: string,
   ctx: BabyContext,
 ): PredictedNap[] {
-  const napCount =
-    ctx.customNapCount != null
-      ? ctx.customNapCount
-      : getLearnedNapCount(ctx) ?? findByAge(NAP_COUNTS, ctx.ageMonths).naps;
+  const napCount = resolveNapCount(ctx);
   if (napCount === 0) return [];
 
   const bedtimeWW = getLearnedBedtimeWakeWindow(ctx);
@@ -164,7 +164,7 @@ export function planBackwardFromBedtime(
 
 /** Recommend bedtime based on today's sleeps and baby context. */
 export function recommendBedtime(todaySleeps: SleepEntry[], ctx: BabyContext): string {
-  const targetNaps = getExpectedNapCount(ctx.ageMonths, ctx.customNapCount);
+  const targetNaps = resolveNapCount(ctx);
 
   const lastSleep = [...todaySleeps]
     .filter((s) => s.end_time)
