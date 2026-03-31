@@ -9,6 +9,9 @@
  */
 
 import { loadConfig, getBackend, getCachedMeta, saveCachedMeta } from './fetch/drive.js';
+import fs from 'fs/promises';
+import { existsSync } from 'fs';
+import path from 'path';
 
 const checkNew = process.argv.includes('--check-new');
 
@@ -54,6 +57,8 @@ async function main() {
   let needsRebuild = false;
   const updatedMeta = { ...cached };
 
+  const DOCS_CACHE_DIR = path.resolve('cache/docs');
+
   // Check existing cached documents
   for (const docId of cachedIds) {
     const driveDoc = driveDocsById.get(docId);
@@ -64,10 +69,30 @@ async function main() {
     }
 
     const cachedTime = cached[docId].modifiedTime;
+    const htmlPath = path.join(DOCS_CACHE_DIR, `${docId}.clean.html`);
+    const metaPath = path.join(DOCS_CACHE_DIR, `${docId}.meta.json`);
+
+    // Check if docs HTML cache exists and is in sync with documents.json
+    let docsCacheStale = false;
+    if (!existsSync(htmlPath)) {
+      docsCacheStale = true;
+    } else {
+      try {
+        const docMeta = JSON.parse(await fs.readFile(metaPath, 'utf-8'));
+        if (docMeta.sourceModifiedTime !== cachedTime) {
+          docsCacheStale = true;
+        }
+      } catch {
+        docsCacheStale = true;
+      }
+    }
 
     if (driveDoc.modifiedTime !== cachedTime) {
       console.log(`  ✓ ${driveDoc.name}: Changed (${driveDoc.modifiedTime})`);
       updatedMeta[docId] = { modifiedTime: driveDoc.modifiedTime, name: driveDoc.name };
+      needsRebuild = true;
+    } else if (docsCacheStale) {
+      console.log(`  ✓ ${driveDoc.name}: Docs cache out of sync — forcing rebuild`);
       needsRebuild = true;
     } else {
       console.log(`  · ${driveDoc.name}: No changes`);
