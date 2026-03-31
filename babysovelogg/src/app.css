@@ -967,6 +967,39 @@ html, body {
   font-weight: 700;
 }
 
+.arc-center-text .arc-sub-label {
+  font-size: 0.75rem;
+  color: var(--text-light);
+}
+
+.arc-center-text .confidence-range {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.trust-badge {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-top: 4px;
+  display: inline-block;
+}
+
+.trust-learned {
+  background: var(--sage-light, #e8f0e8);
+  color: var(--sage-dark, #3a6b3a);
+}
+
+.trust-partial {
+  background: var(--cream, #fdf6e3);
+  color: var(--text-light);
+}
+
+.trust-age-default {
+  background: var(--peach-light, #ffe8d6);
+  color: var(--peach-dark, #c77c3a);
+}
+
 /* --- Stats page --- */
 .stats-view {
   max-width: 440px;

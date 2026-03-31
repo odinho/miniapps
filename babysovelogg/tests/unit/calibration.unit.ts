@@ -38,7 +38,7 @@ describe("calibration", () => {
     const cal = calibrate(7, undefined, null, TZ);
 
     expect(cal.trust).toBe("age-default");
-    expect(cal.warnings).toContain("No recent sleep data — using age-based defaults only");
+    expect(cal.warnings).toContain("Ingen søvndata — brukar aldersbaserte standardverdiar");
   });
 
   it("1 day of data → age-default trust", () => {
@@ -57,8 +57,8 @@ describe("calibration", () => {
   it("calibration progression over time", () => {
     const lines = [0, 1, 3, 7, 15, 40, 70].map(renderCal);
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "day 0: trust=age-default, 0d/0naps — count=age-default(0), ww=age-default(0), bed=age-default(0), dur=age-default(0) [No recent sleep data — using age-based defaults only; Baby is in a transition age (2-3 naps typical) — consider setting nap count manually]
-      day 1: trust=age-default, 1d/2naps — count=age-default(0), ww=age-default(1), bed=age-default(0), dur=age-default(2) [Only 1 day(s) of data — predictions will improve with more logging; Baby is in a transition age (2-3 naps typical) — consider setting nap count manually]
+      "day 0: trust=age-default, 0d/0naps — count=age-default(0), ww=age-default(0), bed=age-default(0), dur=age-default(0) [Ingen søvndata — brukar aldersbaserte standardverdiar; Babyen er i ein overgangsalder (2–3 lurar er vanleg) — vurder å setja lurtal manuelt]
+      day 1: trust=age-default, 1d/2naps — count=age-default(0), ww=age-default(1), bed=age-default(0), dur=age-default(2) [Berre 1 dag(ar) med data — prediksjonane blir betre med meir logging; Babyen er i ein overgangsalder (2–3 lurar er vanleg) — vurder å setja lurtal manuelt]
       day 3: trust=learned, 3d/7naps — count=learned(3), ww=learned(6), bed=learned(3), dur=learned(7)
       day 7: trust=learned, 7d/18naps — count=learned(7), ww=learned(17), bed=learned(7), dur=learned(18)
       day 15: trust=learned, 7d/13naps — count=learned(7), ww=learned(12), bed=learned(7), dur=learned(13)

@@ -58,13 +58,13 @@ export function calibrate(
   // ── Nap count calibration ──
   const napCountInfo = calibrateNapCount(recentSleeps, customNapCount, timezone, daysWithData);
   if (napCountInfo.source === "age-default" && daysWithData >= 5) {
-    warnings.push("Nap count unclear — baby's pattern is inconsistent across recent days");
+    warnings.push("Uklart lurtal — mønsteret varierer mykje dei siste dagane");
   }
 
   // ── Wake window calibration ──
   const wwInfo = calibrateWakeWindows(recentSleeps, timezone);
   if (wwInfo.sampleCount < 4 && daysWithData >= 3) {
-    warnings.push("Few wake window samples — predictions may be imprecise");
+    warnings.push("Få vakevindu-målingar — prediksjonane kan vera upresise");
   }
 
   // ── Bedtime wake window calibration ──
@@ -81,9 +81,9 @@ export function calibrate(
   if (daysWithData < 3) {
     trust = "age-default";
     if (daysWithData === 0) {
-      warnings.push("No recent sleep data — using age-based defaults only");
+      warnings.push("Ingen søvndata — brukar aldersbaserte standardverdiar");
     } else {
-      warnings.push("Only " + daysWithData + " day(s) of data — predictions will improve with more logging");
+      warnings.push("Berre " + daysWithData + " dag(ar) med data — prediksjonane blir betre med meir logging");
     }
   } else if (learnedCount >= 3) {
     trust = "learned";
@@ -96,7 +96,7 @@ export function calibrate(
   if (ageNapRange.range[0] !== ageNapRange.range[1]) {
     // Baby is in an age bracket with variable nap counts (transition zone)
     if (napCountInfo.source === "age-default") {
-      warnings.push(`Baby is in a transition age (${ageNapRange.range[0]}-${ageNapRange.range[1]} naps typical) — consider setting nap count manually`);
+      warnings.push(`Babyen er i ein overgangsalder (${ageNapRange.range[0]}–${ageNapRange.range[1]} lurar er vanleg) — vurder å setja lurtal manuelt`);
     }
   }
 

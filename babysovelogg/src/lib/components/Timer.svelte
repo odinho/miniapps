@@ -28,6 +28,39 @@
 	const input = $derived({ activeSleep, prediction, todayWakeUp, todaySleeps, now });
 	const mode = $derived(getTimerMode(input));
 	const awakeMs = $derived(getAwakeSince(input));
+
+	// Confidence range for current prediction
+	const confidenceLabel = $derived.by(() => {
+		if (!prediction?.confidence) return null;
+		const conf = prediction.confidence;
+		if (mode.kind === 'next-nap' || mode.kind === 'overtime') {
+			// Show range for next nap
+			const nextRange = conf.napRanges[0]?.startRange;
+			if (nextRange && nextRange.sdMinutes > 0) {
+				return `±${Math.round(nextRange.sdMinutes)} min`;
+			}
+		}
+		if (mode.kind === 'bedtime' || mode.kind === 'after-bedtime') {
+			const br = conf.bedtimeRange;
+			if (br && br.sdMinutes > 0) {
+				return `±${Math.round(br.sdMinutes)} min`;
+			}
+		}
+		return null;
+	});
+
+	const trustLabel = $derived.by(() => {
+		if (!prediction?.calibration) return null;
+		const trust = prediction.calibration.trust;
+		if (trust === 'learned') return 'Tilpassa';
+		if (trust === 'partial') return 'Delvis tilpassa';
+		return 'Aldersbasert';
+	});
+
+	const trustClass = $derived.by(() => {
+		if (!prediction?.calibration) return '';
+		return `trust-${prediction.calibration.trust}`;
+	});
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -48,13 +81,19 @@
 	{:else if mode.kind === 'next-nap'}
 		<div class="arc-center-label">Neste lur</div>
 		<span class="countdown-value">{formatDuration(mode.countdown)}</span>
+		{#if confidenceLabel}
+			<div class="arc-sub-label confidence-range" data-testid="confidence-range">{confidenceLabel}</div>
+		{/if}
 	{:else if mode.kind === 'overtime'}
 		<div class="arc-center-label">Overtid</div>
 		<span class="countdown-value" style="color: var(--peach-dark)">+{formatDuration(mode.overtime)}</span>
+		{#if confidenceLabel}
+			<div class="arc-sub-label confidence-range" data-testid="confidence-range">{confidenceLabel}</div>
+		{/if}
 	{:else if mode.kind === 'bedtime'}
 		<div class="arc-center-label">Leggetid om</div>
 		<span class="countdown-value">{formatDuration(mode.countdown)}</span>
-		<div class="arc-sub-label">{formatTime(mode.bedtime)}</div>
+		<div class="arc-sub-label">{formatTime(mode.bedtime)} {confidenceLabel ? `(${confidenceLabel})` : ''}</div>
 	{:else if mode.kind === 'after-bedtime'}
 		<div class="arc-center-label">Etter leggetid</div>
 		<span class="countdown-value">{formatTime(mode.bedtime)}</span>
@@ -62,5 +101,8 @@
 
 	{#if mode.kind !== 'sleeping' && mode.kind !== 'deep-night' && mode.kind !== 'idle' && awakeMs != null}
 		<div class="arc-sub-label">Vaken {formatDuration(awakeMs)}</div>
+	{/if}
+	{#if trustLabel && mode.kind !== 'sleeping' && mode.kind !== 'deep-night' && mode.kind !== 'idle'}
+		<div class="trust-badge {trustClass}" data-testid="trust-badge">{trustLabel}</div>
 	{/if}
 </div>
