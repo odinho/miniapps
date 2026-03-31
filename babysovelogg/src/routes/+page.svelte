@@ -410,6 +410,7 @@
 				{todaySleeps}
 				{ageMonths}
 				{baby}
+				napsAllDone={prediction?.napsAllDone}
 				{onSleepStarted}
 				{onSleepEnded}
 			/>

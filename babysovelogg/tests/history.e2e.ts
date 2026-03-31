@@ -61,7 +61,7 @@ test("Notes and fall-asleep-time visible in history list", async ({ page }) => {
   const start = new Date(now.getTime() - 3600000).toISOString();
   const end = now.toISOString();
   db.prepare(
-    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, fall_asleep_time, notes, woke_by, wake_notes, domain_id) VALUES (?, ?, ?, 'nap', '5-15', 'Roleg kveld', 'self', 'Glad ved oppvakning', ?)",
+    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, fall_asleep_time, notes, woke_by, wake_notes, domain_id) VALUES (?, ?, ?, 'nap', '5-20', 'Roleg kveld', 'self', 'Glad ved oppvakning', ?)",
   ).run(babyId, start, end, generateId());
 
   await page.goto("/history");
@@ -69,7 +69,7 @@ test("Notes and fall-asleep-time visible in history list", async ({ page }) => {
 
   const item = page.locator(".sleep-log-item:not(.wakeup-log-item)").first();
   // Fall-asleep time should be formatted
-  await expect(item).toContainText("5–15 min");
+  await expect(item).toContainText("5–20 min");
   // Notes visible
   await expect(item).toContainText("Roleg kveld");
   // Woke-by info visible

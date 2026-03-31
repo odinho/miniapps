@@ -78,8 +78,8 @@ test("Can select fall-asleep bucket and enter note", async ({ page }) => {
   });
 
   // Select fall-asleep bucket
-  await page.getByRole("button", { name: "5–15 min" }).click();
-  await expect(page.getByRole("button", { name: "5–15 min" })).toHaveClass(/active/);
+  await page.getByRole("button", { name: "5–20 min" }).click();
+  await expect(page.getByRole("button", { name: "5–20 min" })).toHaveClass(/active/);
 
   // Enter note
   await page.locator('input[placeholder="Valfritt notat..."]').fill("Sovna fort i dag");
@@ -89,7 +89,7 @@ test("Can select fall-asleep bucket and enter note", async ({ page }) => {
 
   // Verify in DB
   const state = renderDayState(getDb(), babyId);
-  expect(state).toContain('innsov:5-15');
+  expect(state).toContain('innsov:5-20');
   expect(state).toContain('"Sovna fort i dag"');
 });
 
@@ -260,11 +260,11 @@ test("Latency feedback appears when fall-asleep time is selected", async ({ page
   await expect(page.getByTestId("latency-feedback")).toBeVisible();
   await expect(page.getByTestId("latency-feedback")).toContainText("Raskt innsovning");
 
-  // Select "30+ min" — should show warning
-  await page.getByRole("button", { name: "30+ min" }).click();
+  // Select "20+ min" — should show warning
+  await page.getByRole("button", { name: "20+ min" }).click();
   await expect(page.getByTestId("latency-feedback")).toContainText("ikkje trøytt nok");
 
   // Deselect — latency feedback disappears
-  await page.getByRole("button", { name: "30+ min" }).click();
+  await page.getByRole("button", { name: "20+ min" }).click();
   await expect(page.getByTestId("latency-feedback")).not.toBeVisible();
 });

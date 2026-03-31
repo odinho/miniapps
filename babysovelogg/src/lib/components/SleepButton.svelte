@@ -9,11 +9,12 @@
 		todaySleeps: SleepLogRow[];
 		ageMonths: number;
 		baby: Baby;
+		napsAllDone?: boolean;
 		onSleepStarted?: (sleepDomainId: string, startTime: string) => void;
 		onSleepEnded?: (domainId: string, sleepSnapshot: SleepLogRow, endTime: string) => void;
 	}
 
-	let { activeSleep, todaySleeps, ageMonths, baby, onSleepStarted, onSleepEnded }: Props =
+	let { activeSleep, todaySleeps, ageMonths, baby, napsAllDone, onSleepStarted, onSleepEnded }: Props =
 		$props();
 
 	const isSleeping = $derived(!!activeSleep && !activeSleep.end_time);
@@ -36,6 +37,7 @@
 					todaySleeps,
 					ageMonths,
 					baby.custom_nap_count,
+					napsAllDone,
 				);
 				await sync.sendEvents(result.events);
 				await tick();

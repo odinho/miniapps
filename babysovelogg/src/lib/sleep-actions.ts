@@ -15,8 +15,9 @@ export function buildStartSleep(
 	todaySleeps: SleepLogRow[],
 	ageMonths: number,
 	customNapCount: number | null,
+	napsAllDone?: boolean,
 ): StartSleepResult {
-	const type = classifySleepType(todaySleeps, ageMonths, customNapCount);
+	const type = classifySleepType(todaySleeps, ageMonths, customNapCount, undefined, napsAllDone);
 	const sleepDomainId = generateSleepId();
 	const startTime = new Date().toISOString();
 

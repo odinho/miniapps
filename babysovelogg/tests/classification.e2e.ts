@@ -60,9 +60,10 @@ test("At 17:45 with nap quota met, sleep is classified as night", async ({ page 
   expect(renderDayState(getDb(), babyId)).toMatch(/pågår natt/);
 });
 
-test("At 17:00 with nap quota NOT met, sleep is classified as nap", async ({ page }) => {
+test("At 17:00 with all naps skipped, sleep is classified as night", async ({ page }) => {
   await forceHour(page, 17);
-  // 9-month baby has 2 expected naps, 0 completed
+  // 9-month baby has 2 expected naps, 0 completed, wake at 07:00
+  // Predicted naps are >90 min overdue → naps detected as skipped → napsAllDone
   const babyId = createBaby("Testa", "2025-06-12");
   setWakeUpTime(babyId);
 
@@ -70,5 +71,6 @@ test("At 17:00 with nap quota NOT met, sleep is classified as nap", async ({ pag
   await page.getByTestId("sleep-button").click();
   await expect(page.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 5000 });
 
-  expect(renderDayState(getDb(), babyId)).toMatch(/søvn:.*lur$/m);
+  expect(renderDayState(getDb(), babyId)).toMatch(/pågår natt/);
 });
+

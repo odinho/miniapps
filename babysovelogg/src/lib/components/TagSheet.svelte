@@ -53,6 +53,11 @@
 		mood === 'upset' || mood === 'fighting' || fallAsleepTime === '20+',
 	);
 
+	// Clear onset note text when conditions no longer apply (prevents stale data)
+	$effect(() => {
+		if (!showOnsetNote) onsetNote = '';
+	});
+
 	function toggleMood(value: string) {
 		mood = mood === value ? null : value;
 	}

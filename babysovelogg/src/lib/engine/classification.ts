@@ -7,12 +7,15 @@ export function classifySleepTypeByHour(hour?: number): "nap" | "night" {
   return h >= 18 || h < 6 ? "night" : "nap";
 }
 
-/** Smart classification: considers time-of-day, nap count, and last wake time. */
+/** Smart classification: considers time-of-day, nap count, and last wake time.
+ *  When `napsAllDone` is provided (from the prediction engine's resolveNapCount),
+ *  it takes precedence over age-default nap counting. */
 export function classifySleepType(
   todaySleeps: SleepLogRow[],
   ageMonths?: number,
   customNapCount?: number | null,
   hour?: number,
+  napsAllDone?: boolean,
 ): "nap" | "night" {
   const h = hour ?? new Date().getHours();
   // Clear night (before 6am or after 8pm)
@@ -20,7 +23,11 @@ export function classifySleepType(
   // Clear daytime (before 4pm)
   if (h < 16) return "nap";
   // Ambiguous zone (16:00–19:59): check if naps are done for the day
-  if (ageMonths != null) {
+  if (napsAllDone != null) {
+    // Use the prediction engine's learned nap count (handles transitions correctly)
+    if (napsAllDone) return "night";
+  } else if (ageMonths != null) {
+    // Fallback: age-default nap count (no prediction data available)
     const expectedNaps = getExpectedNapCount(ageMonths, customNapCount);
     const completedNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time).length;
     if (completedNaps >= expectedNaps) return "night";

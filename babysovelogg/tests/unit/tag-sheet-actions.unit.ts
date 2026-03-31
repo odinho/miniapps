@@ -48,8 +48,8 @@ describe('buildTagEvent', () => {
 	});
 
 	it('builds event when fallAsleepTime is selected', () => {
-		const evt = buildTagEvent('slp_1', null, null, '5-15', '');
-		expect(evt!.payload.fallAsleepTime).toBe('5-15');
+		const evt = buildTagEvent('slp_1', null, null, '5-20', '');
+		expect(evt!.payload.fallAsleepTime).toBe('5-20');
 	});
 
 	it('builds event when notes are provided', () => {
@@ -63,12 +63,12 @@ describe('buildTagEvent', () => {
 	});
 
 	it('builds event with all fields set', () => {
-		const evt = buildTagEvent('slp_1', 'upset', 'held', '15-30', 'rough night', 'vondt i magen');
+		const evt = buildTagEvent('slp_1', 'upset', 'held', '20+', 'rough night', 'vondt i magen');
 		expect(evt!.payload).toEqual({
 			sleepDomainId: 'slp_1',
 			mood: 'upset',
 			method: 'held',
-			fallAsleepTime: '15-30',
+			fallAsleepTime: '20+',
 			notes: 'rough night',
 			onsetNote: 'vondt i magen',
 		});
@@ -200,7 +200,7 @@ describe('collectTagSheetEvents', () => {
 			'2026-03-27T09:55:00.000Z',
 			'upset',
 			'nursing',
-			'5-15',
+			'5-20',
 			'cried',
 		);
 		expect(events).toHaveLength(2);

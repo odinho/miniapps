@@ -270,9 +270,9 @@ export function buildSleepUpdateEvent(payload: SleepUpdatePayload) {
 			mood: payload.mood,
 			method: payload.method,
 			fallAsleepTime: payload.fallAsleepTime,
-			...(payload.onsetNote ? { onsetNote: payload.onsetNote } : {}),
+			onsetNote: payload.onsetNote || null,
 			wakeMood: payload.wakeMood,
-			...(payload.notes ? { notes: payload.notes } : {}),
+			notes: payload.notes || null,
 		},
 		domainId: payload.sleepDomainId,
 	};
