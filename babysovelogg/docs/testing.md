@@ -262,7 +262,6 @@ The test for "reset DB clears all projections" should not be five separate `expe
 
 - **`tests/helpers/render-state.ts`**: State renderers for snapshot-based assertions:
   - `renderDayState(db, babyId)` — Full baby state as readable string (sleeps, diapers, wake-up, pauses, tags)
-  - `renderEventLog(db)` — Compact event sequence summary
   - `renderCounts(db)` — Projection row counts (events, sleeps, diapers, pauses, dayStarts)
 
 When adding new state (projections, tables, etc.), update `resetDb()` and the relevant renderer so existing tests automatically catch regressions.

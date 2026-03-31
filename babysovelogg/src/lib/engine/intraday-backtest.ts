@@ -46,9 +46,6 @@ export const napQualityAdjustment: IntradayStrategy = (baseWW, napDur) => {
   return baseWW;
 };
 
-/** "Stick to the plan" — same as no adjustment. */
-export const stickToPlan: IntradayStrategy = (baseWW) => baseWW;
-
 /**
  * Run the intra-day backtest.
  *

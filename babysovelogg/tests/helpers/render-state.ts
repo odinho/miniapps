@@ -46,29 +46,6 @@ export function renderDayState(db: SqliteDb, babyId: number): string {
   return lines.join("\n");
 }
 
-/** Render the full event log as a compact summary. */
-export function renderEventLog(db: SqliteDb): string {
-  const events = db.prepare("SELECT type, payload, domain_id FROM events ORDER BY id").all() as {
-    type: string;
-    payload: string;
-    domain_id: string | null;
-  }[];
-
-  if (events.length === 0) return "(ingen hendingar)";
-
-  return events
-    .map((e) => {
-      const p = JSON.parse(e.payload);
-      const parts = [e.type];
-      if (e.domain_id) parts.push(e.domain_id);
-      // Add key payload fields
-      if (p.name) parts.push(p.name);
-      if (p.type) parts.push(p.type);
-      return parts.join(" ");
-    })
-    .join("\n");
-}
-
 /** Render projection row counts — useful for rebuild tests. */
 export function renderCounts(db: SqliteDb): string {
   const counts = {

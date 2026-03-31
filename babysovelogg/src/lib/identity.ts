@@ -26,7 +26,7 @@ function randomBase62(len: number): string {
 }
 
 /** Generate a short sortable ID with the given prefix. */
-export function generatePrefixedId(prefix: string): string {
+function generatePrefixedId(prefix: string): string {
   return `${prefix}_${base36Time()}${randomBase62(6)}`;
 }
 

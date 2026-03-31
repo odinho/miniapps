@@ -1,0 +1,19 @@
+{
+	"$schema": "https://unpkg.com/knip@6/schema.json",
+	"include": ["files", "exports"],
+	"entry": [
+		"src/routes/**/*.{svelte,ts}",
+		"tests/**/*.unit.ts",
+		"tests/**/*.test.ts",
+		"tests/**/*.e2e.ts",
+		"scripts/**/*.ts",
+		"cli/**/*.ts"
+	],
+	"project": [
+		"src/**/*.{ts,svelte}",
+		"tests/**/*.ts",
+		"scripts/**/*.ts",
+		"cli/**/*.ts",
+		"*.{js,ts}"
+	]
+}

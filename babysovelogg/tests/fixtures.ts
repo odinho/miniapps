@@ -103,7 +103,7 @@ export function getDb() {
   return _db;
 }
 
-export function resetDb() {
+function resetDb() {
   try { _db.prepare("DELETE FROM sleep_pauses").run(); } catch {}
   try { _db.prepare("DELETE FROM diaper_log").run(); } catch {}
   try { _db.prepare("DELETE FROM sleep_log").run(); } catch {}
@@ -262,25 +262,6 @@ export async function forceHour(page: Page, hour: number) {
   }, hour);
 }
 
-/** Force a specific time in the browser — overrides Date.now() and getHours(). */
-export async function forceTime(page: Page, isoOrDate: string | Date) {
-  const ts = typeof isoOrDate === "string" ? new Date(isoOrDate).getTime() : isoOrDate.getTime();
-  await page.addInitScript((frozenTs: number) => {
-    const _origNow = Date.now;
-    const offset = frozenTs - _origNow();
-    Date.now = () => _origNow() + offset;
-    const _origGetHours = Date.prototype.getHours;
-    Date.prototype.getHours = function () {
-      return new Date(this.getTime() + offset - (this.getTime() - _origNow())).getUTCHours();
-    };
-    // Override getHours to return the shifted hour
-    Date.prototype.getHours = function () {
-      const shifted = new Date(_origNow() + offset);
-      return _origGetHours.call(shifted);
-    };
-  }, ts);
-}
-
 /** Dismiss any visible modal sheet by clicking "Ferdig" */
 export async function dismissSheet(page: Page) {
   const overlay = page.getByTestId("modal-overlay");
@@ -314,6 +295,6 @@ export async function fillTimeInput(locator: import("@playwright/test").Locator,
   }, time);
 }
 
-export { generateId, generateSleepId, generateDiaperId };
+export { generateId, generateDiaperId };
 
 export { expect };

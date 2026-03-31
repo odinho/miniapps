@@ -9,11 +9,6 @@ export function toLocalDate(iso: string): string {
   return toLocal(iso).slice(0, 10);
 }
 
-/** Convert ISO string to local time string (HH:MM). */
-export function toLocalTime(iso: string): string {
-  return toLocal(iso).slice(11, 16);
-}
-
 export function formatDuration(ms: number): string {
   if (ms < 0) ms = 0;
   const totalMin = Math.floor(ms / 60000);
