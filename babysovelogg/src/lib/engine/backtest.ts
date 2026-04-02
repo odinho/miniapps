@@ -1,6 +1,6 @@
 import type { SleepEntry, BabyContext } from "$lib/types.js";
 import type { PredictedNap } from "./schedule.js";
-import { predictDayNaps, recommendBedtime, calculateAgeMonths } from "./schedule.js";
+import { predictDayNaps, recommendBedtime, calculateAgeMonths, getLearnedNightDuration } from "./schedule.js";
 
 /** A single day's recorded sleep data. */
 export interface DayRecord {
@@ -19,7 +19,10 @@ export interface DayResult {
   actualBedtime: string | null;
   napCountError: number; // predicted - actual (positive = over-predicted)
   napStartErrors: number[]; // minutes, per matched nap (positive = predicted later than actual)
+  napEndErrors: number[]; // minutes, per matched nap (positive = predicted later than actual)
+  napDurationErrors: number[]; // minutes, matched naps only (positive = predicted longer than actual)
   bedtimeError: number | null; // minutes (positive = predicted later than actual)
+  wakeTimeError: number | null; // minutes, predicted morning wake vs actual (positive = predicted later)
 }
 
 /** Aggregate metrics across all backtested days. */
@@ -31,6 +34,9 @@ export interface BacktestResult {
   bedtimeMAE: number; // mean absolute error in minutes
   napCountBias: number; // mean signed error (positive = over-predicting nap count)
   napStartBias: number; // mean signed error (positive = predicting too late)
+  napDurationMAE: number; // mean absolute error on nap duration (matched naps only)
+  napEndMAE: number; // mean absolute error on nap end time
+  wakeTimeMAE: number; // mean absolute error on predicted morning wake
 }
 
 /** Predictor function signature — takes wake time and baby context. */
@@ -38,6 +44,9 @@ export type NapPredictor = (wakeUpTime: string, ctx: BabyContext) => PredictedNa
 
 /** Bedtime predictor function signature — takes today's sleeps and baby context. */
 export type BedtimePredictor = (todaySleeps: SleepEntry[], ctx: BabyContext) => string;
+
+/** Night duration predictor — returns expected night sleep duration in minutes. */
+export type NightDurationPredictor = (ctx: BabyContext) => number;
 
 /**
  * Run a backtest: replay historical sleep data day-by-day, predict each day
@@ -54,6 +63,7 @@ export function backtest(
     lookbackDays?: number;
     predict?: NapPredictor;
     predictBedtime?: BedtimePredictor;
+    predictNightDuration?: NightDurationPredictor;
     customNapCount?: number | null;
     tz?: string;
   },
@@ -61,6 +71,7 @@ export function backtest(
   const lookback = options?.lookbackDays ?? 7;
   const predict = options?.predict ?? predictDayNaps;
   const bedtimePredict = options?.predictBedtime ?? recommendBedtime;
+  const nightDurationPredict = options?.predictNightDuration ?? getLearnedNightDuration;
   const customNapCount = options?.customNapCount ?? null;
   const tz = options?.tz ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -100,11 +111,21 @@ export function backtest(
 
     // Match predicted naps to actual naps by order
     const napStartErrors: number[] = [];
+    const napEndErrors: number[] = [];
+    const napDurationErrors: number[] = [];
     const matchCount = Math.min(predictedNaps.length, actualNaps.length);
     for (let k = 0; k < matchCount; k++) {
       const predictedStart = new Date(predictedNaps[k].startTime).getTime();
       const actualStart = new Date(actualNaps[k].start_time).getTime();
       napStartErrors.push((predictedStart - actualStart) / 60000);
+
+      const predictedEnd = new Date(predictedNaps[k].endTime).getTime();
+      const actualEnd = new Date(actualNaps[k].end_time!).getTime();
+      napEndErrors.push((predictedEnd - actualEnd) / 60000);
+
+      const predictedDur = (predictedEnd - predictedStart) / 60000;
+      const actualDur = (actualEnd - actualStart) / 60000;
+      napDurationErrors.push(predictedDur - actualDur);
     }
 
     // Penalize unmatched naps: 60 min per extra/missing nap so count errors
@@ -112,6 +133,8 @@ export function backtest(
     const unmatchedCount = Math.abs(predictedNaps.length - actualNaps.length);
     for (let k = 0; k < unmatchedCount; k++) {
       napStartErrors.push(60);
+      napEndErrors.push(60);
+      // No duration penalty for unmatched — that's a count error, not duration
     }
 
     // Bedtime error — only score when we have both naps and a bedtime.
@@ -123,6 +146,16 @@ export function backtest(
         (new Date(predictedBedtime).getTime() - new Date(actualBedtime).getTime()) / 60000;
     }
 
+    // Wake time prediction: use tonight's actual bedtime + predicted night duration,
+    // compare to next day's actual wake time.
+    let wakeTimeError: number | null = null;
+    if (actualBedtime && i + 1 < days.length) {
+      const predictedNightDur = nightDurationPredict(ctx);
+      const predictedWakeMs = new Date(actualBedtime).getTime() + predictedNightDur * 60000;
+      const actualWakeMs = new Date(days[i + 1].wakeTime).getTime();
+      wakeTimeError = (predictedWakeMs - actualWakeMs) / 60000;
+    }
+
     results.push({
       date: day.date,
       dayIndex: i,
@@ -132,7 +165,10 @@ export function backtest(
       actualBedtime,
       napCountError: predictedNaps.length - actualNaps.length,
       napStartErrors,
+      napEndErrors,
+      napDurationErrors,
       bedtimeError,
+      wakeTimeError,
     });
   }
 
@@ -150,6 +186,9 @@ function summarize(days: DayResult[]): BacktestResult {
       bedtimeMAE: 0,
       napCountBias: 0,
       napStartBias: 0,
+      napDurationMAE: 0,
+      napEndMAE: 0,
+      wakeTimeMAE: 0,
     };
   }
 
@@ -168,11 +207,32 @@ function summarize(days: DayResult[]): BacktestResult {
       ? allStartErrors.reduce((sum, e) => sum + e, 0) / allStartErrors.length
       : 0;
 
+  // Nap end errors (includes unmatched penalty)
+  const allEndErrors = days.flatMap((d) => d.napEndErrors);
+  const napEndMAE =
+    allEndErrors.length > 0
+      ? allEndErrors.reduce((sum, e) => sum + Math.abs(e), 0) / allEndErrors.length
+      : 0;
+
+  // Nap duration errors (matched naps only — no unmatched penalty)
+  const allDurationErrors = days.flatMap((d) => d.napDurationErrors);
+  const napDurationMAE =
+    allDurationErrors.length > 0
+      ? allDurationErrors.reduce((sum, e) => sum + Math.abs(e), 0) / allDurationErrors.length
+      : 0;
+
   // Bedtime errors
   const bedtimeErrors = days.map((d) => d.bedtimeError).filter((e): e is number => e !== null);
   const bedtimeMAE =
     bedtimeErrors.length > 0
       ? bedtimeErrors.reduce((sum, e) => sum + Math.abs(e), 0) / bedtimeErrors.length
+      : 0;
+
+  // Wake time errors
+  const wakeTimeErrors = days.map((d) => d.wakeTimeError).filter((e): e is number => e !== null);
+  const wakeTimeMAE =
+    wakeTimeErrors.length > 0
+      ? wakeTimeErrors.reduce((sum, e) => sum + Math.abs(e), 0) / wakeTimeErrors.length
       : 0;
 
   // Nap count bias
@@ -186,6 +246,9 @@ function summarize(days: DayResult[]): BacktestResult {
     bedtimeMAE: Math.round(bedtimeMAE * 10) / 10,
     napCountBias: Math.round(napCountBias * 100) / 100,
     napStartBias: Math.round(napStartBias * 10) / 10,
+    napDurationMAE: Math.round(napDurationMAE * 10) / 10,
+    napEndMAE: Math.round(napEndMAE * 10) / 10,
+    wakeTimeMAE: Math.round(wakeTimeMAE * 10) / 10,
   };
 }
 
@@ -240,8 +303,10 @@ export function renderSummary(result: BacktestResult, label: string): string {
     `${label}:`,
     `${result.totalDays} days,`,
     `count ${pct}% (${correct}/${result.totalDays}),`,
-    `nap MAE ${result.napStartMAE} min,`,
-    `bed MAE ${result.bedtimeMAE} min,`,
+    `nap MAE ${result.napStartMAE},`,
+    `dur MAE ${result.napDurationMAE},`,
+    `bed MAE ${result.bedtimeMAE},`,
+    `wake MAE ${result.wakeTimeMAE},`,
     `nap bias ${result.napStartBias > 0 ? "+" : ""}${result.napStartBias},`,
     `count bias ${result.napCountBias > 0 ? "+" : ""}${result.napCountBias}`,
   ].join(" ");
@@ -281,8 +346,11 @@ export function formatReport(result: BacktestResult, label?: string): string {
   lines.push("═".repeat(50));
   lines.push(`Nap count accuracy: ${Math.round(result.napCountAccuracy * 100)}% (${result.days.filter((d) => d.napCountError === 0).length}/${result.totalDays})`);
   lines.push(`Nap start MAE: ${result.napStartMAE} min`);
+  lines.push(`Nap duration MAE: ${result.napDurationMAE} min`);
+  lines.push(`Nap end MAE: ${result.napEndMAE} min`);
   lines.push(`Nap start bias: ${result.napStartBias > 0 ? "+" : ""}${result.napStartBias} min (positive = predicting too late)`);
   lines.push(`Bedtime MAE: ${result.bedtimeMAE} min`);
+  lines.push(`Wake time MAE: ${result.wakeTimeMAE} min`);
   lines.push(`Nap count bias: ${result.napCountBias > 0 ? "+" : ""}${result.napCountBias} (positive = over-predicting)`);
 
   return lines.join("\n");
