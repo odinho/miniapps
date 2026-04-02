@@ -92,10 +92,12 @@ export function resolveNapCount(ctx: BabyContext): number {
 
 /** Predict all naps for the day based on wake-up time and recent sleep patterns. */
 export function predictDayNaps(wakeUpTime: string, ctx: BabyContext): PredictedNap[] {
-  const defaultWW = getWakeWindow(ctx);
   const expectedNaps = resolveNapCount(ctx);
-  const positionalWWs = getPositionalWakeWindows(ctx);
-  const positionalDurs = getPositionalNapDurations(ctx);
+  const defaultWW = getWakeWindow(ctx);
+  // During transitions, filter positional data to days matching the predicted nap count.
+  // This prevents 2-nap wake windows (~120 min) from being used in 1-nap predictions (~240 min).
+  const { wws: positionalWWs, durs: positionalDurs } =
+    getPositionalDataForNapCount(ctx, expectedNaps);
   const defaultDuration = getLearnedNapDuration(ctx);
 
   const predictions: PredictedNap[] = [];
@@ -298,6 +300,100 @@ function getPositionalWakeWindows(ctx: BabyContext): number[] {
   }
 
   return result;
+}
+
+/**
+ * Get positional wake windows and durations filtered to days with a specific nap count.
+ * During transitions (e.g. 2→1 naps), the overall averages are poisoned by data from
+ * both schedules. This filters to only days that match the predicted schedule.
+ * Falls back to unfiltered data if not enough filtered days.
+ */
+function getPositionalDataForNapCount(
+  ctx: BabyContext,
+  targetNapCount: number,
+): { wws: number[]; durs: number[] } {
+  if (ctx.recentSleeps.length < 4) return { wws: [], durs: [] };
+
+  // Group sleeps by day
+  const byDay = new Map<string, SleepEntry[]>();
+  for (const s of ctx.recentSleeps) {
+    if (!s.end_time) continue;
+    const day = localDate(s.start_time, ctx.tz);
+    if (!byDay.has(day)) byDay.set(day, []);
+    byDay.get(day)!.push(s);
+  }
+
+  // Filter to days with the target nap count
+  const matchingDays: SleepEntry[][] = [];
+  for (const daySleeps of byDay.values()) {
+    const napCount = daySleeps.filter((s) => s.type === "nap").length;
+    if (napCount === targetNapCount) matchingDays.push(daySleeps);
+  }
+
+  // Only apply filtering if there's actual mixed nap counts (transition).
+  // If all days have the same count, or not enough matching days, use unfiltered.
+  const allNapCounts = [...byDay.values()].map(
+    (ds) => ds.filter((s) => s.type === "nap").length,
+  );
+  const uniqueCounts = new Set(allNapCounts);
+  if (uniqueCounts.size <= 1 || matchingDays.length < 2) {
+    return {
+      wws: getPositionalWakeWindows(ctx),
+      durs: feat(ctx, "positionalDuration") ? getPositionalNapDurations(ctx) : [],
+    };
+  }
+
+  // Compute positional wake windows from matching days only
+  const adaptedRange = getAdaptedWakeWindowRange(ctx);
+  const gapsByPos = new Map<number, number[]>();
+  const dursByPos = new Map<number, number[]>();
+
+  for (const daySleeps of matchingDays) {
+    const sorted = [...daySleeps]
+      .filter((s) => s.end_time)
+      .toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+    let napPos = 0;
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i].type !== "nap") continue;
+      const prevEnd = new Date(sorted[i - 1].end_time!).getTime();
+      const nextStart = new Date(sorted[i].start_time).getTime();
+      const gapMin = (nextStart - prevEnd) / 60000;
+      if (gapMin >= 10 && gapMin <= 480) {
+        if (!gapsByPos.has(napPos)) gapsByPos.set(napPos, []);
+        gapsByPos.get(napPos)!.push(gapMin);
+      }
+      napPos++;
+    }
+
+    // Collect durations
+    const naps = sorted.filter((s) => s.type === "nap");
+    for (let i = 0; i < naps.length; i++) {
+      const dur = (new Date(naps[i].end_time!).getTime() - new Date(naps[i].start_time).getTime()) / 60_000;
+      if (dur >= 10 && dur <= 180) {
+        if (!dursByPos.has(i)) dursByPos.set(i, []);
+        dursByPos.get(i)!.push(dur);
+      }
+    }
+  }
+
+  const wws: number[] = [];
+  for (const [pos, gaps] of gapsByPos) {
+    if (gaps.length < 2) continue;
+    let avg = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+    avg = Math.max(adaptedRange.minMinutes, Math.min(adaptedRange.maxMinutes, avg));
+    wws[pos] = Math.round(avg);
+  }
+
+  const durs: number[] = [];
+  if (feat(ctx, "positionalDuration")) {
+    for (const [pos, ds] of dursByPos) {
+      if (ds.length < 2) continue;
+      durs[pos] = Math.round(ds.reduce((a, b) => a + b, 0) / ds.length);
+    }
+  }
+
+  return { wws, durs };
 }
 
 /**

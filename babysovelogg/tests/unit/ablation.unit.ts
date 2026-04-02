@@ -72,14 +72,14 @@ const ablations = featureNames.map(({ key, label }) => ({
 
 describe("feature ablation", () => {
   it("all features enabled (baseline)", () => {
-    expect(renderSummary(allOn, "all-on")).toMatchInlineSnapshot(`"all-on: 82 days, count 80% (66/82), nap MAE 57.8, dur MAE 23.4, bed MAE 22.3, wake MAE 44, nap bias +8.7, count bias +0.07"`);
+    expect(renderSummary(allOn, "all-on")).toMatchInlineSnapshot(`"all-on: 82 days, count 80% (66/82), nap MAE 58, dur MAE 23.4, bed MAE 22.3, wake MAE 44, nap bias +9.2, count bias +0.07"`);
   });
 
   it("per-feature contribution", () => {
     const lines = ablations.map((a) => renderAblation(allOn, a.label, a.result));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "positional nap duration:
-        nap MAE +0.8 (helps)
+        nap MAE +0.3 (helps)
         dur MAE +0.4 (helps)
         bed MAE 0 (neutral)
         wake MAE 0 (neutral)
