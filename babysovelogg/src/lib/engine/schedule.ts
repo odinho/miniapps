@@ -130,7 +130,8 @@ export function planBackwardFromBedtime(
   const bedtimeWW = getLearnedBedtimeWakeWindow(ctx);
   const defaultWW = getWakeWindow(ctx);
   const positionalWWs = getPositionalWakeWindows(ctx);
-  const napDuration = getLearnedNapDuration(ctx);
+  const positionalDurs = getPositionalNapDurations(ctx);
+  const defaultDuration = getLearnedNapDuration(ctx);
 
   const bedtimeMs = new Date(targetBedtime).getTime();
   const wakeMs = new Date(wakeUpTime).getTime();
@@ -142,9 +143,10 @@ export function planBackwardFromBedtime(
     const ww = i === napCount - 1
       ? bedtimeWW
       : positionalWWs[i + 1] ?? defaultWW;
+    const duration = positionalDurs[i] ?? defaultDuration;
 
     const napEnd = cursor - ww * 60_000;
-    const napStart = napEnd - napDuration * 60_000;
+    const napStart = napEnd - duration * 60_000;
 
     if (napStart < wakeMs) {
       const firstWW = positionalWWs[0] ?? defaultWW;
@@ -177,13 +179,28 @@ export function recommendBedtime(todaySleeps: SleepEntry[], ctx: BabyContext): s
     return setHourInTz(new Date(), 19, 0, ctx.tz).toISOString();
   }
 
-  // Use the bedtime wake window (nap->night gap) — typically longer than nap wake windows.
+  // Pressure-based: last nap end + bedtime wake window
   const bedtimeWW = getLearnedBedtimeWakeWindow(ctx);
   const hasEnoughNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time).length >= targetNaps;
   const multiplier = hasEnoughNaps ? 1.0 : 0.85;
-  const bedtime = new Date(
+  const pressureBedtime = new Date(
     new Date(lastSleep.end_time).getTime() + bedtimeWW * multiplier * 60 * 1000,
   );
+
+  // Habitual: what time does this family usually do bedtime?
+  const habitualBedtimeMs = getHabitualBedtimePrediction(pressureBedtime, ctx);
+  let bedtime: Date;
+  if (habitualBedtimeMs !== null) {
+    // Blend based on data consistency — consistent family → habitual dominates.
+    // But if naps were missed (multiplier < 1), shift toward pressure-based
+    // since the day was unusual and earlier bedtime is appropriate.
+    const baseWeight = getHabitualBedtimeWeight(ctx);
+    const weight = hasEnoughNaps ? baseWeight : baseWeight * 0.5;
+    const blendedMs = pressureBedtime.getTime() * (1 - weight) + habitualBedtimeMs * weight;
+    bedtime = new Date(Math.round(blendedMs));
+  } else {
+    bedtime = pressureBedtime;
+  }
 
   // Wide sanity clamp in the baby's local time
   const hour = getHourInTz(bedtime, ctx.tz);
@@ -455,9 +472,11 @@ export function predictNightEndTime(startTime: string, ctx: BabyContext): string
     return new Date(durationBasedMs).toISOString();
   }
 
-  // Blend: 40% duration-based + 60% habitual wake time.
-  // Duration matters when bedtime shifts; habitual matters for circadian regularity.
-  const blendedMs = durationBasedMs * 0.4 + habitualWake * 0.6;
+  // Data-driven blend: use whichever signal is more consistent.
+  // For a baby with a rock-solid 06:45 wake, habitual dominates (~100%).
+  // For a baby whose wake time follows bedtime, duration dominates.
+  const habitualWeight = getHabitualVsDurationWeight(ctx);
+  const blendedMs = durationBasedMs * (1 - habitualWeight) + habitualWake * habitualWeight;
   const minWakeMs = startMs + 360 * 60_000;
   const maxWakeMs = startMs + 900 * 60_000;
   return new Date(clamp(Math.round(blendedMs), minWakeMs, maxWakeMs)).toISOString();
@@ -570,6 +589,79 @@ function snapToCycleBoundary(
   // Soft blend: 70% raw data, 30% cycle boundary
   const blended = bounded * 0.7 + nearestBoundary * 0.3;
   return clamp(Math.round(blended), minMinutes, maxMinutes);
+}
+
+/**
+ * Compute how much to trust habitual wake time vs duration-based.
+ * Returns 0..1 where 1 = fully habitual (consistent wake times),
+ * 0 = fully duration-based (variable wake times, consistent night lengths).
+ *
+ * Logic: compare the coefficient of variation (SD/mean) of wake times
+ * vs night durations. The more consistent signal gets more weight.
+ * With very few samples, stays conservative (0.5).
+ */
+function getHabitualVsDurationWeight(ctx: BabyContext): number {
+  const wakeSamples = collectNightWakeMinuteSamples(ctx);
+  const durationSamples = collectWeightedDurations(ctx.recentSleeps, "night", 360, 900);
+
+  if (wakeSamples.length < 3 || durationSamples.length < 3) return 0.5;
+
+  const wakeSD = weightedSD(wakeSamples);
+  const durSD = weightedSD(durationSamples);
+
+  // If both are very consistent, lean habitual (circadian is real)
+  // If wake times are 2x more variable than durations, lean duration
+  // The ratio determines the blend smoothly
+  if (wakeSD + durSD === 0) return 0.5;
+  return clamp(durSD / (wakeSD + durSD), 0.15, 0.85);
+}
+
+/** Collect bedtime (local minute of day) samples from recent nights. */
+function collectBedtimeMinuteSamples(ctx: BabyContext): WeightedSample[] {
+  const nights = [...ctx.recentSleeps]
+    .filter((s) => s.type === "night")
+    .toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+  return nights.map((s, idx) => ({
+    value: getLocalMinuteOfDay(new Date(s.start_time), ctx.tz),
+    weight: Math.pow(0.85, nights.length - 1 - idx),
+  }));
+}
+
+/** Predict habitual bedtime for the given reference date. Returns epoch ms or null. */
+function getHabitualBedtimePrediction(refDate: Date, ctx: BabyContext): number | null {
+  const samples = collectBedtimeMinuteSamples(ctx);
+  if (samples.length < 2) return null;
+
+  const habitualMinute = weightedMedian(samples);
+  const dateStr = isoToDateInTz(refDate.toISOString(), ctx.tz);
+  return setLocalClockTime(dateStr, habitualMinute, ctx.tz).getTime();
+}
+
+/**
+ * How much to trust habitual bedtime vs pressure-based.
+ * Consistent bedtime families → weight near 1.0.
+ * Variable bedtime → weight near 0.0.
+ */
+function getHabitualBedtimeWeight(ctx: BabyContext): number {
+  const samples = collectBedtimeMinuteSamples(ctx);
+  if (samples.length < 3) return 0;
+
+  const sd = weightedSD(samples);
+  // SD < 15 min → very consistent → weight ~0.8
+  // SD > 45 min → very variable → weight ~0.1
+  // Linear interpolation between
+  return clamp(1 - (sd - 10) / 50, 0.1, 0.85);
+}
+
+/** Weighted standard deviation of sample values. */
+function weightedSD(samples: WeightedSample[]): number {
+  if (samples.length < 2) return 0;
+  const mean = weightedMean(samples);
+  const totalWeight = samples.reduce((sum, s) => sum + s.weight, 0);
+  if (totalWeight === 0) return 0;
+  const variance = samples.reduce((sum, s) => sum + s.weight * (s.value - mean) ** 2, 0) / totalWeight;
+  return Math.sqrt(variance);
 }
 
 function collectNightWakeMinuteSamples(ctx: BabyContext): WeightedSample[] {

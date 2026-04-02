@@ -68,10 +68,10 @@ describe("baseline", () => {
   it("per-month breakdown", () => {
     const lines = buckets.map((b) => renderSummary(b.result, b.label));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "6mo: 5 days, count 60% (3/5), nap MAE 45.9, dur MAE 23.2, bed MAE 61.5, wake MAE 10, nap bias +26.5, count bias -0.4
-      7mo: 31 days, count 74% (23/31), nap MAE 50.3, dur MAE 26.3, bed MAE 43.8, wake MAE 28.2, nap bias -7.2, count bias +0.13
-      8mo: 28 days, count 89% (25/28), nap MAE 33.8, dur MAE 19, bed MAE 26.5, wake MAE 21.3, nap bias +11, count bias +0.11
-      9mo: 18 days, count 83% (15/18), nap MAE 148.9, dur MAE 27, bed MAE 44.3, wake MAE 112.8, nap bias +38.4, count bias +0.06"
+      "6mo: 5 days, count 60% (3/5), nap MAE 45.9, dur MAE 23.2, bed MAE 28.7, wake MAE 9.9, nap bias +26.5, count bias -0.4
+      7mo: 31 days, count 74% (23/31), nap MAE 50.3, dur MAE 26.3, bed MAE 24.3, wake MAE 28.5, nap bias -7.2, count bias +0.13
+      8mo: 28 days, count 89% (25/28), nap MAE 33.8, dur MAE 19, bed MAE 18.1, wake MAE 21.5, nap bias +11, count bias +0.11
+      9mo: 18 days, count 83% (15/18), nap MAE 148.9, dur MAE 27, bed MAE 23.1, wake MAE 113.6, nap bias +38.4, count bias +0.06"
     `);
   });
 
@@ -85,32 +85,32 @@ describe("baseline", () => {
       return renderSummary(manualBucket.result, `${b.label} manual=${n}`);
     });
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "6mo manual=3: 5 days, count 80% (4/5), nap MAE 52.4, dur MAE 24.8, bed MAE 68.1, wake MAE 20.1, nap bias +33.3, count bias +0.2
-      7mo manual=2: 31 days, count 84% (26/31), nap MAE 50.4, dur MAE 26.6, bed MAE 41.9, wake MAE 28.2, nap bias -8.9, count bias +0.1
-      8mo manual=2: 28 days, count 89% (25/28), nap MAE 33.8, dur MAE 19, bed MAE 26.5, wake MAE 21.3, nap bias +11, count bias +0.11
-      9mo manual=1: 18 days, count 89% (16/18), nap MAE 160, dur MAE 27.3, bed MAE 41.4, wake MAE 112.8, nap bias +38.4, count bias -0.11"
+      "6mo manual=3: 5 days, count 80% (4/5), nap MAE 52.4, dur MAE 24.8, bed MAE 35.3, wake MAE 20.1, nap bias +33.3, count bias +0.2
+      7mo manual=2: 31 days, count 84% (26/31), nap MAE 50.4, dur MAE 26.6, bed MAE 22, wake MAE 28.5, nap bias -8.9, count bias +0.1
+      8mo manual=2: 28 days, count 89% (25/28), nap MAE 33.8, dur MAE 19, bed MAE 18.1, wake MAE 21.5, nap bias +11, count bias +0.11
+      9mo manual=1: 18 days, count 89% (16/18), nap MAE 160, dur MAE 27.3, bed MAE 18, wake MAE 113.6, nap bias +38.4, count bias -0.11"
     `);
   });
 
   it("combined summary", () => {
-    expect(renderSummary(auto, "all")).toMatchInlineSnapshot(`"all: 82 days, count 80% (66/82), nap MAE 57.8, dur MAE 23.4, bed MAE 39.3, wake MAE 43.2, nap bias +8.7, count bias +0.07"`);
+    expect(renderSummary(auto, "all")).toMatchInlineSnapshot(`"all: 82 days, count 80% (66/82), nap MAE 57.8, dur MAE 23.4, bed MAE 22.3, wake MAE 43.5, nap bias +8.7, count bias +0.07"`);
   });
 
   it("warm-up curve", () => {
     const warmup = bucketByWarmup(auto);
     const lines = warmup.map((b) => renderSummary(b.result, b.label));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "day 1-3: 3 days, count 33% (1/3), nap MAE 66.7, dur MAE 22.3, bed MAE 54.9, wake MAE 5.1, nap bias +36.1, count bias -0.67
-      day 4-7: 4 days, count 50% (2/4), nap MAE 34.2, dur MAE 34.6, bed MAE 80.3, wake MAE 33.8, nap bias +6.6, count bias +0.5
-      day 8-14: 7 days, count 86% (6/7), nap MAE 67.7, dur MAE 21.8, bed MAE 43, wake MAE 23.1, nap bias -44, count bias +0.14
-      day 15+: 68 days, count 84% (57/68), nap MAE 58.4, dur MAE 22.6, bed MAE 35.6, wake MAE 47.8, nap bias +13.1, count bias +0.07"
+      "day 1-3: 3 days, count 33% (1/3), nap MAE 66.7, dur MAE 22.3, bed MAE 36.3, wake MAE 5.6, nap bias +36.1, count bias -0.67
+      day 4-7: 4 days, count 50% (2/4), nap MAE 34.2, dur MAE 34.6, bed MAE 39.2, wake MAE 33.7, nap bias +6.6, count bias +0.5
+      day 8-14: 7 days, count 86% (6/7), nap MAE 67.7, dur MAE 21.8, bed MAE 13.5, wake MAE 22.8, nap bias -44, count bias +0.14
+      day 15+: 68 days, count 84% (57/68), nap MAE 58.4, dur MAE 22.6, bed MAE 21.5, wake MAE 48.2, nap bias +13.1, count bias +0.07"
     `);
   });
 
   // ── Regression guards ──
   it("nap start MAE ≤ 60 min", () => expect(auto.napStartMAE).toBeLessThan(60));
   it("nap duration MAE ≤ 30 min", () => expect(auto.napDurationMAE).toBeLessThan(30));
-  it("bedtime MAE ≤ 50 min", () => expect(auto.bedtimeMAE).toBeLessThan(50));
+  it("bedtime MAE ≤ 30 min", () => expect(auto.bedtimeMAE).toBeLessThan(30));
   it("wake time MAE ≤ 55 min", () => expect(auto.wakeTimeMAE).toBeLessThan(55));
   it("nap count accuracy ≥ 78%", () => expect(auto.napCountAccuracy).toBeGreaterThan(0.78));
 });
