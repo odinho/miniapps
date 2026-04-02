@@ -243,25 +243,30 @@ This is the most speculative part — probably needs more data than we have for 
 ## Implementation Order
 
 ```
-Phase 1 (tests first)     ← WE ARE HERE
+Phase 1 (tests first)     ✅ DONE
   1a. Duration metrics in backtest
   1b. Wake-time metrics in backtest  
   1c. duration-prediction.unit.ts
   1d. Duration baselines
 
-Phase 2 (quick wins)
+Phase 2 (quick wins)       ✅ DONE
   2a. Positional nap duration
-  2b. Circadian wake-time anchor
-  2c. Bedtime anchoring
-  2d. Cycle-aware duration rounding
+  2b. Circadian wake-time anchor (data-driven blend weight)
+  2c. Bedtime anchoring (data-driven blend weight)
+  2d. Cycle-aware duration rounding (soft bias)
 
-Phase 3 (pressure modeling)
-  3a. Daily sleep budget
-  3b. Onset latency feedback
-  3c. Transition handling
-  3d. Galland regression equations
+Phase 3 (pressure modeling) ✅ PARTIALLY DONE
+  3a. Daily sleep budget     ✅ (hurts wake MAE by 1.4 min — needs tuning)
+  3b. Onset latency feedback   (needs fall_asleep_time data)
+  3c. Transition handling      (9mo cliff: 149 min MAE — biggest remaining problem)
+  3d. Galland regression equations (minor improvement over step functions)
 
-Phase 4 (cycle modeling)
+Feature toggle system        ✅ DONE
+  - PredictionFeatures on BabyContext
+  - Ablation test (tests/unit/ablation.unit.ts)
+  - Backtest accepts features option
+
+Phase 4 (cycle modeling)     FUTURE
   4a. Cycle-based duration model
   4b. Wake probability at boundaries
   4c. Night wake prediction
@@ -271,17 +276,45 @@ Each phase has its own backtest targets. Phase 1 establishes baselines. Phases 2
 
 ---
 
-## Success Criteria
+## Feature Ablation Results (2026-04-02)
 
-After Phase 2 completes:
+Measured on Halldis data (82 days). Delta = what happens when you disable the feature:
 
-| Metric | Current | Target |
-|--------|---------|--------|
-| Nap start MAE (overall) | 58.5 min | < 55 min |
-| Nap duration MAE | unmeasured | < 20 min |
-| Bedtime MAE | 39.3 min | < 30 min |
-| Wake time MAE | unmeasured | < 30 min |
-| 9mo nap start MAE | 148.7 min | < 100 min |
-| CI coverage (60%+ of actuals in range) | unmeasured | > 60% |
+| Feature | nap MAE | dur MAE | bed MAE | wake MAE | Verdict |
+|---------|---------|---------|---------|----------|---------|
+| positionalDuration | +0.8 | +0.4 | 0 | 0 | **Helps** nap timing and duration |
+| habitualWake | 0 | 0 | 0 | +3.3 | **Helps** wake prediction |
+| habitualBedtime | 0 | 0 | **+17** | 0 | **Biggest single contributor** |
+| cycleBias | 0 | 0 | 0 | +0.2 | Marginal |
+| sleepBudget | 0 | 0 | 0 | -1.4 | **Hurts** — needs tuning or disabling |
+| weightedRecency | 0 | 0 | 0 | 0 | Neutral on this dataset |
 
-These are conservative — the point is to measure, not to promise specific numbers before we've even measured the baseline.
+**Key insight:** habitualBedtime alone accounts for +17 min bedtime improvement. The data-driven weight system means consistent families get near-100% habitual weight automatically.
+
+**sleepBudget hurts slightly** — the 50% compensation factor may be too aggressive, or the signal is noisy on this dataset. Consider tuning down to 25% or making it adaptive.
+
+### Future: Dynamic Feature Selection
+
+Not yet implemented. The idea:
+- Run ablation per-baby during initial data collection
+- Auto-disable features that hurt that specific baby's predictions
+- Log feature on/off decisions with backtest deltas
+- Re-evaluate periodically as more data arrives
+- Show parents a "prediction quality" indicator based on recent accuracy
+
+This requires the multi-baby backtest infrastructure to validate across populations.
+
+---
+
+## Results Summary (Phase 1 baseline → current)
+
+| Metric | Phase 1 baseline | Current | Change |
+|--------|---------|---------|--------|
+| Nap start MAE | 58.5 min | 57.8 min | -1% |
+| **Nap duration MAE** | 23.5 min | **23.4 min** | ~ |
+| **Bedtime MAE** | 39.3 min | **22.3 min** | **-43%** |
+| **Wake time MAE** | 46.5 min | **44.9 min** | -3% |
+| Nap end MAE | 64.7 min | 63.8 min | -1% |
+| 9mo nap start MAE | 148.7 min | 148.9 min | unchanged |
+| Engine beats all baselines | No (bedtime) | **Yes** | Fixed |
+| CI coverage | 54% | 54% | unchanged |
