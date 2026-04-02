@@ -500,8 +500,9 @@ export function predictNightEndTime(startTime: string, ctx: BabyContext, todayNa
   if (feat(ctx, "sleepBudget") && todayNapMinutes !== undefined) {
     const expectedNapMin = getLearnedNapDuration(ctx) * resolveNapCount(ctx);
     const napDelta = todayNapMinutes - expectedNapMin;
-    // ~50% compensation: 30 extra nap minutes → ~15 min shorter night
-    durationEstimate = Math.max(360, durationEstimate - napDelta * 0.5);
+    // ~25% compensation: 60 extra nap minutes → ~15 min shorter night.
+    // Kept low because the signal is noisy (logging delays, varied nap quality).
+    durationEstimate = Math.max(360, durationEstimate - napDelta * 0.25);
   }
   let durationMin = durationEstimate;
   if (feat(ctx, "cycleBias")) {

@@ -151,7 +151,7 @@ describe("duration and wake-time prediction", () => {
       "82 days
       nap dur MAE: 23.4 min (bias -1.7)
       nap end MAE: 63.8 min
-      wake time MAE: 44.9 min (bias -20.6)"
+      wake time MAE: 44 min (bias -20.4)"
     `);
 
     expect(result.napDurationMAE).toBeLessThan(30);
@@ -166,10 +166,10 @@ describe("duration and wake-time prediction", () => {
       return `${b.label}: dur MAE ${r.napDurationMAE}, wake MAE ${r.wakeTimeMAE}`;
     });
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "6mo: dur MAE 23.2, wake MAE 13.9
-      7mo: dur MAE 26.3, wake MAE 30.6
-      8mo: dur MAE 19, wake MAE 21.5
-      9mo: dur MAE 27, wake MAE 114.8"
+      "6mo: dur MAE 23.2, wake MAE 11.3
+      7mo: dur MAE 26.3, wake MAE 28.9
+      8mo: dur MAE 19, wake MAE 21.8
+      9mo: dur MAE 27, wake MAE 114.2"
     `);
   });
 
@@ -179,10 +179,10 @@ describe("duration and wake-time prediction", () => {
       `${b.label}: dur MAE ${b.result.napDurationMAE}, wake MAE ${b.result.wakeTimeMAE}`,
     );
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "day 1-3: dur MAE 22.3, wake MAE 4.8
-      day 4-7: dur MAE 34.6, wake MAE 35.7
-      day 8-14: dur MAE 21.8, wake MAE 24
-      day 15+: dur MAE 22.6, wake MAE 49.6"
+      "day 1-3: dur MAE 22.3, wake MAE 3.5
+      day 4-7: dur MAE 34.6, wake MAE 35.8
+      day 8-14: dur MAE 21.8, wake MAE 23.7
+      day 15+: dur MAE 22.6, wake MAE 48.6"
     `);
 
     const earlyDur = warmup.find((b) => b.label === "day 1-3")!.result.napDurationMAE;
