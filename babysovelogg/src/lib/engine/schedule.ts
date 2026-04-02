@@ -90,25 +90,23 @@ export function predictDayNaps(wakeUpTime: string, ctx: BabyContext): PredictedN
   const defaultWW = getWakeWindow(ctx);
   const expectedNaps = resolveNapCount(ctx);
   const positionalWWs = getPositionalWakeWindows(ctx);
+  const positionalDurs = getPositionalNapDurations(ctx);
+  const defaultDuration = getLearnedNapDuration(ctx);
 
   const predictions: PredictedNap[] = [];
   let currentWake = new Date(wakeUpTime);
 
-  // Learn nap duration from recent data, fallback to age-based defaults
-  const napDurationMinutes = getLearnedNapDuration(ctx);
-
   for (let i = 0; i < expectedNaps; i++) {
-    // Use positional wake window if available, otherwise fall back to global average
     const ww = positionalWWs[i] ?? defaultWW;
+    const duration = positionalDurs[i] ?? defaultDuration;
     const napStart = new Date(currentWake.getTime() + ww * 60 * 1000);
-    const napEnd = new Date(napStart.getTime() + napDurationMinutes * 60 * 1000);
+    const napEnd = new Date(napStart.getTime() + duration * 60 * 1000);
 
     predictions.push({
       startTime: napStart.toISOString(),
       endTime: napEnd.toISOString(),
     });
 
-    // Next wake window starts after this nap ends
     currentWake = napEnd;
   }
 
@@ -280,6 +278,42 @@ function getPositionalWakeWindows(ctx: BabyContext): number[] {
 }
 
 /**
+ * Compute per-position average nap durations from recent sleeps.
+ * 1st nap of the day is typically longer than 2nd nap.
+ * Returns a sparse array indexed by position (0-based).
+ */
+function getPositionalNapDurations(ctx: BabyContext): number[] {
+  if (ctx.recentSleeps.length < 4) return [];
+
+  const byDay = new Map<string, SleepEntry[]>();
+  for (const s of ctx.recentSleeps) {
+    if (s.type !== "nap" || !s.end_time) continue;
+    const day = localDate(s.start_time, ctx.tz);
+    if (!byDay.has(day)) byDay.set(day, []);
+    byDay.get(day)!.push(s);
+  }
+
+  const dursByPosition = new Map<number, number[]>();
+  for (const dayNaps of byDay.values()) {
+    const sorted = dayNaps
+      .toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+    for (let i = 0; i < sorted.length; i++) {
+      const dur = (new Date(sorted[i].end_time!).getTime() - new Date(sorted[i].start_time).getTime()) / 60_000;
+      if (dur < 10 || dur > 180) continue;
+      if (!dursByPosition.has(i)) dursByPosition.set(i, []);
+      dursByPosition.get(i)!.push(dur);
+    }
+  }
+
+  const result: number[] = [];
+  for (const [pos, durs] of dursByPosition) {
+    if (durs.length < 2) continue;
+    result[pos] = Math.round(durs.reduce((a, b) => a + b, 0) / durs.length);
+  }
+  return result;
+}
+
+/**
  * Learn nap count from recent sleep data using probability-weighted hypothesis scoring.
  *
  * Instead of a hard >60% mode switch, this keeps multiple hypotheses alive
@@ -421,9 +455,12 @@ export function predictNightEndTime(startTime: string, ctx: BabyContext): string
     return new Date(durationBasedMs).toISOString();
   }
 
+  // Blend: 40% duration-based + 60% habitual wake time.
+  // Duration matters when bedtime shifts; habitual matters for circadian regularity.
+  const blendedMs = durationBasedMs * 0.4 + habitualWake * 0.6;
   const minWakeMs = startMs + 360 * 60_000;
   const maxWakeMs = startMs + 900 * 60_000;
-  return new Date(clamp(habitualWake, minWakeMs, maxWakeMs)).toISOString();
+  return new Date(clamp(Math.round(blendedMs), minWakeMs, maxWakeMs)).toISOString();
 }
 
 /**
@@ -473,7 +510,7 @@ function collectWeightedDurations(
 }
 
 function weightedTrimmedMean(samples: WeightedSample[], trimFraction = 0.15): number {
-  const sorted = [...samples].sort((a, b) => a.value - b.value);
+  const sorted = [...samples].toSorted((a, b) => a.value - b.value);
   if (sorted.length <= 2) return weightedMean(sorted);
 
   const trimCount = Math.floor(sorted.length * trimFraction);
@@ -504,26 +541,35 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function getSleepCycleMinutes(ageMonths: number): number {
-  if (ageMonths < 3) return 55;
-  if (ageMonths < 6) return 60;
-  if (ageMonths < 12) return 65;
-  return 70;
+  // Research: newborn ~50 min, infant ~50-60 min, toddler ~60 min
+  // School-age 85-90 min. See docs/sleep-science-research.md
+  if (ageMonths < 3) return 50;
+  if (ageMonths < 6) return 50;
+  if (ageMonths < 12) return 55;
+  return 60;
 }
 
+/**
+ * Soft-snap to nearest sleep cycle boundary.
+ * Blends between the raw duration and the nearest cycle multiple
+ * (30% cycle bias, 70% raw data), so the data is nudged toward
+ * cycle boundaries but not forced there.
+ */
 function snapToCycleBoundary(
   durationMinutes: number,
   cycleMinutes: number,
-  minCycles: number,
-  maxCycles: number,
+  _minCycles: number,
+  _maxCycles: number,
   minMinutes: number,
   maxMinutes: number,
 ): number {
   const bounded = clamp(durationMinutes, minMinutes, maxMinutes);
-  const minBoundary = minCycles * cycleMinutes;
-  const maxBoundary = maxCycles * cycleMinutes;
-  const cycleBounded = clamp(bounded, minBoundary, maxBoundary);
-  const cycles = clamp(Math.round(cycleBounded / cycleMinutes), minCycles, maxCycles);
-  return clamp(cycles * cycleMinutes, minMinutes, maxMinutes);
+  // Find nearest cycle boundary (including half-cycles for naps)
+  const halfCycle = cycleMinutes / 2;
+  const nearestBoundary = Math.round(bounded / halfCycle) * halfCycle;
+  // Soft blend: 70% raw data, 30% cycle boundary
+  const blended = bounded * 0.7 + nearestBoundary * 0.3;
+  return clamp(Math.round(blended), minMinutes, maxMinutes);
 }
 
 function collectNightWakeMinuteSamples(ctx: BabyContext): WeightedSample[] {
@@ -547,13 +593,13 @@ function getHabitualWakeTimePrediction(
   const habitualMinute = weightedMedian(samples);
   const predicted = new Date(start);
   predicted.setUTCDate(predicted.getUTCDate() + 1);
-  const localDate = isoToDateInTz(predicted.toISOString(), ctx.tz);
-  const candidate = setLocalClockTime(localDate, habitualMinute, ctx.tz);
+  const wakeDate = isoToDateInTz(predicted.toISOString(), ctx.tz);
+  const candidate = setLocalClockTime(wakeDate, habitualMinute, ctx.tz);
   return candidate.getTime();
 }
 
 function weightedMedian(samples: WeightedSample[]): number {
-  const sorted = [...samples].sort((a, b) => a.value - b.value);
+  const sorted = [...samples].toSorted((a, b) => a.value - b.value);
   const totalWeight = sorted.reduce((sum, sample) => sum + sample.weight, 0);
   if (totalWeight === 0) return sorted[0]?.value ?? 0;
 
@@ -579,8 +625,8 @@ function getLocalMinuteOfDay(date: Date, tz: string): number {
   return hour * 60 + minute;
 }
 
-function setLocalClockTime(localDate: string, minuteOfDay: number, tz: string): Date {
+function setLocalClockTime(dateStr: string, minuteOfDay: number, tz: string): Date {
   const hour = Math.floor(minuteOfDay / 60);
   const minute = minuteOfDay % 60;
-  return setHourInTz(new Date(`${localDate}T12:00:00.000Z`), hour, minute, tz);
+  return setHourInTz(new Date(`${dateStr}T12:00:00.000Z`), hour, minute, tz);
 }
