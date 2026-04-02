@@ -255,11 +255,11 @@ Phase 2 (quick wins)       ✅ DONE
   2c. Bedtime anchoring (data-driven blend weight)
   2d. Cycle-aware duration rounding (soft bias)
 
-Phase 3 (pressure modeling) ✅ PARTIALLY DONE
-  3a. Daily sleep budget     ✅ (hurts wake MAE by 1.4 min — needs tuning)
-  3b. Onset latency feedback   (needs fall_asleep_time data)
-  3c. Transition handling      (9mo cliff: 149 min MAE — biggest remaining problem)
-  3d. Galland regression equations (minor improvement over step functions)
+Phase 3 (pressure modeling) ✅ DONE (except 3b)
+  3a. Daily sleep budget     ✅ (tuned to 25% compensation — helps baby_2/5, marginal on halldis)
+  3b. Onset latency feedback   BLOCKED (only 8 days of fall_asleep_time data in DB)
+  3c. Transition handling    ✅ (nap-count-filtered wake windows: 9mo 149→140 MAE)
+  3d. Galland regression     ✅ TESTED, NOT USED (worse than step functions for all babies)
 
 Feature toggle system        ✅ DONE
   - PredictionFeatures on BabyContext
@@ -310,11 +310,29 @@ This requires the multi-baby backtest infrastructure to validate across populati
 
 | Metric | Phase 1 baseline | Current | Change |
 |--------|---------|---------|--------|
-| Nap start MAE | 58.5 min | 57.8 min | -1% |
-| **Nap duration MAE** | 23.5 min | **23.4 min** | ~ |
+| Nap start MAE | 58.5 min | 58.0 min | -1% |
+| Nap duration MAE | 23.5 min | 23.4 min | ~ |
 | **Bedtime MAE** | 39.3 min | **22.3 min** | **-43%** |
-| **Wake time MAE** | 46.5 min | **44.9 min** | -3% |
-| Nap end MAE | 64.7 min | 63.8 min | -1% |
-| 9mo nap start MAE | 148.7 min | 148.9 min | unchanged |
+| Wake time MAE | 46.5 min | 44.0 min | -5% |
+| Nap end MAE | 64.7 min | 63.6 min | -2% |
+| **9mo nap start MAE** | 148.7 min | **140.3 min** | **-6%** |
 | Engine beats all baselines | No (bedtime) | **Yes** | Fixed |
-| CI coverage | 54% | 54% | unchanged |
+
+### Remaining issues
+
+- **9mo cliff still large** (140 min) — transition handling helps but the first
+  few days after a nap drop have too little data to learn from. UI should show
+  both schedules during this period.
+- **3b onset latency** blocked on data — only 8 days of `fall_asleep_time` in DB.
+  Will become viable once the feature accumulates more data from daily use.
+- **Sleep budget** marginal on Halldis (+0.5 wake MAE) but helps baby_2 (-10.9)
+  and baby_5 (-24.6). Worth keeping at 25% compensation.
+- **Galland regression** tested and rejected — step functions work better for
+  our use case. The regressions are for population-level totals, not individual
+  nap durations.
+
+### UI TODO from this work
+
+- Show both schedules during detected nap transitions ("if 2 naps: ... / if 1 nap: ...")
+- Consider showing a "prediction quality" indicator based on recent accuracy
+- Show "unusual day" indicator when sleep budget adjustment is large
