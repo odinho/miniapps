@@ -1,8 +1,13 @@
 import { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, findByAge } from "./constants.js";
 export { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, findByAge } from "./constants.js";
 export type { SleepEntry } from "$lib/types.js";
-import type { SleepEntry, BabyContext } from "$lib/types.js";
+import type { SleepEntry, BabyContext, PredictionFeatures } from "$lib/types.js";
 import { getHourInTz, setHourInTz, isoToDateInTz } from "$lib/tz.js";
+
+/** Check if a feature is enabled (defaults to true if not specified). */
+function feat(ctx: BabyContext, key: keyof PredictionFeatures): boolean {
+  return ctx.features?.[key] !== false;
+}
 
 /** Get the baby-local date (YYYY-MM-DD) for a UTC ISO timestamp. */
 function localDate(iso: string, tz: string): string {
@@ -98,7 +103,7 @@ export function predictDayNaps(wakeUpTime: string, ctx: BabyContext): PredictedN
 
   for (let i = 0; i < expectedNaps; i++) {
     const ww = positionalWWs[i] ?? defaultWW;
-    const duration = positionalDurs[i] ?? defaultDuration;
+    const duration = (feat(ctx, "positionalDuration") ? positionalDurs[i] : undefined) ?? defaultDuration;
     const napStart = new Date(currentWake.getTime() + ww * 60 * 1000);
     const napEnd = new Date(napStart.getTime() + duration * 60 * 1000);
 
@@ -143,7 +148,7 @@ export function planBackwardFromBedtime(
     const ww = i === napCount - 1
       ? bedtimeWW
       : positionalWWs[i + 1] ?? defaultWW;
-    const duration = positionalDurs[i] ?? defaultDuration;
+    const duration = (feat(ctx, "positionalDuration") ? positionalDurs[i] : undefined) ?? defaultDuration;
 
     const napEnd = cursor - ww * 60_000;
     const napStart = napEnd - duration * 60_000;
@@ -188,7 +193,8 @@ export function recommendBedtime(todaySleeps: SleepEntry[], ctx: BabyContext): s
   );
 
   // Habitual: what time does this family usually do bedtime?
-  const habitualBedtimeMs = getHabitualBedtimePrediction(pressureBedtime, ctx);
+  const habitualBedtimeMs = feat(ctx, "habitualBedtime")
+    ? getHabitualBedtimePrediction(pressureBedtime, ctx) : null;
   let bedtime: Date;
   if (habitualBedtimeMs !== null) {
     // Blend based on data consistency — consistent family → habitual dominates.
@@ -423,49 +429,89 @@ function getLearnedBedtimeWakeWindow(ctx: BabyContext): number {
 /** Learn average night sleep duration (minutes) from recent completed nights. */
 export function getLearnedNightDuration(ctx: BabyContext): number {
   const sleepNeed = findByAge(SLEEP_NEEDS, ctx.ageMonths);
-  // Default: total sleep need minus typical nap time
   const napDur = getLearnedNapDuration(ctx);
   const napCount = resolveNapCount(ctx);
   const defaultNight = (sleepNeed.totalHours * 60) - (napDur * napCount);
 
-  const samples = collectWeightedDurations(ctx.recentSleeps, "night", 360, 900);
-  if (samples.length < 2) return Math.round(defaultNight);
+  if (feat(ctx, "weightedRecency")) {
+    const samples = collectWeightedDurations(ctx.recentSleeps, "night", 360, 900);
+    if (samples.length < 2) return Math.round(defaultNight);
+    const learned = weightedTrimmedMean(samples);
+    return Math.round(blendEstimate(defaultNight, learned, samples.length, 2, 6));
+  }
 
-  const learned = weightedTrimmedMean(samples);
-  return Math.round(blendEstimate(defaultNight, learned, samples.length, 2, 6));
+  // Simple average fallback
+  const nights = ctx.recentSleeps.filter((s) => s.type === "night" && s.end_time);
+  if (nights.length < 2) return Math.round(defaultNight);
+  const durations = nights
+    .map((s) => (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60000)
+    .filter((d) => d >= 360 && d <= 900);
+  if (durations.length < 2) return Math.round(defaultNight);
+  return Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);
 }
 
 /** Learn average nap duration from recent completed naps, fallback to age-based defaults. */
 export function getLearnedNapDuration(ctx: BabyContext): number {
   const ageMonths = ctx.ageMonths;
   const defaultDuration = ageMonths < 6 ? 60 : ageMonths < 12 ? 45 : 30;
-
   if (ctx.recentSleeps.length === 0) return defaultDuration;
 
-  const samples = collectWeightedDurations(ctx.recentSleeps, "nap", 10, 180);
-  if (samples.length < 3) return defaultDuration;
+  if (feat(ctx, "weightedRecency")) {
+    const samples = collectWeightedDurations(ctx.recentSleeps, "nap", 10, 180);
+    if (samples.length < 3) return defaultDuration;
+    const learned = weightedTrimmedMean(samples);
+    return Math.round(blendEstimate(defaultDuration, learned, samples.length, 3, 8));
+  }
 
-  const learned = weightedTrimmedMean(samples);
-  return Math.round(blendEstimate(defaultDuration, learned, samples.length, 3, 8));
+  // Simple average fallback
+  const naps = ctx.recentSleeps.filter((s) => s.type === "nap" && s.end_time);
+  if (naps.length < 3) return defaultDuration;
+  const durations = naps
+    .map((s) => (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60000)
+    .filter((d) => d >= 10 && d <= 180);
+  if (durations.length < 3) return defaultDuration;
+  return Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);
 }
 
 /** Predict the likely end of an active nap using learned duration and cycle boundaries. */
 export function predictNapEndTime(startTime: string, ctx: BabyContext): string {
   const startMs = new Date(startTime).getTime();
   const targetDuration = getLearnedNapDuration(ctx);
-  const cycleMinutes = getSleepCycleMinutes(ctx.ageMonths);
-  const predictedDuration = snapToCycleBoundary(targetDuration, cycleMinutes, 1, 3, 10, 180);
+  let predictedDuration = targetDuration;
+  if (feat(ctx, "cycleBias")) {
+    const cycleMinutes = getSleepCycleMinutes(ctx.ageMonths);
+    predictedDuration = snapToCycleBoundary(targetDuration, cycleMinutes, 1, 3, 10, 180);
+  }
   return new Date(startMs + predictedDuration * 60_000).toISOString();
 }
 
-/** Predict the likely wake-up time from an active night sleep. */
-export function predictNightEndTime(startTime: string, ctx: BabyContext): string {
+/**
+ * Predict the likely wake-up time from an active night sleep.
+ * @param todayNapMinutes - optional total nap minutes today, for sleep budget adjustment
+ */
+export function predictNightEndTime(startTime: string, ctx: BabyContext, todayNapMinutes?: number): string {
   const start = new Date(startTime);
   const startMs = start.getTime();
   const cycleMinutes = getSleepCycleMinutes(ctx.ageMonths);
-  const durationEstimate = getLearnedNightDuration(ctx);
-  const durationBasedMs =
-    startMs + snapToCycleBoundary(durationEstimate, cycleMinutes, 6, 16, 360, 900) * 60_000;
+  let durationEstimate = getLearnedNightDuration(ctx);
+
+  // Sleep budget: if today's naps were unusually long/short, adjust night prediction.
+  // Not fully compensatory — baby doesn't perfectly trade nap for night.
+  if (feat(ctx, "sleepBudget") && todayNapMinutes !== undefined) {
+    const expectedNapMin = getLearnedNapDuration(ctx) * resolveNapCount(ctx);
+    const napDelta = todayNapMinutes - expectedNapMin;
+    // ~50% compensation: 30 extra nap minutes → ~15 min shorter night
+    durationEstimate = Math.max(360, durationEstimate - napDelta * 0.5);
+  }
+  let durationMin = durationEstimate;
+  if (feat(ctx, "cycleBias")) {
+    durationMin = snapToCycleBoundary(durationEstimate, cycleMinutes, 6, 16, 360, 900);
+  }
+  const durationBasedMs = startMs + durationMin * 60_000;
+
+  if (!feat(ctx, "habitualWake")) {
+    return new Date(durationBasedMs).toISOString();
+  }
 
   const habitualWake = getHabitualWakeTimePrediction(start, ctx);
   if (habitualWake === null) {

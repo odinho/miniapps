@@ -77,6 +77,29 @@ export interface SleepPause {
   resume_time: string | null;
 }
 
+/**
+ * Feature toggles for the prediction engine.
+ * All default to true (enabled). Set to false to disable.
+ * Used for ablation testing and per-baby feature selection.
+ */
+export interface PredictionFeatures {
+  positionalDuration: boolean;  // per-position nap durations (1st ≠ 2nd)
+  habitualWake: boolean;        // circadian wake-time anchor
+  habitualBedtime: boolean;     // family routine bedtime anchor
+  cycleBias: boolean;           // soft-snap to sleep cycle boundaries
+  sleepBudget: boolean;         // adjust night duration based on day's nap total
+  weightedRecency: boolean;     // recency-weighted duration learning
+}
+
+export const DEFAULT_FEATURES: PredictionFeatures = {
+  positionalDuration: true,
+  habitualWake: true,
+  habitualBedtime: true,
+  cycleBias: true,
+  sleepBudget: true,
+  weightedRecency: true,
+};
+
 /** Everything the prediction engine needs to know about a baby. */
 export interface BabyContext {
   birthdate: string;          // ISO date
@@ -84,6 +107,7 @@ export interface BabyContext {
   tz: string;                 // IANA timezone (e.g. "Europe/Oslo")
   customNapCount: number | null;
   recentSleeps: SleepEntry[]; // last 7 days of completed sleeps
+  features?: Partial<PredictionFeatures>;
 }
 
 export interface EventRow {

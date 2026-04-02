@@ -1,4 +1,4 @@
-import type { SleepEntry, BabyContext } from "$lib/types.js";
+import type { SleepEntry, BabyContext, PredictionFeatures } from "$lib/types.js";
 import type { PredictedNap } from "./schedule.js";
 import {
   predictDayNaps,
@@ -67,6 +67,7 @@ export function backtest(
     predictBedtime?: BedtimePredictor;
     customNapCount?: number | null;
     tz?: string;
+    features?: Partial<PredictionFeatures>;
   },
 ): BacktestResult {
   const lookback = options?.lookbackDays ?? 7;
@@ -74,6 +75,7 @@ export function backtest(
   const bedtimePredict = options?.predictBedtime ?? recommendBedtime;
   const customNapCount = options?.customNapCount ?? null;
   const tz = options?.tz ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const features = options?.features;
 
   const results: DayResult[] = [];
 
@@ -96,6 +98,7 @@ export function backtest(
       tz,
       customNapCount,
       recentSleeps,
+      features,
     };
 
     // Predict naps
@@ -150,7 +153,12 @@ export function backtest(
     // night-end predictor, then compare to the next day's actual wake time.
     let wakeTimeError: number | null = null;
     if (actualBedtime && i + 1 < days.length) {
-      const predictedWakeMs = new Date(predictNightEndTime(actualBedtime, ctx)).getTime();
+      // Pass today's actual nap total for sleep budget adjustment
+      const todayNapMin = actualNaps.reduce((sum, n) => {
+        const dur = (new Date(n.end_time!).getTime() - new Date(n.start_time).getTime()) / 60000;
+        return sum + dur;
+      }, 0);
+      const predictedWakeMs = new Date(predictNightEndTime(actualBedtime, ctx, todayNapMin)).getTime();
       const actualWakeMs = new Date(days[i + 1].wakeTime).getTime();
       wakeTimeError = (predictedWakeMs - actualWakeMs) / 60000;
     }

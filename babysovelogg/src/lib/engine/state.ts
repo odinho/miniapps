@@ -142,7 +142,10 @@ export function assembleState(data: DayData) {
       // Compute expected night end for active night sleep
       let expectedNightEnd: string | null = null;
       if (activeSleep && activeSleep.type === "night" && !activeSleep.end_time) {
-        expectedNightEnd = predictNightEndTime(activeSleep.start_time, ctx);
+        const todayNapMin = todaySleeps
+          .filter((s) => s.type === "nap" && s.end_time)
+          .reduce((sum, s) => sum + (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60000, 0);
+        expectedNightEnd = predictNightEndTime(activeSleep.start_time, ctx, todayNapMin);
       }
 
       prediction = {
