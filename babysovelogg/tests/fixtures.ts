@@ -48,6 +48,9 @@ export const test = base.extend<
         };
         proc.stdout?.on("data", onData);
         proc.on("error", (err) => { clearTimeout(timer); reject(err); });
+        proc.on("exit", (code) => {
+          if (code !== 0) { clearTimeout(timer); reject(new Error(`Server exited with code ${code} (port ${port} in use?)`)); }
+        });
       });
 
       // Trigger a request to force lazy-loaded DB module initialization.

@@ -95,6 +95,7 @@ function cli(
 ): { stdout: string; stderr: string; exitCode: number } {
   const execOpts: ExecFileSyncOptions = {
     cwd: tmpDir,
+    stdio: ["pipe", "pipe", "pipe"],
     env: {
       ...process.env,
       MOCK_TIME: opts?.mockTime ?? T,

@@ -208,6 +208,16 @@ test("B19: stats shows all predicted nap times", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
 
+  // Fix server time to 09:00 so predicted naps (at ~10:00, ~14:00) are in the future
+  const today9am = new Date();
+  today9am.setHours(9, 0, 0, 0);
+  await page.route("**/api/state*", (route) => {
+    const url = new URL(route.request().url());
+    url.searchParams.set("now", String(today9am.getTime()));
+    return route.continue({ url: url.toString() });
+  });
+  await forceHour(page, 9);
+
   // Default nap count for 9 months = 2
   await page.goto("/stats");
   await expect(page.getByText("Appen reknar med")).toBeVisible({ timeout: 5000 });
@@ -221,6 +231,16 @@ test("B19: stats shows all predicted nap times", async ({ page }) => {
 test("B19: stats prediction updates when nap count is changed in settings", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
+
+  // Fix server time to 09:00 so predicted naps are in the future
+  const today9am = new Date();
+  today9am.setHours(9, 0, 0, 0);
+  await page.route("**/api/state*", (route) => {
+    const url = new URL(route.request().url());
+    url.searchParams.set("now", String(today9am.getTime()));
+    return route.continue({ url: url.toString() });
+  });
+  await forceHour(page, 9);
 
   // Verify initial prediction (auto = 2 naps for 9 months)
   await page.goto("/stats");

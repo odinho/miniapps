@@ -3,7 +3,7 @@ import { assembleState } from "$lib/engine/state.js";
 import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow } from "$lib/types.js";
 import { todayInTz } from "$lib/tz.js";
 
-export function getState() {
+export function getState(now?: number) {
   const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby | undefined;
   if (!baby)
     return { baby: null, activeSleep: null, todaySleeps: [], stats: null, prediction: null };
@@ -100,5 +100,6 @@ export function getState() {
     pausesBySleep,
     diaperCount: todayDiapers?.count ?? 0,
     lastDiaperTime: lastDiaper?.time ?? null,
+    now,
   });
 }

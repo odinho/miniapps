@@ -26,8 +26,8 @@ test("Can select mood and method and save", async ({ page }) => {
     timeout: 5000,
   });
 
-  await page.getByRole("button", { name: "Normal" }).click();
-  await expect(page.getByRole("button", { name: "Normal" })).toHaveClass(/active/);
+  await page.getByTestId("mood-normal").click();
+  await expect(page.getByTestId("mood-normal")).toHaveClass(/active/);
 
   await page.getByRole("button", { name: "Amming" }).click();
   await expect(page.getByRole("button", { name: "Amming" })).toHaveClass(/active/);
@@ -151,7 +151,7 @@ test("Wake-up sheet shows compact bedtime summary when tags were set", async ({ 
   await expect(page.getByRole("heading", { name: "Korleis gjekk legginga?" })).toBeVisible({
     timeout: 5000,
   });
-  await page.getByRole("button", { name: "Normal" }).click();
+  await page.getByTestId("mood-normal").click();
   await page.getByRole("button", { name: "Amming" }).click();
   await page.getByRole("button", { name: "Ferdig" }).click();
   await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });
@@ -198,7 +198,7 @@ test("Bedtime tags are NOT overwritten by wake-up sheet", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Korleis gjekk legginga?" })).toBeVisible({
     timeout: 5000,
   });
-  await page.getByRole("button", { name: "Normal" }).click();
+  await page.getByTestId("mood-normal").click();
   await page.getByRole("button", { name: "Amming" }).click();
   await page.getByRole("button", { name: "Ferdig" }).click();
   await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });
@@ -229,7 +229,7 @@ test("Dismissing tag sheet auto-saves entered data", async ({ page }) => {
   });
 
   // Enter some data, then dismiss by clicking overlay
-  await page.getByRole("button", { name: "Normal" }).click();
+  await page.getByTestId("mood-normal").click();
   await page.locator('input[placeholder="Valfritt notat..."]').fill("Viktig notat");
   await page.getByTestId("modal-overlay").click({ position: { x: 5, y: 5 } });
   await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });

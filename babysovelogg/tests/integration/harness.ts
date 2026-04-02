@@ -1,6 +1,78 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "http";
-import { beforeAll, afterAll, beforeEach } from "bun:test";
+import { beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
 import { db, initDb, closeDb } from "$lib/server/db.js";
+
+// ── Console guard ──────────────────────────────────────────────────────
+// Silences console.log/info during tests.
+// Captures console.error/warn and fails the test unless explicitly allowed.
+
+const _origLog = console.log;
+const _origInfo = console.info;
+const _origError = console.error;
+const _origWarn = console.warn;
+
+let _capturedErrors: string[] = [];
+let _capturedWarns: string[] = [];
+let _expectedErrors: RegExp[] = [];
+let _expectedWarns: RegExp[] = [];
+
+/** Declare an expected console.error pattern. Each call adds one pattern.
+ *  Every captured error must match at least one pattern, and every pattern must match at least one error. */
+export function expectConsoleError(pattern: string | RegExp) {
+  _expectedErrors.push(typeof pattern === "string" ? new RegExp(pattern) : pattern);
+}
+
+/** Declare an expected console.warn pattern. Same matching rules as expectConsoleError. */
+export function expectConsoleWarn(pattern: string | RegExp) {
+  _expectedWarns.push(typeof pattern === "string" ? new RegExp(pattern) : pattern);
+}
+
+function stringify(args: unknown[]): string {
+  return args.map(String).join(" ");
+}
+
+function checkExpected(captured: string[], expected: RegExp[], level: string) {
+  const unmatched = captured.filter((msg) => !expected.some((re) => re.test(msg)));
+  if (unmatched.length > 0) {
+    throw new Error(
+      `Unexpected console.${level} during test:\n  ${unmatched.join("\n  ")}`,
+    );
+  }
+  const unused = expected.filter((re) => !captured.some((msg) => re.test(msg)));
+  if (unused.length > 0) {
+    throw new Error(
+      `Expected console.${level} never fired:\n  ${unused.map((r) => r.source).join("\n  ")}`,
+    );
+  }
+}
+
+function installConsoleGuard() {
+  beforeEach(() => {
+    _capturedErrors = [];
+    _capturedWarns = [];
+    _expectedErrors = [];
+    _expectedWarns = [];
+
+    console.log = () => {};
+    console.info = () => {};
+    console.error = (...args: unknown[]) => {
+      _capturedErrors.push(stringify(args));
+    };
+    console.warn = (...args: unknown[]) => {
+      _capturedWarns.push(stringify(args));
+    };
+  });
+
+  afterEach(() => {
+    console.log = _origLog;
+    console.info = _origInfo;
+    console.error = _origError;
+    console.warn = _origWarn;
+
+    checkExpected(_capturedErrors, _expectedErrors, "error");
+    checkExpected(_capturedWarns, _expectedWarns, "warn");
+  });
+}
 
 // Import SvelteKit route handlers
 import { GET as eventsGET, POST as eventsPOST } from "../../src/routes/api/events/+server.js";
@@ -90,6 +162,8 @@ let baseUrl: string;
 
 /** Register lifecycle hooks for integration tests. Call this at the top level of each test file. */
 export function setupHarness() {
+  installConsoleGuard();
+
   beforeAll(async () => {
     initDb(":memory:");
     server = createServer(handleRequest);

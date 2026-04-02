@@ -8,6 +8,7 @@ import {
   generateSleepId,
   generateDiaperId,
   setupHarness,
+  expectConsoleError,
 } from "./harness.js";
 setupHarness();
 
@@ -158,6 +159,7 @@ test("POST batch where one event is invalid returns 400, nothing written", async
 });
 
 test("POST batch where projection fails midway returns 500, nothing written", async () => {
+  expectConsoleError(/no sleep found with domain_id/);
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
 
