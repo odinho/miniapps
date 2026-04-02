@@ -266,6 +266,26 @@ The test for "reset DB clears all projections" should not be five separate `expe
 
 When adding new state (projections, tables, etc.), update `resetDb()` and the relevant renderer so existing tests automatically catch regressions.
 
+## Console guard
+
+Integration tests must produce zero console noise. The harness captures all console output (`log`, `info`, `error`, `warn`) — any unexpected call fails the test in `afterEach`.
+
+Tests that intentionally trigger console output must declare patterns up front:
+
+```ts
+expectConsoleError(/no sleep found with domain_id/);
+```
+
+Every captured message must match at least one pattern, and every pattern must match at least one message. This prevents both uncaught noise and stale expectations.
+
+To pass through console output while debugging (and skip the guard checks):
+
+```bash
+DEBUG=1 bun test tests/integration/foo.test.ts
+```
+
+CLI tests (`cli.test.ts`) use `spawnSync` to capture both stdout and stderr. A successful command that writes to stderr fails the test.
+
 ## Repo expectations
 
 - update tests when behavior changes

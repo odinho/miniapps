@@ -1,5 +1,5 @@
 import { test, expect, beforeEach, afterEach } from "bun:test";
-import { execFileSync, type ExecFileSyncOptions } from "child_process";
+import { spawnSync } from "child_process";
 import { mkdtempSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -88,39 +88,33 @@ function seedDb() {
   db.close();
 }
 
-/** Run the CLI with a fixed MOCK_TIME. */
+/** Run the CLI with a fixed MOCK_TIME. Captures both stdout and stderr.
+ *  Fails on unexpected exit code or unexpected stderr output. */
 function cli(
   args: string[],
   opts?: { expectFail?: boolean; mockTime?: string },
 ): { stdout: string; stderr: string; exitCode: number } {
-  const execOpts: ExecFileSyncOptions = {
+  const result = spawnSync("bun", [CLI_PATH, ...args], {
     cwd: tmpDir,
-    stdio: ["pipe", "pipe", "pipe"],
-    env: {
-      ...process.env,
-      MOCK_TIME: opts?.mockTime ?? T,
-    },
+    env: { ...process.env, MOCK_TIME: opts?.mockTime ?? T },
     timeout: 15_000,
-  };
-  try {
-    const stdout = execFileSync("bun", [CLI_PATH, ...args], execOpts);
-    return { stdout: stdout.toString(), stderr: "", exitCode: 0 };
-  } catch (err: unknown) {
-    const e = err as { stdout?: Buffer; stderr?: Buffer; status?: number };
-    if (!opts?.expectFail) {
-      const stderr = e.stderr?.toString() ?? "";
-      const stdout = e.stdout?.toString() ?? "";
-      throw new Error(
-        `CLI failed unexpectedly (exit ${e.status}):\nstdout: ${stdout}\nstderr: ${stderr}`,
-        { cause: err },
-      );
-    }
-    return {
-      stdout: e.stdout?.toString() ?? "",
-      stderr: e.stderr?.toString() ?? "",
-      exitCode: e.status ?? 1,
-    };
+  });
+
+  const stdout = result.stdout?.toString() ?? "";
+  const stderr = result.stderr?.toString() ?? "";
+  const exitCode = result.status ?? 1;
+
+  if (exitCode !== 0 && !opts?.expectFail) {
+    throw new Error(
+      `CLI failed unexpectedly (exit ${exitCode}):\nstdout: ${stdout}\nstderr: ${stderr}`,
+    );
   }
+
+  if (exitCode === 0 && stderr.trim()) {
+    throw new Error(`CLI succeeded but wrote to stderr:\n${stderr}`);
+  }
+
+  return { stdout, stderr, exitCode };
 }
 
 beforeEach(() => {

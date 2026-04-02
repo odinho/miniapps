@@ -3,39 +3,58 @@ import { beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
 import { db, initDb, closeDb } from "$lib/server/db.js";
 
 // ── Console guard ──────────────────────────────────────────────────────
-// Silences console.log/info during tests.
-// Captures console.error/warn and fails the test unless explicitly allowed.
+// All console methods are captured during tests. Any call that doesn't
+// match a declared expectation fails the test in afterEach.
+// Bypass with: DEBUG=1 bun test …
 
-const _origLog = console.log;
-const _origInfo = console.info;
-const _origError = console.error;
-const _origWarn = console.warn;
+const _debug = !!process.env.DEBUG;
 
-let _capturedErrors: string[] = [];
-let _capturedWarns: string[] = [];
-let _expectedErrors: RegExp[] = [];
-let _expectedWarns: RegExp[] = [];
+const _orig = {
+  log: console.log,
+  info: console.info,
+  error: console.error,
+  warn: console.warn,
+};
 
-/** Declare an expected console.error pattern. Each call adds one pattern.
- *  Every captured error must match at least one pattern, and every pattern must match at least one error. */
-export function expectConsoleError(pattern: string | RegExp) {
-  _expectedErrors.push(typeof pattern === "string" ? new RegExp(pattern) : pattern);
-}
+type Level = "log" | "info" | "error" | "warn";
 
-/** Declare an expected console.warn pattern. Same matching rules as expectConsoleError. */
-export function expectConsoleWarn(pattern: string | RegExp) {
-  _expectedWarns.push(typeof pattern === "string" ? new RegExp(pattern) : pattern);
+const _captured: Record<Level, string[]> = { log: [], info: [], error: [], warn: [] };
+const _expected: Record<Level, RegExp[]> = { log: [], info: [], error: [], warn: [] };
+
+function toRegExp(pattern: string | RegExp): RegExp {
+  return typeof pattern === "string" ? new RegExp(pattern) : pattern;
 }
 
 function stringify(args: unknown[]): string {
   return args.map(String).join(" ");
 }
 
-function checkExpected(captured: string[], expected: RegExp[], level: string) {
+export function expectConsoleLog(pattern: string | RegExp) {
+  _expected.log.push(toRegExp(pattern));
+}
+export function expectConsoleInfo(pattern: string | RegExp) {
+  _expected.info.push(toRegExp(pattern));
+}
+export function expectConsoleError(pattern: string | RegExp) {
+  _expected.error.push(toRegExp(pattern));
+}
+export function expectConsoleWarn(pattern: string | RegExp) {
+  _expected.warn.push(toRegExp(pattern));
+}
+
+function checkLevel(level: Level) {
+  const captured = _captured[level];
+  const expected = _expected[level];
+
   const unmatched = captured.filter((msg) => !expected.some((re) => re.test(msg)));
   if (unmatched.length > 0) {
     throw new Error(
-      `Unexpected console.${level} during test:\n  ${unmatched.join("\n  ")}`,
+      [
+        `Unexpected console.${level} during test:`,
+        ...unmatched.map((m) => `  ${m}`),
+        ``,
+        `Debugging? Run with: DEBUG=1 bun test …`,
+      ].join("\n"),
     );
   }
   const unused = expected.filter((re) => !captured.some((msg) => re.test(msg)));
@@ -48,29 +67,25 @@ function checkExpected(captured: string[], expected: RegExp[], level: string) {
 
 function installConsoleGuard() {
   beforeEach(() => {
-    _capturedErrors = [];
-    _capturedWarns = [];
-    _expectedErrors = [];
-    _expectedWarns = [];
-
-    console.log = () => {};
-    console.info = () => {};
-    console.error = (...args: unknown[]) => {
-      _capturedErrors.push(stringify(args));
-    };
-    console.warn = (...args: unknown[]) => {
-      _capturedWarns.push(stringify(args));
-    };
+    for (const lvl of ["log", "info", "error", "warn"] as Level[]) {
+      _captured[lvl] = [];
+      _expected[lvl] = [];
+      console[lvl] = (...args: unknown[]) => {
+        _captured[lvl].push(stringify(args));
+        if (_debug) _orig[lvl](...args);
+      };
+    }
   });
 
   afterEach(() => {
-    console.log = _origLog;
-    console.info = _origInfo;
-    console.error = _origError;
-    console.warn = _origWarn;
-
-    checkExpected(_capturedErrors, _expectedErrors, "error");
-    checkExpected(_capturedWarns, _expectedWarns, "warn");
+    for (const lvl of ["log", "info", "error", "warn"] as Level[]) {
+      console[lvl] = _orig[lvl];
+    }
+    if (!_debug) {
+      for (const lvl of ["log", "info", "error", "warn"] as Level[]) {
+        checkLevel(lvl);
+      }
+    }
   });
 }
 
