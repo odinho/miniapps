@@ -11,6 +11,8 @@ export interface Prediction {
 	napsAllDone: boolean;
 	/** Expected end time for the current active nap (null when not napping) */
 	expectedNapEnd: string | null;
+	/** Expected end time for the current active night sleep (null when not in night sleep) */
+	expectedNightEnd: string | null;
 	/** Confidence intervals for nap/bedtime predictions (null when no data) */
 	confidence: ConfidenceResult | null;
 	/** Calibration report: what's learned vs age-default */

@@ -151,6 +151,11 @@ export interface PredictionRow {
 	value: string;
 }
 
+function napDurationStr(startIso: string, endIso: string): string {
+	const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
+	return formatDuration(ms);
+}
+
 export function buildPredictionRows(opts: {
 	ageMonths: number;
 	napCount: number | null;
@@ -160,44 +165,51 @@ export function buildPredictionRows(opts: {
 	serverPrediction: { predictedNaps: PredictedNap[] | null; bedtime: string } | null;
 	totalSleepMinutes: number;
 }): PredictionRow[] {
-	const expected = getExpectedNapCount(opts.ageMonths, opts.napCount ?? undefined);
+	// Derive expected nap count from server prediction when available (reflects learned data),
+	// otherwise fall back to age-based default.
+	const expected = opts.serverPrediction?.predictedNaps
+		? opts.completedNaps + opts.serverPrediction.predictedNaps.length
+		: getExpectedNapCount(opts.ageMonths, opts.napCount ?? undefined);
 	const rows: PredictionRow[] = [
 		{ label: 'Forventa lurar i dag', value: `${opts.completedNaps} av ${expected}` },
 	];
 
 	if (opts.wakeTime && opts.serverPrediction?.predictedNaps) {
-		// Use server prediction (computed with full 7-day history) rather than
-		// recomputing locally with only today's data.
 		const predicted = opts.serverPrediction.predictedNaps;
 		const bedtime = opts.serverPrediction.bedtime;
 		for (let i = 0; i < predicted.length; i++) {
 			const actual = opts.recentSleeps.filter(s => s.type === 'nap' && s.end_time)[i];
-			const predictedStr = `${formatTime(predicted[i].startTime)}–${formatTime(predicted[i].endTime)}`;
-			const actualStr = actual
-				? ` (var ${formatTime(actual.start_time)}–${formatTime(actual.end_time!)})`
-				: '';
-			rows.push({
-				label: `Lur ${i + 1}`,
-				value: `~${predictedStr}${actualStr}`,
-			});
+			const predDur = napDurationStr(predicted[i].startTime, predicted[i].endTime);
+			const predictedStr = `~${formatTime(predicted[i].startTime)}–${formatTime(predicted[i].endTime)}`;
+			if (actual) {
+				const actDur = napDurationStr(actual.start_time, actual.end_time!);
+				rows.push({
+					label: `Lur ${i + 1}`,
+					value: `${predictedStr} (${predDur}), var ${formatTime(actual.start_time)}–${formatTime(actual.end_time!)} (${actDur})`,
+				});
+			} else {
+				rows.push({
+					label: `Lur ${i + 1}`,
+					value: `${predictedStr} (${predDur})`,
+				});
+			}
 		}
 		rows.push({ label: 'Leggetid', value: `~${formatTime(bedtime)}` });
 	} else if (opts.serverPrediction) {
 		if (opts.serverPrediction.predictedNaps) {
 			for (let i = 0; i < opts.serverPrediction.predictedNaps.length; i++) {
 				const nap = opts.serverPrediction.predictedNaps[i];
+				const dur = napDurationStr(nap.startTime, nap.endTime);
 				rows.push({
 					label: `Lur ${i + 1}`,
-					value: `~${formatTime(nap.startTime)}–${formatTime(nap.endTime)}`,
+					value: `~${formatTime(nap.startTime)}–${formatTime(nap.endTime)} (${dur})`,
 				});
 			}
 		}
 		rows.push({ label: 'Leggetid', value: `~${formatTime(opts.serverPrediction.bedtime)}` });
 	}
 
-	if (opts.totalSleepMinutes > 0) {
-		rows.push({ label: 'Søvn i dag', value: formatDuration(opts.totalSleepMinutes * 60000) });
-	}
+	rows.push({ label: 'Søvn i dag', value: opts.totalSleepMinutes > 0 ? formatDuration(opts.totalSleepMinutes * 60000) : '0m' });
 
 	return rows;
 }

@@ -45,6 +45,12 @@
 		timeHM = d.toTimeString().slice(0, 5);
 	}
 
+	function setNow() {
+		const d = new Date();
+		timeDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+		timeHM = d.toTimeString().slice(0, 5);
+	}
+
 	const canSave = $derived(
 		pottyMode ? selectedPottyResult != null : selectedType != null,
 	);
@@ -158,9 +164,10 @@
 				<DateInput bind:value={timeDate} />
 				<TimeInput bind:value={timeHM} />
 			</div>
-			<div style="display: flex; gap: 6px; margin-top: 6px; justify-content: center;">
+			<div style="display: flex; gap: 6px; margin-top: 6px; justify-content: center; align-items: center;">
 				<button class="btn btn-ghost" style="padding: 4px 10px; min-height: 0; font-size: 0.8rem;" onclick={() => adjustMinutes(-5)}>-5 min</button>
 				<button class="btn btn-ghost" style="padding: 4px 10px; min-height: 0; font-size: 0.8rem;" onclick={() => adjustMinutes(-1)}>-1 min</button>
+				<button class="btn btn-ghost" style="padding: 4px 10px; min-height: 0; font-size: 0.8rem; font-weight: 600;" onclick={setNow}>Nå</button>
 				<button class="btn btn-ghost" style="padding: 4px 10px; min-height: 0; font-size: 0.8rem;" onclick={() => adjustMinutes(1)}>+1 min</button>
 				<button class="btn btn-ghost" style="padding: 4px 10px; min-height: 0; font-size: 0.8rem;" onclick={() => adjustMinutes(5)}>+5 min</button>
 			</div>

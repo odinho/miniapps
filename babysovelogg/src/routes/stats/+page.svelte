@@ -21,6 +21,7 @@
 	const sleepInfoRows = $derived(baby ? buildSleepInfoRows(ageMonths) : []);
 	const nextMilestone = $derived(baby ? getNextSleepMilestone(ageMonths) : null);
 	const selectedNapCount = $derived(baby?.custom_nap_count ?? null);
+	const pottyMode = $derived(baby?.potty_mode === 1);
 
 	const predictionRows = $derived(
 		baby
@@ -279,7 +280,7 @@
 					</div>
 					<div class="stats-card">
 						<div class="stat-value">{stats.diaperStats7.wetCount}/{stats.diaperStats7.dirtyCount}/{stats.diaperStats7.bothCount}</div>
-						<div class="stat-label">Våt/Skitten/Begge</div>
+						<div class="stat-label">{pottyMode ? 'Tiss/Bæsj/Begge' : 'Våt/Skitten/Begge'}</div>
 					</div>
 					{#if stats.diaperStats30 && stats.diaperStats30.pottyCount > 0 && stats.diaperStats30.pottySuccessRate != null}
 						<div class="stats-card">

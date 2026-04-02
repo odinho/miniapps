@@ -138,8 +138,8 @@ export function computeDiaperStats(diapers: DiaperLogRow[]): DiaperStats {
 	let pottySuccess = 0;
 
 	for (const d of diapers) {
-		if (d.type === "wet") wetCount++;
-		else if (d.type === "dirty") dirtyCount++;
+		if (d.type === "wet" || d.type === "potty_wet") wetCount++;
+		else if (d.type === "dirty" || d.type === "potty_dirty") dirtyCount++;
 		else if (d.type === "both") bothCount++;
 
 		if (d.type.startsWith("potty_")) {

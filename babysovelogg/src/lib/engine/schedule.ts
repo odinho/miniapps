@@ -1,4 +1,4 @@
-import { WAKE_WINDOWS, NAP_COUNTS, findByAge } from "./constants.js";
+import { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, findByAge } from "./constants.js";
 export { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, findByAge } from "./constants.js";
 export type { SleepEntry } from "$lib/types.js";
 import type { SleepEntry, BabyContext } from "$lib/types.js";
@@ -362,6 +362,25 @@ function getLearnedBedtimeWakeWindow(ctx: BabyContext): number {
 
   if (gaps.length < 2) return defaultWW;
   return gaps.reduce((a, b) => a + b, 0) / gaps.length;
+}
+
+/** Learn average night sleep duration (minutes) from recent completed nights. */
+export function getLearnedNightDuration(ctx: BabyContext): number {
+  const sleepNeed = findByAge(SLEEP_NEEDS, ctx.ageMonths);
+  // Default: total sleep need minus typical nap time
+  const napDur = getLearnedNapDuration(ctx);
+  const napCount = resolveNapCount(ctx);
+  const defaultNight = (sleepNeed.totalHours * 60) - (napDur * napCount);
+
+  const nights = ctx.recentSleeps.filter((s) => s.type === "night" && s.end_time);
+  if (nights.length < 2) return defaultNight;
+
+  const durations = nights
+    .map((s) => (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60000)
+    .filter((d) => d >= 360 && d <= 900); // 6h–15h
+
+  if (durations.length < 2) return defaultNight;
+  return Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);
 }
 
 /** Learn average nap duration from recent completed naps, fallback to age-based defaults. */

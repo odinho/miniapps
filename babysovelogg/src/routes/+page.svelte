@@ -39,7 +39,7 @@
 	function showUndoToast(message: string, undoEvents: Array<{ type: string; payload: Record<string, unknown> }>) {
 		if (undoTimer) clearTimeout(undoTimer);
 		undoToast = { message, undoEvents };
-		undoTimer = setTimeout(() => { undoToast = null; }, 5000);
+		undoTimer = setTimeout(() => { undoToast = null; }, 8000);
 	}
 
 	async function handleUndo() {
@@ -168,8 +168,9 @@
 
 	const arcEndLabel = $derived.by(() => {
 		if (isNightMode) {
-			// Night: end = expected wake-up (use 07:00 as default or prediction)
-			return null; // Will show ☀️ icon
+			// Night: end = expected wake-up from learned night duration
+			if (prediction?.expectedNightEnd) return formatTime(prediction.expectedNightEnd);
+			return null;
 		}
 		// Day: end = predicted bedtime
 		return prediction?.bedtime ? formatTime(prediction.bedtime) : null;

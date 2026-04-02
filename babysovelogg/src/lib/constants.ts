@@ -37,9 +37,9 @@ export const FALL_ASLEEP_LABELS: Record<string, string> = {
 };
 
 export const FALL_ASLEEP_BUCKETS = [
-  { value: "<5", label: "< 5 min" },
-  { value: "5-20", label: "5–20 min" },
-  { value: "20+", label: "20+ min" },
+  { value: "<5", label: "Kjapp (< 5 min)" },
+  { value: "5-20", label: "Normal (5–20 min)" },
+  { value: "20+", label: "Treg (20+ min)" },
 ] as const;
 
 /** Wake mood options — assessed ~5 min after waking, not the initial cry. */

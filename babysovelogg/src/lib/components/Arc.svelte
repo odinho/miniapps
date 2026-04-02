@@ -103,6 +103,8 @@
 		predictionIndex?: number;
 		label: { x: number; y: number; text: string; opacity: number } | null;
 		tapD: string;
+		/** When true, render as a circle dot instead of an arc path */
+		dot: { cx: number; cy: number; r: number } | null;
 	}
 
 	const renderedBubbles = $derived.by((): RenderedBubble[] => {
@@ -125,7 +127,9 @@
 			// Sleep is outside this arc's time window (clamping inverted start/end)
 			if (endFrac < startFrac) continue;
 
-			if (bubble.status === 'active' && endFrac - startFrac < 0.015) {
+			const isVeryShort = endFrac - startFrac < 0.015;
+
+			if (bubble.status === 'active' && isVeryShort) {
 				endFrac = Math.min(1, startFrac + 0.015);
 			}
 
@@ -194,6 +198,13 @@
 				};
 			}
 
+			// For very short active arcs, render as a dot instead of a path
+			let dot: RenderedBubble['dot'] = null;
+			if (bubble.status === 'active' && isVeryShort) {
+				const dotPt = fracToPoint(startFrac, cx, cy, r);
+				dot = { cx: dotPt.x, cy: dotPt.y, r: strokeWidth / 2 };
+			}
+
 			result.push({
 				d,
 				status: bubble.status,
@@ -208,6 +219,7 @@
 				predictionIndex: bubble.predictionIndex,
 				label,
 				tapD,
+				dot,
 			});
 		}
 
@@ -315,17 +327,29 @@
 	<!-- Sleep bubbles -->
 	{#each renderedBubbles as b}
 		<g class="arc-bubble arc-bubble-{b.status}">
-			<path
-				d={b.d}
-				fill="none"
-				stroke={b.stroke}
-				stroke-width={b.strokeWidth}
-				stroke-linecap="round"
-				opacity={b.opacity}
-				stroke-dasharray={b.dashArray}
-				filter={b.filter}
-				class={b.cssClass}
-			/>
+			{#if b.dot}
+				<circle
+					cx={b.dot.cx}
+					cy={b.dot.cy}
+					r={b.dot.r}
+					fill={b.stroke}
+					opacity={b.opacity}
+					filter={b.filter}
+					class={b.cssClass}
+				/>
+			{:else}
+				<path
+					d={b.d}
+					fill="none"
+					stroke={b.stroke}
+					stroke-width={b.strokeWidth}
+					stroke-linecap="round"
+					opacity={b.opacity}
+					stroke-dasharray={b.dashArray}
+					filter={b.filter}
+					class={b.cssClass}
+				/>
+			{/if}
 
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<!-- svelte-ignore a11y_click_events_have_key_events -->

@@ -50,9 +50,10 @@ export function formatPayloadValue(key: string, value: unknown): string | null {
 	if (key.endsWith('DomainId') || key === 'clientId' || key === 'domainId') return null;
 
 	if (typeof value === 'string') {
-		// Shorten ISO dates to just the time
+		// Shorten ISO dates to local HH:MM
 		if (ISO_RE.test(value)) {
-			return value.slice(11, 16); // "HH:MM"
+			const d = new Date(value);
+			return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 		}
 		// Truncate long strings
 		if (value.length > 30) {

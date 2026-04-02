@@ -71,8 +71,6 @@
 		<span class="countdown-value">{formatDurationLong(mode.elapsed)}</span>
 		{#if mode.expectedWake && mode.expectedWakeCountdown != null && mode.expectedWakeCountdown > 0}
 			<div class="arc-sub-label" style="opacity: 0.8;">Vaknar ~{formatTime(mode.expectedWake)} ({formatDuration(mode.expectedWakeCountdown)})</div>
-		{:else if activeSleep?.type === 'nap' && prediction?.bedtime}
-			<div class="arc-sub-label">Leggetid ~{formatTime(prediction.bedtime)}</div>
 		{/if}
 	{:else if mode.kind === 'deep-night'}
 		<div class="arc-center-label">God natt 💤</div>

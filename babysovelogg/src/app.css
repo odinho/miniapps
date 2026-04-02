@@ -1135,18 +1135,18 @@ html, body {
 }
 
 .stats-trend-label {
-  flex: 0 0 auto;
+  flex: 1 1 0;
   font-size: 0.85rem;
   min-width: 0;
 }
 
 .stats-trend-val {
-  flex: 1;
+  flex: 0 0 auto;
   text-align: right;
   font-size: 0.85rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  min-width: 0;
+  min-width: 5.5em;
 }
 
 /* --- Compact summary row --- */
@@ -1297,7 +1297,7 @@ html, body {
 /* --- Undo toast --- */
 .undo-toast {
   position: fixed;
-  bottom: calc(80px + var(--safe-bottom));
+  top: calc(16px + var(--safe-top, 0px));
   left: 50%;
   transform: translateX(-50%);
   background: var(--text);
