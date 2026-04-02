@@ -1,6 +1,11 @@
 import type { SleepEntry, BabyContext } from "$lib/types.js";
 import type { PredictedNap } from "./schedule.js";
-import { predictDayNaps, recommendBedtime, calculateAgeMonths, getLearnedNightDuration } from "./schedule.js";
+import {
+  predictDayNaps,
+  predictNightEndTime,
+  recommendBedtime,
+  calculateAgeMonths,
+} from "./schedule.js";
 
 /** A single day's recorded sleep data. */
 export interface DayRecord {
@@ -45,9 +50,6 @@ export type NapPredictor = (wakeUpTime: string, ctx: BabyContext) => PredictedNa
 /** Bedtime predictor function signature — takes today's sleeps and baby context. */
 export type BedtimePredictor = (todaySleeps: SleepEntry[], ctx: BabyContext) => string;
 
-/** Night duration predictor — returns expected night sleep duration in minutes. */
-export type NightDurationPredictor = (ctx: BabyContext) => number;
-
 /**
  * Run a backtest: replay historical sleep data day-by-day, predict each day
  * using only prior data, and compare predictions to actuals.
@@ -63,7 +65,6 @@ export function backtest(
     lookbackDays?: number;
     predict?: NapPredictor;
     predictBedtime?: BedtimePredictor;
-    predictNightDuration?: NightDurationPredictor;
     customNapCount?: number | null;
     tz?: string;
   },
@@ -71,7 +72,6 @@ export function backtest(
   const lookback = options?.lookbackDays ?? 7;
   const predict = options?.predict ?? predictDayNaps;
   const bedtimePredict = options?.predictBedtime ?? recommendBedtime;
-  const nightDurationPredict = options?.predictNightDuration ?? getLearnedNightDuration;
   const customNapCount = options?.customNapCount ?? null;
   const tz = options?.tz ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -146,12 +146,11 @@ export function backtest(
         (new Date(predictedBedtime).getTime() - new Date(actualBedtime).getTime()) / 60000;
     }
 
-    // Wake time prediction: use tonight's actual bedtime + predicted night duration,
-    // compare to next day's actual wake time.
+    // Wake time prediction: use tonight's actual bedtime and the engine's
+    // night-end predictor, then compare to the next day's actual wake time.
     let wakeTimeError: number | null = null;
     if (actualBedtime && i + 1 < days.length) {
-      const predictedNightDur = nightDurationPredict(ctx);
-      const predictedWakeMs = new Date(actualBedtime).getTime() + predictedNightDur * 60000;
+      const predictedWakeMs = new Date(predictNightEndTime(actualBedtime, ctx)).getTime();
       const actualWakeMs = new Date(days[i + 1].wakeTime).getTime();
       wakeTimeError = (predictedWakeMs - actualWakeMs) / 60000;
     }

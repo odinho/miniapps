@@ -4,8 +4,8 @@ import {
   recommendBedtime,
   predictDayNaps,
   resolveNapCount,
-  getLearnedNapDuration,
-  getLearnedNightDuration,
+  predictNapEndTime,
+  predictNightEndTime,
 } from "./schedule.js";
 import { getTodayStats } from "./stats.js";
 import { computeConfidence } from "./confidence.js";
@@ -136,19 +136,13 @@ export function assembleState(data: DayData) {
       // Compute expected nap end for active naps
       let expectedNapEnd: string | null = null;
       if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
-        const napDuration = getLearnedNapDuration(ctx);
-        expectedNapEnd = new Date(
-          new Date(activeSleep.start_time).getTime() + napDuration * 60_000,
-        ).toISOString();
+        expectedNapEnd = predictNapEndTime(activeSleep.start_time, ctx);
       }
 
       // Compute expected night end for active night sleep
       let expectedNightEnd: string | null = null;
       if (activeSleep && activeSleep.type === "night" && !activeSleep.end_time) {
-        const nightDuration = getLearnedNightDuration(ctx);
-        expectedNightEnd = new Date(
-          new Date(activeSleep.start_time).getTime() + nightDuration * 60_000,
-        ).toISOString();
+        expectedNightEnd = predictNightEndTime(activeSleep.start_time, ctx);
       }
 
       prediction = {

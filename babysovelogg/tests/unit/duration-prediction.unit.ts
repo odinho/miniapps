@@ -149,9 +149,9 @@ describe("duration and wake-time prediction", () => {
   it("overall metrics", () => {
     expect(renderDurationMetrics(result)).toMatchInlineSnapshot(`
       "82 days
-      nap dur MAE: 23.5 min (bias -1.9)
-      nap end MAE: 64.7 min
-      wake time MAE: 46.5 min (bias -18.7)"
+      nap dur MAE: 23.8 min (bias -3.3)
+      nap end MAE: 65.1 min
+      wake time MAE: 43.6 min (bias -20.4)"
     `);
 
     expect(result.napDurationMAE).toBeLessThan(30);
@@ -166,10 +166,10 @@ describe("duration and wake-time prediction", () => {
       return `${b.label}: dur MAE ${r.napDurationMAE}, wake MAE ${r.wakeTimeMAE}`;
     });
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "6mo: dur MAE 21.3, wake MAE 13.6
-      7mo: dur MAE 27.4, wake MAE 31.6
-      8mo: dur MAE 17.7, wake MAE 27.1
-      9mo: dur MAE 29.2, wake MAE 112.1"
+      "6mo: dur MAE 22.1, wake MAE 22
+      7mo: dur MAE 27.8, wake MAE 29.2
+      8mo: dur MAE 17.7, wake MAE 19
+      9mo: dur MAE 29.8, wake MAE 113"
     `);
   });
 
@@ -179,10 +179,10 @@ describe("duration and wake-time prediction", () => {
       `${b.label}: dur MAE ${b.result.napDurationMAE}, wake MAE ${b.result.wakeTimeMAE}`,
     );
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "day 1-3: dur MAE 25.3, wake MAE 17.4
-      day 4-7: dur MAE 28.3, wake MAE 33
-      day 8-14: dur MAE 24.3, wake MAE 28.7
-      day 15+: dur MAE 22.8, wake MAE 50.6"
+      "day 1-3: dur MAE 25.3, wake MAE 20
+      day 4-7: dur MAE 29.3, wake MAE 35.8
+      day 8-14: dur MAE 24.5, wake MAE 26.9
+      day 15+: dur MAE 23.1, wake MAE 47.1"
     `);
 
     const earlyDur = warmup.find((b) => b.label === "day 1-3")!.result.napDurationMAE;
@@ -192,16 +192,16 @@ describe("duration and wake-time prediction", () => {
 
   it("per-position duration (1st nap ≠ 2nd nap)", () => {
     expect(renderPositionalDurations()).toMatchInlineSnapshot(`
-      "nap 1: avg 69 min actual, MAE 24.9, bias -3 (n=82)
-      nap 2: avg 61 min actual, MAE 21.4, bias +0.1 (n=57)
-      nap 3: avg 60 min actual, MAE 23.9, bias -13.4 (n=2)"
+      "nap 1: avg 69 min actual, MAE 25.2, bias -4.5 (n=82)
+      nap 2: avg 61 min actual, MAE 21.8, bias -1.1 (n=57)
+      nap 3: avg 60 min actual, MAE 24.9, bias -16.4 (n=2)"
     `);
   });
 });
 
 describe("confidence interval coverage", () => {
   it("±1 SD ranges contain a reasonable fraction of actuals", () => {
-    expect(renderCIcoverage()).toMatchInlineSnapshot(`"68/125 naps within ±1 SD range (54%)"`);
+    expect(renderCIcoverage()).toMatchInlineSnapshot(`"66/125 naps within ±1 SD range (53%)"`);
 
     // Ranges are ±1 SD so ~68% coverage expected if well-calibrated.
     // We accept ≥40% as a floor — below that the ranges are meaningless.

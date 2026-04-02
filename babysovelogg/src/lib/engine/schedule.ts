@@ -68,6 +68,11 @@ export interface PredictedNap {
   endTime: string;
 }
 
+interface WeightedSample {
+  value: number;
+  weight: number;
+}
+
 /** Get expected nap count, using custom override if set. Does NOT use learned data. */
 export function getExpectedNapCount(ageMonths: number, customNapCount?: number | null): number {
   if (customNapCount != null) return customNapCount;
@@ -372,15 +377,11 @@ export function getLearnedNightDuration(ctx: BabyContext): number {
   const napCount = resolveNapCount(ctx);
   const defaultNight = (sleepNeed.totalHours * 60) - (napDur * napCount);
 
-  const nights = ctx.recentSleeps.filter((s) => s.type === "night" && s.end_time);
-  if (nights.length < 2) return defaultNight;
+  const samples = collectWeightedDurations(ctx.recentSleeps, "night", 360, 900);
+  if (samples.length < 2) return Math.round(defaultNight);
 
-  const durations = nights
-    .map((s) => (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60000)
-    .filter((d) => d >= 360 && d <= 900); // 6h–15h
-
-  if (durations.length < 2) return defaultNight;
-  return Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);
+  const learned = weightedTrimmedMean(samples);
+  return Math.round(blendEstimate(defaultNight, learned, samples.length, 2, 6));
 }
 
 /** Learn average nap duration from recent completed naps, fallback to age-based defaults. */
@@ -390,18 +391,39 @@ export function getLearnedNapDuration(ctx: BabyContext): number {
 
   if (ctx.recentSleeps.length === 0) return defaultDuration;
 
-  const naps = ctx.recentSleeps.filter((s) => s.type === "nap" && s.end_time);
-  if (naps.length < 3) return defaultDuration;
+  const samples = collectWeightedDurations(ctx.recentSleeps, "nap", 10, 180);
+  if (samples.length < 3) return defaultDuration;
 
-  const durations = naps
-    .map((s) => {
-      const dur = (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60000;
-      return dur;
-    })
-    .filter((d) => d >= 10 && d <= 180); // Filter out unreasonable values
+  const learned = weightedTrimmedMean(samples);
+  return Math.round(blendEstimate(defaultDuration, learned, samples.length, 3, 8));
+}
 
-  if (durations.length < 3) return defaultDuration;
-  return Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);
+/** Predict the likely end of an active nap using learned duration and cycle boundaries. */
+export function predictNapEndTime(startTime: string, ctx: BabyContext): string {
+  const startMs = new Date(startTime).getTime();
+  const targetDuration = getLearnedNapDuration(ctx);
+  const cycleMinutes = getSleepCycleMinutes(ctx.ageMonths);
+  const predictedDuration = snapToCycleBoundary(targetDuration, cycleMinutes, 1, 3, 10, 180);
+  return new Date(startMs + predictedDuration * 60_000).toISOString();
+}
+
+/** Predict the likely wake-up time from an active night sleep. */
+export function predictNightEndTime(startTime: string, ctx: BabyContext): string {
+  const start = new Date(startTime);
+  const startMs = start.getTime();
+  const cycleMinutes = getSleepCycleMinutes(ctx.ageMonths);
+  const durationEstimate = getLearnedNightDuration(ctx);
+  const durationBasedMs =
+    startMs + snapToCycleBoundary(durationEstimate, cycleMinutes, 6, 16, 360, 900) * 60_000;
+
+  const habitualWake = getHabitualWakeTimePrediction(start, ctx);
+  if (habitualWake === null) {
+    return new Date(durationBasedMs).toISOString();
+  }
+
+  const minWakeMs = startMs + 360 * 60_000;
+  const maxWakeMs = startMs + 900 * 60_000;
+  return new Date(clamp(habitualWake, minWakeMs, maxWakeMs)).toISOString();
 }
 
 /**
@@ -430,4 +452,135 @@ function getAverageWakeWindowFromSleeps(sleeps: SleepEntry[]): number | null {
 
   if (gaps.length === 0) return null;
   return gaps.reduce((a, b) => a + b, 0) / gaps.length;
+}
+
+function collectWeightedDurations(
+  sleeps: SleepEntry[],
+  type: SleepEntry["type"],
+  minMinutes: number,
+  maxMinutes: number,
+): WeightedSample[] {
+  const sorted = [...sleeps]
+    .filter((s) => s.type === type && s.end_time)
+    .toSorted((a, b) => new Date(a.end_time!).getTime() - new Date(b.end_time!).getTime());
+
+  return sorted
+    .map((s, idx) => ({
+      value: (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60_000,
+      weight: Math.pow(0.85, sorted.length - 1 - idx),
+    }))
+    .filter((sample) => sample.value >= minMinutes && sample.value <= maxMinutes);
+}
+
+function weightedTrimmedMean(samples: WeightedSample[], trimFraction = 0.15): number {
+  const sorted = [...samples].sort((a, b) => a.value - b.value);
+  if (sorted.length <= 2) return weightedMean(sorted);
+
+  const trimCount = Math.floor(sorted.length * trimFraction);
+  const kept = sorted.slice(trimCount, Math.max(trimCount + 1, sorted.length - trimCount));
+  return weightedMean(kept);
+}
+
+function weightedMean(samples: WeightedSample[]): number {
+  const totalWeight = samples.reduce((sum, sample) => sum + sample.weight, 0);
+  if (totalWeight === 0) return 0;
+  return samples.reduce((sum, sample) => sum + sample.value * sample.weight, 0) / totalWeight;
+}
+
+function blendEstimate(
+  fallback: number,
+  learned: number,
+  sampleCount: number,
+  minSamples: number,
+  fullLearningSamples: number,
+): number {
+  if (sampleCount < minSamples) return fallback;
+  const blend = clamp((sampleCount - minSamples + 1) / (fullLearningSamples - minSamples + 1), 0, 1);
+  return fallback * (1 - blend) + learned * blend;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function getSleepCycleMinutes(ageMonths: number): number {
+  if (ageMonths < 3) return 55;
+  if (ageMonths < 6) return 60;
+  if (ageMonths < 12) return 65;
+  return 70;
+}
+
+function snapToCycleBoundary(
+  durationMinutes: number,
+  cycleMinutes: number,
+  minCycles: number,
+  maxCycles: number,
+  minMinutes: number,
+  maxMinutes: number,
+): number {
+  const bounded = clamp(durationMinutes, minMinutes, maxMinutes);
+  const minBoundary = minCycles * cycleMinutes;
+  const maxBoundary = maxCycles * cycleMinutes;
+  const cycleBounded = clamp(bounded, minBoundary, maxBoundary);
+  const cycles = clamp(Math.round(cycleBounded / cycleMinutes), minCycles, maxCycles);
+  return clamp(cycles * cycleMinutes, minMinutes, maxMinutes);
+}
+
+function collectNightWakeMinuteSamples(ctx: BabyContext): WeightedSample[] {
+  const nights = [...ctx.recentSleeps]
+    .filter((s) => s.type === "night" && s.end_time)
+    .toSorted((a, b) => new Date(a.end_time!).getTime() - new Date(b.end_time!).getTime());
+
+  return nights.map((s, idx) => ({
+    value: getLocalMinuteOfDay(new Date(s.end_time!), ctx.tz),
+    weight: Math.pow(0.85, nights.length - 1 - idx),
+  }));
+}
+
+function getHabitualWakeTimePrediction(
+  start: Date,
+  ctx: BabyContext,
+): number | null {
+  const samples = collectNightWakeMinuteSamples(ctx);
+  if (samples.length < 2) return null;
+
+  const habitualMinute = weightedMedian(samples);
+  const predicted = new Date(start);
+  predicted.setUTCDate(predicted.getUTCDate() + 1);
+  const localDate = isoToDateInTz(predicted.toISOString(), ctx.tz);
+  const candidate = setLocalClockTime(localDate, habitualMinute, ctx.tz);
+  return candidate.getTime();
+}
+
+function weightedMedian(samples: WeightedSample[]): number {
+  const sorted = [...samples].sort((a, b) => a.value - b.value);
+  const totalWeight = sorted.reduce((sum, sample) => sum + sample.weight, 0);
+  if (totalWeight === 0) return sorted[0]?.value ?? 0;
+
+  let running = 0;
+  for (const sample of sorted) {
+    running += sample.weight;
+    if (running >= totalWeight / 2) return sample.value;
+  }
+
+  return sorted[sorted.length - 1]?.value ?? 0;
+}
+
+function getLocalMinuteOfDay(date: Date, tz: string): number {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: tz,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+
+  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
+  return hour * 60 + minute;
+}
+
+function setLocalClockTime(localDate: string, minuteOfDay: number, tz: string): Date {
+  const hour = Math.floor(minuteOfDay / 60);
+  const minute = minuteOfDay % 60;
+  return setHourInTz(new Date(`${localDate}T12:00:00.000Z`), hour, minute, tz);
 }

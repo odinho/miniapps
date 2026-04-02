@@ -62,7 +62,7 @@ describe("planBackwardFromBedtime", () => {
     const naps = planBackwardFromBedtime(WAKE, BEDTIME, ctx({ recentSleeps }));
 
     expect(naps.length).toBe(2);
-    expect(renderNaps(naps)).toMatchInlineSnapshot(`"10:00–11:00, 14:00–15:00"`);
+    expect(renderNaps(naps)).toMatchInlineSnapshot(`"10:20–11:10, 14:10–15:00"`);
   });
 
   it("0 naps returns empty", () => {
