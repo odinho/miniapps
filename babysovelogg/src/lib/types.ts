@@ -86,6 +86,7 @@ export interface PredictionFeatures {
   positionalDuration: boolean;  // per-position nap durations (1st ≠ 2nd)
   habitualWake: boolean;        // circadian wake-time anchor
   habitualBedtime: boolean;     // family routine bedtime anchor
+  habitualNapStart: boolean;    // circadian nap-time anchor (blend with pressure)
   cycleBias: boolean;           // soft-snap to sleep cycle boundaries
   sleepBudget: boolean;         // adjust night duration based on day's nap total
   weightedRecency: boolean;     // recency-weighted duration learning
@@ -95,6 +96,7 @@ export const DEFAULT_FEATURES: PredictionFeatures = {
   positionalDuration: true,
   habitualWake: true,
   habitualBedtime: true,
+  habitualNapStart: true,
   cycleBias: true,
   sleepBudget: true,
   weightedRecency: true,

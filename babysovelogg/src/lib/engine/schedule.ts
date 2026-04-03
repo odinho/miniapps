@@ -100,13 +100,37 @@ export function predictDayNaps(wakeUpTime: string, ctx: BabyContext): PredictedN
     getPositionalDataForNapCount(ctx, expectedNaps);
   const defaultDuration = getLearnedNapDuration(ctx);
 
+  // Habitual nap start anchoring: only meaningful once circadian rhythm develops (~5mo+)
+  const useHabitualNapStart = feat(ctx, "habitualNapStart") && ctx.ageMonths >= 5;
+  let habitualStarts: (number | undefined)[] = [];
+  let habitualWeights: number[] = [];
+  if (useHabitualNapStart) {
+    // Single pass collects both start times and wake window samples
+    const napData = collectHabitualNapData(ctx, expectedNaps);
+    habitualStarts = computeHabitualNapStarts(wakeUpTime, ctx, expectedNaps, napData.startSamples);
+    habitualWeights = computeHabitualNapWeights(expectedNaps, napData.startSamples, napData.wwSamples);
+  }
+
   const predictions: PredictedNap[] = [];
   let currentWake = new Date(wakeUpTime);
 
   for (let i = 0; i < expectedNaps; i++) {
     const ww = positionalWWs[i] ?? defaultWW;
     const duration = (feat(ctx, "positionalDuration") ? positionalDurs[i] : undefined) ?? defaultDuration;
-    const napStart = new Date(currentWake.getTime() + ww * 60 * 1000);
+    const pressureStart = new Date(currentWake.getTime() + ww * 60 * 1000);
+
+    // Blend pressure-based start with habitual start (like bedtime anchoring)
+    // Sanity: habitual must be after current wake (can't nap before waking up)
+    let napStart: Date;
+    const habitualMs = habitualStarts[i];
+    const weight = habitualWeights[i] ?? 0;
+    if (habitualMs !== undefined && weight > 0 && habitualMs > currentWake.getTime()) {
+      const blendedMs = pressureStart.getTime() * (1 - weight) + habitualMs * weight;
+      napStart = new Date(Math.round(blendedMs));
+    } else {
+      napStart = pressureStart;
+    }
+
     const napEnd = new Date(napStart.getTime() + duration * 60 * 1000);
 
     predictions.push({
@@ -864,4 +888,165 @@ function setLocalClockTime(dateStr: string, minuteOfDay: number, tz: string): Da
   const hour = Math.floor(minuteOfDay / 60);
   const minute = minuteOfDay % 60;
   return setHourInTz(new Date(`${dateStr}T12:00:00.000Z`), hour, minute, tz);
+}
+
+// ─── Habitual nap start anchoring ──────────────────────────────────────────
+
+/**
+ * Collect per-position nap start times AND wake window samples in a single pass.
+ * Filters to days matching the target nap count during transitions.
+ * Returns both datasets to avoid redundant day-grouping work.
+ */
+function collectHabitualNapData(
+  ctx: BabyContext,
+  targetNapCount: number,
+): { startSamples: Map<number, WeightedSample[]>; wwSamples: Map<number, WeightedSample[]> } {
+  const empty = { startSamples: new Map(), wwSamples: new Map() };
+  if (ctx.recentSleeps.length < 4) return empty;
+
+  // Group ALL sleeps by day (needed for wake window gaps between any sleep types)
+  const allByDay = new Map<string, SleepEntry[]>();
+  const napsByDay = new Map<string, SleepEntry[]>();
+  for (const s of ctx.recentSleeps) {
+    if (!s.end_time) continue;
+    const day = localDate(s.start_time, ctx.tz);
+    if (!allByDay.has(day)) allByDay.set(day, []);
+    allByDay.get(day)!.push(s);
+    if (s.type === "nap") {
+      if (!napsByDay.has(day)) napsByDay.set(day, []);
+      napsByDay.get(day)!.push(s);
+    }
+  }
+
+  // Filter to days matching target nap count during transitions
+  const allNapCounts = [...napsByDay.values()].map((ds) => ds.length);
+  const uniqueCounts = new Set(allNapCounts);
+  const useFiltered = uniqueCounts.size > 1;
+
+  const sortedDayKeys = [...new Set([...allByDay.keys(), ...napsByDay.keys()])]
+    .toSorted();
+
+  const startSamples = new Map<number, WeightedSample[]>();
+  const wwSamples = new Map<number, WeightedSample[]>();
+
+  for (let dayIdx = 0; dayIdx < sortedDayKeys.length; dayIdx++) {
+    const dayKey = sortedDayKeys[dayIdx];
+    const dayNaps = napsByDay.get(dayKey);
+    if (!dayNaps) continue;
+
+    // Skip days with wrong nap count during transitions
+    if (useFiltered && dayNaps.length !== targetNapCount) continue;
+
+    const recencyWeight = Math.pow(0.85, sortedDayKeys.length - 1 - dayIdx);
+
+    // Nap start times by position
+    const sortedNaps = dayNaps.toSorted(
+      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
+    );
+    for (let pos = 0; pos < sortedNaps.length; pos++) {
+      const minuteOfDay = getLocalMinuteOfDay(new Date(sortedNaps[pos].start_time), ctx.tz);
+      if (!startSamples.has(pos)) startSamples.set(pos, []);
+      startSamples.get(pos)!.push({ value: minuteOfDay, weight: recencyWeight });
+    }
+
+    // Wake windows by position (gaps between consecutive sleeps before naps)
+    const allSleeps = allByDay.get(dayKey);
+    if (allSleeps) {
+      const sorted = [...allSleeps].toSorted(
+        (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
+      );
+      let napPos = 0;
+      for (let i = 1; i < sorted.length; i++) {
+        if (sorted[i].type !== "nap") continue;
+        const gapMin = (new Date(sorted[i].start_time).getTime() - new Date(sorted[i - 1].end_time!).getTime()) / 60000;
+        if (gapMin >= 10 && gapMin <= 480) {
+          if (!wwSamples.has(napPos)) wwSamples.set(napPos, []);
+          wwSamples.get(napPos)!.push({ value: gapMin, weight: recencyWeight });
+        }
+        napPos++;
+      }
+    }
+  }
+
+  return { startSamples, wwSamples };
+}
+
+/** Compute habitual nap start times (epoch ms) from pre-collected samples. */
+function computeHabitualNapStarts(
+  wakeUpTime: string,
+  ctx: BabyContext,
+  targetNapCount: number,
+  startSamples: Map<number, WeightedSample[]>,
+): (number | undefined)[] {
+  if (startSamples.size === 0) return [];
+
+  const wakeDate = isoToDateInTz(wakeUpTime, ctx.tz);
+  const result: (number | undefined)[] = [];
+
+  for (let pos = 0; pos < targetNapCount; pos++) {
+    const posSamples = startSamples.get(pos);
+    if (!posSamples || posSamples.length < 2) continue;
+    const habitualMinute = weightedMedian(posSamples);
+    result[pos] = setLocalClockTime(wakeDate, habitualMinute, ctx.tz).getTime();
+  }
+
+  return result;
+}
+
+/**
+ * Compute habitual nap start weights from pre-collected samples.
+ *
+ * Dynamic approach:
+ * - Absolute gate: SD > 40 min → no habitual signal
+ * - Ratio: compare nap start SD vs wake window SD (clock vs pressure driven)
+ * - Ramp: weight increases with sample count
+ */
+function computeHabitualNapWeights(
+  targetNapCount: number,
+  startSamples: Map<number, WeightedSample[]>,
+  wwSamples: Map<number, WeightedSample[]>,
+): number[] {
+  if (startSamples.size === 0) return [];
+
+  const weights: number[] = [];
+
+  for (let pos = 0; pos < targetNapCount; pos++) {
+    const napSamples = startSamples.get(pos);
+    if (!napSamples || napSamples.length < 3) {
+      weights[pos] = 0;
+      continue;
+    }
+
+    const napStartSD = weightedSD(napSamples);
+
+    // Absolute gate: if nap start times vary by more than 40 min SD,
+    // there's no habitual signal worth anchoring to.
+    if (napStartSD > 40) {
+      weights[pos] = 0;
+      continue;
+    }
+
+    // Base consistency weight from absolute SD
+    // SD < 15 min → base 0.65, SD = 40 → base 0
+    const consistencyWeight = clamp(1 - (napStartSD - 10) / 45, 0, 0.65);
+
+    // If we have WW data, modulate by the ratio (clock vs pressure driven)
+    const wwSamplesForPos = wwSamples.get(pos);
+    let ratioModulator = 1.0;
+    if (wwSamplesForPos && wwSamplesForPos.length >= 3) {
+      const wwSD = weightedSD(wwSamplesForPos);
+      // If WW SD >> nap start SD, timing is clock-driven → keep full weight
+      // If WW SD << nap start SD, timing is pressure-driven → reduce weight
+      if (napStartSD + wwSD > 0) {
+        ratioModulator = clamp(wwSD / (napStartSD + wwSD) * 2, 0.3, 1.0);
+      }
+    }
+
+    // Ramp up with sample count (like blendEstimate): 3 samples → 33%, 6+ → 100%
+    const sampleRamp = clamp((napSamples.length - 2) / 4, 0.25, 1);
+
+    weights[pos] = consistencyWeight * ratioModulator * sampleRamp;
+  }
+
+  return weights;
 }

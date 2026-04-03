@@ -57,6 +57,7 @@ const featureNames: { key: FeatureKey; label: string }[] = [
   { key: "positionalDuration", label: "positional nap duration" },
   { key: "habitualWake", label: "habitual wake anchor" },
   { key: "habitualBedtime", label: "habitual bedtime anchor" },
+  { key: "habitualNapStart", label: "habitual nap start anchor" },
   { key: "cycleBias", label: "sleep cycle bias" },
   { key: "sleepBudget", label: "sleep budget" },
   { key: "weightedRecency", label: "weighted recency" },
@@ -72,14 +73,14 @@ const ablations = featureNames.map(({ key, label }) => ({
 
 describe("feature ablation", () => {
   it("all features enabled (baseline)", () => {
-    expect(renderSummary(allOn, "all-on")).toMatchInlineSnapshot(`"all-on: 82 days, count 80% (66/82), nap MAE 58, dur MAE 23.4, bed MAE 22.3, wake MAE 44, nap bias +9.2, count bias +0.07"`);
+    expect(renderSummary(allOn, "all-on")).toMatchInlineSnapshot(`"all-on: 86 days, count 81% (70/86), nap MAE 44.3, dur MAE 23.1, bed MAE 22.6, wake MAE 25.6, nap bias -3.1, count bias +0.07"`);
   });
 
   it("per-feature contribution", () => {
     const lines = ablations.map((a) => renderAblation(allOn, a.label, a.result));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "positional nap duration:
-        nap MAE +0.3 (helps)
+        nap MAE 0 (neutral)
         dur MAE +0.4 (helps)
         bed MAE 0 (neutral)
         wake MAE 0 (neutral)
@@ -87,27 +88,32 @@ describe("feature ablation", () => {
         nap MAE 0 (neutral)
         dur MAE 0 (neutral)
         bed MAE 0 (neutral)
-        wake MAE +3 (helps)
+        wake MAE +3.2 (helps)
       habitual bedtime anchor:
         nap MAE 0 (neutral)
         dur MAE 0 (neutral)
-        bed MAE +17 (helps)
+        bed MAE +17.7 (helps)
+        wake MAE 0 (neutral)
+      habitual nap start anchor:
+        nap MAE +4.3 (helps)
+        dur MAE 0 (neutral)
+        bed MAE 0 (neutral)
         wake MAE 0 (neutral)
       sleep cycle bias:
         nap MAE 0 (neutral)
         dur MAE 0 (neutral)
         bed MAE 0 (neutral)
-        wake MAE 0 (neutral)
+        wake MAE -0.1 (hurts)
       sleep budget:
         nap MAE 0 (neutral)
         dur MAE 0 (neutral)
         bed MAE 0 (neutral)
-        wake MAE -0.5 (hurts)
+        wake MAE -0.6 (hurts)
       weighted recency:
         nap MAE 0 (neutral)
         dur MAE 0 (neutral)
         bed MAE 0 (neutral)
-        wake MAE +0.2 (helps)"
+        wake MAE +0.3 (helps)"
     `);
   });
 
