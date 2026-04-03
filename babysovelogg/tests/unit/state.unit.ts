@@ -128,7 +128,7 @@ describe("assembleState", () => {
     );
     expect(result.prediction).not.toBeNull();
     // Next nap should be after the completed sleep's end time
-    expect(new Date(result.prediction!.nextNap).getTime()).toBeGreaterThan(
+    expect(new Date(result.prediction!.nextNap!).getTime()).toBeGreaterThan(
       new Date("2026-03-26T10:00:00.000Z").getTime(),
     );
   });
@@ -193,7 +193,7 @@ describe("assembleState", () => {
     // With 1 nap for a 9mo, the first wake window should be ~3h (180min midpoint)
     // so next nap should be around 09:00, not 07:30
     // The key assertion: nap should NOT be before 09:00
-    const nextNapTime = new Date(result.prediction!.nextNap);
+    const nextNapTime = new Date(result.prediction!.nextNap!);
     expect(nextNapTime.getTime()).toBeGreaterThanOrEqual(
       new Date("2026-03-26T09:00:00.000Z").getTime(),
     );
@@ -288,7 +288,7 @@ describe("assembleState", () => {
         new Date("2026-03-28T12:22:00.000Z").getTime(),
       );
     }
-    expect(new Date(result.prediction!.nextNap).getTime()).toBeGreaterThan(
+    expect(new Date(result.prediction!.nextNap!).getTime()).toBeGreaterThan(
       new Date("2026-03-28T12:22:00.000Z").getTime(),
     );
   });

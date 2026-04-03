@@ -56,7 +56,7 @@ describe("calculateAgeMonths", () => {
 
 describe("findByAge", () => {
   it("returns correct bracket for each age", () => {
-    expect(findByAge(WAKE_WINDOWS, 0).minMinutes).toBe(60);
+    expect(findByAge(WAKE_WINDOWS, 0).minMinutes).toBe(30);
     expect(findByAge(WAKE_WINDOWS, 5).minMinutes).toBe(105);
     expect(findByAge(WAKE_WINDOWS, 9).minMinutes).toBe(150);
   });
@@ -72,7 +72,7 @@ describe("findByAge", () => {
   });
 
   it("works for sleep needs", () => {
-    expect(findByAge(SLEEP_NEEDS, 1).totalHours).toBe(16);
+    expect(findByAge(SLEEP_NEEDS, 1).totalHours).toBe(15.5);
     expect(findByAge(SLEEP_NEEDS, 20).totalHours).toBe(13);
   });
 });
@@ -81,7 +81,7 @@ describe("findByAge", () => {
 
 describe("getWakeWindow", () => {
   it("returns midpoint for age bracket without recent sleeps", () => {
-    expect(getWakeWindow(ctx(0))).toBe(75); // (60+90)/2
+    expect(getWakeWindow(ctx(0))).toBe(45); // (30+60)/2
     expect(getWakeWindow(ctx(5))).toBe(127.5); // (105+150)/2
     expect(getWakeWindow(ctx(10))).toBe(210); // (180+240)/2
   });

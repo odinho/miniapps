@@ -3,10 +3,15 @@ import type { DayStats } from "$lib/engine/stats.js";
 import type { PredictedNap } from "$lib/engine/schedule.js";
 import type { ConfidenceResult } from "$lib/engine/confidence.js";
 import type { CalibrationReport } from "$lib/engine/calibration.js";
+import type { Strategy } from "$lib/engine/strategy.js";
+import type { RollingSleepStats, LongestStretchTrend, AgeNorms } from "$lib/engine/features.js";
 
 export interface Prediction {
-	nextNap: string;
-	bedtime: string;
+	/** Which prediction strategy produced this result */
+	strategy: Strategy;
+	// ── Schedule fields (routine_schedule, partially used by emerging_rhythm) ──
+	nextNap: string | null;
+	bedtime: string | null;
 	predictedNaps: PredictedNap[] | null;
 	napsAllDone: boolean;
 	/** Expected end time for the current active nap (null when not napping) */
@@ -17,6 +22,21 @@ export interface Prediction {
 	confidence: ConfidenceResult | null;
 	/** Calibration report: what's learned vs age-default */
 	calibration: CalibrationReport | null;
+	// ── Newborn/emerging fields ─────────────────────────────────────────────
+	/** Sleep window: when the next sleep is likely to start (newborn/emerging) */
+	sleepWindow: { earliest: string; latest: string } | null;
+	/** Current sleep pressure level (newborn/emerging) */
+	sleepPressure: "low" | "rising" | "high" | null;
+	/** Total sleep in last 24h (minutes) */
+	totalSleep24h: number | null;
+	/** Longest single stretch in recent data (minutes) */
+	longestStretch: number | null;
+	/** Longest stretch trend (week over week) */
+	longestStretchTrend: "growing" | "stable" | "shrinking" | null;
+	/** Age-appropriate norms for context display */
+	ageNorms: AgeNorms | null;
+	/** Rolling 24h stats for context card */
+	rolling: RollingSleepStats | null;
 }
 
 export interface AppState {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { getTimerMode, getAwakeSince, type TimerInput } from "$lib/timer-state.js";
+import type { Prediction } from "$lib/stores/app.svelte.js";
 import type { SleepLogRow } from "$lib/types.js";
 
 function makeSleep(overrides: Partial<SleepLogRow> = {}): SleepLogRow {
@@ -21,6 +22,29 @@ function makeSleep(overrides: Partial<SleepLogRow> = {}): SleepLogRow {
     domain_id: "test-1",
     created_by_event_id: null,
     updated_by_event_id: null,
+    ...overrides,
+  };
+}
+
+/** Build a routine_schedule prediction with defaults for test brevity. */
+function makePrediction(overrides: Partial<Prediction> = {}): Prediction {
+  return {
+    strategy: "routine_schedule",
+    nextNap: "2026-03-27T14:00:00.000Z",
+    bedtime: "2026-03-27T19:00:00.000Z",
+    predictedNaps: null,
+    napsAllDone: false,
+    expectedNapEnd: null,
+    expectedNightEnd: null,
+    confidence: null,
+    calibration: null,
+    sleepWindow: null,
+    sleepPressure: null,
+    totalSleep24h: null,
+    longestStretch: null,
+    longestStretchTrend: null,
+    ageNorms: null,
+    rolling: null,
     ...overrides,
   };
 }
@@ -144,16 +168,7 @@ describe("getTimerMode", () => {
   describe("next nap countdown", () => {
     it("shows next-nap when prediction has future nextNap", () => {
       const input = makeInput({
-        prediction: {
-          nextNap: "2026-03-27T14:00:00.000Z",
-          bedtime: "2026-03-27T19:00:00.000Z",
-          predictedNaps: null,
-          napsAllDone: false,
-          expectedNapEnd: null,
-          expectedNightEnd: null,
-          confidence: null,
-          calibration: null,
-        },
+        prediction: makePrediction(),
       });
       const mode = getTimerMode(input);
       expect(mode.kind).toBe("next-nap");
@@ -167,16 +182,7 @@ describe("getTimerMode", () => {
   describe("overtime", () => {
     it("shows overtime when nextNap is in the past and naps not done", () => {
       const input = makeInput({
-        prediction: {
-          nextNap: "2026-03-27T11:00:00.000Z",
-          bedtime: "2026-03-27T19:00:00.000Z",
-          predictedNaps: null,
-          napsAllDone: false,
-          expectedNapEnd: null,
-          expectedNightEnd: null,
-          confidence: null,
-          calibration: null,
-        },
+        prediction: makePrediction({ nextNap: "2026-03-27T11:00:00.000Z" }),
       });
       const mode = getTimerMode(input);
       expect(mode.kind).toBe("overtime");
@@ -190,16 +196,7 @@ describe("getTimerMode", () => {
   describe("bedtime", () => {
     it("shows bedtime countdown when naps are all done", () => {
       const input = makeInput({
-        prediction: {
-          nextNap: "2026-03-27T14:00:00.000Z",
-          bedtime: "2026-03-27T19:00:00.000Z",
-          predictedNaps: null,
-          napsAllDone: true,
-          expectedNapEnd: null,
-          expectedNightEnd: null,
-          confidence: null,
-          calibration: null,
-        },
+        prediction: makePrediction({ napsAllDone: true }),
       });
       const mode = getTimerMode(input);
       expect(mode.kind).toBe("bedtime");
@@ -211,16 +208,7 @@ describe("getTimerMode", () => {
     it("shows after-bedtime when bedtime has passed", () => {
       const input = makeInput({
         now: new Date("2026-03-27T20:00:00.000Z").getTime(),
-        prediction: {
-          nextNap: "2026-03-27T14:00:00.000Z",
-          bedtime: "2026-03-27T19:00:00.000Z",
-          predictedNaps: null,
-          napsAllDone: true,
-          expectedNapEnd: null,
-          expectedNightEnd: null,
-          confidence: null,
-          calibration: null,
-        },
+        prediction: makePrediction({ napsAllDone: true }),
       });
       const mode = getTimerMode(input);
       // At 20:00 (evening), napsAllDone, bedtime in past
@@ -240,16 +228,7 @@ describe("getTimerMode", () => {
       nextNap.setHours(14, 0, 0, 0);
       const input = makeInput({
         now: d.getTime(),
-        prediction: {
-          nextNap: nextNap.toISOString(),
-          bedtime: bedtime.toISOString(),
-          predictedNaps: null,
-          napsAllDone: false,
-          expectedNapEnd: null,
-          expectedNightEnd: null,
-          confidence: null,
-          calibration: null,
-        },
+        prediction: makePrediction({ nextNap: nextNap.toISOString(), bedtime: bedtime.toISOString() }),
       });
       const mode = getTimerMode(input);
       expect(mode.kind).toBe("bedtime");

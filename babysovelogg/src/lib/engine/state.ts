@@ -10,8 +10,13 @@ import {
 import { getTodayStats } from "./stats.js";
 import { computeConfidence } from "./confidence.js";
 import { calibrate } from "./calibration.js";
+import { computeStrategySignals } from "./features.js";
+import { selectStrategy } from "./strategy.js";
+import { predictNewborn } from "./newborn.js";
 import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry, BabyContext } from "$lib/types.js";
 import type { PredictedNap } from "./schedule.js";
+import type { Strategy } from "./strategy.js";
+import type { Prediction } from "$lib/stores/app.svelte.js";
 
 export interface DayData {
   baby: Baby;
@@ -56,111 +61,18 @@ export function assembleState(data: DayData) {
 
   // Calculate predictions even during active sleep so ghost arcs stay visible
   const now = data.now ?? Date.now();
-  let prediction = null;
-  {
-    const lastCompleted = todaySleeps.find((s) => s.end_time);
-    const wakeTimeForPrediction = lastCompleted?.end_time || todayWakeUp?.wake_time;
 
-    if (wakeTimeForPrediction) {
-      const bedtime = recommendBedtime(todaySleeps.map(toSleepEntry), ctx);
-      const bedtimeMs = new Date(bedtime).getTime();
-      const completedNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time);
-      // During active nap, count it toward consumed slots
-      const consumedNaps = completedNaps.length + (activeSleep?.type === "nap" ? 1 : 0);
-      const expectedNapCount = resolveNapCount(ctx);
+  // Determine strategy
+  const strategy = determineStrategy(recentEntries, baby.birthdate, ctx.tz, now);
 
-      // Build predicted naps from day schedule (accounts for custom nap count)
-      // Compute once — reused for predictions and confidence intervals below
-      const allPredictedFromWakeUp = todayWakeUp
-        ? predictDayNaps(todayWakeUp.wake_time, ctx)
-        : [];
-      let predictedNaps: PredictedNap[] | null = null;
-      if (todayWakeUp) {
-        const allPredicted = allPredictedFromWakeUp;
-        let remaining = allPredicted.slice(consumedNaps);
-
-        // If remaining predictions are stale (actual last wake is past the predicted
-        // nap start), the schedule drifted — recalculate from the actual wake time
-        if (remaining.length > 0) {
-          const actualWakeMs = new Date(wakeTimeForPrediction).getTime();
-          const predictedStartMs = new Date(remaining[0].startTime).getTime();
-          if (actualWakeMs > predictedStartMs) {
-            remaining = predictDayNaps(
-              wakeTimeForPrediction,
-              { ...ctx, customNapCount: remaining.length },
-            );
-          }
-        }
-
-        // B8: Filter out predicted naps starting within 60 min of bedtime
-        predictedNaps = remaining.filter(
-          (n) => new Date(n.startTime).getTime() < bedtimeMs - 60 * 60000,
-        );
-      }
-
-      // B2: Derive nextNap from the day schedule when available (respects custom nap count)
-      let nextNap: string;
-      if (predictedNaps && predictedNaps.length > 0) {
-        nextNap = predictedNaps[0].startTime;
-      } else {
-        nextNap = predictNextNap(wakeTimeForPrediction, ctx);
-      }
-
-      // Detect skipped naps: if the predicted next nap is >90 min overdue (same day), it was skipped
-      const nextNapMs = new Date(nextNap).getTime();
-      const overdueMs = now - nextNapMs;
-      const napSkipped = !activeSleep && overdueMs > 90 * 60000 && overdueMs < 18 * 60 * 60000;
-      const napsAllDone = consumedNaps >= expectedNapCount || napSkipped;
-
-      // B8: Don't suggest a nap that starts within 60 min of bedtime
-      if (nextNapMs > bedtimeMs - 60 * 60000 || napsAllDone) {
-        // All naps done or too close to bedtime — show bedtime instead of next nap
-        nextNap = bedtime;
-      }
-
-      // Clear predicted nap bubbles if all naps are done (by count or skipped)
-      if (napsAllDone) {
-        predictedNaps = null;
-      }
-
-      // During active night sleep, don't show stale daytime nap predictions
-      if (activeSleep && activeSleep.type === "night") {
-        predictedNaps = null;
-      }
-
-      // Compute confidence intervals and calibration
-      const allPredictedForConf = allPredictedFromWakeUp;
-      const confidence = allPredictedForConf.length > 0
-        ? computeConfidence(allPredictedForConf, bedtime, ctx.ageMonths, ctx.recentSleeps, ctx.tz)
-        : null;
-      const calibration = calibrate(ctx.ageMonths, ctx.recentSleeps, ctx.customNapCount, ctx.tz);
-
-      // Compute expected nap end for active naps
-      let expectedNapEnd: string | null = null;
-      if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
-        expectedNapEnd = predictNapEndTime(activeSleep.start_time, ctx);
-      }
-
-      // Compute expected night end for active night sleep
-      let expectedNightEnd: string | null = null;
-      if (activeSleep && activeSleep.type === "night" && !activeSleep.end_time) {
-        const todayNapMin = todaySleeps
-          .filter((s) => s.type === "nap" && s.end_time)
-          .reduce((sum, s) => sum + (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60000, 0);
-        expectedNightEnd = predictNightEndTime(activeSleep.start_time, ctx, todayNapMin);
-      }
-
-      prediction = {
-        nextNap,
-        bedtime,
-        predictedNaps,
-        napsAllDone: napsAllDone || activeSleep?.type === "night",
-        expectedNapEnd,
-        expectedNightEnd,
-        confidence,
-        calibration,
-      };
-    }
+  let prediction: Prediction | null = null;
+  if (strategy === "newborn_guidance") {
+    prediction = assembleNewbornPrediction(ctx, recentEntries, todaySleeps, now);
+  } else {
+    // routine_schedule (and emerging_rhythm for now — emerging adapter comes later)
+    prediction = assembleSchedulePrediction(
+      strategy, ctx, todaySleeps, activeSleep, todayWakeUp, now,
+    );
   }
 
   return {
@@ -173,5 +85,190 @@ export function assembleState(data: DayData) {
     diaperCount: data.diaperCount,
     lastDiaperTime: data.lastDiaperTime,
     todayWakeUp,
+  };
+}
+
+/** Determine which strategy to use for this baby right now. */
+function determineStrategy(
+  recentSleeps: SleepEntry[],
+  birthdate: string,
+  tz: string,
+  now: number,
+): Strategy {
+  const signals = computeStrategySignals(recentSleeps, birthdate, tz, now);
+  return selectStrategy(signals);
+}
+
+/** Assemble a newborn-style prediction. */
+function assembleNewbornPrediction(
+  ctx: BabyContext,
+  recentEntries: SleepEntry[],
+  todaySleeps: SleepLogRow[],
+  now: number,
+): Prediction {
+  // Find last completed sleep end time
+  const completedSleeps = todaySleeps
+    .filter((s) => s.end_time)
+    .map((s) => ({ endMs: new Date(s.end_time!).getTime() }))
+    .sort((a, b) => b.endMs - a.endMs);
+
+  // Also check recent sleeps for last sleep end
+  const recentCompleted = recentEntries
+    .filter((s) => s.end_time)
+    .map((s) => ({ endMs: new Date(s.end_time!).getTime() }))
+    .sort((a, b) => b.endMs - a.endMs);
+
+  const lastSleepEndMs = completedSleeps[0]?.endMs ?? recentCompleted[0]?.endMs ?? null;
+
+  const result = predictNewborn({
+    ageMonths: ctx.ageMonths,
+    tz: ctx.tz,
+    recentSleeps: ctx.recentSleeps,
+    lastSleepEndMs,
+    now,
+  });
+
+  return {
+    strategy: "newborn_guidance",
+    // Schedule fields — null for newborn
+    nextNap: null,
+    bedtime: null,
+    predictedNaps: null,
+    napsAllDone: false,
+    expectedNapEnd: null,
+    expectedNightEnd: null,
+    confidence: null,
+    calibration: null,
+    // Newborn fields
+    sleepWindow: result.sleepWindow,
+    sleepPressure: result.sleepPressure,
+    totalSleep24h: result.rolling.totalSleep24h,
+    longestStretch: result.rolling.longestStretch,
+    longestStretchTrend: result.longestStretchTrend.direction,
+    ageNorms: result.ageNorms,
+    rolling: result.rolling,
+  };
+}
+
+/** Assemble a schedule-based prediction (routine_schedule or emerging_rhythm). */
+function assembleSchedulePrediction(
+  strategy: Strategy,
+  ctx: BabyContext,
+  todaySleeps: SleepLogRow[],
+  activeSleep: SleepLogRow | undefined,
+  todayWakeUp: DayStartRow | undefined,
+  now: number,
+): Prediction | null {
+  const lastCompleted = todaySleeps.find((s) => s.end_time);
+  const wakeTimeForPrediction = lastCompleted?.end_time || todayWakeUp?.wake_time;
+
+  if (!wakeTimeForPrediction) return null;
+
+  const bedtime = recommendBedtime(todaySleeps.map(toSleepEntry), ctx);
+  const bedtimeMs = new Date(bedtime).getTime();
+  const completedNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time);
+  // During active nap, count it toward consumed slots
+  const consumedNaps = completedNaps.length + (activeSleep?.type === "nap" ? 1 : 0);
+  const expectedNapCount = resolveNapCount(ctx);
+
+  // Build predicted naps from day schedule (accounts for custom nap count)
+  // Compute once — reused for predictions and confidence intervals below
+  const allPredictedFromWakeUp = todayWakeUp
+    ? predictDayNaps(todayWakeUp.wake_time, ctx)
+    : [];
+  let predictedNaps: PredictedNap[] | null = null;
+  if (todayWakeUp) {
+    const allPredicted = allPredictedFromWakeUp;
+    let remaining = allPredicted.slice(consumedNaps);
+
+    // If remaining predictions are stale (actual last wake is past the predicted
+    // nap start), the schedule drifted — recalculate from the actual wake time
+    if (remaining.length > 0) {
+      const actualWakeMs = new Date(wakeTimeForPrediction).getTime();
+      const predictedStartMs = new Date(remaining[0].startTime).getTime();
+      if (actualWakeMs > predictedStartMs) {
+        remaining = predictDayNaps(
+          wakeTimeForPrediction,
+          { ...ctx, customNapCount: remaining.length },
+        );
+      }
+    }
+
+    // B8: Filter out predicted naps starting within 60 min of bedtime
+    predictedNaps = remaining.filter(
+      (n) => new Date(n.startTime).getTime() < bedtimeMs - 60 * 60000,
+    );
+  }
+
+  // B2: Derive nextNap from the day schedule when available (respects custom nap count)
+  let nextNap: string;
+  if (predictedNaps && predictedNaps.length > 0) {
+    nextNap = predictedNaps[0].startTime;
+  } else {
+    nextNap = predictNextNap(wakeTimeForPrediction, ctx);
+  }
+
+  // Detect skipped naps: if the predicted next nap is >90 min overdue (same day), it was skipped
+  const nextNapMs = new Date(nextNap).getTime();
+  const overdueMs = now - nextNapMs;
+  const napSkipped = !activeSleep && overdueMs > 90 * 60000 && overdueMs < 18 * 60 * 60000;
+  const napsAllDone = consumedNaps >= expectedNapCount || napSkipped;
+
+  // B8: Don't suggest a nap that starts within 60 min of bedtime
+  if (nextNapMs > bedtimeMs - 60 * 60000 || napsAllDone) {
+    // All naps done or too close to bedtime — show bedtime instead of next nap
+    nextNap = bedtime;
+  }
+
+  // Clear predicted nap bubbles if all naps are done (by count or skipped)
+  if (napsAllDone) {
+    predictedNaps = null;
+  }
+
+  // During active night sleep, don't show stale daytime nap predictions
+  if (activeSleep && activeSleep.type === "night") {
+    predictedNaps = null;
+  }
+
+  // Compute confidence intervals and calibration
+  const allPredictedForConf = allPredictedFromWakeUp;
+  const confidence = allPredictedForConf.length > 0
+    ? computeConfidence(allPredictedForConf, bedtime, ctx.ageMonths, ctx.recentSleeps, ctx.tz)
+    : null;
+  const calibration = calibrate(ctx.ageMonths, ctx.recentSleeps, ctx.customNapCount, ctx.tz);
+
+  // Compute expected nap end for active naps
+  let expectedNapEnd: string | null = null;
+  if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
+    expectedNapEnd = predictNapEndTime(activeSleep.start_time, ctx);
+  }
+
+  // Compute expected night end for active night sleep
+  let expectedNightEnd: string | null = null;
+  if (activeSleep && activeSleep.type === "night" && !activeSleep.end_time) {
+    const todayNapMin = todaySleeps
+      .filter((s) => s.type === "nap" && s.end_time)
+      .reduce((sum, s) => sum + (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60000, 0);
+    expectedNightEnd = predictNightEndTime(activeSleep.start_time, ctx, todayNapMin);
+  }
+
+  return {
+    strategy,
+    nextNap,
+    bedtime,
+    predictedNaps,
+    napsAllDone: napsAllDone || activeSleep?.type === "night",
+    expectedNapEnd,
+    expectedNightEnd,
+    confidence,
+    calibration,
+    // Newborn fields — null for schedule-based strategies
+    sleepWindow: null,
+    sleepPressure: null,
+    totalSleep24h: null,
+    longestStretch: null,
+    longestStretchTrend: null,
+    ageNorms: null,
+    rolling: null,
   };
 }

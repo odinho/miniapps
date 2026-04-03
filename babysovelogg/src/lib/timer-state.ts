@@ -9,6 +9,7 @@ export type TimerMode =
 	| { kind: 'overtime'; overtime: number }
 	| { kind: 'bedtime'; countdown: number; bedtime: string }
 	| { kind: 'after-bedtime'; bedtime: string }
+	| { kind: 'sleep-window'; windowStart: number; windowEnd: number; pressure: 'low' | 'rising' | 'high' }
 	| { kind: 'idle' };
 
 export interface TimerInput {
@@ -58,6 +59,13 @@ export function getTimerMode(input: TimerInput): TimerMode {
 			wakeCountdown: wakeCountdown != null && wakeCountdown > 0 ? wakeCountdown : null,
 			wakeTime,
 		};
+	}
+
+	// Newborn/emerging: sleep window mode
+	if (prediction?.strategy === 'newborn_guidance' && prediction.sleepWindow && prediction.sleepPressure) {
+		const windowStart = new Date(prediction.sleepWindow.earliest).getTime() - now;
+		const windowEnd = new Date(prediction.sleepWindow.latest).getTime() - now;
+		return { kind: 'sleep-window', windowStart, windowEnd, pressure: prediction.sleepPressure };
 	}
 
 	if (prediction?.nextNap) {

@@ -145,10 +145,10 @@
 			: null,
 	);
 	const arcPrediction = $derived(
-		prediction
+		prediction?.nextNap
 			? {
 					nextNap: prediction.nextNap,
-					bedtime: prediction.bedtime,
+					bedtime: prediction.bedtime ?? undefined,
 					predictedNaps: prediction.predictedNaps ?? undefined,
 				}
 			: null,
