@@ -278,6 +278,16 @@ describe('applyOptimisticEvent', () => {
 		expect(result.lastDiaperTime).toBe('2026-03-27T14:00:00.000Z');
 	});
 
+	it('day.started sets todayWakeUp', () => {
+		const state = makeState();
+		const result = applyOptimisticEvent(state, 'day.started', {
+			babyId: 1,
+			wakeTime: '2026-03-27T07:00:00.000Z',
+		});
+		expect(result.todayWakeUp).not.toBeNull();
+		expect(result.todayWakeUp!.wake_time).toBe('2026-03-27T07:00:00.000Z');
+	});
+
 	it('does not mutate original state', () => {
 		const state = makeState();
 		const original = JSON.stringify(state);

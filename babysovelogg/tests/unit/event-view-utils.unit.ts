@@ -17,8 +17,8 @@ describe('TYPE_COLORS', () => {
 		expect(TYPE_COLORS['diaper.logged']).toBe('#2e7d32');
 	});
 
-	it('has 13 event types', () => {
-		expect(Object.keys(TYPE_COLORS)).toHaveLength(13);
+	it('has 14 event types', () => {
+		expect(Object.keys(TYPE_COLORS)).toHaveLength(14);
 	});
 });
 

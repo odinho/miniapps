@@ -15,6 +15,7 @@ export const TYPE_COLORS: Record<string, string> = {
 	'diaper.logged': '#2e7d32',
 	'diaper.updated': '#43a047',
 	'diaper.deleted': '#66bb6a',
+	'day.started': '#ef6c00',
 };
 
 /** All event types available for the filter dropdown. */

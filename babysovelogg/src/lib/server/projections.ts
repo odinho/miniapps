@@ -2,6 +2,7 @@ import { db } from "./db.js";
 import type { AppEvent } from "./events.js";
 import type { EventRow } from "$lib/types.js";
 import { validateEventPayload } from "./schemas.js";
+import { isoToDateInTz } from "$lib/tz.js";
 import { shouldReclassifyAsNight } from "$lib/engine/classification.js";
 
 export function applyEvent(event: AppEvent): void {
@@ -316,10 +317,22 @@ export function applyEvent(event: AppEvent): void {
       break;
     }
 
-    case "day.started":
-    case "day.deleted":
-      // Legacy no-op: wakeup is now derived from night sleep end_time
+    case "day.started": {
+      // Used during onboarding / cold start when no night sleep exists yet
+      const baby = db.prepare("SELECT timezone FROM baby ORDER BY id DESC LIMIT 1").get() as { timezone: string | null } | undefined;
+      const tz = baby?.timezone || "UTC";
+      const dateStr = isoToDateInTz(payload.wakeTime as string, tz);
+      db.prepare(
+        "INSERT OR REPLACE INTO day_start (baby_id, date, wake_time, created_by_event_id) VALUES (?, ?, ?, ?)",
+      ).run(payload.babyId, dateStr, payload.wakeTime, eventId);
       break;
+    }
+
+    case "day.deleted": {
+      db.prepare("DELETE FROM day_start WHERE baby_id = ? AND date = ?")
+        .run(payload.babyId, payload.date);
+      break;
+    }
   }
 }
 

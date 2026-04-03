@@ -1,14 +1,14 @@
-import { test, expect, fillDateInput } from "./fixtures";
+import { test, expect, fillDateInput, forceHour } from "./fixtures";
 
 test("SSE: Context B sees sleep started in Context A without refresh", async ({
   page,
   browser,
 }) => {
+  await forceHour(page, 14); // Afternoon — skip morning prompt
   await page.goto("/");
   await page.locator('#baby-name').fill("SSE-Baby");
   await fillDateInput(page.locator('input.date-input'), "2025-06-12");
   await page.getByRole("button", { name: "Kom i gang ✨" }).click();
-  // After onboarding, the dashboard appears directly (no morning prompt)
   await expect(page.getByTestId("baby-name")).toHaveText("SSE-Baby", { timeout: 5000 });
 
   const ctx2 = await browser.newContext();
@@ -27,11 +27,11 @@ test("SSE: Context B sees sleep started in Context A without refresh", async ({
 });
 
 test("SSE: Both contexts work independently", async ({ page, browser }) => {
+  await forceHour(page, 14);
   await page.goto("/");
   await page.locator('#baby-name').fill("SSE-Baby2");
   await fillDateInput(page.locator('input.date-input'), "2025-06-12");
   await page.getByRole("button", { name: "Kom i gang ✨" }).click();
-  // After onboarding, the dashboard appears directly (no morning prompt)
   await expect(page.getByTestId("baby-name")).toHaveText("SSE-Baby2", { timeout: 5000 });
 
   const ctx2 = await browser.newContext();

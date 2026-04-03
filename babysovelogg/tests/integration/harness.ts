@@ -200,6 +200,7 @@ export function setupHarness() {
     db.prepare("DELETE FROM sleep_pauses").run();
     db.prepare("DELETE FROM diaper_log").run();
     db.prepare("DELETE FROM sleep_log").run();
+    db.prepare("DELETE FROM day_start").run();
     db.prepare("DELETE FROM baby").run();
     db.prepare("DELETE FROM events").run();
     try {

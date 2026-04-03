@@ -14,6 +14,8 @@
 	import { calcPauseMs } from '$lib/engine/classification.js';
 	import { buildPause, buildResume, isPaused } from '$lib/sleep-actions.js';
 	import { buildSleepInfoRows } from '$lib/settings-utils.js';
+	import TimeInput from '$lib/components/TimeInput.svelte';
+	import DateInput from '$lib/components/DateInput.svelte';
 	import DstBanner from '$lib/components/DstBanner.svelte';
 	import ContextCard from '$lib/components/ContextCard.svelte';
 
@@ -272,16 +274,18 @@
 		}
 	}
 
-	/** Arc start endpoint click: open the relevant sleep for editing */
+	/** Arc start endpoint click: open night sleep or morning dialog */
 	function onArcStartClick() {
 		if (isNightMode) {
-			// Night mode start = bedtime → open active or last night sleep
 			const target = activeSleep ?? todaySleeps.toReversed().find(sl => sl.type === 'night');
 			if (target) editingSleep = target;
 		} else {
-			// Day mode start = wakeup → open last night sleep that ended this morning
 			const nightSleep = todaySleeps.toReversed().find(sl => sl.type === 'night');
-			if (nightSleep) editingSleep = nightSleep;
+			if (nightSleep) {
+				editingSleep = nightSleep;
+			} else {
+				openMorningDialog();
+			}
 		}
 	}
 
@@ -298,6 +302,70 @@
 		editingSleep = null;
 	}
 
+	// --- Morning prompt (onboarding / cold start) ---
+	// Shows when no todayWakeUp exists and no sleeps logged yet today
+	const needsMorningPrompt = $derived.by(() => {
+		void now; // re-derive when clock ticks
+		if (!baby || todayWakeUp) return false;
+		if (activeSleep && !activeSleep.end_time) return false;
+		if (todaySleeps.length > 0) return false;
+		const h = new Date().getHours();
+		return h >= 5 && h < 13;
+	});
+
+	let showMorningDialog = $state(false);
+	let morningDate = $state('');
+	let morningTime = $state('07:00');
+	let morningBusy = $state(false);
+
+	$effect(() => {
+		if (needsMorningPrompt && !morningDate) {
+			const d = new Date();
+			morningDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+		}
+	});
+
+	function openMorningDialog() {
+		const d = new Date();
+		morningDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+		if (todayWakeUp) {
+			morningTime = formatTime(todayWakeUp.wake_time);
+		} else {
+			morningTime = '07:00';
+		}
+		showMorningDialog = true;
+	}
+
+	async function saveMorningWakeTime() {
+		if (morningBusy || !baby) return;
+		morningBusy = true;
+		try {
+			const wakeTime = new Date(`${morningDate}T${morningTime}:00`).toISOString();
+			await sync.sendEvents([{
+				type: 'day.started',
+				payload: { babyId: baby.id, wakeTime },
+			}]);
+			showMorningDialog = false;
+		} finally {
+			morningBusy = false;
+		}
+	}
+
+	async function skipMorningWakeTime() {
+		if (morningBusy || !baby) return;
+		morningBusy = true;
+		try {
+			const today = new Date();
+			today.setHours(6, 0, 0, 0);
+			await sync.sendEvents([{
+				type: 'day.started',
+				payload: { babyId: baby.id, wakeTime: today.toISOString() },
+			}]);
+			showMorningDialog = false;
+		} finally {
+			morningBusy = false;
+		}
+	}
 </script>
 
 {#if !loaded}
@@ -310,6 +378,45 @@
 	</div>
 {:else}
 	<div class="dashboard" data-testid="dashboard">
+		{#if needsMorningPrompt}
+			<div class="morning-prompt" data-testid="morning-prompt">
+				<div class="morning-icon" data-testid="morning-icon">🌅</div>
+				<h2>God morgon!</h2>
+				<p>Når vakna {baby.name}?</p>
+				<div style="display: flex; gap: 8px; margin: 8px 0;">
+					<DateInput bind:value={morningDate} />
+					<TimeInput bind:value={morningTime} />
+				</div>
+				<div style="display: flex; gap: 8px;">
+					<button class="btn btn-primary" onclick={saveMorningWakeTime} disabled={morningBusy}>
+						Sett vaknetid
+					</button>
+					<button class="btn btn-ghost" onclick={skipMorningWakeTime} disabled={morningBusy}>
+						Hopp over
+					</button>
+				</div>
+			</div>
+		{/if}
+
+		{#if showMorningDialog && !needsMorningPrompt}
+			<div class="modal-overlay" data-testid="morning-dialog-overlay" role="presentation" onclick={() => showMorningDialog = false}>
+				<div class="morning-prompt" style="position: relative; max-width: 320px; margin: 20vh auto;" role="presentation" onclick={(e) => e.stopPropagation()}>
+					<h2>Endra vaknetid</h2>
+					<div style="display: flex; gap: 8px; margin: 8px 0;">
+						<DateInput bind:value={morningDate} />
+						<TimeInput bind:value={morningTime} />
+					</div>
+					<div style="display: flex; gap: 8px;">
+						<button class="btn btn-primary" onclick={saveMorningWakeTime} disabled={morningBusy}>
+							Lagra
+						</button>
+						<button class="btn btn-ghost" onclick={() => showMorningDialog = false}>
+							Avbryt
+						</button>
+					</div>
+				</div>
+			</div>
+		{/if}
 
 		<DstBanner timezone={baby.timezone} bedtime={prediction?.bedtime} />
 

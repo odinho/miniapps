@@ -36,7 +36,7 @@ export function getState(now?: number) {
     )
     .all(baby.id, midnightIso) as SleepLogRow[];
 
-  // Derive wakeup from overnight night sleep end_time
+  // Derive wakeup: night sleep end_time takes precedence, day_start is fallback (onboarding)
   let todayWakeUp: DayStartRow | undefined;
   const overnightSleep = db
     .prepare(
@@ -52,6 +52,11 @@ export function getState(now?: number) {
       created_at: overnightSleep.end_time,
       created_by_event_id: null,
     };
+  } else {
+    // Fallback: explicit day.started from onboarding / manual morning prompt
+    todayWakeUp = db
+      .prepare("SELECT * FROM day_start WHERE baby_id = ? AND date = ?")
+      .get(baby.id, todayDateStr) as DayStartRow | undefined;
   }
 
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();

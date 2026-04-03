@@ -110,6 +110,7 @@ function resetDb() {
   try { _db.prepare("DELETE FROM sleep_pauses").run(); } catch {}
   try { _db.prepare("DELETE FROM diaper_log").run(); } catch {}
   try { _db.prepare("DELETE FROM sleep_log").run(); } catch {}
+  try { _db.prepare("DELETE FROM day_start").run(); } catch {}
   try { _db.prepare("DELETE FROM baby").run(); } catch {}
   try { _db.prepare("DELETE FROM events").run(); } catch {}
   try { _db.prepare("DELETE FROM sqlite_sequence").run(); } catch {}

@@ -4,7 +4,8 @@
  */
 
 import type { AppState } from "./stores/app.svelte.js";
-import type { SleepLogRow } from "./types.js";
+import type { SleepLogRow, DayStartRow } from "./types.js";
+import { isoToDateInTz } from "./tz.js";
 
 const QUEUE_KEY = "babysovelogg_event_queue";
 const STATE_CACHE_KEY = "babysovelogg_cached_state";
@@ -285,6 +286,19 @@ export function applyOptimisticEvent(
 		case "diaper.logged": {
 			s.diaperCount = (s.diaperCount || 0) + 1;
 			s.lastDiaperTime = payload.time as string;
+			break;
+		}
+
+		case "day.started": {
+			const tz = s.baby?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+			s.todayWakeUp = {
+				id: 0,
+				baby_id: (payload.babyId as number) || s.baby?.id || 0,
+				date: isoToDateInTz(payload.wakeTime as string, tz),
+				wake_time: payload.wakeTime as string,
+				created_at: new Date().toISOString(),
+				created_by_event_id: null,
+			} as DayStartRow;
 			break;
 		}
 
