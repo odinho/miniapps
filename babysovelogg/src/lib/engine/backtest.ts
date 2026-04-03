@@ -6,6 +6,8 @@ import {
   recommendBedtime,
   calculateAgeMonths,
 } from "./schedule.js";
+import { computeStrategySignals, computeSleepWindow, extractWakeWindows } from "./features.js";
+import { selectStrategy, type Strategy } from "./strategy.js";
 
 /** A single day's recorded sleep data. */
 export interface DayRecord {
@@ -18,6 +20,8 @@ export interface DayRecord {
 export interface DayResult {
   date: string;
   dayIndex: number; // 0-based index in the input array (how many prior days of data)
+  /** Which strategy the selector would have chosen for this day */
+  strategy: Strategy;
   predictedNaps: PredictedNap[];
   actualNaps: SleepEntry[];
   predictedBedtime: string;
@@ -28,6 +32,8 @@ export interface DayResult {
   napDurationErrors: number[]; // minutes, matched naps only (positive = predicted longer than actual)
   bedtimeError: number | null; // minutes (positive = predicted later than actual)
   wakeTimeError: number | null; // minutes, predicted morning wake vs actual (positive = predicted later)
+  /** Newborn: was the actual sleep start within the predicted window? (null for schedule days) */
+  sleepWindowHit: boolean | null;
 }
 
 /** Aggregate metrics across all backtested days. */
@@ -42,6 +48,10 @@ export interface BacktestResult {
   napDurationMAE: number; // mean absolute error on nap duration (matched naps only)
   napEndMAE: number; // mean absolute error on nap end time
   wakeTimeMAE: number; // mean absolute error on predicted morning wake
+  /** Strategy distribution: count of days per strategy */
+  strategyCounts: Record<Strategy, number>;
+  /** Fraction of newborn/emerging days where actual sleep started within predicted window */
+  sleepWindowHitRate: number | null;
 }
 
 /** Predictor function signature — takes wake time and baby context. */
@@ -105,6 +115,11 @@ export function backtest(
       recentSleeps,
       features,
     };
+
+    // Determine which strategy applies to this day
+    const dayMs = new Date(day.date + "T12:00:00Z").getTime();
+    const strategySignals = computeStrategySignals(recentSleeps, birthdate, tz, dayMs);
+    const strategy = selectStrategy(strategySignals);
 
     // Predict naps
     const predictedNaps = predict(day.wakeTime, ctx);
@@ -172,9 +187,27 @@ export function backtest(
       wakeTimeError = (predictedWakeMs - actualWakeMs) / 60000;
     }
 
+    // Sleep window hit rate for newborn/emerging days
+    let sleepWindowHit: boolean | null = null;
+    if (strategy !== "routine_schedule" && day.sleeps.length > 0) {
+      // Compute a sleep window from the prior day's last sleep end
+      const priorDaySleeps = i > 0 ? days[i - 1].sleeps.filter((s) => s.end_time) : [];
+      if (priorDaySleeps.length > 0) {
+        const lastEnd = priorDaySleeps
+          .map((s) => new Date(s.end_time!).getTime())
+          .sort((a, b) => b - a)[0];
+        const wws = extractWakeWindows(recentSleeps);
+        const window = computeSleepWindow(lastEnd, wws, ctx.ageMonths);
+        // Check if the first actual sleep of today started within the window
+        const firstSleepStart = new Date(day.sleeps[0].start_time).getTime();
+        sleepWindowHit = firstSleepStart >= window.earliestMs && firstSleepStart <= window.latestMs;
+      }
+    }
+
     results.push({
       date: day.date,
       dayIndex: i,
+      strategy,
       predictedNaps,
       actualNaps,
       predictedBedtime,
@@ -185,6 +218,7 @@ export function backtest(
       napDurationErrors,
       bedtimeError,
       wakeTimeError,
+      sleepWindowHit,
     });
   }
 
@@ -205,6 +239,8 @@ function summarize(days: DayResult[]): BacktestResult {
       napDurationMAE: 0,
       napEndMAE: 0,
       wakeTimeMAE: 0,
+      strategyCounts: { newborn_guidance: 0, emerging_rhythm: 0, routine_schedule: 0 },
+      sleepWindowHitRate: null,
     };
   }
 
@@ -254,6 +290,18 @@ function summarize(days: DayResult[]): BacktestResult {
   // Nap count bias
   const napCountBias = days.reduce((sum, d) => sum + d.napCountError, 0) / totalDays;
 
+  // Strategy distribution
+  const strategyCounts: Record<Strategy, number> = {
+    newborn_guidance: 0, emerging_rhythm: 0, routine_schedule: 0,
+  };
+  for (const d of days) strategyCounts[d.strategy]++;
+
+  // Sleep window hit rate (newborn/emerging days only)
+  const windowDays = days.filter((d) => d.sleepWindowHit !== null);
+  const sleepWindowHitRate = windowDays.length > 0
+    ? Math.round(windowDays.filter((d) => d.sleepWindowHit).length / windowDays.length * 100) / 100
+    : null;
+
   return {
     days,
     totalDays,
@@ -265,6 +313,8 @@ function summarize(days: DayResult[]): BacktestResult {
     napDurationMAE: Math.round(napDurationMAE * 10) / 10,
     napEndMAE: Math.round(napEndMAE * 10) / 10,
     wakeTimeMAE: Math.round(wakeTimeMAE * 10) / 10,
+    strategyCounts,
+    sleepWindowHitRate,
   };
 }
 
