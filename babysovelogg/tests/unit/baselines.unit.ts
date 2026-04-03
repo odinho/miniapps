@@ -7,10 +7,13 @@ import {
 import {
   ageDefaultNaps,
   ageDefaultBedtime,
+  ageDefaultWakeTime,
   yesterdayRepeatedNaps,
   yesterdayRepeatedBedtime,
+  yesterdayRepeatedWakeTime,
   movingAvgNaps,
   movingAvgBedtime,
+  movingAvgWakeTime,
 } from "$lib/engine/baselines.js";
 import {
   weightedNaps,
@@ -30,8 +33,9 @@ function runBaseline(
   label: string,
   predict: NonNullable<Parameters<typeof backtest>[2]>["predict"],
   predictBedtime: NonNullable<Parameters<typeof backtest>[2]>["predictBedtime"],
+  predictWakeTime?: NonNullable<Parameters<typeof backtest>[2]>["predictWakeTime"],
 ) {
-  const result = backtest(days, BIRTHDATE, { predict, predictBedtime, tz: TZ });
+  const result = backtest(days, BIRTHDATE, { predict, predictBedtime, predictWakeTime, tz: TZ });
   const buckets = bucketResultsByAge(result, BIRTHDATE);
   return { result, buckets, label };
 }
@@ -46,11 +50,11 @@ function perMonth(b: ReturnType<typeof runBaseline>) {
 
 // ─── Run all strategies ──────────────────────────────────────────────────────
 
-const engine = runBaseline("engine", undefined, undefined);
-const ageDefault = runBaseline("age-default", ageDefaultNaps, ageDefaultBedtime);
-const yesterday = runBaseline("yesterday", yesterdayRepeatedNaps, yesterdayRepeatedBedtime);
-const movingAvg = runBaseline("3d-avg", movingAvgNaps, movingAvgBedtime);
-const weighted = runBaseline("weighted", weightedNaps, weightedBedtime);
+const engine = runBaseline("engine", undefined, undefined, undefined);
+const ageDefault = runBaseline("age-default", ageDefaultNaps, ageDefaultBedtime, ageDefaultWakeTime);
+const yesterday = runBaseline("yesterday", yesterdayRepeatedNaps, yesterdayRepeatedBedtime, yesterdayRepeatedWakeTime);
+const movingAvg = runBaseline("3d-avg", movingAvgNaps, movingAvgBedtime, movingAvgWakeTime);
+const weighted = runBaseline("weighted", weightedNaps, weightedBedtime, undefined);
 
 // ─── Combined summary ────────────────────────────────────────────────────────
 
@@ -59,9 +63,9 @@ describe("baseline comparison", () => {
     const lines = [engine, ageDefault, yesterday, movingAvg, weighted].map(summaryLine);
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "engine: 86 days, count 81% (70/86), nap MAE 44.5, dur MAE 23.1, bed MAE 22.6, wake MAE 25.6, nap bias -3, count bias +0.07
-      age-default: 86 days, count 63% (54/86), nap MAE 63.7, dur MAE 29.4, bed MAE 59.7, wake MAE 25.6, nap bias -34.3, count bias +0.26
-      yesterday: 86 days, count 76% (65/86), nap MAE 56.7, dur MAE 32.4, bed MAE 26.6, wake MAE 25.6, nap bias +5.8, count bias +0.01
-      3d-avg: 86 days, count 80% (69/86), nap MAE 48.2, dur MAE 25.2, bed MAE 41.8, wake MAE 25.6, nap bias +0.3, count bias +0.06
+      age-default: 86 days, count 63% (54/86), nap MAE 63.7, dur MAE 29.4, bed MAE 59.7, wake MAE 42.5, nap bias -34.3, count bias +0.26
+      yesterday: 86 days, count 76% (65/86), nap MAE 56.7, dur MAE 32.4, bed MAE 26.6, wake MAE 27.6, nap bias +5.8, count bias +0.01
+      3d-avg: 86 days, count 80% (69/86), nap MAE 48.2, dur MAE 25.2, bed MAE 41.8, wake MAE 24, nap bias +0.3, count bias +0.06
       weighted: 86 days, count 81% (70/86), nap MAE 52.7, dur MAE 23.4, bed MAE 45.6, wake MAE 25.6, nap bias -11.4, count bias +0.07"
     `);
   });
@@ -74,20 +78,20 @@ describe("baseline comparison", () => {
       engine 8mo: 28 days, count 89% (25/28), nap MAE 26.4, dur MAE 18.8, bed MAE 18.1, wake MAE 21.8, nap bias +3.3, count bias +0.11
       engine 9mo: 22 days, count 86% (19/22), nap MAE 64.1, dur MAE 23.4, bed MAE 24.1, wake MAE 28.8, nap bias -12.5, count bias +0.05
 
-      age-default 6mo: 5 days, count 20% (1/5), nap MAE 40, dur MAE 20.8, bed MAE 44.9, wake MAE 11.3, nap bias +25.6, count bias -0.8
-      age-default 7mo: 31 days, count 84% (26/31), nap MAE 68.6, dur MAE 30.6, bed MAE 64.9, wake MAE 28.9, nap bias -50.7, count bias +0.1
-      age-default 8mo: 28 days, count 89% (25/28), nap MAE 37.2, dur MAE 21.2, bed MAE 36.1, wake MAE 21.8, nap bias -23.8, count bias +0.11
-      age-default 9mo: 22 days, count 9% (2/22), nap MAE 97.9, dur MAE 48.3, bed MAE 85, wake MAE 28.8, nap bias -43.4, count bias +0.91
+      age-default 6mo: 5 days, count 20% (1/5), nap MAE 40, dur MAE 20.8, bed MAE 44.9, wake MAE 28, nap bias +25.6, count bias -0.8
+      age-default 7mo: 31 days, count 84% (26/31), nap MAE 68.6, dur MAE 30.6, bed MAE 64.9, wake MAE 46.2, nap bias -50.7, count bias +0.1
+      age-default 8mo: 28 days, count 89% (25/28), nap MAE 37.2, dur MAE 21.2, bed MAE 36.1, wake MAE 43.2, nap bias -23.8, count bias +0.11
+      age-default 9mo: 22 days, count 9% (2/22), nap MAE 97.9, dur MAE 48.3, bed MAE 85, wake MAE 39.8, nap bias -43.4, count bias +0.91
 
-      yesterday 6mo: 5 days, count 40% (2/5), nap MAE 52.8, dur MAE 34.3, bed MAE 32, wake MAE 11.3, nap bias +14.5, count bias -0.2
-      yesterday 7mo: 31 days, count 74% (23/31), nap MAE 68.3, dur MAE 38, bed MAE 28.5, wake MAE 28.9, nap bias +10.2, count bias 0
-      yesterday 8mo: 28 days, count 79% (22/28), nap MAE 46.4, dur MAE 25, bed MAE 25.4, wake MAE 21.8, nap bias -3.2, count bias +0.07
-      yesterday 9mo: 22 days, count 82% (18/22), nap MAE 53.4, dur MAE 34.7, bed MAE 24.2, wake MAE 28.8, nap bias +9.8, count bias 0
+      yesterday 6mo: 5 days, count 40% (2/5), nap MAE 52.8, dur MAE 34.3, bed MAE 32, wake MAE 29.2, nap bias +14.5, count bias -0.2
+      yesterday 7mo: 31 days, count 74% (23/31), nap MAE 68.3, dur MAE 38, bed MAE 28.5, wake MAE 29.2, nap bias +10.2, count bias 0
+      yesterday 8mo: 28 days, count 79% (22/28), nap MAE 46.4, dur MAE 25, bed MAE 25.4, wake MAE 21.5, nap bias -3.2, count bias +0.07
+      yesterday 9mo: 22 days, count 82% (18/22), nap MAE 53.4, dur MAE 34.7, bed MAE 24.2, wake MAE 32.5, nap bias +9.8, count bias 0
 
-      3d-avg 6mo: 5 days, count 40% (2/5), nap MAE 43.3, dur MAE 27.3, bed MAE 54.1, wake MAE 11.3, nap bias +9.6, count bias -0.2
-      3d-avg 7mo: 31 days, count 71% (22/31), nap MAE 56.6, dur MAE 28.4, bed MAE 48.6, wake MAE 28.9, nap bias +3.6, count bias +0.1
-      3d-avg 8mo: 28 days, count 89% (25/28), nap MAE 39.4, dur MAE 20.1, bed MAE 29.6, wake MAE 21.8, nap bias -6.9, count bias +0.11
-      3d-avg 9mo: 22 days, count 91% (20/22), nap MAE 48.8, dur MAE 28.5, bed MAE 44.3, wake MAE 28.8, nap bias +2.3, count bias 0
+      3d-avg 6mo: 5 days, count 40% (2/5), nap MAE 43.3, dur MAE 27.3, bed MAE 54.1, wake MAE 30.6, nap bias +9.6, count bias -0.2
+      3d-avg 7mo: 31 days, count 71% (22/31), nap MAE 56.6, dur MAE 28.4, bed MAE 48.6, wake MAE 27.1, nap bias +3.6, count bias +0.1
+      3d-avg 8mo: 28 days, count 89% (25/28), nap MAE 39.4, dur MAE 20.1, bed MAE 29.6, wake MAE 19.2, nap bias -6.9, count bias +0.11
+      3d-avg 9mo: 22 days, count 91% (20/22), nap MAE 48.8, dur MAE 28.5, bed MAE 44.3, wake MAE 24, nap bias +2.3, count bias 0
 
       weighted 6mo: 5 days, count 60% (3/5), nap MAE 41.7, dur MAE 21.7, bed MAE 59.5, wake MAE 11.3, nap bias +21.8, count bias -0.4
       weighted 7mo: 31 days, count 74% (23/31), nap MAE 51.1, dur MAE 27.6, bed MAE 45.9, wake MAE 28.9, nap bias -6.1, count bias +0.13
@@ -136,11 +140,16 @@ describe("duration: engine vs baselines", () => {
     expect(engine.result.napDurationMAE).toBeLessThanOrEqual(movingAvg.result.napDurationMAE);
   });
 
-  // NOTE: wake MAE is identical across strategies because they all use the
-  // engine's getLearnedNightDuration as default. Differentiating this
-  // requires strategy-specific night duration predictors (Phase 1d future work).
-  it("wake MAE is the same across all strategies (known limitation)", () => {
-    expect(engine.result.wakeTimeMAE).toBe(ageDefault.result.wakeTimeMAE);
-    expect(engine.result.wakeTimeMAE).toBe(yesterday.result.wakeTimeMAE);
+  it("engine wake MAE beats age-default and yesterday", () => {
+    expect(engine.result.wakeTimeMAE).toBeLessThanOrEqual(ageDefault.result.wakeTimeMAE);
+    expect(engine.result.wakeTimeMAE).toBeLessThanOrEqual(yesterday.result.wakeTimeMAE);
+  });
+
+  // NOTE: 3d-avg wake baseline (24 min) currently beats the engine (25.6 min).
+  // The engine's wake prediction blends habitual wake + night duration + sleep budget,
+  // but a simple 3-day average of actual wake times is more accurate on Halldis data.
+  // This suggests the engine's night-side features need tuning.
+  it("3d-avg wake baseline exposes engine weakness", () => {
+    expect(movingAvg.result.wakeTimeMAE).toBeLessThan(engine.result.wakeTimeMAE);
   });
 });

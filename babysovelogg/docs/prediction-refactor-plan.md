@@ -276,22 +276,25 @@ Each phase has its own backtest targets. Phase 1 establishes baselines. Phases 2
 
 ---
 
-## Feature Ablation Results (2026-04-02)
+## Feature Ablation Results (2026-04-03)
 
-Measured on Halldis data (82 days). Delta = what happens when you disable the feature:
+Measured on Halldis data (86 days). Delta = what happens when you disable the feature:
 
 | Feature | nap MAE | dur MAE | bed MAE | wake MAE | Verdict |
 |---------|---------|---------|---------|----------|---------|
-| positionalDuration | +0.8 | +0.4 | 0 | 0 | **Helps** nap timing and duration |
-| habitualWake | 0 | 0 | 0 | +3.3 | **Helps** wake prediction |
-| habitualBedtime | 0 | 0 | **+17** | 0 | **Biggest single contributor** |
-| cycleBias | 0 | 0 | 0 | +0.2 | Marginal |
-| sleepBudget | 0 | 0 | 0 | -1.4 | **Hurts** — needs tuning or disabling |
-| weightedRecency | 0 | 0 | 0 | 0 | Neutral on this dataset |
+| positionalDuration | 0 | +0.4 | 0 | 0 | **Helps** duration |
+| habitualWake | 0 | 0 | 0 | +3.2 | **Helps** wake prediction |
+| habitualBedtime | 0 | 0 | **+17.7** | 0 | **Biggest single contributor** |
+| habitualNapStart | +4.1 | 0 | 0 | 0 | **Helps** nap timing |
+| cycleBias | 0 | 0 | 0 | -0.1 | Marginal hurt |
+| sleepBudget | 0 | 0 | 0 | -0.6 | **Hurts** slightly on Halldis |
+| weightedRecency | 0 | 0 | 0 | +0.3 | Marginal help |
 
-**Key insight:** habitualBedtime alone accounts for +17 min bedtime improvement. The data-driven weight system means consistent families get near-100% habitual weight automatically.
+**Key insight:** habitualBedtime alone accounts for +17.7 min bedtime improvement. The data-driven weight system means consistent families get near-100% habitual weight automatically.
 
-**sleepBudget hurts slightly** — the 50% compensation factor may be too aggressive, or the signal is noisy on this dataset. Consider tuning down to 25% or making it adaptive.
+**habitualNapStart (new in 2026-04-02):** +4.1 min nap MAE contribution, and the wake-window cross-day fix (2026-04-03) enables proper pressure-vs-clock gating at position 0.
+
+**sleepBudget** hurts slightly on Halldis (-0.6 wake MAE at 25% compensation) but helps baby_2 and baby_5 on Kaggle data. Worth keeping but may benefit from per-baby adaptation.
 
 ### Future: Dynamic Feature Selection
 
@@ -306,30 +309,46 @@ This requires the multi-baby backtest infrastructure to validate across populati
 
 ---
 
-## Results Summary (Phase 1 baseline → current)
+## Results Summary (Phase 1 baseline → current, updated 2026-04-03)
 
 | Metric | Phase 1 baseline | Current | Change |
 |--------|---------|---------|--------|
-| Nap start MAE | 58.5 min | 58.0 min | -1% |
-| Nap duration MAE | 23.5 min | 23.4 min | ~ |
-| **Bedtime MAE** | 39.3 min | **22.3 min** | **-43%** |
-| Wake time MAE | 46.5 min | 44.0 min | -5% |
-| Nap end MAE | 64.7 min | 63.6 min | -2% |
-| **9mo nap start MAE** | 148.7 min | **140.3 min** | **-6%** |
+| Nap start MAE | 58.5 min | **44.5 min** | **-24%** |
+| Nap duration MAE | 23.5 min | 23.1 min | -2% |
+| **Bedtime MAE** | 39.3 min | **22.6 min** | **-43%** |
+| **Wake time MAE** | 46.5 min | **25.6 min** | **-45%** |
+| Nap end MAE | 64.7 min | **53.0 min** | **-18%** |
+| **9mo nap start MAE** | 148.7 min | **64.1 min** | **-57%** |
 | Engine beats all baselines | No (bedtime) | **Yes** | Fixed |
+
+Key improvements in this batch (2026-04-03):
+- **Wake-window cross-day fix** — overnight sleeps are keyed to the previous day, so nap 1 never got a wake-window sample. Fixing this gave massive gains: wake MAE -42%, 9mo nap MAE -54%.
+- **Local-tz fixture generation** — Kaggle fixtures were bucketed by UTC date. After fixing, baby_1 wake MAE went from 799.7 → 146.9 min (5.4x improvement).
+- **Habitual nap start anchoring** (from previous commit) now properly gated by pressure-vs-clock ratio at position 0.
+
+### Multi-baby results (Kaggle, post-tz-fix)
+
+| Baby | Days | Nap MAE | Bed MAE | Wake MAE | Count accuracy |
+|------|------|---------|---------|----------|----------------|
+| halldis | 86 | 44.5 | 22.6 | 25.6 | 81% |
+| baby_1 | 804 | 237.7 | 181.6 | 146.9 | 75% |
+| baby_2 | 146 | 104.7 | 121.8 | 474.2 | 40% |
+| baby_3 | 70 | 244.2 | 547 | 471.1 | 19% |
+| baby_4 | 25 | 85.6 | 0 | 0 | 20% |
+| baby_5 | 42 | 97.5 | 1392.3 | 2810 | 17% |
+
+baby_1 at 8-17mo (the signal window): nap MAE 18-66 min, wake MAE 20-50 min — comparable to Halldis.
 
 ### Remaining issues
 
-- **9mo cliff still large** (140 min) — transition handling helps but the first
-  few days after a nap drop have too little data to learn from. UI should show
-  both schedules during this period.
+- **Kaggle early months still poor** — nap MAE 200-570 at 0-7mo on baby_1. This is
+  expected (no circadian rhythm, irregular schedules) but worth investigating if
+  better newborn priors could help.
+- **baby_2/3/5 bed/wake MAE still extreme** — likely data quality issues (missing
+  nights, inconsistent logging). Need per-baby investigation.
 - **3b onset latency** blocked on data — only 8 days of `fall_asleep_time` in DB.
-  Will become viable once the feature accumulates more data from daily use.
-- **Sleep budget** marginal on Halldis (+0.5 wake MAE) but helps baby_2 (-10.9)
-  and baby_5 (-24.6). Worth keeping at 25% compensation.
-- **Galland regression** tested and rejected — step functions work better for
-  our use case. The regressions are for population-level totals, not individual
-  nap durations.
+- **cycleBias and sleepBudget** both marginally hurt on Halldis. Consider
+  per-baby adaptive toggling.
 
 ### UI TODO from this work
 

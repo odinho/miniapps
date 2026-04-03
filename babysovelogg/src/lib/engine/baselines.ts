@@ -5,7 +5,7 @@
  * Compare per-month, not just aggregate.
  */
 
-import { WAKE_WINDOWS, NAP_COUNTS, findByAge } from "./constants.js";
+import { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, findByAge } from "./constants.js";
 import type { PredictedNap } from "./schedule.js";
 import type { SleepEntry, BabyContext } from "$lib/types.js";
 import { isoToDateInTz } from "$lib/tz.js";
@@ -172,6 +172,56 @@ export function movingAvgBedtime(todaySleeps: SleepEntry[], ctx: BabyContext): s
   }
 
   return new Date(new Date(lastSleep.end_time).getTime() + avgGap * 60_000).toISOString();
+}
+
+// ─── Wake time baselines ────────────────────────────────────────────────────
+
+/** Age-default night duration: bedtime + expected night hours from SLEEP_NEEDS. */
+export function ageDefaultWakeTime(bedtime: string, ctx: BabyContext, _todayNapMin: number): string {
+  const need = findByAge(SLEEP_NEEDS, ctx.ageMonths);
+  const napCount = findByAge(NAP_COUNTS, ctx.ageMonths).naps;
+  const napDur = ctx.ageMonths < 6 ? 60 : ctx.ageMonths < 12 ? 45 : 30;
+  const nightMin = (need.totalHours * 60) - (napDur * napCount);
+  return new Date(new Date(bedtime).getTime() + nightMin * 60_000).toISOString();
+}
+
+/** Yesterday-repeated: apply yesterday's actual wake time to tomorrow. */
+export function yesterdayRepeatedWakeTime(bedtime: string, ctx: BabyContext, _todayNapMin: number): string {
+  // Find the most recent night end time
+  const nights = ctx.recentSleeps
+    .filter((s) => s.type === "night" && s.end_time)
+    .toSorted((a, b) => new Date(b.end_time!).getTime() - new Date(a.end_time!).getTime());
+
+  if (nights.length === 0) return ageDefaultWakeTime(bedtime, ctx, _todayNapMin);
+
+  // Apply yesterday's wake hour to tomorrow's date
+  const lastWake = new Date(nights[0].end_time!);
+  const tomorrowDate = new Date(new Date(bedtime).getTime() + 12 * 3600_000)
+    .toISOString().slice(0, 10);
+  const timeOfDay = lastWake.toISOString().slice(11);
+  return new Date(`${tomorrowDate}T${timeOfDay}`).toISOString();
+}
+
+/** 3-day moving average of wake times. */
+export function movingAvgWakeTime(bedtime: string, ctx: BabyContext, _todayNapMin: number): string {
+  const nights = ctx.recentSleeps
+    .filter((s) => s.type === "night" && s.end_time)
+    .toSorted((a, b) => new Date(b.end_time!).getTime() - new Date(a.end_time!).getTime())
+    .slice(0, 3);
+
+  if (nights.length === 0) return ageDefaultWakeTime(bedtime, ctx, _todayNapMin);
+
+  // Average the time-of-day portion (minutes since midnight UTC)
+  const avgMinutes = nights.reduce((sum, n) => {
+    const d = new Date(n.end_time!);
+    return sum + d.getUTCHours() * 60 + d.getUTCMinutes();
+  }, 0) / nights.length;
+
+  const tomorrowDate = new Date(new Date(bedtime).getTime() + 12 * 3600_000)
+    .toISOString().slice(0, 10);
+  const h = String(Math.floor(avgMinutes / 60)).padStart(2, "0");
+  const m = String(Math.round(avgMinutes % 60)).padStart(2, "0");
+  return new Date(`${tomorrowDate}T${h}:${m}:00.000Z`).toISOString();
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

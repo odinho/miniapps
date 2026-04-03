@@ -50,6 +50,9 @@ export type NapPredictor = (wakeUpTime: string, ctx: BabyContext) => PredictedNa
 /** Bedtime predictor function signature — takes today's sleeps and baby context. */
 export type BedtimePredictor = (todaySleeps: SleepEntry[], ctx: BabyContext) => string;
 
+/** Wake time predictor function signature — takes bedtime, context, and today's nap total. */
+export type WakeTimePredictor = (bedtime: string, ctx: BabyContext, todayNapMinutes: number) => string;
+
 /**
  * Run a backtest: replay historical sleep data day-by-day, predict each day
  * using only prior data, and compare predictions to actuals.
@@ -65,6 +68,7 @@ export function backtest(
     lookbackDays?: number;
     predict?: NapPredictor;
     predictBedtime?: BedtimePredictor;
+    predictWakeTime?: WakeTimePredictor;
     customNapCount?: number | null;
     tz?: string;
     features?: Partial<PredictionFeatures>;
@@ -73,6 +77,7 @@ export function backtest(
   const lookback = options?.lookbackDays ?? 7;
   const predict = options?.predict ?? predictDayNaps;
   const bedtimePredict = options?.predictBedtime ?? recommendBedtime;
+  const wakePredict = options?.predictWakeTime ?? predictNightEndTime;
   const customNapCount = options?.customNapCount ?? null;
   const tz = options?.tz ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   const features = options?.features;
@@ -158,7 +163,7 @@ export function backtest(
         const dur = (new Date(n.end_time!).getTime() - new Date(n.start_time).getTime()) / 60000;
         return sum + dur;
       }, 0);
-      const predictedWakeMs = new Date(predictNightEndTime(actualBedtime, ctx, todayNapMin)).getTime();
+      const predictedWakeMs = new Date(wakePredict(actualBedtime, ctx, todayNapMin)).getTime();
       const actualWakeMs = new Date(days[i + 1].wakeTime).getTime();
       wakeTimeError = (predictedWakeMs - actualWakeMs) / 60000;
     }
