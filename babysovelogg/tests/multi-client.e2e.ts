@@ -1,18 +1,11 @@
 import { test, expect, fillDateInput } from "./fixtures";
-import type { Page } from "@playwright/test";
-
-async function dismissMorningPrompt(page: Page) {
-  await page.getByTestId("morning-prompt").waitFor({ state: "visible", timeout: 5000 });
-  await page.getByRole("button", { name: "Sett vaknetid" }).click();
-  await page.getByTestId("morning-prompt").waitFor({ state: "hidden", timeout: 5000 });
-}
 
 test("Second browser context sees baby created in first", async ({ page, browser }) => {
   await page.goto("/");
   await page.locator('#baby-name').fill("Testa");
   await fillDateInput(page.locator('input.date-input'), "2025-06-12");
   await page.getByRole("button", { name: "Kom i gang ✨" }).click();
-  await dismissMorningPrompt(page);
+  // After onboarding, the dashboard appears directly (no morning prompt)
   await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
 
   const ctx2 = await browser.newContext();
@@ -32,7 +25,7 @@ test("Sleep started in one client is visible in another after reload", async ({
   await page.locator('#baby-name').fill("Testa");
   await fillDateInput(page.locator('input.date-input'), "2025-06-12");
   await page.getByRole("button", { name: "Kom i gang ✨" }).click();
-  await dismissMorningPrompt(page);
+  // After onboarding, the dashboard appears directly (no morning prompt)
   await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
 
   await page.getByTestId("sleep-button").click();

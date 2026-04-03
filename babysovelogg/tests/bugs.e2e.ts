@@ -122,12 +122,14 @@ test("B15: changing sleep type from nap to night preserves the entry", async ({ 
   addCompletedSleep(babyId, napStart.toISOString(), napEnd.toISOString());
 
   await page.goto("/history");
+  // setWakeUpTime inserts a night sleep + we added 1 nap = 2 sleep entries
   const sleepItems = page.locator(".sleep-log-item:not(.wakeup-log-item):not(.diaper-log-item)");
-  await expect(sleepItems).toHaveCount(1, { timeout: 5000 });
-  await expect(sleepItems.locator(".log-meta").first()).toContainText("Lur");
+  await expect(sleepItems).toHaveCount(2, { timeout: 5000 });
 
-  // Click to edit
-  await sleepItems.first().click();
+  // Find and click the nap entry specifically
+  const napItem = sleepItems.filter({ hasText: "Lur" });
+  await expect(napItem).toHaveCount(1);
+  await napItem.click();
   await expect(page.getByRole("heading", { name: "Endra søvn" })).toBeVisible();
 
   // Change type to night
@@ -136,9 +138,9 @@ test("B15: changing sleep type from nap to night preserves the entry", async ({ 
 
   await expect(page.getByRole("heading", { name: "Endra søvn" })).not.toBeVisible({ timeout: 3000 });
 
-  // The entry should still exist, now showing as night sleep
-  await expect(sleepItems).toHaveCount(1);
-  await expect(sleepItems.locator(".log-meta").first()).toContainText("Nattesøvn");
+  // The edited entry should still exist, now showing as night sleep (total still 2)
+  await expect(sleepItems).toHaveCount(2);
+  await expect(sleepItems.filter({ hasText: "Nattesøvn" })).toHaveCount(2);
 });
 
 // --- B18: Ending a night sleep derives wakeup from its end_time ---
@@ -268,15 +270,16 @@ test("B6: diaper notes are visible in history log", async ({ page }) => {
   await expect(diaperItem).toContainText("Litt raudt utslett");
 });
 
-// --- B12: Wakeup time visible in log ---
+// --- B12: Night sleep end time (wakeup) visible in history ---
 
-test("B12: wakeup time appears as entry in history", async ({ page }) => {
+test("B12: night sleep end time appears in history", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
 
   await page.goto("/history");
-  const wakeupItem = page.locator(".wakeup-log-item").first();
-  await expect(wakeupItem).toBeVisible({ timeout: 5000 });
-  await expect(wakeupItem).toContainText("07:00");
-  await expect(wakeupItem).toContainText("Vakna");
+  // setWakeUpTime inserts a completed night sleep ending at 07:00
+  const nightItem = page.locator(".sleep-log-item:not(.wakeup-log-item):not(.diaper-log-item)").filter({ hasText: "Nattesøvn" });
+  await expect(nightItem).toHaveCount(1, { timeout: 5000 });
+  // The night sleep entry should show its end time (07:00)
+  await expect(nightItem).toContainText("07:00");
 });

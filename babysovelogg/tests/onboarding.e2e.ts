@@ -11,9 +11,7 @@ test("Get Started button creates baby and navigates to dashboard", async ({ page
 
   await page.getByRole("button", { name: "Kom i gang ✨" }).click();
 
-  await expect(page.getByTestId("morning-prompt")).toBeVisible({ timeout: 5000 });
-  await page.getByRole("button", { name: "Sett vaknetid" }).click();
-
+  // After onboarding, the dashboard appears directly (no morning prompt)
   await expect(page.getByTestId("baby-name")).toHaveText("Halldis", { timeout: 5000 });
   await expect(page.getByTestId("baby-age")).toContainText("mnd");
   await expect(page.getByTestId("sleep-button")).toBeVisible();
@@ -31,8 +29,7 @@ test("Get Started validates required fields", async ({ page }) => {
 
   await fillDateInput(page.locator('input.date-input'), "2025-06-12");
   await page.getByRole("button", { name: "Kom i gang ✨" }).click();
-  await expect(page.getByTestId("morning-prompt")).toBeVisible({ timeout: 5000 });
-  await page.getByRole("button", { name: "Sett vaknetid" }).click();
+  // After onboarding, the dashboard appears directly (no morning prompt)
   await expect(page.getByTestId("baby-name")).toHaveText("Halldis", { timeout: 5000 });
 });
 
@@ -52,8 +49,7 @@ test("Sleep tracking flow after onboarding", async ({ page, request }) => {
   });
 
   await page.goto("/");
-  await expect(page.getByTestId("morning-prompt")).toBeVisible({ timeout: 5000 });
-  await page.getByRole("button", { name: "Sett vaknetid" }).click();
+  // After baby is created, the dashboard appears directly (no morning prompt)
   await expect(page.getByTestId("baby-name")).toHaveText("Halldis", { timeout: 5000 });
 
   await page.getByTestId("sleep-button").click();

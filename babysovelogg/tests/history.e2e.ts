@@ -17,13 +17,11 @@ test("History page shows logged sleeps", async ({ page }) => {
 });
 
 test("History page shows empty state when no sleeps", async ({ page }) => {
-  const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
+  createBaby("Testa");
 
   await page.goto("/history");
-  // Wake-up entry is shown, but no sleep entries
-  await expect(page.locator(".wakeup-log-item")).toHaveCount(1, { timeout: 5000 });
-  await expect(page.locator(".sleep-log-item:not(.wakeup-log-item):not(.diaper-log-item)")).toHaveCount(0);
+  // No sleep entries at all — empty state message shown
+  await expect(page.getByText("Ingen oppføringar enno")).toBeVisible({ timeout: 5000 });
 });
 
 test("Clicking a sleep entry opens edit modal", async ({ page }) => {
@@ -98,7 +96,10 @@ test('Active sleep shows "pågår…" in history', async ({ page }) => {
   addActiveSleep(babyId, new Date().toISOString(), "nap");
 
   await page.goto("/history");
+  // setWakeUpTime inserts a completed night sleep + 1 active nap = 2 items
   const sleepItems = page.locator(".sleep-log-item:not(.wakeup-log-item):not(.diaper-log-item)");
-  await expect(sleepItems).toHaveCount(1, { timeout: 5000 });
-  await expect(sleepItems.locator(".log-duration")).toHaveText("pågår…");
+  await expect(sleepItems).toHaveCount(2, { timeout: 5000 });
+  // The active nap should show "pågår…"
+  const activeItem = sleepItems.filter({ hasText: "pågår…" });
+  await expect(activeItem.locator(".log-duration")).toHaveText("pågår…");
 });

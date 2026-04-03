@@ -83,8 +83,8 @@ test("Stats subtracts pause time from sleep durations", async ({ page }) => {
 });
 
 test("Stats shows empty state when no data", async ({ page }) => {
-  const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
+  createBaby("Testa");
+  // No sleep entries — empty state should be shown
 
   await page.goto("/stats");
   await expect(page.getByText("Ingen søvndata enno")).toBeVisible({ timeout: 5000 });
