@@ -245,24 +245,24 @@ describe("strategy integration", () => {
       ...scheduleDay("2026-03-25"),
       ...scheduleDay("2026-03-26"),
     ];
-    const signals = computeStrategySignals(sleeps, "2025-06-01", "UTC",
+    const s9mo = computeStrategySignals(sleeps, "2025-06-01", "UTC",
       new Date("2026-03-27T12:00:00Z").getTime());
 
-    expect(selectStrategy(signals)).toBe("routine_schedule");
+    expect(selectStrategy(s9mo)).toBe("routine_schedule");
   });
 
   it("2-week baby always gets newborn_guidance", () => {
-    const signals = computeStrategySignals([], "2026-03-17", "UTC",
+    const s2wk = computeStrategySignals([], "2026-03-17", "UTC",
       new Date("2026-04-01T12:00:00Z").getTime());
 
-    expect(selectStrategy(signals)).toBe("newborn_guidance");
+    expect(selectStrategy(s2wk)).toBe("newborn_guidance");
   });
 
   it("3-month baby with sparse data gets emerging_rhythm", () => {
     const sleeps = newbornDay("2026-03-25");
-    const signals = computeStrategySignals(sleeps, "2026-01-01", "UTC",
+    const s3mo = computeStrategySignals(sleeps, "2026-01-01", "UTC",
       new Date("2026-04-01T12:00:00Z").getTime());
 
-    expect(selectStrategy(signals)).toBe("emerging_rhythm");
+    expect(selectStrategy(s3mo)).toBe("emerging_rhythm");
   });
 });

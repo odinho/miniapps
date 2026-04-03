@@ -110,13 +110,13 @@ function assembleNewbornPrediction(
   const completedSleeps = todaySleeps
     .filter((s) => s.end_time)
     .map((s) => ({ endMs: new Date(s.end_time!).getTime() }))
-    .sort((a, b) => b.endMs - a.endMs);
+    .toSorted((a, b) => b.endMs - a.endMs);
 
   // Also check recent sleeps for last sleep end
   const recentCompleted = recentEntries
     .filter((s) => s.end_time)
     .map((s) => ({ endMs: new Date(s.end_time!).getTime() }))
-    .sort((a, b) => b.endMs - a.endMs);
+    .toSorted((a, b) => b.endMs - a.endMs);
 
   const lastSleepEndMs = completedSleeps[0]?.endMs ?? recentCompleted[0]?.endMs ?? null;
 

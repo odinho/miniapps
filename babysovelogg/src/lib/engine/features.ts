@@ -213,7 +213,7 @@ export function computeStrategySignals(
   const wakeWindowSD = sd(wakeWindows);
 
   // Logging completeness: fraction of calendar days in the data range that have entries
-  const sortedDates = [...byDay.keys()].sort();
+  const sortedDates = [...byDay.keys()].toSorted();
   let calendarDays = 1;
   if (sortedDates.length >= 2) {
     const firstDay = new Date(sortedDates[0] + "T12:00:00Z").getTime();
@@ -305,7 +305,7 @@ export function computeLongestStretchTrend(
     day.push(s);
   }
 
-  const sortedDates = [...byDay.keys()].sort();
+  const sortedDates = [...byDay.keys()].toSorted();
   const refMs = now ?? Date.now();
   const refDate = isoToDateInTz(new Date(refMs).toISOString(), tz);
 
@@ -420,7 +420,7 @@ export function computeSleepWindow(
 
   if (recentWakeWindows.length >= 3) {
     // Use observed wake windows with padding
-    const sorted = [...recentWakeWindows].sort((a, b) => a - b);
+    const sorted = [...recentWakeWindows].toSorted((a, b) => a - b);
     const p25 = sorted[Math.floor(sorted.length * 0.25)];
     const p75 = sorted[Math.floor(sorted.length * 0.75)];
     minWW = Math.max(15, p25 - 10);
@@ -448,7 +448,7 @@ export function extractWakeWindows(sleeps: SleepEntry[]): number[] {
   const completed = sleeps
     .filter((s) => s.end_time)
     .map((s) => ({ startMs: new Date(s.start_time).getTime(), endMs: new Date(s.end_time!).getTime() }))
-    .sort((a, b) => a.startMs - b.startMs);
+    .toSorted((a, b) => a.startMs - b.startMs);
 
   const gaps: number[] = [];
   for (let i = 1; i < completed.length; i++) {

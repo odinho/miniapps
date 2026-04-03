@@ -4,7 +4,7 @@ import type { PredictedNap } from "$lib/engine/schedule.js";
 import type { ConfidenceResult } from "$lib/engine/confidence.js";
 import type { CalibrationReport } from "$lib/engine/calibration.js";
 import type { Strategy } from "$lib/engine/strategy.js";
-import type { RollingSleepStats, LongestStretchTrend, AgeNorms } from "$lib/engine/features.js";
+import type { RollingSleepStats, AgeNorms } from "$lib/engine/features.js";
 
 export interface Prediction {
 	/** Which prediction strategy produced this result */

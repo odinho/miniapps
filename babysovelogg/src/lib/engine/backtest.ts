@@ -195,7 +195,7 @@ export function backtest(
       if (priorDaySleeps.length > 0) {
         const lastEnd = priorDaySleeps
           .map((s) => new Date(s.end_time!).getTime())
-          .sort((a, b) => b - a)[0];
+          .toSorted((a, b) => b - a)[0];
         const wws = extractWakeWindows(recentSleeps);
         const window = computeSleepWindow(lastEnd, wws, ctx.ageMonths);
         // Check if the first actual sleep of today started within the window

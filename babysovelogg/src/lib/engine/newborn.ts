@@ -115,7 +115,7 @@ function computeExpectedDuration(
     return { min: 30, max: 150 };
   }
 
-  const sorted = durations.sort((a, b) => a - b);
+  const sorted = durations.toSorted((a, b) => a - b);
   const p15 = sorted[Math.floor(sorted.length * 0.15)];
   const p85 = sorted[Math.floor(sorted.length * 0.85)];
   return {
