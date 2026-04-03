@@ -238,7 +238,17 @@ function assembleEmergingPrediction(
 
   let predictedNaps = result.predictedNaps;
   let nextNap = result.nextNap;
-  const bedtime = result.bedtime;
+  // Recalculate bedtime during active nap: predictEmerging calls recommendBedtime
+  // with raw todaySleeps which has no completed entries, causing a 19:00 default.
+  // Include a synthetic completed nap with predicted end time for a better estimate.
+  let bedtime = result.bedtime;
+  if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
+    const napEnd = predictNapEndTime(activeSleep.start_time, ctx);
+    const augmented = [...todaySleeps.map(toSleepEntry), {
+      start_time: activeSleep.start_time, end_time: napEnd, type: "nap" as const,
+    }];
+    bedtime = recommendBedtime(augmented, ctx);
+  }
   const bedtimeMs = bedtime ? new Date(bedtime).getTime() : Infinity;
 
   if (predictedNaps) {
@@ -341,7 +351,18 @@ function assembleSchedulePrediction(
 
   if (!wakeTimeForPrediction) return null;
 
-  const bedtime = recommendBedtime(todaySleeps.map(toSleepEntry), ctx);
+  // During active nap, include a synthetic completed entry with the predicted
+  // end time so recommendBedtime can calculate properly (instead of defaulting to 19:00)
+  const sleepsForBedtime = todaySleeps.map(toSleepEntry);
+  if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
+    const napEnd = predictNapEndTime(activeSleep.start_time, ctx);
+    sleepsForBedtime.push({
+      start_time: activeSleep.start_time,
+      end_time: napEnd,
+      type: "nap",
+    });
+  }
+  const bedtime = recommendBedtime(sleepsForBedtime, ctx);
   const bedtimeMs = new Date(bedtime).getTime();
   const completedNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time);
   // During active nap, count it toward consumed slots
