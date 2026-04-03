@@ -65,6 +65,7 @@ export function assembleState(data: DayData) {
 
   // Determine strategy
   const strategy = determineStrategy(recentEntries, baby.birthdate, ctx.tz, now);
+  ctx.strategy = strategy;
 
   let prediction: Prediction | null = null;
   if (strategy === "newborn_guidance") {
