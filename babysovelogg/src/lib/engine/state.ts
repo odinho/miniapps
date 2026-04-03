@@ -16,7 +16,7 @@ import { predictNewborn } from "./newborn.js";
 import { predictEmerging } from "./emerging.js";
 import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry, BabyContext } from "$lib/types.js";
 import type { PredictedNap } from "./schedule.js";
-import type { Strategy } from "./strategy.js";
+import type { Strategy, StrategyContext, StrategyOverride } from "./strategy.js";
 import type { Prediction } from "$lib/stores/app.svelte.js";
 
 export interface DayData {
@@ -90,15 +90,55 @@ export function assembleState(data: DayData) {
   };
 }
 
-/** Determine which strategy to use for this baby right now. */
+/**
+ * Determine which strategy to use, with hysteresis derived from recent data.
+ *
+ * Replays the raw selector over the last 7 days (1 day steps) to build a
+ * history, then applies hysteresis rules. This is pure — no persistence needed.
+ */
 function determineStrategy(
   recentSleeps: SleepEntry[],
   birthdate: string,
   tz: string,
   now: number,
+  override?: StrategyOverride,
 ): Strategy {
-  const signals = computeStrategySignals(recentSleeps, birthdate, tz, now);
-  return selectStrategy(signals);
+  const todaySignals = computeStrategySignals(recentSleeps, birthdate, tz, now);
+
+  // Replay raw selector over recent days to derive hysteresis context
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const rawHistory: Strategy[] = [];
+  for (let daysAgo = 6; daysAgo >= 1; daysAgo--) {
+    const dayMs = now - daysAgo * DAY_MS;
+    // Only use sleeps that ended before this day's reference point
+    const windowSleeps = recentSleeps.filter((s) =>
+      s.end_time && new Date(s.end_time).getTime() < dayMs,
+    );
+    const daySignals = computeStrategySignals(windowSleeps, birthdate, tz, dayMs);
+    rawHistory.push(selectStrategy(daySignals));
+  }
+
+  // The "previous" strategy is the most recent historical day's raw selection
+  const previous = rawHistory.length > 0 ? rawHistory[rawHistory.length - 1] : null;
+
+  // Today's raw selection
+  const todayRaw = selectStrategy(todaySignals);
+
+  // Count consecutive days the raw selector has suggested today's raw strategy
+  // (counting backward from yesterday)
+  let consecutiveDays = 0;
+  for (let i = rawHistory.length - 1; i >= 0; i--) {
+    if (rawHistory[i] === todayRaw) consecutiveDays++;
+    else break;
+  }
+
+  // Apply hysteresis
+  const ctx: StrategyContext = {
+    previous,
+    consecutiveDaysAtCandidate: consecutiveDays,
+    override: override ?? null,
+  };
+  return selectStrategy(todaySignals, ctx);
 }
 
 /** Assemble a newborn-style prediction. */

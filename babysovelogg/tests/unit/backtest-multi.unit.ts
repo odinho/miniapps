@@ -51,9 +51,9 @@ describe("multi-baby backtest", () => {
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "halldis: 86 days, count 83% (71/86), nap MAE 44.2, dur MAE 23.1, bed MAE 22.6, wake MAE 25.6, nap bias -3.3, count bias +0.08
       baby_1: 619 days, count 82% (505/619), nap MAE 339.7, dur MAE 27.2, bed MAE 176.4, wake MAE 89.3, nap bias +321.3, count bias -0.09
-      baby_2: 54 days, count 35% (19/54), nap MAE 88.3, dur MAE 30.8, bed MAE 131.2, wake MAE 74.8, nap bias -7.6, count bias -0.04
-      baby_3: 50 days, count 20% (10/50), nap MAE 339.7, dur MAE 36.4, bed MAE 502.7, wake MAE 308.4, nap bias +264.3, count bias +0.64
-      baby_5: 8 days, count 0% (0/8), nap MAE 153.1, dur MAE 43.4, bed MAE 1798.7, wake MAE 722, nap bias +3.4, count bias +2"
+      baby_2: 54 days, count 46% (25/54), nap MAE 62.9, dur MAE 28.9, bed MAE 59.8, wake MAE 74.8, nap bias +16.9, count bias -0.09
+      baby_3: 50 days, count 52% (26/50), nap MAE 134.8, dur MAE 38.1, bed MAE 471.6, wake MAE 166.6, nap bias +18.2, count bias +0.32
+      baby_5: 8 days, count 50% (4/8), nap MAE 119.9, dur MAE 29.6, bed MAE 1574, wake MAE 722, nap bias -17.1, count bias +0.5"
     `);
   });
 
@@ -96,8 +96,8 @@ describe("multi-baby backtest", () => {
     const buckets = bucketResultsByAge(results[2].result, results[2].birthdate);
     const lines = buckets.map((b) => renderSummary(b.result, b.label));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "0mo: 4 days, count 0% (0/4), nap MAE 156.7, dur MAE 46.3, bed MAE 0, wake MAE 0, nap bias -67.3, count bias -1.25
-      1mo: 3 days, count 33% (1/3), nap MAE 191.4, dur MAE 20.6, bed MAE 2344, wake MAE 0, nap bias -118.2, count bias +2.67
+      "0mo: 4 days, count 100% (4/4), nap MAE 0, dur MAE 0, bed MAE 0, wake MAE 0, nap bias 0, count bias 0
+      1mo: 3 days, count 100% (3/3), nap MAE 0, dur MAE 0, bed MAE 0, wake MAE 0, nap bias 0, count bias 0
       2mo: 6 days, count 33% (2/6), nap MAE 53.9, dur MAE 24.6, bed MAE 101.1, wake MAE 43.5, nap bias +10.9, count bias +0.5
       3mo: 8 days, count 25% (2/8), nap MAE 52.7, dur MAE 33.3, bed MAE 102.9, wake MAE 102.6, nap bias +20.8, count bias -0.87
       4mo: 23 days, count 48% (11/23), nap MAE 66.3, dur MAE 27.6, bed MAE 31.5, wake MAE 81.1, nap bias +26.2, count bias -0.22

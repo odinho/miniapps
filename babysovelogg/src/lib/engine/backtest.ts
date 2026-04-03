@@ -121,16 +121,50 @@ export function backtest(
     const strategySignals = computeStrategySignals(recentSleeps, birthdate, tz, dayMs);
     const strategy = selectStrategy(strategySignals);
 
-    // Predict naps
-    const predictedNaps = predict(day.wakeTime, ctx);
-
-    // Predict bedtime using today's actual nap data (as if naps happened)
     const actualNaps = day.sleeps.filter((s) => s.type === "nap" && s.end_time);
-    const predictedBedtime = bedtimePredict(actualNaps, ctx);
-
-    // Find actual bedtime (tonight's night sleep start)
     const nightSleep = day.sleeps.find((s) => s.type === "night");
     const actualBedtime = nightSleep?.start_time ?? null;
+
+    // Sleep window hit rate for newborn/emerging days
+    let sleepWindowHit: boolean | null = null;
+    if (strategy !== "routine_schedule" && day.sleeps.length > 0) {
+      const priorDaySleeps = i > 0 ? days[i - 1].sleeps.filter((s) => s.end_time) : [];
+      if (priorDaySleeps.length > 0) {
+        const lastEnd = priorDaySleeps
+          .map((s) => new Date(s.end_time!).getTime())
+          .toSorted((a, b) => b - a)[0];
+        const wws = extractWakeWindows(recentSleeps);
+        const window = computeSleepWindow(lastEnd, wws, ctx.ageMonths);
+        const firstSleepStart = new Date(day.sleeps[0].start_time).getTime();
+        sleepWindowHit = firstSleepStart >= window.earliestMs && firstSleepStart <= window.latestMs;
+      }
+    }
+
+    // For newborn days: don't run the schedule engine — nap/bedtime predictions
+    // are meaningless. Only score with sleep window hit rate.
+    if (strategy === "newborn_guidance") {
+      results.push({
+        date: day.date,
+        dayIndex: i,
+        strategy,
+        predictedNaps: [],
+        actualNaps,
+        predictedBedtime: "",
+        actualBedtime,
+        napCountError: 0,
+        napStartErrors: [],
+        napEndErrors: [],
+        napDurationErrors: [],
+        bedtimeError: null,
+        wakeTimeError: null,
+        sleepWindowHit,
+      });
+      continue;
+    }
+
+    // For emerging/routine: run the schedule predictor
+    const predictedNaps = predict(day.wakeTime, ctx);
+    const predictedBedtime = bedtimePredict(actualNaps, ctx);
 
     // Match predicted naps to actual naps by order
     const napStartErrors: number[] = [];
@@ -157,27 +191,20 @@ export function backtest(
     for (let k = 0; k < unmatchedCount; k++) {
       napStartErrors.push(60);
       napEndErrors.push(60);
-      // No duration penalty for unmatched — that's a count error, not duration
     }
 
     // Bedtime error — only score when we have both naps and a bedtime.
-    // Without naps, the predictor falls back to "19:00 today" which uses
-    // the current date (wrong for historical backtest days).
     let bedtimeError: number | null = null;
     if (actualBedtime && actualNaps.length > 0) {
       bedtimeError =
         (new Date(predictedBedtime).getTime() - new Date(actualBedtime).getTime()) / 60000;
     }
 
-    // Wake time prediction: use tonight's actual bedtime and the engine's
-    // night-end predictor, then compare to the next day's actual wake time.
-    // Only score when the next record is the next calendar day — multi-day
-    // gaps (missing data) produce meaningless wake errors.
+    // Wake time prediction
     let wakeTimeError: number | null = null;
     const nextDayIsAdjacent = i + 1 < days.length
       && (new Date(days[i + 1].date + "T00:00:00Z").getTime() - new Date(day.date + "T00:00:00Z").getTime()) / 86400000 === 1;
     if (actualBedtime && nextDayIsAdjacent) {
-      // Pass today's actual nap total for sleep budget adjustment
       const todayNapMin = actualNaps.reduce((sum, n) => {
         const dur = (new Date(n.end_time!).getTime() - new Date(n.start_time).getTime()) / 60000;
         return sum + dur;
@@ -185,23 +212,6 @@ export function backtest(
       const predictedWakeMs = new Date(wakePredict(actualBedtime, ctx, todayNapMin)).getTime();
       const actualWakeMs = new Date(days[i + 1].wakeTime).getTime();
       wakeTimeError = (predictedWakeMs - actualWakeMs) / 60000;
-    }
-
-    // Sleep window hit rate for newborn/emerging days
-    let sleepWindowHit: boolean | null = null;
-    if (strategy !== "routine_schedule" && day.sleeps.length > 0) {
-      // Compute a sleep window from the prior day's last sleep end
-      const priorDaySleeps = i > 0 ? days[i - 1].sleeps.filter((s) => s.end_time) : [];
-      if (priorDaySleeps.length > 0) {
-        const lastEnd = priorDaySleeps
-          .map((s) => new Date(s.end_time!).getTime())
-          .toSorted((a, b) => b - a)[0];
-        const wws = extractWakeWindows(recentSleeps);
-        const window = computeSleepWindow(lastEnd, wws, ctx.ageMonths);
-        // Check if the first actual sleep of today started within the window
-        const firstSleepStart = new Date(day.sleeps[0].start_time).getTime();
-        sleepWindowHit = firstSleepStart >= window.earliestMs && firstSleepStart <= window.latestMs;
-      }
     }
 
     results.push({

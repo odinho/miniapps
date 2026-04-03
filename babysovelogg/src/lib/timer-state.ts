@@ -61,11 +61,16 @@ export function getTimerMode(input: TimerInput): TimerMode {
 		};
 	}
 
-	// Newborn/emerging: sleep window mode
-	if (prediction?.strategy === 'newborn_guidance' && prediction.sleepWindow && prediction.sleepPressure) {
-		const windowStart = new Date(prediction.sleepWindow.earliest).getTime() - now;
-		const windowEnd = new Date(prediction.sleepWindow.latest).getTime() - now;
-		return { kind: 'sleep-window', windowStart, windowEnd, pressure: prediction.sleepPressure };
+	// Newborn: always use sleep window mode
+	// Emerging: use sleep window when schedule has no nextNap (low confidence)
+	const usesSleepWindow = prediction?.sleepWindow && prediction.sleepPressure && (
+		prediction.strategy === 'newborn_guidance'
+		|| (prediction.strategy === 'emerging_rhythm' && !prediction.nextNap)
+	);
+	if (usesSleepWindow) {
+		const windowStart = new Date(prediction!.sleepWindow!.earliest).getTime() - now;
+		const windowEnd = new Date(prediction!.sleepWindow!.latest).getTime() - now;
+		return { kind: 'sleep-window', windowStart, windowEnd, pressure: prediction!.sleepPressure! };
 	}
 
 	if (prediction?.nextNap) {

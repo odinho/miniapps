@@ -79,14 +79,14 @@ describe("multi-baby ablation", () => {
       "positionalDuration:
         halldis: nap 0, wake 0
         baby_1: nap -8.1, wake 0
-        baby_2: nap +0.9, wake 0
-        baby_3: nap -3, wake 0
-        baby_5: nap -5.4, wake 0
+        baby_2: nap +1.1, wake 0
+        baby_3: nap -2.7, wake 0
+        baby_5: nap +0.1, wake 0
       habitualWake:
         halldis: nap 0, wake +3.4
         baby_1: nap 0, wake +20.1
         baby_2: nap 0, wake +13
-        baby_3: nap 0, wake +27.7
+        baby_3: nap 0, wake +41.6
         baby_5: nap 0, wake +505
       habitualBedtime:
         halldis: nap 0, wake 0
@@ -110,14 +110,14 @@ describe("multi-baby ablation", () => {
         halldis: nap 0, wake -0.6
         baby_1: nap 0, wake 0
         baby_2: nap 0, wake +3.2
-        baby_3: nap 0, wake -2.3
+        baby_3: nap 0, wake -0.5
         baby_5: nap 0, wake 0
       weightedRecency:
         halldis: nap 0, wake +0.3
         baby_1: nap +0.1, wake -0.6
-        baby_2: nap +0.8, wake -2.3
-        baby_3: nap -0.4, wake +1.3
-        baby_5: nap +12.4, wake 0"
+        baby_2: nap +0.2, wake -2.3
+        baby_3: nap 0, wake +2.2
+        baby_5: nap +0.3, wake 0"
     `);
   });
 

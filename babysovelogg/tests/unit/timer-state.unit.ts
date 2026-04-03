@@ -244,6 +244,53 @@ describe("getTimerMode", () => {
   });
 });
 
+describe("sleep-window mode", () => {
+  it("newborn strategy uses sleep-window mode", () => {
+    const input = makeInput({
+      prediction: makePrediction({
+        strategy: "newborn_guidance",
+        nextNap: null,
+        bedtime: null,
+        sleepWindow: { earliest: "2026-03-27T12:30:00.000Z", latest: "2026-03-27T13:00:00.000Z" },
+        sleepPressure: "rising",
+      }),
+    });
+    const mode = getTimerMode(input);
+    expect(mode.kind).toBe("sleep-window");
+    if (mode.kind === "sleep-window") {
+      expect(mode.pressure).toBe("rising");
+    }
+  });
+
+  it("emerging without nextNap uses sleep-window mode", () => {
+    const input = makeInput({
+      prediction: makePrediction({
+        strategy: "emerging_rhythm",
+        nextNap: null,
+        bedtime: null,
+        sleepWindow: { earliest: "2026-03-27T12:30:00.000Z", latest: "2026-03-27T13:00:00.000Z" },
+        sleepPressure: "low",
+      }),
+    });
+    const mode = getTimerMode(input);
+    expect(mode.kind).toBe("sleep-window");
+  });
+
+  it("emerging with nextNap uses schedule countdown", () => {
+    const input = makeInput({
+      prediction: makePrediction({
+        strategy: "emerging_rhythm",
+        nextNap: "2026-03-27T14:00:00.000Z",
+        bedtime: "2026-03-27T19:00:00.000Z",
+        sleepWindow: { earliest: "2026-03-27T12:30:00.000Z", latest: "2026-03-27T13:00:00.000Z" },
+        sleepPressure: "rising",
+      }),
+    });
+    const mode = getTimerMode(input);
+    expect(mode.kind).toBe("next-nap");
+  });
+});
+
 describe("getAwakeSince", () => {
   it("returns null with no sleeps and no wake-up", () => {
     expect(getAwakeSince(makeInput())).toBeNull();
