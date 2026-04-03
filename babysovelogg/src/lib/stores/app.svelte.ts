@@ -33,6 +33,8 @@ export interface Prediction {
 	longestStretch: number | null;
 	/** Longest stretch trend (week over week) */
 	longestStretchTrend: "growing" | "stable" | "shrinking" | null;
+	/** Longest stretch weekly averages for detailed display (minutes) */
+	longestStretchDetail: { currentWeekAvg: number; priorWeekAvg: number } | null;
 	/** Age-appropriate norms for context display */
 	ageNorms: AgeNorms | null;
 	/** Rolling 24h stats for context card */

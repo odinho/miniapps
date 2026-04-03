@@ -188,6 +188,10 @@ function assembleNewbornPrediction(
     totalSleep24h: result.rolling.totalSleep24h,
     longestStretch: result.rolling.longestStretch,
     longestStretchTrend: result.longestStretchTrend.direction,
+    longestStretchDetail: {
+      currentWeekAvg: result.longestStretchTrend.currentWeekAvg,
+      priorWeekAvg: result.longestStretchTrend.priorWeekAvg,
+    },
     ageNorms: result.ageNorms,
     rolling: result.rolling,
   };
@@ -247,6 +251,10 @@ function assembleEmergingPrediction(
     totalSleep24h: result.rolling.totalSleep24h,
     longestStretch: result.rolling.longestStretch,
     longestStretchTrend: result.longestStretchTrend.direction,
+    longestStretchDetail: {
+      currentWeekAvg: result.longestStretchTrend.currentWeekAvg,
+      priorWeekAvg: result.longestStretchTrend.priorWeekAvg,
+    },
     ageNorms: result.ageNorms,
     rolling: result.rolling,
   };
@@ -370,6 +378,7 @@ function assembleSchedulePrediction(
     totalSleep24h: null,
     longestStretch: null,
     longestStretchTrend: null,
+    longestStretchDetail: null,
     ageNorms: null,
     rolling: null,
   };

@@ -470,7 +470,7 @@
 		</div>
 
 		{#if showContextCard && prediction}
-			<ContextCard {prediction} {ageMonths} />
+			<ContextCard {prediction} {ageMonths} birthdate={baby.birthdate} />
 		{/if}
 
 		{#if showPopulationNorms}
