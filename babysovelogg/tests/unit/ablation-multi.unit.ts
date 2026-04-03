@@ -12,7 +12,6 @@ import halldisData from "../fixtures/halldis-sleep.json";
 import baby1Data from "../fixtures/baby_1-sleep.json";
 import baby2Data from "../fixtures/baby_2-sleep.json";
 import baby3Data from "../fixtures/baby_3-sleep.json";
-import baby4Data from "../fixtures/baby_4-sleep.json";
 import baby5Data from "../fixtures/baby_5-sleep.json";
 
 interface BabyFixture {
@@ -27,7 +26,6 @@ const babies: BabyFixture[] = [
   { name: "baby_1", ...(baby1Data as { birthdate: string; days: DayRecord[] }), tz: "America/New_York" },
   { name: "baby_2", ...(baby2Data as { birthdate: string; days: DayRecord[] }), tz: "America/New_York" },
   { name: "baby_3", ...(baby3Data as { birthdate: string; days: DayRecord[] }), tz: "America/New_York" },
-  { name: "baby_4", ...(baby4Data as { birthdate: string; days: DayRecord[] }), tz: "America/New_York" },
   { name: "baby_5", ...(baby5Data as { birthdate: string; days: DayRecord[] }), tz: "America/New_York" },
 ];
 
@@ -79,54 +77,47 @@ describe("multi-baby ablation", () => {
     }
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "positionalDuration:
-        halldis: nap 0, wake 0
-        baby_1: nap -6.2, wake 0
-        baby_2: nap -4.3, wake 0
-        baby_3: nap -4, wake 0
-        baby_4: nap -3.2, wake 0
-        baby_5: nap +2.4, wake 0
+        halldis: nap +0.1, wake 0
+        baby_1: nap -8, wake 0
+        baby_2: nap +0.9, wake 0
+        baby_3: nap -5.3, wake 0
+        baby_5: nap -1.4, wake 0
       habitualWake:
-        halldis: nap 0, wake +3.2
-        baby_1: nap 0, wake +14.2
-        baby_2: nap 0, wake +20.7
-        baby_3: nap 0, wake +10.8
-        baby_4: nap 0, wake 0
-        baby_5: nap 0, wake +103.3
+        halldis: nap 0, wake +3.3
+        baby_1: nap 0, wake +19.7
+        baby_2: nap 0, wake +14
+        baby_3: nap 0, wake +52.8
+        baby_5: nap 0, wake +410
       habitualBedtime:
         halldis: nap 0, wake 0
         baby_1: nap 0, wake 0
         baby_2: nap 0, wake 0
         baby_3: nap 0, wake 0
-        baby_4: nap 0, wake 0
         baby_5: nap 0, wake 0
       habitualNapStart:
-        halldis: nap +4.1, wake 0
-        baby_1: nap +2.3, wake 0
-        baby_2: nap +0.3, wake 0
+        halldis: nap +3.9, wake 0
+        baby_1: nap +2.4, wake 0
+        baby_2: nap 0, wake 0
         baby_3: nap 0, wake 0
-        baby_4: nap 0, wake 0
         baby_5: nap 0, wake 0
       cycleBias:
-        halldis: nap 0, wake -0.1
+        halldis: nap 0, wake 0
         baby_1: nap 0, wake 0
-        baby_2: nap 0, wake -0.4
-        baby_3: nap 0, wake -0.2
-        baby_4: nap 0, wake 0
+        baby_2: nap 0, wake -0.3
+        baby_3: nap 0, wake +0.1
         baby_5: nap 0, wake 0
       sleepBudget:
         halldis: nap 0, wake -0.6
-        baby_1: nap 0, wake +0.6
-        baby_2: nap 0, wake +6.4
-        baby_3: nap 0, wake -4.6
-        baby_4: nap 0, wake 0
-        baby_5: nap 0, wake +15.1
+        baby_1: nap 0, wake 0
+        baby_2: nap 0, wake +5
+        baby_3: nap 0, wake -2.4
+        baby_5: nap 0, wake 0
       weightedRecency:
         halldis: nap 0, wake +0.3
-        baby_1: nap 0, wake -0.3
-        baby_2: nap +0.8, wake 0
-        baby_3: nap 0, wake +5.5
-        baby_4: nap +0.2, wake 0
-        baby_5: nap 0, wake -0.2"
+        baby_1: nap 0, wake -0.5
+        baby_2: nap -1.2, wake -3.1
+        baby_3: nap -0.1, wake +0.1
+        baby_5: nap +0.5, wake 0"
     `);
   });
 

@@ -36,6 +36,8 @@ interface SleepCache {
   byDay: Map<string, CachedSleep[]>;
   /** Number of completed naps per local date */
   napCountByDay: Map<string, number>;
+  /** Days that have at least one night entry (complete data) */
+  daysWithNight: Set<string>;
   /** Day keys sorted chronologically */
   sortedDayKeys: string[];
   /** Memoized learned nap count (undefined = not yet computed) */
@@ -80,9 +82,14 @@ function buildCache(ctx: BabyContext): SleepCache {
     }
   }
 
+  const daysWithNight = new Set<string>();
+  for (const cs of completed) {
+    if (cs.type === "night") daysWithNight.add(cs.localDate);
+  }
+
   const sortedDayKeys = [...byDay.keys()].toSorted();
 
-  return { sorted: completed, naps: sortedNaps, nights: sortedNights, byDay, napCountByDay, sortedDayKeys, learnedNapCount: undefined };
+  return { sorted: completed, naps: sortedNaps, nights: sortedNights, byDay, napCountByDay, daysWithNight, sortedDayKeys, learnedNapCount: undefined };
 }
 
 function getCache(ctx: BabyContext): SleepCache {
@@ -361,10 +368,11 @@ function getPositionalWakeWindows(ctx: BabyContext): number[] {
 
   const cache = getCache(ctx);
 
-  // Collect wake windows by position across all days.
-  // Only count gaps before naps (excludes nap->night evening gap).
+  // Collect wake windows by position across complete days only.
+  // Skip days without night entries — their nap gaps may span missing overnight sleep.
   const gapsByPosition = new Map<number, number[]>();
-  for (const daySleeps of cache.byDay.values()) {
+  for (const [dayKey, daySleeps] of cache.byDay) {
+    if (!cache.daysWithNight.has(dayKey)) continue;
     let napPosition = 0;
     for (let i = 1; i < daySleeps.length; i++) {
       if (daySleeps[i].type !== "nap") continue; // skip gaps before night sleep
@@ -404,10 +412,10 @@ function getPositionalDataForNapCount(
 
   const cache = getCache(ctx);
 
-  // Filter to days with the target nap count
+  // Filter to complete days with the target nap count
   const matchingDayKeys: string[] = [];
   for (const [day, count] of cache.napCountByDay) {
-    if (count === targetNapCount) matchingDayKeys.push(day);
+    if (count === targetNapCount && cache.daysWithNight.has(day)) matchingDayKeys.push(day);
   }
 
   // Only apply filtering if there's actual mixed nap counts (transition).
@@ -521,11 +529,12 @@ function getLearnedNapCount(ctx: BabyContext): number | null {
 
   // Sort days with naps chronologically and apply recency weights.
   // Most recent day gets weight 1.0, each prior day decays by 0.8x.
-  // Use sortedDayKeys (already sorted) filtered for days with naps.
+  // Only include complete days (have a night entry) — incomplete days
+  // may have inflated nap counts from misclassified overnight fragments.
   const sortedDays: [string, number][] = [];
   for (const day of cache.sortedDayKeys) {
     const count = cache.napCountByDay.get(day);
-    if (count !== undefined) sortedDays.push([day, count]);
+    if (count !== undefined && cache.daysWithNight.has(day)) sortedDays.push([day, count]);
   }
 
   if (sortedDays.length < 3) {
@@ -956,6 +965,7 @@ function collectHabitualNapData(
 
   for (let dayIdx = 0; dayIdx < cache.sortedDayKeys.length; dayIdx++) {
     const dayKey = cache.sortedDayKeys[dayIdx];
+    if (!cache.daysWithNight.has(dayKey)) continue; // skip incomplete days
     const napCount = cache.napCountByDay.get(dayKey) ?? 0;
     if (napCount === 0) continue;
 

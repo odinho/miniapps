@@ -156,8 +156,12 @@ export function backtest(
 
     // Wake time prediction: use tonight's actual bedtime and the engine's
     // night-end predictor, then compare to the next day's actual wake time.
+    // Only score when the next record is the next calendar day — multi-day
+    // gaps (missing data) produce meaningless wake errors.
     let wakeTimeError: number | null = null;
-    if (actualBedtime && i + 1 < days.length) {
+    const nextDayIsAdjacent = i + 1 < days.length
+      && (new Date(days[i + 1].date + "T00:00:00Z").getTime() - new Date(day.date + "T00:00:00Z").getTime()) / 86400000 === 1;
+    if (actualBedtime && nextDayIsAdjacent) {
       // Pass today's actual nap total for sleep budget adjustment
       const todayNapMin = actualNaps.reduce((sum, n) => {
         const dur = (new Date(n.end_time!).getTime() - new Date(n.start_time).getTime()) / 60000;

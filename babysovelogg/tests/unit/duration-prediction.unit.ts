@@ -149,9 +149,9 @@ describe("duration and wake-time prediction", () => {
   it("overall metrics", () => {
     expect(renderDurationMetrics(result)).toMatchInlineSnapshot(`
       "86 days
-      nap dur MAE: 23.1 min (bias -1.4)
-      nap end MAE: 53 min
-      wake time MAE: 25.6 min (bias -2.4)"
+      nap dur MAE: 23.1 min (bias -1.2)
+      nap end MAE: 52.6 min
+      wake time MAE: 25.6 min (bias -2.3)"
     `);
 
     expect(result.napDurationMAE).toBeLessThan(30);
@@ -167,7 +167,7 @@ describe("duration and wake-time prediction", () => {
     });
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "6mo: dur MAE 23.5, wake MAE 11.3
-      7mo: dur MAE 27, wake MAE 28.9
+      7mo: dur MAE 26.8, wake MAE 29.1
       8mo: dur MAE 18.8, wake MAE 21.8
       9mo: dur MAE 23.4, wake MAE 28.8"
     `);
@@ -182,7 +182,7 @@ describe("duration and wake-time prediction", () => {
       "day 1-3: dur MAE 20.1, wake MAE 3.5
       day 4-7: dur MAE 36.6, wake MAE 35.8
       day 8-14: dur MAE 20.8, wake MAE 23.7
-      day 15+: dur MAE 22.4, wake MAE 26.1"
+      day 15+: dur MAE 22.4, wake MAE 26.2"
     `);
 
     const earlyDur = warmup.find((b) => b.label === "day 1-3")!.result.napDurationMAE;
@@ -193,8 +193,8 @@ describe("duration and wake-time prediction", () => {
 
   it("per-position duration (1st nap ≠ 2nd nap)", () => {
     expect(renderPositionalDurations()).toMatchInlineSnapshot(`
-      "nap 1: avg 71 min actual, MAE 23.5, bias -2.9 (n=86)
-      nap 2: avg 61 min actual, MAE 22.5, bias +1 (n=57)
+      "nap 1: avg 71 min actual, MAE 23.2, bias -3.1 (n=86)
+      nap 2: avg 61 min actual, MAE 22.9, bias +1.7 (n=58)
       nap 3: avg 60 min actual, MAE 26.4, bias -2.9 (n=2)"
     `);
   });
@@ -202,7 +202,7 @@ describe("duration and wake-time prediction", () => {
 
 describe("confidence interval coverage", () => {
   it("±1 SD ranges contain a reasonable fraction of actuals", () => {
-    expect(renderCIcoverage()).toMatchInlineSnapshot(`"86/129 naps within ±1 SD range (67%)"`);
+    expect(renderCIcoverage()).toMatchInlineSnapshot(`"87/130 naps within ±1 SD range (67%)"`);
 
     // Ranges are ±1 SD so ~68% coverage expected if well-calibrated.
     // We accept ≥40% as a floor — below that the ranges are meaningless.

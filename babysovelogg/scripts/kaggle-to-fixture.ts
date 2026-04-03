@@ -125,11 +125,12 @@ function entriesToDays(entries: SleepEntry[], tz: string): DayRecord[] {
   for (const [date, naps] of [...napsByDate.entries()].sort()) {
     if (naps.length === 0) continue;
 
-    // Wake-up: end of the night that ended today
+    // Wake-up: end of the night that ended today.
+    // Skip days without a real wake time — fabricating from the first nap
+    // produces semantically wrong data that poisons the backtest.
     const morningNight = nightByEndDate.get(date);
-    const wakeTime = morningNight
-      ? morningNight.endTime.toISOString()
-      : naps[0].startTime.toISOString();
+    if (!morningNight) continue;
+    const wakeTime = morningNight.endTime.toISOString();
 
     // Tonight's bedtime: night sleep starting today
     const tonightNight = nightByStartDate.get(date);
