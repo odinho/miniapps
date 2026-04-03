@@ -104,7 +104,7 @@
 				return;
 			}
 			showToast(
-				`Importerte ${result.sleeps} søvnøkter og ${result.dayStarts} vekkingar`,
+				`Importerte ${result.sleeps} søvnøkter`,
 				'success',
 			);
 			// Re-fetch state after import

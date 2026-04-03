@@ -1,5 +1,5 @@
 import type { SqliteDb } from "$lib/server/db.js";
-import type { SleepLogRow, DiaperLogRow, DayStartRow, Baby, SleepPauseRow } from "$lib/types.js";
+import type { SleepLogRow, DiaperLogRow, Baby, SleepPauseRow } from "$lib/types.js";
 
 /** Render a compact, readable summary of a baby's current day state from the DB. */
 export function renderDayState(db: SqliteDb, babyId: number): string {
@@ -14,9 +14,10 @@ export function renderDayState(db: SqliteDb, babyId: number): string {
     .prepare("SELECT * FROM diaper_log WHERE baby_id = ? AND deleted = 0 ORDER BY time")
     .all(babyId) as DiaperLogRow[];
 
-  const dayStart = db
-    .prepare("SELECT * FROM day_start WHERE baby_id = ? ORDER BY date DESC LIMIT 1")
-    .get(babyId) as DayStartRow | undefined;
+  // Derive wakeup from last completed night sleep end_time
+  const lastNight = db
+    .prepare("SELECT end_time FROM sleep_log WHERE baby_id = ? AND type = 'night' AND end_time IS NOT NULL AND deleted = 0 ORDER BY end_time DESC LIMIT 1")
+    .get(babyId) as { end_time: string } | undefined;
 
   const pauses = db
     .prepare("SELECT * FROM sleep_pauses ORDER BY pause_time")
@@ -30,8 +31,8 @@ export function renderDayState(db: SqliteDb, babyId: number): string {
   const lines: string[] = [];
   lines.push(`baby: ${baby.name} (${baby.birthdate})`);
 
-  if (dayStart) {
-    lines.push(`vekketid: ${fmtTime(dayStart.wake_time)}`);
+  if (lastNight) {
+    lines.push(`vekketid: ${fmtTime(lastNight.end_time)}`);
   }
 
   const sleepLine =
@@ -57,7 +58,6 @@ export function renderCounts(db: SqliteDb): string {
       db.prepare("SELECT COUNT(*) as c FROM diaper_log WHERE deleted = 0").get() as { c: number }
     ).c,
     pauses: (db.prepare("SELECT COUNT(*) as c FROM sleep_pauses").get() as { c: number }).c,
-    dayStarts: (db.prepare("SELECT COUNT(*) as c FROM day_start").get() as { c: number }).c,
   };
   return Object.entries(counts)
     .map(([k, v]) => `${k}: ${v}`)

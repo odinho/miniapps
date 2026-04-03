@@ -123,7 +123,6 @@ export function mapNapperToEvents(rows: NapperRow[], babyId: number): ImportEven
     switch (row.category) {
       case "WOKE_UP": {
         closeNight(row.start, row.babyMoodOnWakeUp);
-        emit("day.started", { babyId, wakeTime: toUtc(row.start) });
         break;
       }
       case "NAP": {

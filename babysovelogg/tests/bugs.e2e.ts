@@ -9,7 +9,7 @@ import {
   seedScheduleHistory,
   generateId,
 } from "./fixtures";
-import { renderDayState } from "./helpers/render-state";
+
 
 // --- B11: Dashboard shows overtime when a nap is skipped ---
 // When the predicted nap window has passed without a nap being logged,
@@ -28,12 +28,13 @@ test("B11: shows overtime when predicted nap time has passed", async ({ page }) 
   // The 90-min skip threshold means 30 min overdue will show "Overtid" (not bedtime).
   const now = Date.now();
   const wakeTime = new Date(now - 210 * 60000);
-  const dateStr = `${wakeTime.getFullYear()}-${String(wakeTime.getMonth() + 1).padStart(2, '0')}-${String(wakeTime.getDate()).padStart(2, '0')}`;
-  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
-    babyId,
-    dateStr,
-    wakeTime.toISOString(),
-  );
+  // Insert a completed overnight night sleep so wakeup is derived from its end_time
+  const nightStart = new Date(wakeTime);
+  nightStart.setDate(nightStart.getDate() - 1);
+  nightStart.setHours(19, 0, 0, 0);
+  db.prepare(
+    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, 'night', ?)",
+  ).run(babyId, nightStart.toISOString(), wakeTime.toISOString(), generateId());
 
   // Force browser to daytime hour (avoids deep-night mode at 0-5 AM)
   // getHours() is used for night mode check; Date.now() remains real time
@@ -58,12 +59,13 @@ test("B11: shows bedtime when all expected naps are completed", async ({ page })
 
   const today = new Date();
   today.setHours(6, 0, 0, 0);
-  const dateStr = today.toISOString().split("T")[0];
-  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
-    babyId,
-    dateStr,
-    today.toISOString(),
-  );
+  // Insert overnight night sleep so wakeup is derived
+  const nightStart = new Date(today);
+  nightStart.setDate(nightStart.getDate() - 1);
+  nightStart.setHours(19, 0, 0, 0);
+  db.prepare(
+    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, 'night', ?)",
+  ).run(babyId, nightStart.toISOString(), today.toISOString(), generateId());
 
   // Add a completed nap — fulfills the expected 1 nap
   const napStart = new Date(today);
@@ -139,36 +141,11 @@ test("B15: changing sleep type from nap to night preserves the entry", async ({ 
   await expect(sleepItems.locator(".log-meta").first()).toContainText("Nattesøvn");
 });
 
-test("B17: morning button IS shown in late night hours", async ({ page }) => {
-  const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
+// --- B18: Ending a night sleep derives wakeup from its end_time ---
 
-  // Force browser to 5 AM — morning is plausible
-  await forceHour(page, 5);
-  await page.goto("/");
-  await expect(page.getByTestId("dashboard")).toBeVisible({ timeout: 5000 });
-
-  // At 5 AM the morning button should be visible
-  await expect(page.locator(".arc-action-btn.morning")).toBeVisible({ timeout: 3000 });
-});
-
-// --- B18: Ending a night sleep should auto-create wakeup ---
-// When the user ends a night sleep, that IS the morning. The app should automatically
-// create a day.started event so the morning prompt does NOT re-appear.
-
-test("B18: ending night sleep auto-sets wakeup, no morning prompt", async ({ page }) => {
+test("B18: ending night sleep derives wakeup from end time", async ({ page }) => {
   const babyId = createBaby("Testa");
   const db = getDb();
-  // Set yesterday's wakeup (so baby has a "previous day")
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  yesterday.setHours(7, 0, 0, 0);
-  const yesterdayDate = yesterday.toISOString().split("T")[0];
-  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
-    babyId,
-    yesterdayDate,
-    yesterday.toISOString(),
-  );
 
   // Create an active night sleep that started yesterday evening
   const nightStart = new Date();
@@ -194,14 +171,8 @@ test("B18: ending night sleep auto-sets wakeup, no morning prompt", async ({ pag
     await overlay.waitFor({ state: "hidden", timeout: 3000 });
   } catch {}
 
-  // Dashboard should be visible — NOT the morning prompt
+  // Dashboard should be visible with wakeup derived from night sleep end
   await expect(page.getByTestId("dashboard")).toBeVisible({ timeout: 5000 });
-  await expect(page.getByTestId("morning-prompt")).not.toBeVisible();
-
-  // Verify a day_start was created for today (yesterday's + today's = 2)
-  expect(renderDayState(db, babyId)).toContain("vekketid:");
-  const dayStarts = db.prepare("SELECT COUNT(*) as c FROM day_start WHERE baby_id = ?").get(babyId) as { c: number };
-  expect(dayStarts.c).toBe(2);
 });
 
 // --- B19: Settings prediction shows all naps and reacts to nap count change ---

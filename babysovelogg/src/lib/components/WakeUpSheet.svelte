@@ -65,14 +65,6 @@
 			const events: Array<{ type: string; payload: Record<string, unknown> }> = [];
 			if (event) events.push(event);
 
-			// When adjusting a night sleep's end time, also update the day.started record
-			if (endTimeIso && sleepSnapshot.type === 'night') {
-				events.push({
-					type: 'day.started',
-					payload: { babyId: sleepSnapshot.baby_id, wakeTime: endTimeIso },
-				});
-			}
-
 			if (events.length > 0) {
 				await sync.sendEvents(events);
 			}

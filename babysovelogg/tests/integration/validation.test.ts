@@ -3,7 +3,6 @@ import {
   post,
   db,
   createBaby,
-  setWakeUpTime,
   generateId,
   generateSleepId,
   generateDiaperId,
@@ -126,7 +125,6 @@ test("POST with valid event returns 200", async () => {
 
 test("POST batch where one event is invalid returns 400, nothing written", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
 
   const eventCountBefore = (db.prepare("SELECT COUNT(*) as c FROM events").get() as { c: number })
     .c;
@@ -161,7 +159,6 @@ test("POST batch where one event is invalid returns 400, nothing written", async
 test("POST batch where projection fails midway returns 500, nothing written", async () => {
   expectConsoleError(/no sleep found with domain_id/);
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
 
   const eventCountBefore = (db.prepare("SELECT COUNT(*) as c FROM events").get() as { c: number })
     .c;
@@ -196,7 +193,6 @@ test("POST batch where projection fails midway returns 500, nothing written", as
 
 test("POST batch of 3 valid events returns all 3", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
 
   const did1 = generateDiaperId();
   const did2 = generateDiaperId();

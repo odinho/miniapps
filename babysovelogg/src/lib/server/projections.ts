@@ -2,7 +2,6 @@ import { db } from "./db.js";
 import type { AppEvent } from "./events.js";
 import type { EventRow } from "$lib/types.js";
 import { validateEventPayload } from "./schemas.js";
-import { isoToDateInTz } from "$lib/tz.js";
 import { shouldReclassifyAsNight } from "$lib/engine/classification.js";
 
 export function applyEvent(event: AppEvent): void {
@@ -317,26 +316,10 @@ export function applyEvent(event: AppEvent): void {
       break;
     }
 
-    case "day.started": {
-      // Derive date in the baby's timezone (falls back to UTC if no timezone set)
-      const baby = db.prepare("SELECT timezone FROM baby ORDER BY id DESC LIMIT 1").get() as { timezone: string | null } | undefined;
-      const tz = baby?.timezone || "UTC";
-      const dateStr = isoToDateInTz(payload.wakeTime as string, tz);
-      db.prepare(
-        "INSERT OR REPLACE INTO day_start (baby_id, date, wake_time, created_by_event_id) VALUES (?, ?, ?, ?)",
-      ).run(payload.babyId, dateStr, payload.wakeTime, eventId);
+    case "day.started":
+    case "day.deleted":
+      // Legacy no-op: wakeup is now derived from night sleep end_time
       break;
-    }
-
-    case "day.deleted": {
-      const result = db
-        .prepare("DELETE FROM day_start WHERE baby_id = ? AND date = ?")
-        .run(payload.babyId, payload.date);
-      if (result.changes === 0) {
-        // Silently ignore if already deleted
-      }
-      break;
-    }
   }
 }
 
@@ -344,8 +327,8 @@ export interface RebuildReport {
   success: boolean;
   eventsReplayed: number;
   invalidEvents: { id: number; type: string; error: string }[];
-  before: { sleeps: number; diapers: number; pauses: number; dayStarts: number };
-  after: { sleeps: number; diapers: number; pauses: number; dayStarts: number };
+  before: { sleeps: number; diapers: number; pauses: number };
+  after: { sleeps: number; diapers: number; pauses: number };
   durationMs: number;
 }
 
@@ -353,8 +336,7 @@ function countProjections() {
   const sleeps = (db.prepare("SELECT COUNT(*) as c FROM sleep_log").get() as { c: number }).c;
   const diapers = (db.prepare("SELECT COUNT(*) as c FROM diaper_log").get() as { c: number }).c;
   const pauses = (db.prepare("SELECT COUNT(*) as c FROM sleep_pauses").get() as { c: number }).c;
-  const dayStarts = (db.prepare("SELECT COUNT(*) as c FROM day_start").get() as { c: number }).c;
-  return { sleeps, diapers, pauses, dayStarts };
+  return { sleeps, diapers, pauses };
 }
 
 export function rebuildAll(): RebuildReport {
@@ -388,11 +370,10 @@ export function rebuildAll(): RebuildReport {
     db.prepare("DELETE FROM sleep_pauses").run();
     db.prepare("DELETE FROM diaper_log").run();
     db.prepare("DELETE FROM sleep_log").run();
-    db.prepare("DELETE FROM day_start").run();
     db.prepare("DELETE FROM baby").run();
     // Reset autoincrement so replayed baby IDs match original payload references
     db.prepare(
-      "DELETE FROM sqlite_sequence WHERE name IN ('baby', 'sleep_log', 'diaper_log', 'sleep_pauses', 'day_start')",
+      "DELETE FROM sqlite_sequence WHERE name IN ('baby', 'sleep_log', 'diaper_log', 'sleep_pauses')",
     ).run();
     for (const row of events) {
       applyEvent({ ...row, payload: JSON.parse(row.payload) } as unknown as AppEvent);

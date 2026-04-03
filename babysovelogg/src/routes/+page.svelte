@@ -14,8 +14,6 @@
 	import { calcPauseMs } from '$lib/engine/classification.js';
 	import { buildPause, buildResume, isPaused } from '$lib/sleep-actions.js';
 	import { buildSleepInfoRows } from '$lib/settings-utils.js';
-	import TimeInput from '$lib/components/TimeInput.svelte';
-	import DateInput from '$lib/components/DateInput.svelte';
 	import DstBanner from '$lib/components/DstBanner.svelte';
 	import ContextCard from '$lib/components/ContextCard.svelte';
 
@@ -103,13 +101,6 @@
 		document.documentElement.setAttribute('data-theme', mode);
 	});
 
-	// Morning button visible at 4-5 AM (late night / early morning)
-	const showMorningButton = $derived.by(() => {
-		void now; // re-derive when clock ticks
-		if (!baby || activeSleep) return false;
-		const h = new Date().getHours();
-		return h >= 4 && h < 6;
-	});
 
 	// Redirect to settings when no baby exists
 	$effect(() => {
@@ -307,66 +298,6 @@
 		editingSleep = null;
 	}
 
-	// --- Morning prompt ---
-	// Shows when baby exists, no todayWakeUp, and it's morning (5-12)
-	const needsMorningPrompt = $derived.by(() => {
-		void now; // re-derive when clock ticks
-		if (!baby || todayWakeUp) return false;
-		// Don't show while there's an active sleep (baby still sleeping)
-		if (activeSleep && !activeSleep.end_time) return false;
-		// If there are already sleeps today, skip prompt (wakeup was implicit)
-		if (todaySleeps.length > 0) return false;
-		const h = new Date().getHours();
-		return h >= 5 && h < 13;
-	});
-
-	let morningDate = $state('');
-	let morningTime = $state('07:00');
-	let morningBusy = $state(false);
-
-	$effect(() => {
-		// Pre-fill date with today (local, not UTC)
-		const d = new Date();
-		morningDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-	});
-
-	async function setMorningWakeTime() {
-		if (morningBusy || !baby) return;
-		morningBusy = true;
-		try {
-			const wakeTime = new Date(`${morningDate}T${morningTime}:00`).toISOString();
-			const event = {
-				type: 'day.started',
-				payload: { babyId: baby.id, date: morningDate, wakeTime },
-			};
-			await sync.sendEvents([event]);
-		} finally {
-			morningBusy = false;
-		}
-	}
-
-	async function skipMorningWakeTime() {
-		if (morningBusy || !baby) return;
-		morningBusy = true;
-		try {
-			const today = new Date();
-			today.setHours(6, 0, 0, 0);
-			const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-			const event = {
-				type: 'day.started',
-				payload: { babyId: baby.id, date: dateStr, wakeTime: today.toISOString() },
-			};
-			await sync.sendEvents([event]);
-		} finally {
-			morningBusy = false;
-		}
-	}
-
-	function triggerMorning() {
-		// Force the morning prompt to show by scrolling to top
-		// The morning button acts as a shortcut for the morning workflow
-		window.scrollTo({ top: 0, behavior: 'smooth' });
-	}
 </script>
 
 {#if !loaded}
@@ -379,24 +310,6 @@
 	</div>
 {:else}
 	<div class="dashboard" data-testid="dashboard">
-		{#if needsMorningPrompt}
-			<div class="morning-prompt" data-testid="morning-prompt">
-				<div class="morning-icon" data-testid="morning-icon">🌅</div>
-				<h2>God morgon!</h2>
-				<p>Når vakna {baby.name}?</p>
-				<div style="display: flex; gap: 8px; margin: 8px 0;">
-					<DateInput bind:value={morningDate} />
-					<TimeInput bind:value={morningTime} />
-				</div>
-				<div style="display: flex; gap: 8px;">
-					<button class="btn btn-primary" onclick={setMorningWakeTime} disabled={morningBusy}>
-						Sett vaknetid
-					</button>
-					<button class="btn btn-ghost" onclick={skipMorningWakeTime} disabled={morningBusy}>
-						Hopp over
-					</button>
-				</div>
-			</div>
 		{/if}
 
 		<DstBanner timezone={baby.timezone} bedtime={prediction?.bedtime} />
@@ -460,11 +373,6 @@
 					disabled={pauseBusy}
 				>
 					{paused ? '▶️ Fortset' : '⏸️ Pause'}
-				</button>
-			{/if}
-			{#if showMorningButton}
-				<button class="arc-action-btn morning" onclick={triggerMorning}>
-					☀️ Morgon
 				</button>
 			{/if}
 			<button class="arc-action-btn diaper" onclick={openDiaper} data-testid="fab">

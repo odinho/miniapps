@@ -12,15 +12,24 @@ import {
 setupHarness();
 import { renderDayState } from "../helpers/render-state.js";
 
-// --- B12: Wakeup time visible in API ---
+// --- B12: Wakeup time visible in API (derived from night sleep end) ---
 
-test("B12: GET /api/wakeups returns day_start entries", async () => {
+test("B12: GET /api/wakeups returns wakeups derived from night sleeps", async () => {
   const babyId = createBaby("Testa");
+  const did = generateSleepId();
 
   await postEvents([
-    makeEvent("day.started", {
+    makeEvent("sleep.started", {
       babyId,
-      wakeTime: "2026-03-26T06:10:00.000Z",
+      startTime: "2026-03-25T19:00:00.000Z",
+      type: "night",
+      sleepDomainId: did,
+    }),
+  ]);
+  await postEvents([
+    makeEvent("sleep.ended", {
+      sleepDomainId: did,
+      endTime: "2026-03-26T06:10:00.000Z",
     }),
   ]);
 
@@ -67,6 +76,7 @@ test("B15: sleep.updated changing type from nap to night preserves the entry", a
 
   expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
     "baby: Testa (2025-06-12)
+    vekketid: 10:30
     søvn: 09:00–10:30 natt
     bleier: (ingen)"
   `);
@@ -106,6 +116,7 @@ test("B15: sleep.updated with type + times preserves the entry", async () => {
 
   expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
     "baby: Testa (2025-06-12)
+    vekketid: 10:00
     søvn: 08:30–10:00 natt
     bleier: (ingen)"
   `);
@@ -130,6 +141,7 @@ test("Wakeup derived from overnight night sleep — no day.started needed", asyn
 
   expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
     "baby: Testa (2025-06-12)
+    vekketid: 06:00
     søvn: 18:30–06:00 natt
     bleier: (ingen)"
   `);
@@ -137,33 +149,6 @@ test("Wakeup derived from overnight night sleep — no day.started needed", asyn
   // API should derive todayWakeUp from the night sleep end
   const state = await (await get("/api/state")).json();
   expect(state.todayWakeUp.wake_time).toBe(nightEnd);
-});
-
-test("Explicit day.started takes precedence over derived wakeup", async () => {
-  const babyId = createBaby("Testa");
-  const did = generateSleepId();
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-
-  await postEvents([
-    makeEvent("sleep.started", { babyId, startTime: `${yesterday}T18:30:00.000Z`, type: "night", sleepDomainId: did }),
-  ]);
-  await postEvents([
-    makeEvent("sleep.ended", { sleepDomainId: did, endTime: `${today}T05:50:00.000Z` }),
-  ]);
-  await postEvents([
-    makeEvent("day.started", { babyId, wakeTime: `${today}T06:10:00.000Z` }),
-  ]);
-
-  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
-    "baby: Testa (2025-06-12)
-    vekketid: 06:10
-    søvn: 18:30–05:50 natt
-    bleier: (ingen)"
-  `);
-
-  const state = await (await get("/api/state")).json();
-  expect(state.todayWakeUp.wake_time).toBe(`${today}T06:10:00.000Z`);
 });
 
 // --- B5+B6: Diaper note and type visibility ---

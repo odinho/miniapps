@@ -36,7 +36,6 @@ All mutations are stored as **events** in an append-only log (`events` table). C
 | `diaper.logged` | Log a diaper change or potty visit |
 | `diaper.updated` | Edit type, amount, or note |
 | `diaper.deleted` | Soft-delete a diaper entry |
-| `day.started` | Log morning wake-up time |
 
 Each event has: `id` (auto-increment), `type`, `payload` (JSON), `client_id`, `client_event_id`, `timestamp`, `domain_id`.
 

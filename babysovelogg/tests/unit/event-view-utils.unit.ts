@@ -15,11 +15,10 @@ describe('TYPE_COLORS', () => {
 		expect(TYPE_COLORS['baby.created']).toBe('#9c27b0');
 		expect(TYPE_COLORS['sleep.started']).toBe('#1565c0');
 		expect(TYPE_COLORS['diaper.logged']).toBe('#2e7d32');
-		expect(TYPE_COLORS['day.started']).toBe('#ef6c00');
 	});
 
-	it('has 14 event types', () => {
-		expect(Object.keys(TYPE_COLORS)).toHaveLength(14);
+	it('has 13 event types', () => {
+		expect(Object.keys(TYPE_COLORS)).toHaveLength(13);
 	});
 });
 

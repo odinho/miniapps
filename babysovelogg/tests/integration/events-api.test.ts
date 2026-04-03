@@ -3,7 +3,6 @@ import {
   get,
   postEvents,
   createBaby,
-  setWakeUpTime,
   makeEvent,
   generateSleepId,
   generateDiaperId,
@@ -13,7 +12,6 @@ setupHarness();
 
 test("GET /api/events with type filter narrows results", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
 
   await postEvents([
     makeEvent("sleep.started", {
@@ -41,7 +39,6 @@ test("GET /api/events with type filter narrows results", async () => {
 
 test("GET /api/events with domainId filter returns entity events", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
   const did = generateSleepId();
 
   await postEvents([

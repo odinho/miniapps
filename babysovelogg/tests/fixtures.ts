@@ -110,7 +110,6 @@ function resetDb() {
   try { _db.prepare("DELETE FROM sleep_pauses").run(); } catch {}
   try { _db.prepare("DELETE FROM diaper_log").run(); } catch {}
   try { _db.prepare("DELETE FROM sleep_log").run(); } catch {}
-  try { _db.prepare("DELETE FROM day_start").run(); } catch {}
   try { _db.prepare("DELETE FROM baby").run(); } catch {}
   try { _db.prepare("DELETE FROM events").run(); } catch {}
   try { _db.prepare("DELETE FROM sqlite_sequence").run(); } catch {}
@@ -153,10 +152,14 @@ export function createBaby(name = "Testa", birthdate = "2025-06-12"): number {
 export function setWakeUpTime(babyId: number, wakeTime?: Date) {
   const wake = wakeTime || new Date();
   wake.setHours(7, 0, 0, 0);
-  const dateStr = `${wake.getFullYear()}-${String(wake.getMonth() + 1).padStart(2, '0')}-${String(wake.getDate()).padStart(2, '0')}`;
+  // Insert a completed overnight night sleep so wakeup is derived from its end_time
+  const nightStart = new Date(wake);
+  nightStart.setDate(nightStart.getDate() - 1);
+  nightStart.setHours(19, 0, 0, 0);
+  const did = generateId("slp");
   _db
-    .prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)")
-    .run(babyId, dateStr, wake.toISOString());
+    .prepare("INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, 'night', ?)")
+    .run(babyId, nightStart.toISOString(), wake.toISOString(), did);
 }
 
 export function addCompletedSleep(

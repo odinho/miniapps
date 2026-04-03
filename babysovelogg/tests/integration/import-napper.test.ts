@@ -13,14 +13,13 @@ const NAPPER_CSV = `start,end,category,overallHappiness,babyMoodOnWakeUp,diaperW
 2026-01-07T05:46:00.000+01:00,2026-01-07T05:46:00.000+01:00,WOKE_UP,,3,,,,,,,,,,,2026-01-07T12:15:15.500Z,`;
 
 describe("POST /api/import/napper", () => {
-  test("imports CSV and creates correct sleep + day_start entries", async () => {
+  test("imports CSV and creates correct sleep entries", async () => {
     const babyId = createBaby("Halldis", "2025-10-21");
 
     const res = await postCsv("/api/import/napper", NAPPER_CSV);
     expect(res.ok).toBe(true);
     const body = await res.json();
     expect(body.sleeps).toBeGreaterThanOrEqual(3); // 2 naps + 1 night
-    expect(body.dayStarts).toBeGreaterThanOrEqual(1);
     expect(body.skipped).toBeGreaterThanOrEqual(1); // SOLIDS
 
     expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`

@@ -200,7 +200,6 @@ export function setupHarness() {
     db.prepare("DELETE FROM sleep_pauses").run();
     db.prepare("DELETE FROM diaper_log").run();
     db.prepare("DELETE FROM sleep_log").run();
-    db.prepare("DELETE FROM day_start").run();
     db.prepare("DELETE FROM baby").run();
     db.prepare("DELETE FROM events").run();
     try {
@@ -268,21 +267,23 @@ export function createBaby(name = "Testa", birthdate = "2025-06-12"): number {
 export function setWakeUpTime(babyId: number, wakeTime?: Date) {
   const wake = wakeTime || new Date();
   wake.setHours(7, 0, 0, 0);
-  const dateStr = wake.toISOString().split("T")[0];
-  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
-    babyId,
-    dateStr,
-    wake.toISOString(),
-  );
+  // Insert a completed overnight night sleep so wakeup is derived from its end_time
+  const nightStart = new Date(wake);
+  nightStart.setDate(nightStart.getDate() - 1);
+  nightStart.setHours(19, 0, 0, 0);
+  const did = generateId("slp");
+  db.prepare(
+    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, 'night', ?)",
+  ).run(babyId, nightStart.toISOString(), wake.toISOString(), did);
 }
 
 /** Timezone-safe version that takes explicit ISO strings for deterministic snapshots. */
 export function setWakeUpTimeUTC(babyId: number, date: string, wakeTimeISO: string) {
-  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
-    babyId,
-    date,
-    wakeTimeISO,
-  );
+  const nightStart = new Date(new Date(wakeTimeISO).getTime() - 12 * 3600000).toISOString();
+  const did = generateId("slp");
+  db.prepare(
+    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, 'night', ?)",
+  ).run(babyId, nightStart, wakeTimeISO, did);
 }
 
 export function addCompletedSleep(

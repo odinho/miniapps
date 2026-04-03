@@ -50,14 +50,6 @@ export function buildEndSleep(activeSleep: SleepLogRow, babyId: number): EndSlee
 		},
 	];
 
-	// Auto-wakeup for night sleep (B18 feature)
-	if (activeSleep.type === 'night') {
-		events.push({
-			type: 'day.started',
-			payload: { babyId, wakeTime: endTime },
-		});
-	}
-
 	return { events, endTime, sleepSnapshot: { ...activeSleep } };
 }
 

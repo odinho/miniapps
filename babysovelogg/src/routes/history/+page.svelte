@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { SleepLogRow, DiaperLogRow, DayStartRow } from '$lib/types.js';
+	import type { SleepLogRow, DiaperLogRow } from '$lib/types.js';
 	import { formatTime } from '$lib/utils.js';
 	import EditSleepModal from '$lib/components/EditSleepModal.svelte';
 	import EditDiaperModal from '$lib/components/EditDiaperModal.svelte';
@@ -42,7 +42,7 @@
 		loading = true;
 		try {
 			const data = await fetchHistory();
-			entries = mergeEntries(data.sleeps, data.diapers, data.wakeups);
+			entries = mergeEntries(data.sleeps, data.diapers);
 		} finally {
 			loading = false;
 		}
@@ -68,16 +68,6 @@
 
 	function closeManualSleep() {
 		showManualSleep = false;
-		load();
-	}
-
-	async function deleteWakeup(entry: DayStartRow & { _kind: 'wakeup'; _sortTime: string }) {
-		if (!baby) return;
-		const dateStr = entry.date;
-		await sync.sendEvents([{
-			type: 'day.deleted',
-			payload: { babyId: baby.id, date: dateStr },
-		}]);
 		load();
 	}
 
@@ -180,21 +170,6 @@
 								{/if}
 							</div>
 							<span class="log-duration">{getDiaperCategoryLabel(entry.type)}</span>
-						</div>
-					{:else if entry._kind === 'wakeup'}
-						<div class="sleep-log-item wakeup-log-item">
-							<span class="log-icon">☀️</span>
-							<div class="log-info">
-								<div class="log-times">{formatTime(entry.wake_time)}</div>
-								<div class="log-meta">Vakna</div>
-							</div>
-							<button
-								class="btn btn-ghost"
-								style="padding: 4px 8px; min-height: 0; font-size: 0.75rem; color: var(--text-light);"
-								onclick={() => deleteWakeup(entry)}
-							>
-								Slett
-							</button>
 						</div>
 					{/if}
 				{/each}

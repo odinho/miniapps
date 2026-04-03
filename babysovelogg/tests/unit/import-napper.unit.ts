@@ -165,17 +165,14 @@ describe("mapNapperToEvents", () => {
     expect(events[1].payload.notes).toBe("Sjuk");
   });
 
-  it("maps WOKE_UP to day.started", () => {
+  it("maps standalone WOKE_UP to no events (day.started removed)", () => {
     const events = map(wakeUp("2026-01-06T06:00"));
-    expect(events).toHaveLength(1);
-    expect(events[0].type).toBe("day.started");
-    expect(events[0].payload.babyId).toBe(1);
-    expect(events[0].payload.wakeTime).toContain("2026-01-06");
+    expect(events).toHaveLength(0);
   });
 
-  it("maps BED_TIME + WOKE_UP to night sleep + day.started", () => {
+  it("maps BED_TIME + WOKE_UP to night sleep only", () => {
     const events = map(bedTime("2026-01-07T18:05"), wakeUp("2026-01-08T06:30"));
-    expect(events.map((e) => e.type)).toEqual(["sleep.manual", "day.started"]);
+    expect(events.map((e) => e.type)).toEqual(["sleep.manual"]);
     const sleep = events[0];
     expect(sleep.payload.type).toBe("night");
     // +01:00 → UTC: 18:05→17:05, 06:30→05:30
@@ -188,7 +185,7 @@ describe("mapNapperToEvents", () => {
       bedTime("2026-01-07T18:05", { comment: "Fussy" }),
       wakeUp("2026-01-08T06:30", { mood: 3 }),
     );
-    expect(events.map((e) => e.type)).toEqual(["sleep.manual", "sleep.tagged", "day.started"]);
+    expect(events.map((e) => e.type)).toEqual(["sleep.manual", "sleep.tagged"]);
     expect(events[1].payload).toMatchObject({
       notes: "Fussy",
       mood: "3",
@@ -206,7 +203,6 @@ describe("mapNapperToEvents", () => {
       "sleep.manual",
       "sleep.paused",
       "sleep.resumed",
-      "day.started",
     ]);
     const sleepId = events[0].payload.sleepDomainId;
     expect(events[1].payload).toMatchObject({
@@ -236,11 +232,10 @@ describe("mapNapperToEvents", () => {
       "sleep.resumed",
       "sleep.paused",
       "sleep.resumed",
-      "day.started",
     ]);
     // All pause/resume reference same sleep
     const sleepId = events[0].payload.sleepDomainId;
-    for (const e of events.slice(1, -1)) {
+    for (const e of events.slice(1)) {
       expect(e.payload.sleepDomainId).toBe(sleepId);
     }
   });
@@ -258,7 +253,6 @@ describe("mapNapperToEvents", () => {
       bedTime("2026-01-06T18:26"),
     );
     expect(events.map((e) => e.type)).toEqual([
-      "day.started",
       "sleep.manual", // nap 1
       "sleep.manual", // nap 2
       // bedTime starts a night — no WOKE_UP yet so open-ended

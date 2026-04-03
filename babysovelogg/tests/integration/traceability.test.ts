@@ -5,7 +5,6 @@ import {
   postEvents,
   db,
   createBaby,
-  setWakeUpTime,
   makeEvent,
   generateSleepId,
   generateDiaperId,
@@ -15,7 +14,6 @@ setupHarness();
 
 test("After sleep.started, sleep_log row has created_by_event_id", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
   const did = generateSleepId();
 
   const res = await postEvents([
@@ -32,7 +30,6 @@ test("After sleep.started, sleep_log row has created_by_event_id", async () => {
 
 test("After sleep.tagged, sleep_log row has updated_by_event_id", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
   const did = generateSleepId();
 
   await postEvents([
@@ -74,7 +71,6 @@ test("After diaper.logged, diaper_log row has created_by_event_id", async () => 
 
 test("After rebuild, traceability columns are correct", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
   const did = generateSleepId();
 
   const createRes = await postEvents([
@@ -104,7 +100,6 @@ test("After rebuild, traceability columns are correct", async () => {
 
 test("GET /api/sleeps returns rows with traceability fields", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
   const did = generateSleepId();
 
   await postEvents([

@@ -145,14 +145,15 @@ test("Bedtime is clamped to 16:00-23:00 range", async ({ page }) => {
   const db = getDb();
   db.prepare("UPDATE baby SET timezone = ? WHERE id = ?").run("Europe/Oslo", babyId);
 
-  // Set very early wake up
+  // Set very early wake up via completed night sleep
   const wake = new Date();
   wake.setHours(5, 0, 0, 0);
-  db.prepare("INSERT INTO day_start (baby_id, date, wake_time) VALUES (?, ?, ?)").run(
-    babyId,
-    `${wake.getFullYear()}-${String(wake.getMonth() + 1).padStart(2, "0")}-${String(wake.getDate()).padStart(2, "0")}`,
-    wake.toISOString(),
-  );
+  const nightStart = new Date(wake);
+  nightStart.setDate(nightStart.getDate() - 1);
+  nightStart.setHours(19, 0, 0, 0);
+  db.prepare(
+    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, 'night', ?)",
+  ).run(babyId, nightStart.toISOString(), wake.toISOString(), `slp_early_${Date.now()}`);
 
   await page.goto("/");
   await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });

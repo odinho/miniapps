@@ -3,7 +3,6 @@ import {
   post,
   db,
   createBaby,
-  setWakeUpTime,
   generateId,
   generateSleepId,
   setupHarness,
@@ -12,7 +11,6 @@ setupHarness();
 
 test("Duplicate events with same clientId+clientEventId are ignored", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
 
   const clientId = "test-client";
   const clientEventId = "test-dedup-" + Date.now();
@@ -61,7 +59,6 @@ test("Duplicate events with same clientId+clientEventId are ignored", async () =
 
 test("Duplicate POST does NOT trigger SSE broadcast", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
 
   const clientId = "test-client";
   const clientEventId = generateId();
@@ -89,7 +86,6 @@ test("Duplicate POST does NOT trigger SSE broadcast", async () => {
 
 test("Batch with mix of new and duplicate events", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
 
   const clientId = "test-client";
   const eid1 = generateId();

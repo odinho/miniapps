@@ -75,7 +75,7 @@ test("sleep.manual creates a complete sleep entry in one event", async () => {
     bleier: (ingen)"
   `);
   expect(renderCounts(db)).toMatchInlineSnapshot(
-    `"events: 2, sleeps: 1, diapers: 0, pauses: 0, dayStarts: 0"`,
+    `"events: 2, sleeps: 1, diapers: 0, pauses: 0"`,
   );
 });
 
@@ -94,6 +94,7 @@ test("sleep.manual with night type", async () => {
 
   expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
     "baby: Testa (2025-06-12)
+    vekketid: 06:15
     søvn: 19:30–06:15 natt
     bleier: (ingen)"
   `);

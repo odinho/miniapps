@@ -4,7 +4,6 @@ import {
   post,
   postEvents,
   createBaby,
-  setWakeUpTimeUTC,
   makeEvent,
   generateSleepId,
   generateDiaperId,
@@ -15,7 +14,6 @@ import { renderDayState } from "../helpers/render-state.js";
 
 test("sleep.started with sleepDomainId creates row with domain_id set", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTimeUTC(babyId, "2026-03-26", "2026-03-26T07:00:00Z");
   const did = generateSleepId();
 
   const res = await postEvents([
@@ -25,7 +23,6 @@ test("sleep.started with sleepDomainId creates row with domain_id set", async ()
 
   expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
     "baby: Testa (2025-06-12)
-    vekketid: 07:00
     søvn: 09:00–pågår lur
     bleier: (ingen)"
   `);
@@ -33,7 +30,6 @@ test("sleep.started with sleepDomainId creates row with domain_id set", async ()
 
 test("sleep.ended with sleepDomainId updates the correct row", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTimeUTC(babyId, "2026-03-26", "2026-03-26T07:00:00Z");
   const did = generateSleepId();
 
   await postEvents([
@@ -47,7 +43,6 @@ test("sleep.ended with sleepDomainId updates the correct row", async () => {
 
   expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
     "baby: Testa (2025-06-12)
-    vekketid: 07:00
     søvn: 09:00–10:30 lur
     bleier: (ingen)"
   `);
@@ -55,7 +50,6 @@ test("sleep.ended with sleepDomainId updates the correct row", async () => {
 
 test("sleep.tagged with sleepDomainId updates the correct row", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTimeUTC(babyId, "2026-03-26", "2026-03-26T07:00:00Z");
   const did = generateSleepId();
 
   await postEvents([
@@ -69,7 +63,6 @@ test("sleep.tagged with sleepDomainId updates the correct row", async () => {
 
   expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
     "baby: Testa (2025-06-12)
-    vekketid: 07:00
     søvn: 09:00–pågår lur normal nursing
     bleier: (ingen)"
   `);
@@ -77,7 +70,6 @@ test("sleep.tagged with sleepDomainId updates the correct row", async () => {
 
 test("sleep.paused / sleep.resumed with sleepDomainId works", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTimeUTC(babyId, "2026-03-26", "2026-03-26T07:00:00Z");
   const did = generateSleepId();
 
   await postEvents([
@@ -95,7 +87,6 @@ test("sleep.paused / sleep.resumed with sleepDomainId works", async () => {
 
   expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
     "baby: Testa (2025-06-12)
-    vekketid: 07:00
     søvn: 09:00–pågår lur 1 pause (5m)
     bleier: (ingen)"
   `);
@@ -155,7 +146,6 @@ test("Events without sleepDomainId are rejected by validation", async () => {
 
 test("rebuildAll produces correct projection state", async () => {
   const babyId = createBaby("Testa");
-  setWakeUpTimeUTC(babyId, "2026-03-26", "2026-03-26T07:00:00Z");
   const did1 = generateSleepId();
   const did2 = generateDiaperId();
 
@@ -186,7 +176,6 @@ test("rebuildAll produces correct projection state", async () => {
   const report = await rebuildRes.json();
   expect(report.success).toBe(true);
 
-  // day_start was inserted directly (not via events), so rebuild drops it
   expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
     "baby: Testa (2025-06-12)
     søvn: 09:00–10:30 lur

@@ -39,9 +39,6 @@ export const GET: RequestHandler = ({ url }) => {
     .prepare("SELECT * FROM diaper_log WHERE baby_id = ? AND deleted = 0 ORDER BY time DESC")
     .all(baby.id);
 
-  const dayStarts = db
-    .prepare("SELECT * FROM day_start WHERE baby_id = ? ORDER BY date DESC")
-    .all(baby.id);
 
   if (format === "csv") {
     const lines = ["type,start,end,sleep_type,mood,method,notes"];
@@ -76,5 +73,5 @@ export const GET: RequestHandler = ({ url }) => {
     });
   }
 
-  return json({ baby, sleeps, diapers, dayStarts });
+  return json({ baby, sleeps, diapers });
 };

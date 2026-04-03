@@ -32,7 +32,7 @@ import {
 	isoToTimeInput,
 	dateTimeToIso,
 } from '$lib/history-utils.js';
-import type { SleepLogRow, DiaperLogRow, DayStartRow } from '$lib/types.js';
+import type { SleepLogRow, DiaperLogRow } from '$lib/types.js';
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -72,18 +72,6 @@ function makeDiaper(overrides: Partial<DiaperLogRow> = {}): DiaperLogRow {
 		domain_id: 'diaper-001',
 		created_by_event_id: null,
 		updated_by_event_id: null,
-		...overrides,
-	};
-}
-
-function makeWakeup(overrides: Partial<DayStartRow> = {}): DayStartRow {
-	return {
-		id: 1,
-		baby_id: 1,
-		date: '2026-03-27',
-		wake_time: '2026-03-27T06:30:00.000Z',
-		created_at: '2026-03-27T06:30:00.000Z',
-		created_by_event_id: null,
 		...overrides,
 	};
 }
@@ -141,34 +129,29 @@ describe('mergeEntries', () => {
 	test('merges and sorts by time descending', () => {
 		const sleeps = [makeSleep({ start_time: '2026-03-27T08:00:00.000Z' })];
 		const diapers = [makeDiaper({ time: '2026-03-27T10:00:00.000Z' })];
-		const wakeups = [makeWakeup({ wake_time: '2026-03-27T06:30:00.000Z' })];
 
-		const result = mergeEntries(sleeps, diapers, wakeups);
+		const result = mergeEntries(sleeps, diapers);
 
-		expect(result).toHaveLength(3);
+		expect(result).toHaveLength(2);
 		expect(result[0]._kind).toBe('diaper'); // 10:00 (most recent)
 		expect(result[1]._kind).toBe('sleep'); // 08:00
-		expect(result[2]._kind).toBe('wakeup'); // 06:30
 	});
 
 	test('handles empty arrays', () => {
-		const result = mergeEntries([], [], []);
+		const result = mergeEntries([], []);
 		expect(result).toHaveLength(0);
 	});
 
 	test('sets correct _sortTime for each kind', () => {
 		const sleeps = [makeSleep({ start_time: '2026-03-27T08:00:00.000Z' })];
 		const diapers = [makeDiaper({ time: '2026-03-27T10:00:00.000Z' })];
-		const wakeups = [makeWakeup({ wake_time: '2026-03-27T06:30:00.000Z' })];
 
-		const result = mergeEntries(sleeps, diapers, wakeups);
+		const result = mergeEntries(sleeps, diapers);
 		const sleep = result.find((e) => e._kind === 'sleep')!;
 		const diaper = result.find((e) => e._kind === 'diaper')!;
-		const wakeup = result.find((e) => e._kind === 'wakeup')!;
 
 		expect(sleep._sortTime).toBe('2026-03-27T08:00:00.000Z');
 		expect(diaper._sortTime).toBe('2026-03-27T10:00:00.000Z');
-		expect(wakeup._sortTime).toBe('2026-03-27T06:30:00.000Z');
 	});
 });
 
@@ -182,7 +165,6 @@ describe('groupByDate', () => {
 				makeSleep({ id: 2, start_time: '2026-03-26T14:00:00.000Z', domain_id: 'sleep-002' }),
 			],
 			[],
-			[],
 		);
 		const grouped = groupByDate(entries);
 		expect(grouped.size).toBeGreaterThanOrEqual(1);
@@ -194,7 +176,6 @@ describe('groupByDate', () => {
 				makeSleep({ start_time: '2026-03-27T08:00:00.000Z' }),
 				makeSleep({ id: 2, start_time: '2026-03-27T14:00:00.000Z', domain_id: 'sleep-002' }),
 			],
-			[],
 			[],
 		);
 		const grouped = groupByDate(entries);

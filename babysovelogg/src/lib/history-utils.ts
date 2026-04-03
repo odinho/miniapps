@@ -1,4 +1,4 @@
-import type { SleepLogRow, DiaperLogRow, DayStartRow } from '$lib/types.js';
+import type { SleepLogRow, DiaperLogRow } from '$lib/types.js';
 import { toLocal, toLocalDate, formatTime, formatDuration } from '$lib/utils.js';
 import { MOOD_EMOJI, METHOD_EMOJI, FALL_ASLEEP_LABELS, WAKE_MOOD_EMOJI } from '$lib/constants.js';
 
@@ -70,22 +70,19 @@ export const POTTY_EDIT_STATUSES = [
 
 export type HistoryEntry =
 	| (SleepLogRow & { _kind: 'sleep'; _sortTime: string })
-	| (DiaperLogRow & { _kind: 'diaper'; _sortTime: string })
-	| (DayStartRow & { _kind: 'wakeup'; _sortTime: string });
+	| (DiaperLogRow & { _kind: 'diaper'; _sortTime: string });
 
 // ── Data fetching ────────────────────────────────────────────────
 
 export async function fetchHistory(limit = 50): Promise<{
 	sleeps: SleepLogRow[];
 	diapers: DiaperLogRow[];
-	wakeups: DayStartRow[];
 }> {
-	const [sleeps, diapers, wakeups] = await Promise.all([
+	const [sleeps, diapers] = await Promise.all([
 		fetch(`/api/sleeps?limit=${limit}`).then((r) => r.json()) as Promise<SleepLogRow[]>,
 		fetch(`/api/diapers?limit=${limit}`).then((r) => r.json()) as Promise<DiaperLogRow[]>,
-		fetch(`/api/wakeups?limit=${limit}`).then((r) => r.json()) as Promise<DayStartRow[]>,
 	]);
-	return { sleeps, diapers, wakeups };
+	return { sleeps, diapers };
 }
 
 // ── Merge + sort ─────────────────────────────────────────────────
@@ -93,12 +90,10 @@ export async function fetchHistory(limit = 50): Promise<{
 export function mergeEntries(
 	sleeps: SleepLogRow[],
 	diapers: DiaperLogRow[],
-	wakeups: DayStartRow[],
 ): HistoryEntry[] {
 	const entries: HistoryEntry[] = [
 		...sleeps.map((s) => ({ ...s, _kind: 'sleep' as const, _sortTime: s.start_time })),
 		...diapers.map((d) => ({ ...d, _kind: 'diaper' as const, _sortTime: d.time })),
-		...wakeups.map((w) => ({ ...w, _kind: 'wakeup' as const, _sortTime: w.wake_time })),
 	];
 	entries.sort((a, b) => new Date(b._sortTime).getTime() - new Date(a._sortTime).getTime());
 	return entries;

@@ -99,20 +99,11 @@ describe('buildEndSleep', () => {
 		expect(result.sleepSnapshot).not.toBe(sleep);
 	});
 
-	it('adds day.started event for night sleep (B18)', () => {
+	it('only emits sleep.ended for night sleep (no day.started)', () => {
 		const sleep = makeSleep({ type: 'night' });
 		const result = buildEndSleep(sleep, 1);
-
-		expect(result.events).toHaveLength(2);
-		expect(result.events[1].type).toBe('day.started');
-		expect(result.events[1].payload.babyId).toBe(1);
-		expect(result.events[1].payload.wakeTime).toBe('2026-03-27T15:00:00.000Z');
-	});
-
-	it('does not add day.started for nap', () => {
-		const sleep = makeSleep({ type: 'nap' });
-		const result = buildEndSleep(sleep, 1);
 		expect(result.events).toHaveLength(1);
+		expect(result.events[0].type).toBe('sleep.ended');
 	});
 });
 

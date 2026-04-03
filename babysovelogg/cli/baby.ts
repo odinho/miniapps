@@ -16,7 +16,7 @@ import {
   predictDayNaps,
 } from "../src/lib/engine/schedule.js";
 import { getTodayStats, getWeekStats, getAverageWakeWindow } from "../src/lib/engine/stats.js";
-import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry, BabyContext } from "../src/lib/types.js";
+import type { Baby, SleepLogRow, SleepPauseRow, SleepEntry, BabyContext } from "../src/lib/types.js";
 
 process.on("exit", closeDb);
 db.exec("PRAGMA busy_timeout = 3000");
@@ -245,12 +245,18 @@ function attachPauses(sleeps: SleepLogRow[]) {
   for (const s of sleeps) s.pauses = grouped.get(s.id) || [];
 }
 
-function getTodayWakeUp(babyId: number): DayStartRow | undefined {
+function getTodayWakeUp(babyId: number): { baby_id: number; date: string; wake_time: string } | undefined {
   const today = new Date(now());
+  today.setHours(0, 0, 0, 0);
+  const midnightIso = today.toISOString();
+  const overnightSleep = db
+    .prepare(
+      "SELECT end_time FROM sleep_log WHERE baby_id = ? AND type = 'night' AND start_time < ? AND end_time >= ? AND deleted = 0 ORDER BY end_time DESC LIMIT 1",
+    )
+    .get(babyId, midnightIso, midnightIso) as { end_time: string } | undefined;
+  if (!overnightSleep) return undefined;
   const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  return db
-    .prepare("SELECT * FROM day_start WHERE baby_id = ? AND date = ?")
-    .get(babyId, dateStr) as DayStartRow | undefined;
+  return { baby_id: babyId, date: dateStr, wake_time: overnightSleep.end_time };
 }
 
 function getTodayDiaperCount(babyId: number): number {
@@ -659,14 +665,8 @@ function cmdUp() {
       `Ended ${active.type}: ${fmtDuration(dur)} (${fmtTime(active.start_time)}-${fmtTime(upTime)})`,
     );
 
-    // Auto-log day start when waking from night sleep
-    if (active.type === "night") {
-      postEvent("day.started", { babyId: baby.id, wakeTime: upTime });
-      actions.push("Logged day start");
-    }
   } else {
-    // No active sleep — just log day start
-    postEvent("day.started", { babyId: baby.id, wakeTime: upTime });
+    // No active sleep — nothing to end
     actions.push(`Logged wake-up at ${fmtTime(upTime)}`);
   }
 

@@ -23,16 +23,14 @@ export const POST: RequestHandler = async ({ request }) => {
 
     // Count what was imported
     let sleeps = 0;
-    let dayStarts = 0;
     for (const e of events) {
       if (e.type === "sleep.manual" || e.type === "sleep.started") sleeps++;
-      if (e.type === "day.started") dayStarts++;
     }
     const skipped = rows.filter(
       (r) => !["WOKE_UP", "NAP", "BED_TIME", "NIGHT_WAKING"].includes(r.category),
     ).length;
 
-    return json({ sleeps, dayStarts, skipped, totalEvents: events.length });
+    return json({ sleeps, skipped, totalEvents: events.length });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[ERROR] POST /api/import/napper:`, message);
