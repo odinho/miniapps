@@ -38,10 +38,14 @@ function sleepRow(overrides: Partial<SleepLogRow> = {}): SleepLogRow {
   };
 }
 
-/** Generate 7 days of schedule-like recent sleep data for strategy selector. */
+/**
+ * Generate 14 days of schedule-like recent sleep data for strategy selector.
+ * Needs to cover the full hysteresis replay window (6 days back) with enough
+ * data at every point for the selector to pick routine_schedule.
+ */
 function scheduleRecentSleeps(): SleepLogRow[] {
   const sleeps: SleepLogRow[] = [];
-  for (let d = 18; d <= 25; d++) {
+  for (let d = 11; d <= 25; d++) {
     const dateStr = `2026-03-${String(d).padStart(2, "0")}`;
     sleeps.push(
       sleepRow({ id: d * 10 + 1, start_time: `${dateStr}T09:30:00Z`, end_time: `${dateStr}T11:00:00Z`, type: "nap", domain_id: `slp_r${d}a` }),

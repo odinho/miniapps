@@ -94,8 +94,12 @@ export function assembleState(data: DayData) {
 /**
  * Determine which strategy to use, with hysteresis derived from recent data.
  *
- * Replays the raw selector over the last 7 days (1 day steps) to build a
- * history, then applies hysteresis rules. This is pure — no persistence needed.
+ * Simulates the full hysteresis chain day-by-day over the last 7 days.
+ * Each day's *applied* strategy (after hysteresis) feeds into the next day
+ * as the "previous" strategy. This ensures transition thresholds (3 forward,
+ * 5 regression) are properly enforced.
+ *
+ * Pure — no persistence needed.
  */
 function determineStrategy(
   recentSleeps: SleepEntry[],
@@ -104,42 +108,41 @@ function determineStrategy(
   now: number,
   override?: StrategyOverride,
 ): Strategy {
-  const todaySignals = computeStrategySignals(recentSleeps, birthdate, tz, now);
-
-  // Replay raw selector over recent days to derive hysteresis context
   const DAY_MS = 24 * 60 * 60 * 1000;
-  const rawHistory: Strategy[] = [];
-  for (let daysAgo = 6; daysAgo >= 1; daysAgo--) {
-    const dayMs = now - daysAgo * DAY_MS;
-    // Only use sleeps that ended before this day's reference point
+
+  // Simulate the hysteresis chain: for each historical day, compute what
+  // strategy the app would have applied given the chain so far.
+  let appliedStrategy: Strategy | null = null;
+  let consecutiveAtCandidate = 0;
+  let lastRawCandidate: Strategy | null = null;
+
+  // Days 6..1 ago + today (index 0 = 6 days ago, index 6 = today)
+  for (let daysAgo = 6; daysAgo >= 0; daysAgo--) {
+    const dayMs = daysAgo === 0 ? now : now - daysAgo * DAY_MS;
     const windowSleeps = recentSleeps.filter((s) =>
       s.end_time && new Date(s.end_time).getTime() < dayMs,
     );
     const daySignals = computeStrategySignals(windowSleeps, birthdate, tz, dayMs);
-    rawHistory.push(selectStrategy(daySignals));
+    const rawSelection = selectStrategy(daySignals);
+
+    // Track consecutive days of the same raw candidate
+    if (rawSelection === lastRawCandidate) {
+      consecutiveAtCandidate++;
+    } else {
+      consecutiveAtCandidate = 1;
+      lastRawCandidate = rawSelection;
+    }
+
+    // Apply hysteresis using the chain's applied strategy as previous
+    const ctx: StrategyContext = {
+      previous: appliedStrategy,
+      consecutiveDaysAtCandidate: consecutiveAtCandidate,
+      override: daysAgo === 0 ? (override ?? null) : null, // only apply override on today
+    };
+    appliedStrategy = selectStrategy(daySignals, ctx);
   }
 
-  // The "previous" strategy is the most recent historical day's raw selection
-  const previous = rawHistory.length > 0 ? rawHistory[rawHistory.length - 1] : null;
-
-  // Today's raw selection
-  const todayRaw = selectStrategy(todaySignals);
-
-  // Count consecutive days the raw selector has suggested today's raw strategy
-  // (counting backward from yesterday)
-  let consecutiveDays = 0;
-  for (let i = rawHistory.length - 1; i >= 0; i--) {
-    if (rawHistory[i] === todayRaw) consecutiveDays++;
-    else break;
-  }
-
-  // Apply hysteresis
-  const ctx: StrategyContext = {
-    previous,
-    consecutiveDaysAtCandidate: consecutiveDays,
-    override: override ?? null,
-  };
-  return selectStrategy(todaySignals, ctx);
+  return appliedStrategy!;
 }
 
 /** Assemble a newborn-style prediction. */

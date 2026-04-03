@@ -254,12 +254,16 @@ function summarize(days: DayResult[]): BacktestResult {
     };
   }
 
-  // Nap count accuracy
-  const napCountCorrect = days.filter((d) => d.napCountError === 0).length;
-  const napCountAccuracy = napCountCorrect / totalDays;
+  // Schedule-scored days only (exclude newborn days which have no schedule predictions)
+  const scheduleDays = days.filter((d) => d.strategy !== "newborn_guidance");
+  const scheduleDayCount = scheduleDays.length;
 
-  // Nap start errors (across all matched naps)
-  const allStartErrors = days.flatMap((d) => d.napStartErrors);
+  // Nap count accuracy (schedule days only)
+  const napCountCorrect = scheduleDays.filter((d) => d.napCountError === 0).length;
+  const napCountAccuracy = scheduleDayCount > 0 ? napCountCorrect / scheduleDayCount : 0;
+
+  // Nap start errors (across all matched naps, schedule days only)
+  const allStartErrors = scheduleDays.flatMap((d) => d.napStartErrors);
   const napStartMAE =
     allStartErrors.length > 0
       ? allStartErrors.reduce((sum, e) => sum + Math.abs(e), 0) / allStartErrors.length
@@ -269,36 +273,38 @@ function summarize(days: DayResult[]): BacktestResult {
       ? allStartErrors.reduce((sum, e) => sum + e, 0) / allStartErrors.length
       : 0;
 
-  // Nap end errors (includes unmatched penalty)
-  const allEndErrors = days.flatMap((d) => d.napEndErrors);
+  // Nap end errors (schedule days only)
+  const allEndErrors = scheduleDays.flatMap((d) => d.napEndErrors);
   const napEndMAE =
     allEndErrors.length > 0
       ? allEndErrors.reduce((sum, e) => sum + Math.abs(e), 0) / allEndErrors.length
       : 0;
 
-  // Nap duration errors (matched naps only — no unmatched penalty)
-  const allDurationErrors = days.flatMap((d) => d.napDurationErrors);
+  // Nap duration errors (schedule days only)
+  const allDurationErrors = scheduleDays.flatMap((d) => d.napDurationErrors);
   const napDurationMAE =
     allDurationErrors.length > 0
       ? allDurationErrors.reduce((sum, e) => sum + Math.abs(e), 0) / allDurationErrors.length
       : 0;
 
-  // Bedtime errors
-  const bedtimeErrors = days.map((d) => d.bedtimeError).filter((e): e is number => e !== null);
+  // Bedtime errors (schedule days only)
+  const bedtimeErrors = scheduleDays.map((d) => d.bedtimeError).filter((e): e is number => e !== null);
   const bedtimeMAE =
     bedtimeErrors.length > 0
       ? bedtimeErrors.reduce((sum, e) => sum + Math.abs(e), 0) / bedtimeErrors.length
       : 0;
 
-  // Wake time errors
-  const wakeTimeErrors = days.map((d) => d.wakeTimeError).filter((e): e is number => e !== null);
+  // Wake time errors (schedule days only)
+  const wakeTimeErrors = scheduleDays.map((d) => d.wakeTimeError).filter((e): e is number => e !== null);
   const wakeTimeMAE =
     wakeTimeErrors.length > 0
       ? wakeTimeErrors.reduce((sum, e) => sum + Math.abs(e), 0) / wakeTimeErrors.length
       : 0;
 
-  // Nap count bias
-  const napCountBias = days.reduce((sum, d) => sum + d.napCountError, 0) / totalDays;
+  // Nap count bias (schedule days only)
+  const napCountBias = scheduleDayCount > 0
+    ? scheduleDays.reduce((sum, d) => sum + d.napCountError, 0) / scheduleDayCount
+    : 0;
 
   // Strategy distribution
   const strategyCounts: Record<Strategy, number> = {
@@ -373,12 +379,13 @@ export function bucketByWarmup(
 
 /** Compact one-line summary for snapshot assertions. */
 export function renderSummary(result: BacktestResult, label: string): string {
-  const pct = Math.round(result.napCountAccuracy * 100);
-  const correct = result.days.filter((d) => d.napCountError === 0).length;
+  const scheduleDays = result.days.filter((d) => d.strategy !== "newborn_guidance");
+  const correct = scheduleDays.filter((d) => d.napCountError === 0).length;
+  const pct = scheduleDays.length > 0 ? Math.round(correct / scheduleDays.length * 100) : 0;
   return [
     `${label}:`,
     `${result.totalDays} days,`,
-    `count ${pct}% (${correct}/${result.totalDays}),`,
+    `count ${pct}% (${correct}/${scheduleDays.length}),`,
     `nap MAE ${result.napStartMAE},`,
     `dur MAE ${result.napDurationMAE},`,
     `bed MAE ${result.bedtimeMAE},`,
