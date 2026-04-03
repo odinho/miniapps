@@ -110,6 +110,8 @@ export interface BabyContext {
   customNapCount: number | null;
   recentSleeps: SleepEntry[]; // last 7 days of completed sleeps
   features?: Partial<PredictionFeatures>;
+  /** @internal Lazy cache for prediction pipeline. Do not set manually. */
+  _cache?: unknown;
 }
 
 export interface EventRow {
