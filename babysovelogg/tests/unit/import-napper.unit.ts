@@ -165,9 +165,12 @@ describe("mapNapperToEvents", () => {
     expect(events[1].payload.notes).toBe("Sjuk");
   });
 
-  it("maps standalone WOKE_UP to no events (day.started removed)", () => {
+  it("maps standalone WOKE_UP to day.started", () => {
     const events = map(wakeUp("2026-01-06T06:00"));
-    expect(events).toHaveLength(0);
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe("day.started");
+    expect(events[0].payload.babyId).toBe(1);
+    expect(events[0].payload.wakeTime).toContain("2026-01-06");
   });
 
   it("maps BED_TIME + WOKE_UP to night sleep only", () => {
@@ -253,6 +256,7 @@ describe("mapNapperToEvents", () => {
       bedTime("2026-01-06T18:26"),
     );
     expect(events.map((e) => e.type)).toEqual([
+      "day.started", // standalone WOKE_UP (no preceding BED_TIME)
       "sleep.manual", // nap 1
       "sleep.manual", // nap 2
       // bedTime starts a night — no WOKE_UP yet so open-ended

@@ -122,7 +122,12 @@ export function mapNapperToEvents(rows: NapperRow[], babyId: number): ImportEven
   for (const row of sorted) {
     switch (row.category) {
       case "WOKE_UP": {
+        const hadNight = !!nightCtx;
         closeNight(row.start, row.babyMoodOnWakeUp);
+        // Standalone WOKE_UP (no preceding BED_TIME) needs explicit day.started
+        if (!hadNight) {
+          emit("day.started", { babyId, wakeTime: toUtc(row.start) });
+        }
         break;
       }
       case "NAP": {
