@@ -403,6 +403,12 @@ export function formatReport(result: BacktestResult, label?: string): string {
   lines.push("═".repeat(50));
 
   for (const day of result.days) {
+    if (day.strategy === "newborn_guidance") {
+      const hit = day.sleepWindowHit === true ? "✓" : day.sleepWindowHit === false ? "✗" : "—";
+      lines.push(`${day.date}: [newborn] ${day.actualNaps.length} naps, window ${hit}`);
+      continue;
+    }
+
     const actual = day.actualNaps.length;
     const predicted = day.predictedNaps.length;
     const countOk = day.napCountError === 0 ? "✓" : "✗";
@@ -427,7 +433,9 @@ export function formatReport(result: BacktestResult, label?: string): string {
   }
 
   lines.push("═".repeat(50));
-  lines.push(`Nap count accuracy: ${Math.round(result.napCountAccuracy * 100)}% (${result.days.filter((d) => d.napCountError === 0).length}/${result.totalDays})`);
+  const scheduleDays = result.days.filter((d) => d.strategy !== "newborn_guidance");
+  const schedCorrect = scheduleDays.filter((d) => d.napCountError === 0).length;
+  lines.push(`Nap count accuracy: ${Math.round(result.napCountAccuracy * 100)}% (${schedCorrect}/${scheduleDays.length})`);
   lines.push(`Nap start MAE: ${result.napStartMAE} min`);
   lines.push(`Nap duration MAE: ${result.napDurationMAE} min`);
   lines.push(`Nap end MAE: ${result.napEndMAE} min`);

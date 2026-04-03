@@ -4,6 +4,7 @@ import {
   createBaby,
   setWakeUpTime,
   addCompletedSleep,
+  seedScheduleHistory,
   getDb,
   forceHour,
 } from "./fixtures";
@@ -38,6 +39,7 @@ test("At 17:45 with nap quota met, sleep is classified as night", async ({ page 
   await forceHour(page, 17);
   // 9-month baby has 2 expected naps
   const babyId = createBaby("Testa", "2025-06-12");
+  seedScheduleHistory(babyId);
   setWakeUpTime(babyId);
 
   // Add 2 completed naps to meet quota (explicit today times to avoid midnight boundary)
@@ -65,6 +67,7 @@ test("At 17:00 with all naps skipped, sleep is classified as night", async ({ pa
   // 9-month baby has 2 expected naps, 0 completed, wake at 07:00
   // Predicted naps are >90 min overdue → naps detected as skipped → napsAllDone
   const babyId = createBaby("Testa", "2025-06-12");
+  seedScheduleHistory(babyId);
   setWakeUpTime(babyId);
 
   await page.goto("/");

@@ -64,6 +64,14 @@ export function getState(now?: number) {
     )
     .all(baby.id, weekAgo) as SleepLogRow[];
 
+  // Extended lookback for strategy hysteresis (needs 6-day replay with sufficient data at each point)
+  const threeWeeksAgo = new Date(Date.now() - 21 * 86400000).toISOString();
+  const strategySleeps = db
+    .prepare(
+      "SELECT * FROM sleep_log WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time DESC",
+    )
+    .all(baby.id, threeWeeksAgo) as SleepLogRow[];
+
   // Batch-fetch pauses for all today's sleeps (avoids N+1 query)
   const todaySleepIds = todaySleeps.map((s) => s.id);
   const pausesBySleep = new Map<number, SleepPauseRow[]>();
@@ -96,6 +104,7 @@ export function getState(now?: number) {
     activeSleep,
     todaySleeps,
     recentSleeps,
+    strategySleeps,
     todayWakeUp,
     pausesBySleep,
     diaperCount: todayDiapers?.count ?? 0,

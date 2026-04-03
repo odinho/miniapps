@@ -23,7 +23,10 @@ export interface DayData {
   baby: Baby;
   activeSleep: SleepLogRow | undefined;
   todaySleeps: SleepLogRow[];
+  /** Recent sleeps (7-day lookback) for the schedule engine. */
   recentSleeps: SleepLogRow[];
+  /** Extended sleeps (21-day lookback) for strategy hysteresis. Falls back to recentSleeps. */
+  strategySleeps?: SleepLogRow[];
   todayWakeUp: DayStartRow | undefined;
   pausesBySleep: Map<number, SleepPauseRow[]>;
   diaperCount: number;
@@ -63,8 +66,9 @@ export function assembleState(data: DayData) {
   // Calculate predictions even during active sleep so ghost arcs stay visible
   const now = data.now ?? Date.now();
 
-  // Determine strategy
-  const strategy = determineStrategy(recentEntries, baby.birthdate, ctx.tz, now);
+  // Determine strategy (use extended lookback for hysteresis when available)
+  const strategyEntries = (data.strategySleeps ?? recentSleeps).map(toSleepEntry);
+  const strategy = determineStrategy(strategyEntries, baby.birthdate, ctx.tz, now);
   ctx.strategy = strategy;
 
   let prediction: Prediction | null = null;

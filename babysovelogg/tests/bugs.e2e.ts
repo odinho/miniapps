@@ -6,6 +6,7 @@ import {
   forceHour,
   addCompletedSleep,
   setWakeUpTime,
+  seedScheduleHistory,
   generateId,
 } from "./fixtures";
 import { renderDayState } from "./helpers/render-state";
@@ -50,6 +51,7 @@ test("B11: shows overtime when predicted nap time has passed", async ({ page }) 
 
 test("B11: shows bedtime when all expected naps are completed", async ({ page }) => {
   const babyId = createBaby("Testa");
+  seedScheduleHistory(babyId, 1);
   const db = getDb();
 
   db.prepare("UPDATE baby SET custom_nap_count = 1 WHERE id = ?").run(babyId);

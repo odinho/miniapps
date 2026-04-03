@@ -199,6 +199,35 @@ export function addDiaper(
   return did;
 }
 
+/**
+ * Seed 14 days of schedule-like history so the strategy selector reliably
+ * picks routine_schedule (needs completeDays >= 7 with nightDayRatio > 0.55).
+ * Covers the full hysteresis replay window.
+ */
+export function seedScheduleHistory(babyId: number, napsPerDay = 2) {
+  const now = new Date();
+  for (let d = 14; d >= 1; d--) {
+    const dayStart = new Date(now);
+    dayStart.setDate(dayStart.getDate() - d);
+
+    let cursor = new Date(dayStart);
+    cursor.setHours(9, 0, 0, 0);
+
+    for (let n = 0; n < napsPerDay; n++) {
+      const napEnd = new Date(cursor.getTime() + 60 * 60_000);
+      addCompletedSleep(babyId, cursor.toISOString(), napEnd.toISOString(), "nap");
+      cursor = new Date(napEnd.getTime() + 120 * 60_000);
+    }
+
+    const bedtime = new Date(dayStart);
+    bedtime.setHours(19, 30, 0, 0);
+    const wakeup = new Date(dayStart);
+    wakeup.setDate(wakeup.getDate() + 1);
+    wakeup.setHours(6, 30, 0, 0);
+    addCompletedSleep(babyId, bedtime.toISOString(), wakeup.toISOString(), "night");
+  }
+}
+
 export function enablePottyMode(babyId: number) {
   _db.prepare("UPDATE baby SET potty_mode = 1 WHERE id = ?").run(babyId);
 }
