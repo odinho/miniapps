@@ -64,9 +64,9 @@
 				? buildPottyEvent(babyId, time, selectedPottyResult!, selectedDiaperStatus ?? 'dry', notes)
 				: buildDiaperEvent(babyId, time, selectedType!, selectedAmount ?? 'middels', notes);
 			await sync.sendEvents([event]);
+			onClose?.();
 		} finally {
 			busy = false;
-			onClose?.();
 		}
 	}
 
@@ -77,8 +77,13 @@
 	function handleOverlayClick(e: MouseEvent) {
 		if (e.target === e.currentTarget) cancel();
 	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') cancel();
+	}
 </script>
 
+<svelte:window onkeydown={handleKeydown} />
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="modal-overlay" onclick={handleOverlayClick} data-testid="modal-overlay">

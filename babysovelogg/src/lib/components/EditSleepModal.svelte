@@ -35,20 +35,25 @@
 	let notes = $state('');
 	let busy = $state(false);
 	let confirmDelete = $state(false);
+	let initialized = $state(false);
 
-	// Sync form fields when entry prop changes (e.g. SSE update while modal is open)
+	// Initialize form fields from entry on first mount only.
+	// SSE updates should NOT reset the form while the user is editing.
 	$effect(() => {
-		startDate = isoToDateInput(entry.start_time);
-		startTime = isoToTimeInput(entry.start_time);
-		endDate = entry.end_time ? isoToDateInput(entry.end_time) : '';
-		endTime = entry.end_time ? isoToTimeInput(entry.end_time) : '';
-		selectedType = entry.type;
-		selectedMood = entry.mood || null;
-		selectedMethod = entry.method || null;
-		selectedFallAsleep = entry.fall_asleep_time || null;
-		onsetNote = entry.onset_note || '';
-		selectedWakeMood = entry.wake_mood || null;
-		notes = entry.notes || '';
+		if (!initialized) {
+			startDate = isoToDateInput(entry.start_time);
+			startTime = isoToTimeInput(entry.start_time);
+			endDate = entry.end_time ? isoToDateInput(entry.end_time) : '';
+			endTime = entry.end_time ? isoToTimeInput(entry.end_time) : '';
+			selectedType = entry.type;
+			selectedMood = entry.mood || null;
+			selectedMethod = entry.method || null;
+			selectedFallAsleep = entry.fall_asleep_time || null;
+			onsetNote = entry.onset_note || '';
+			selectedWakeMood = entry.wake_mood || null;
+			notes = entry.notes || '';
+			initialized = true;
+		}
 	});
 
 	function toggleMood(value: string) {
@@ -84,9 +89,9 @@
 				notes: notes.trim() || undefined,
 			});
 			await sync.sendEvents([event]);
+			onClose?.();
 		} finally {
 			busy = false;
-			onClose?.();
 		}
 	}
 
@@ -122,8 +127,13 @@
 	function handleOverlayClick(e: MouseEvent) {
 		if (e.target === e.currentTarget) onClose?.();
 	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') onClose?.();
+	}
 </script>
 
+<svelte:window onkeydown={handleKeydown} />
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="modal-overlay" onclick={handleOverlayClick} data-testid="modal-overlay">

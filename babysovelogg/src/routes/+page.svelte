@@ -90,6 +90,7 @@
 	}
 
 	const isNightMode = $derived.by(() => {
+		void now; // re-derive when clock ticks
 		const h = new Date().getHours();
 		// Stay night while active night sleep (even after 06:00)
 		const activeNight = activeSleep && !activeSleep.end_time && activeSleep.type === 'night';
@@ -104,6 +105,7 @@
 
 	// Morning button visible at 4-5 AM (late night / early morning)
 	const showMorningButton = $derived.by(() => {
+		void now; // re-derive when clock ticks
 		if (!baby || activeSleep) return false;
 		const h = new Date().getHours();
 		return h >= 4 && h < 6;
@@ -308,6 +310,7 @@
 	// --- Morning prompt ---
 	// Shows when baby exists, no todayWakeUp, and it's morning (5-12)
 	const needsMorningPrompt = $derived.by(() => {
+		void now; // re-derive when clock ticks
 		if (!baby || todayWakeUp) return false;
 		// Don't show while there's an active sleep (baby still sleeping)
 		if (activeSleep && !activeSleep.end_time) return false;

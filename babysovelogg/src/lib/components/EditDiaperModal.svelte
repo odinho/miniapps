@@ -27,12 +27,17 @@
 	let notes = $state('');
 	let busy = $state(false);
 	let confirmDelete = $state(false);
+	let initialized = $state(false);
 
-	// Sync form fields when entry prop changes (e.g. SSE update while modal is open)
+	// Initialize form fields from entry on first mount only.
+	// SSE updates should NOT reset the form while the user is editing.
 	$effect(() => {
-		selectedType = entry.type;
-		selectedAmount = entry.amount || (isPottyEntry(entry.type) ? 'dry' : 'middels');
-		notes = entry.note || '';
+		if (!initialized) {
+			selectedType = entry.type;
+			selectedAmount = entry.amount || (isPottyEntry(entry.type) ? 'dry' : 'middels');
+			notes = entry.note || '';
+			initialized = true;
+		}
 	});
 
 	async function save() {
@@ -46,9 +51,9 @@
 				note: notes.trim() || undefined,
 			});
 			await sync.sendEvents([event]);
+			onClose?.();
 		} finally {
 			busy = false;
-			onClose?.();
 		}
 	}
 
@@ -67,8 +72,13 @@
 	function handleOverlayClick(e: MouseEvent) {
 		if (e.target === e.currentTarget) onClose?.();
 	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') onClose?.();
+	}
 </script>
 
+<svelte:window onkeydown={handleKeydown} />
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="modal-overlay" onclick={handleOverlayClick} data-testid="modal-overlay">

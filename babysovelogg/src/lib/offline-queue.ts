@@ -114,8 +114,16 @@ export function applyOptimisticEvent(
 				s.todaySleeps = [...s.todaySleeps, ended];
 				s.activeSleep = null;
 				if (s.stats) {
+					let pauseMs = 0;
+					if (ended.pauses?.length) {
+						for (const p of ended.pauses) {
+							const ps = new Date(p.pause_time).getTime();
+							const pe = p.resume_time ? new Date(p.resume_time).getTime() : new Date(ended.end_time!).getTime();
+							pauseMs += pe - ps;
+						}
+					}
 					const durationMs =
-						new Date(ended.end_time!).getTime() - new Date(ended.start_time).getTime();
+						new Date(ended.end_time!).getTime() - new Date(ended.start_time).getTime() - pauseMs;
 					const durationMin = Math.max(0, durationMs / 60000);
 					if (ended.type === "nap") {
 						s.stats.napCount += 1;

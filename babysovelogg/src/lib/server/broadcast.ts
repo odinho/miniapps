@@ -1,5 +1,6 @@
 // SSE broadcast to connected clients
 const sseClients = new Set<ReadableStreamDefaultController>();
+const encoder = new TextEncoder();
 
 export function addClient(controller: ReadableStreamDefaultController) {
   sseClients.add(controller);
@@ -9,12 +10,16 @@ export function removeClient(controller: ReadableStreamDefaultController) {
   sseClients.delete(controller);
 }
 
+export function clientCount(): number {
+  return sseClients.size;
+}
+
 export function broadcast(eventType: string, data: Record<string, unknown>) {
   const msg = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
-  const encoder = new TextEncoder();
+  const encoded = encoder.encode(msg);
   for (const client of sseClients) {
     try {
-      client.enqueue(encoder.encode(msg));
+      client.enqueue(encoded);
     } catch {
       sseClients.delete(client);
     }

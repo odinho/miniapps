@@ -1,5 +1,6 @@
 export type { SleepEntry, SleepPause } from "$lib/types.js";
 import type { SleepEntry, SleepPause } from "$lib/types.js";
+import { isoToDateInTz } from "$lib/tz.js";
 
 export interface DayStats {
   totalNapMinutes: number;
@@ -59,13 +60,14 @@ export function getTodayStats(sleeps: SleepEntry[]): DayStats {
   };
 }
 
-/** Get aggregated stats for a week of sleeps, grouped by day. */
-export function getWeekStats(sleeps: SleepEntry[]): WeekStats {
-  // Group by date (based on start_time)
+/** Get aggregated stats for a week of sleeps, grouped by day.
+ *  When tz is provided, groups by local date in the baby's timezone. */
+export function getWeekStats(sleeps: SleepEntry[], tz?: string): WeekStats {
+  // Group by date (based on start_time, in baby's local timezone)
   const byDate = new Map<string, SleepEntry[]>();
 
   for (const s of sleeps) {
-    const date = s.start_time.slice(0, 10); // YYYY-MM-DD
+    const date = tz ? isoToDateInTz(s.start_time, tz) : s.start_time.slice(0, 10);
     if (!byDate.has(date)) byDate.set(date, []);
     byDate.get(date)!.push(s);
   }

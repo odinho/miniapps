@@ -65,6 +65,16 @@ export function applyEvent(event: AppEvent): void {
       break;
 
     case "sleep.ended": {
+      // Sanity-check: reject end times that produce absurd durations (>24h for a single sleep)
+      const preCheck = db.prepare("SELECT start_time FROM sleep_log WHERE domain_id = ?").get(payload.sleepDomainId) as { start_time: string } | undefined;
+      if (preCheck) {
+        const durationMs = new Date(payload.endTime as string).getTime() - new Date(preCheck.start_time).getTime();
+        if (durationMs > 24 * 60 * 60 * 1000) {
+          console.warn(`sleep.ended: duration ${Math.round(durationMs / 60000)}m exceeds 24h for ${payload.sleepDomainId}, clamping end time`);
+          // Clamp to start + 14h (reasonable maximum for a baby sleep)
+          payload.endTime = new Date(new Date(preCheck.start_time).getTime() + 14 * 60 * 60 * 1000).toISOString();
+        }
+      }
       const result = db
         .prepare("UPDATE sleep_log SET end_time = ?, updated_by_event_id = ? WHERE domain_id = ?")
         .run(payload.endTime, eventId, payload.sleepDomainId);

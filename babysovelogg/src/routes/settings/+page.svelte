@@ -75,13 +75,12 @@
 
 		try {
 			await sync.sendEvents([event]);
+			goto('/');
 		} catch (err) {
 			showToast(`Feil ved lagring: ${err instanceof Error ? err.message : 'ukjend feil'}`, 'error');
 		} finally {
 			saving = false;
 		}
-
-		goto('/');
 	}
 
 	function onFileChange(e: Event) {

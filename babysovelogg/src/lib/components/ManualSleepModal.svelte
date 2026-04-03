@@ -12,9 +12,11 @@
 
 	let { babyId, onClose }: Props = $props();
 
-	// Default to yesterday's evening for night, today's morning for nap
 	const now = new Date();
 	const todayStr = isoToDateInput(now.toISOString());
+	const yesterday = new Date(now);
+	yesterday.setDate(yesterday.getDate() - 1);
+	const yesterdayStr = isoToDateInput(yesterday.toISOString());
 
 	let selectedType = $state('nap');
 	let startDate = $state(todayStr);
@@ -23,6 +25,21 @@
 	let endTime = $state('10:00');
 	let busy = $state(false);
 	let error = $state('');
+
+	// Adjust defaults when switching between nap/night
+	$effect(() => {
+		if (selectedType === 'night') {
+			startDate = yesterdayStr;
+			startTime = '19:00';
+			endDate = todayStr;
+			endTime = '06:00';
+		} else {
+			startDate = todayStr;
+			startTime = '09:00';
+			endDate = todayStr;
+			endTime = '10:00';
+		}
+	});
 
 	async function save() {
 		if (busy) return;
@@ -60,8 +77,13 @@
 	function handleOverlayClick(e: MouseEvent) {
 		if (e.target === e.currentTarget) onClose?.();
 	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') onClose?.();
+	}
 </script>
 
+<svelte:window onkeydown={handleKeydown} />
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="modal-overlay" onclick={handleOverlayClick} data-testid="manual-sleep-overlay">

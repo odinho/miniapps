@@ -1,6 +1,7 @@
 import type { SleepEntry, DiaperLogRow } from "$lib/types.js";
 import { getWeekStats, getAverageWakeWindow, type WeekStats } from "$lib/engine/stats.js";
 import { formatDuration } from "$lib/utils.js";
+import { isoToDateInTz } from "$lib/tz.js";
 
 // ── SVG bar chart helpers ──────────────────────────────────────
 
@@ -126,9 +127,9 @@ export interface DiaperStats {
 	pottySuccessRate: number | null;
 }
 
-export function computeDiaperStats(diapers: DiaperLogRow[]): DiaperStats {
+export function computeDiaperStats(diapers: DiaperLogRow[], tz?: string): DiaperStats {
 	const total = diapers.length;
-	const byDay = new Set(diapers.map((d) => d.time.slice(0, 10)));
+	const byDay = new Set(diapers.map((d) => tz ? isoToDateInTz(d.time, tz) : d.time.slice(0, 10)));
 	const dayCount = byDay.size || 1;
 
 	let wetCount = 0;
@@ -213,8 +214,10 @@ export interface BestWorst {
 	worst: { date: string; label: string; duration: string };
 }
 
-export function getBestWorst(weekStats: WeekStats): BestWorst | null {
-	const today = new Date().toISOString().slice(0, 10);
+export function getBestWorst(weekStats: WeekStats, tz?: string): BestWorst | null {
+	const today = tz
+		? new Date().toLocaleDateString("en-CA", { timeZone: tz })
+		: new Date().toISOString().slice(0, 10);
 	const daysWithTotal = weekStats.days
 		.filter((d) => d.date !== today) // exclude incomplete current day
 		.map((d) => ({
@@ -263,6 +266,7 @@ export interface ComputedStats {
 export function computeAllStats(
 	sleeps: SleepEntry[],
 	diapers: DiaperLogRow[],
+	tz?: string,
 ): ComputedStats {
 	const mapped: SleepEntry[] = sleeps.map((s) => ({
 		start_time: s.start_time,
@@ -271,11 +275,14 @@ export function computeAllStats(
 		pauses: s.pauses,
 	}));
 
+	const sevenDaysAgo = new Date();
+	sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+	sevenDaysAgo.setHours(0, 0, 0, 0);
 	const week7 = mapped.filter(
-		(s) => new Date(s.start_time).getTime() > Date.now() - 7 * 86400000,
+		(s) => new Date(s.start_time).getTime() >= sevenDaysAgo.getTime(),
 	);
-	const weekStats = getWeekStats(week7);
-	const allStats = getWeekStats(mapped);
+	const weekStats = getWeekStats(week7, tz);
+	const allStats = getWeekStats(mapped, tz);
 
 	const bars = buildBars(weekStats);
 	const maxMin = getMaxMin(bars);
@@ -285,13 +292,13 @@ export function computeAllStats(
 
 	const wakeAvg = getAverageWakeWindow(week7);
 	const trendRows = buildTrendRows(weekStats, allStats);
-	const bestWorst = getBestWorst(weekStats);
+	const bestWorst = getBestWorst(weekStats, tz);
 
 	const week7Diapers = diapers.filter(
 		(d) => new Date(d.time).getTime() > Date.now() - 7 * 86400000,
 	);
-	const diaperStats7 = diapers.length > 0 ? computeDiaperStats(week7Diapers) : null;
-	const diaperStats30 = diapers.length > 0 ? computeDiaperStats(diapers) : null;
+	const diaperStats7 = diapers.length > 0 ? computeDiaperStats(week7Diapers, tz) : null;
+	const diaperStats30 = diapers.length > 0 ? computeDiaperStats(diapers, tz) : null;
 
 	return {
 		weekStats,

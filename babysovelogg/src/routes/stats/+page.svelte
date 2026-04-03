@@ -57,7 +57,7 @@
 				empty = true;
 			} else {
 				empty = false;
-				stats = computeAllStats(data.sleeps, data.diapers);
+				stats = computeAllStats(data.sleeps, data.diapers, baby?.timezone ?? undefined);
 			}
 		} catch {
 			error = true;

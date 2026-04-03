@@ -136,7 +136,7 @@
 								<div class="log-meta">
 									{getSleepTypeLabel(entry.type)}
 									{#if pauseInfo}
-										 · {pauseInfo.count} pause{pauseInfo.count > 1 ? 'r' : ''} ({pauseInfo.totalMinutes}m)
+										 · {pauseInfo.count} {pauseInfo.count > 1 ? 'pausar' : 'pause'} ({pauseInfo.totalMinutes}m)
 									{/if}
 									{#if badges.length > 0}
 										<span class="tag-badges">

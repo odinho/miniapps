@@ -13,6 +13,9 @@
 	];
 
 	function applyTheme() {
+		// Only set theme on non-dashboard pages — dashboard manages its own theme
+		// (it extends night mode during active night sleep past 06:00)
+		if (page.url.pathname === '/') return;
 		const hour = new Date().getHours();
 		const mode = hour >= 6 && hour < 18 ? 'day' : 'night';
 		document.documentElement.setAttribute('data-theme', mode);

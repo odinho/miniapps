@@ -34,7 +34,8 @@ export function isoToDateInTz(iso: string, tz: string): string {
 export function getHourInTz(date: Date, tz: string): number {
 	const h = parseInt(getHourFmt(tz).format(date));
 	const m = parseInt(getMinuteFmt(tz).format(date));
-	return h + m / 60;
+	// en-US with hour12:false formats midnight as "24" — normalize to 0
+	return (h % 24) + m / 60;
 }
 
 /** Set a Date to a specific local hour in the given IANA timezone, preserving the date. */
