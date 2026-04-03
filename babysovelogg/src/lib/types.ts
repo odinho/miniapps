@@ -110,6 +110,8 @@ export interface BabyContext {
   customNapCount: number | null;
   recentSleeps: SleepEntry[]; // last 7 days of completed sleeps
   features?: Partial<PredictionFeatures>;
+  /** Active prediction strategy — widens wake window clamp for emerging babies. */
+  strategy?: "newborn_guidance" | "emerging_rhythm" | "routine_schedule";
   /** @internal Lazy cache for prediction pipeline. Do not set manually. */
   _cache?: unknown;
 }

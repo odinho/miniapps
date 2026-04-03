@@ -71,7 +71,7 @@ export function predictNewborn(ctx: NewbornContext): NewbornPrediction {
       earliest: new Date(window.earliestMs).toISOString(),
       latest: new Date(window.latestMs).toISOString(),
     };
-    sleepPressure = computeSleepPressure(ctx.lastSleepEndMs, ctx.ageMonths, now);
+    sleepPressure = computeSleepPressure(ctx.lastSleepEndMs, ctx.ageMonths, now, recentWakeWindows);
   } else {
     // No data — show wide window and neutral pressure
     sleepWindow = {
@@ -95,7 +95,13 @@ export function predictNewborn(ctx: NewbornContext): NewbornPrediction {
   };
 }
 
-/** Compute expected next sleep duration range from recent episodes. */
+/**
+ * Compute expected next sleep duration range from recent episodes.
+ *
+ * Blends age-based fallback ranges with observed data gradually as sample
+ * count grows (3→8 samples), avoiding abrupt jumps from population norms
+ * to sparse baby data.
+ */
 function computeExpectedDuration(
   sleeps: SleepEntry[],
   ageMonths: number,
@@ -107,19 +113,22 @@ function computeExpectedDuration(
     if (dur >= 10 && dur <= 600) durations.push(dur);
   }
 
+  // Age-based fallback ranges
+  const ageMin = 30;
+  const ageMax = ageMonths < 1 ? 240 : ageMonths < 2 ? 210 : ageMonths < 3 ? 180 : 150;
+
   if (durations.length < 3) {
-    // Age-based fallback ranges
-    if (ageMonths < 1) return { min: 30, max: 240 };
-    if (ageMonths < 2) return { min: 30, max: 210 };
-    if (ageMonths < 3) return { min: 30, max: 180 };
-    return { min: 30, max: 150 };
+    return { min: ageMin, max: ageMax };
   }
 
   const sorted = durations.toSorted((a, b) => a - b);
-  const p15 = sorted[Math.floor(sorted.length * 0.15)];
-  const p85 = sorted[Math.floor(sorted.length * 0.85)];
+  const babyMin = Math.max(10, sorted[Math.floor(sorted.length * 0.15)] - 10);
+  const babyMax = sorted[Math.floor(sorted.length * 0.85)] + 15;
+
+  // Ramp blend: 0 at 3 samples, 1 at 8+ samples
+  const blend = Math.min(1, (durations.length - 3) / 5);
   return {
-    min: Math.round(Math.max(10, p15 - 10)),
-    max: Math.round(p85 + 15),
+    min: Math.round(ageMin * (1 - blend) + babyMin * blend),
+    max: Math.round(ageMax * (1 - blend) + babyMax * blend),
   };
 }

@@ -121,27 +121,44 @@ export function getWakeWindow(ctx: BabyContext): number {
   return Math.max(clampRange.minMinutes, Math.min(clampRange.maxMinutes, avgWW));
 }
 
-/** Get wake window range adapted to the baby's actual nap pattern. */
+/**
+ * Get wake window range adapted to the baby's actual nap pattern.
+ *
+ * For emerging_rhythm babies, the clamp is widened by 20% beyond the age
+ * bracket so that early developers whose data consistently falls outside
+ * the age table aren't forced back to population norms.
+ */
 function getAdaptedWakeWindowRange(ctx: BabyContext): { minMinutes: number; maxMinutes: number } {
   const ageRange = findByAge(WAKE_WINDOWS, ctx.ageMonths);
   const learnedNaps = getLearnedNapCount(ctx);
-  if (learnedNaps === null) return ageRange;
 
-  const ageNaps = findByAge(NAP_COUNTS, ctx.ageMonths).naps;
-  if (learnedNaps === ageNaps) return ageRange;
-
-  // Baby does fewer/more naps than age default. Find ALL age brackets where
-  // this nap count is within the acceptable range, and look up the CORRESPONDING
-  // wake window range by age (not by array index — the two tables have different sizes).
   let minWW = ageRange.minMinutes;
   let maxWW = ageRange.maxMinutes;
-  for (const nc of NAP_COUNTS) {
-    if (learnedNaps >= nc.range[0] && learnedNaps <= nc.range[1]) {
-      const ww = findByAge(WAKE_WINDOWS, nc.minMonths);
-      minWW = Math.min(minWW, ww.minMinutes);
-      maxWW = Math.max(maxWW, ww.maxMinutes);
+
+  if (learnedNaps !== null) {
+    const ageNaps = findByAge(NAP_COUNTS, ctx.ageMonths).naps;
+    if (learnedNaps !== ageNaps) {
+      // Baby does fewer/more naps than age default. Find ALL age brackets where
+      // this nap count is within the acceptable range, and look up the CORRESPONDING
+      // wake window range by age (not by array index — the two tables have different sizes).
+      for (const nc of NAP_COUNTS) {
+        if (learnedNaps >= nc.range[0] && learnedNaps <= nc.range[1]) {
+          const ww = findByAge(WAKE_WINDOWS, nc.minMonths);
+          minWW = Math.min(minWW, ww.minMinutes);
+          maxWW = Math.max(maxWW, ww.maxMinutes);
+        }
+      }
     }
   }
+
+  // Emerging babies: widen the clamp so the engine can follow the baby's
+  // actual rhythm rather than forcing it back to age-table boundaries
+  if (ctx.strategy === "emerging_rhythm") {
+    const margin = (maxWW - minWW) * 0.2;
+    minWW = Math.max(15, minWW - margin);
+    maxWW = maxWW + margin;
+  }
+
   return { minMinutes: minWW, maxMinutes: maxWW };
 }
 

@@ -185,11 +185,11 @@ describe("predictNewborn", () => {
     });
     expect(low.sleepPressure).toBe("low");
 
-    // Been awake 60 min — high pressure for a newborn
+    // Been awake 90 min — high pressure (above baby's observed p75)
     const high = predictNewborn({
       ageMonths: 0, tz: "UTC", recentSleeps,
       lastSleepEndMs,
-      now: lastSleepEndMs + 60 * 60_000,
+      now: lastSleepEndMs + 90 * 60_000,
     });
     expect(high.sleepPressure).toBe("high");
   });
@@ -215,9 +215,10 @@ describe("predictNewborn", () => {
       now: new Date("2026-03-26T00:00:00Z").getTime(),
     });
 
-    // 0-1 month: 14-18 hours typical
-    expect(result.ageNorms.totalSleepHours.min).toBe(14);
-    expect(result.ageNorms.totalSleepHours.max).toBe(18);
+    // 0-1 month: Galland 95% CI range (9.3-20.0h), typical from SLEEP_NEEDS
+    expect(result.ageNorms.totalSleepHours.min).toBe(9.3);
+    expect(result.ageNorms.totalSleepHours.max).toBe(20.0);
+    expect(result.ageNorms.totalSleepHours.typical).toBe(16.5);
   });
 
   it("handles no prior sleep data gracefully", () => {

@@ -115,7 +115,7 @@ export function predictEmerging(input: EmergingContext): EmergingPrediction {
       earliest: new Date(window.earliestMs).toISOString(),
       latest: new Date(window.latestMs).toISOString(),
     };
-    sleepPressure = computeSleepPressure(lastSleepEndMs, ctx.ageMonths, now);
+    sleepPressure = computeSleepPressure(lastSleepEndMs, ctx.ageMonths, now, wws);
   }
 
   return {

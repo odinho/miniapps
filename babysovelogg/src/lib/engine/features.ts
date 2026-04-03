@@ -8,6 +8,7 @@
 import type { SleepEntry } from "$lib/types.js";
 import { isoToDateInTz } from "$lib/tz.js";
 import { SLEEP_NEEDS, findByAge } from "./constants.js";
+import { sleepDuration as gallandSleepDuration } from "$lib/data/galland2012.js";
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -351,9 +352,34 @@ export function computeLongestStretchTrend(
   return { currentWeekAvg, priorWeekAvg, direction };
 }
 
-/** Get age-appropriate sleep norms. */
+/**
+ * Get age-appropriate sleep norms for parent-facing display.
+ *
+ * Uses the wide Galland 2012 population ranges (mean ± 1.96 SD = 95% CI)
+ * so parents of normal outlier babies don't get false "below/above normal"
+ * warnings. The narrower SLEEP_NEEDS ranges remain for internal engine use.
+ */
 export function getAgeNorms(ageMonths: number): AgeNorms {
   const need = findByAge(SLEEP_NEEDS, ageMonths);
+
+  // Find the best-matching Galland age band (skip "All ..." summary rows)
+  const gallandBand = gallandSleepDuration.ageBands.find((b) => {
+    if ("note" in b) return false; // skip summary rows
+    const [lo, hi] = b.ageMonths;
+    return ageMonths >= lo && ageMonths <= hi;
+  });
+
+  if (gallandBand) {
+    return {
+      totalSleepHours: {
+        min: gallandBand.lower,
+        max: gallandBand.upper,
+        typical: need.totalHours,
+      },
+    };
+  }
+
+  // Fallback to SLEEP_NEEDS if no Galland band matches (unlikely for infants)
   return {
     totalSleepHours: {
       min: need.range[0],
@@ -366,36 +392,48 @@ export function getAgeNorms(ageMonths: number): AgeNorms {
 /**
  * Compute sleep pressure level based on time since last sleep.
  *
+ * When enough observed wake windows are available (≥5), thresholds are derived
+ * from the baby's own distribution (p25 = low→rising, p75 = rising→high),
+ * blended with age-based defaults proportional to sample count.
+ * This avoids prescribing population-level norms to babies with different patterns.
+ *
  * @param lastSleepEndMs - When the last sleep ended (epoch ms)
  * @param ageMonths - Baby's age in months
  * @param now - Reference time (epoch ms)
+ * @param recentWakeWindows - Observed wake windows (minutes), optional
  */
 export function computeSleepPressure(
   lastSleepEndMs: number,
   ageMonths: number,
   now?: number,
+  recentWakeWindows?: number[],
 ): "low" | "rising" | "high" {
   const refMs = now ?? Date.now();
   const awakeMin = (refMs - lastSleepEndMs) / 60_000;
 
-  // Wake window thresholds by age
-  let lowThreshold: number;
-  let highThreshold: number;
-  if (ageMonths < 1) {
-    lowThreshold = 25;  // 25 min = low
-    highThreshold = 50; // 50 min = high
-  } else if (ageMonths < 2) {
-    lowThreshold = 35;
-    highThreshold = 65;
-  } else if (ageMonths < 3) {
-    lowThreshold = 45;
-    highThreshold = 80;
-  } else if (ageMonths < 4) {
-    lowThreshold = 60;
-    highThreshold = 100;
-  } else {
-    lowThreshold = 75;
-    highThreshold = 120;
+  // Age-based defaults
+  const ageLow = ageMonths < 1 ? 25
+    : ageMonths < 2 ? 35
+    : ageMonths < 3 ? 45
+    : ageMonths < 4 ? 60 : 75;
+  const ageHigh = ageMonths < 1 ? 50
+    : ageMonths < 2 ? 65
+    : ageMonths < 3 ? 80
+    : ageMonths < 4 ? 100 : 120;
+
+  let lowThreshold = ageLow;
+  let highThreshold = ageHigh;
+
+  // Blend in baby's own wake windows when we have enough data
+  const wws = recentWakeWindows ?? [];
+  if (wws.length >= 5) {
+    const sorted = [...wws].toSorted((a, b) => a - b);
+    const babyLow = sorted[Math.floor(sorted.length * 0.25)];
+    const babyHigh = sorted[Math.floor(sorted.length * 0.75)];
+    // Ramp blend from 0 at 5 samples to 1 at 15 samples
+    const blend = Math.min(1, (wws.length - 5) / 10);
+    lowThreshold = ageLow * (1 - blend) + babyLow * blend;
+    highThreshold = ageHigh * (1 - blend) + babyHigh * blend;
   }
 
   if (awakeMin < lowThreshold) return "low";
@@ -415,23 +453,21 @@ export function computeSleepWindow(
   recentWakeWindows: number[],
   ageMonths: number,
 ): { earliestMs: number; latestMs: number } {
-  let minWW: number;
-  let maxWW: number;
+  // Age-based fallback ranges
+  const ageMin = ageMonths < 1 ? 25 : ageMonths < 2 ? 35 : ageMonths < 3 ? 50 : ageMonths < 4 ? 60 : 75;
+  const ageMax = ageMonths < 1 ? 60 : ageMonths < 2 ? 75 : ageMonths < 3 ? 90 : ageMonths < 4 ? 120 : 150;
+
+  let minWW = ageMin;
+  let maxWW = ageMax;
 
   if (recentWakeWindows.length >= 3) {
-    // Use observed wake windows with padding
     const sorted = [...recentWakeWindows].toSorted((a, b) => a - b);
-    const p25 = sorted[Math.floor(sorted.length * 0.25)];
-    const p75 = sorted[Math.floor(sorted.length * 0.75)];
-    minWW = Math.max(15, p25 - 10);
-    maxWW = p75 + 15;
-  } else {
-    // Fall back to age-based ranges
-    if (ageMonths < 1) { minWW = 25; maxWW = 60; }
-    else if (ageMonths < 2) { minWW = 35; maxWW = 75; }
-    else if (ageMonths < 3) { minWW = 50; maxWW = 90; }
-    else if (ageMonths < 4) { minWW = 60; maxWW = 120; }
-    else { minWW = 75; maxWW = 150; }
+    const babyMin = Math.max(15, sorted[Math.floor(sorted.length * 0.25)] - 10);
+    const babyMax = sorted[Math.floor(sorted.length * 0.75)] + 15;
+    // Ramp blend: 0 at 3 samples, 1 at 8+ samples
+    const blend = Math.min(1, (recentWakeWindows.length - 3) / 5);
+    minWW = ageMin * (1 - blend) + babyMin * blend;
+    maxWW = ageMax * (1 - blend) + babyMax * blend;
   }
 
   return {

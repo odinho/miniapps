@@ -38,8 +38,8 @@ describe("intraday backtest", () => {
       renderResult("nap-quality-adj", withAdj),
     ];
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "no-adjustment: 64 gaps, MAE 30.4 min, bias -6.4 min
-      nap-quality-adj: 64 gaps, MAE 30.8 min, bias -10.4 min"
+      "no-adjustment: 64 gaps, MAE 30.5 min, bias -7.6 min
+      nap-quality-adj: 64 gaps, MAE 31.5 min, bias -11.4 min"
     `);
   });
 
@@ -49,13 +49,13 @@ describe("intraday backtest", () => {
       renderBuckets("adj", withAdj),
     ];
     expect(lines.join("\n\n")).toMatchInlineSnapshot(`
-      "  no-adj short (≤30m): 12 gaps, MAE 53.3 min, bias +16.6
-        no-adj normal (31-89m): 45 gaps, MAE 23.2 min, bias -11.1
-        no-adj long (≥90m): 7 gaps, MAE 37.3 min, bias -15.9
+      "  no-adj short (≤30m): 12 gaps, MAE 53.4 min, bias +11.6
+        no-adj normal (31-89m): 45 gaps, MAE 23.2 min, bias -11.3
+        no-adj long (≥90m): 7 gaps, MAE 38 min, bias -16.6
 
-        adj short (≤30m): 12 gaps, MAE 53.1 min, bias -13.2
-        adj normal (31-89m): 45 gaps, MAE 23.2 min, bias -11.1
-        adj long (≥90m): 7 gaps, MAE 41.7 min, bias -0.9"
+        adj short (≤30m): 12 gaps, MAE 57.3 min, bias -17.4
+        adj normal (31-89m): 45 gaps, MAE 23.2 min, bias -11.3
+        adj long (≥90m): 7 gaps, MAE 41 min, bias -1.6"
     `);
   });
 });
