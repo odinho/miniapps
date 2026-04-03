@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   calculateAgeMonths,
   getWakeWindow,
+  getLearnedNapDuration,
   predictNextNap,
   getExpectedNapCount,
   predictDayNaps,
@@ -210,5 +211,65 @@ describe("detectNapTransition", () => {
     expect(result).not.toBeNull();
     expect(result!.dropping).toBe(false);
     expect(result!.suggestedNaps).toBe(2);
+  });
+});
+
+// --- incomplete day filtering ---
+
+/** Make an ISO timestamp on a specific date. */
+function day(d: number, hour: number, min = 0): string {
+  return `2026-03-${String(d).padStart(2, "0")}T${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}:00.000Z`;
+}
+
+function renderNaps(naps: { startTime: string; endTime: string }[]): string {
+  return naps.map((n) => `${n.startTime.slice(11, 16)}–${n.endTime.slice(11, 16)}`).join(", ");
+}
+
+describe("incomplete days (missing night) excluded from learning", () => {
+  // Two complete days (day 24, day 25) with 90-min naps and 120-min wake windows.
+  // One incomplete day (day 26) with a bogus 180-min "nap" (really a misclassified
+  // overnight fragment) and 300-min gaps. Without the filter, the incomplete day
+  // would poison wake window, nap duration, and nap count learning.
+  const completeDays: SleepEntry[] = [
+    // Day 24: 2 naps + night
+    sleep(day(24, 9, 0), day(24, 10, 30)),   // nap 90 min
+    sleep(day(24, 12, 30), day(24, 14, 0)),   // nap 90 min
+    sleep(day(24, 19, 0), day(25, 7, 0), "night"),
+
+    // Day 25: 2 naps + night
+    sleep(day(25, 9, 0), day(25, 10, 30)),
+    sleep(day(25, 12, 30), day(25, 14, 0)),
+    sleep(day(25, 19, 0), day(26, 7, 0), "night"),
+  ];
+
+  const incompleteDay: SleepEntry[] = [
+    // Day 26: naps only, no night — e.g. parent forgot to log bedtime.
+    // Includes a 180-min "nap" that is really an overnight fragment.
+    sleep(day(26, 9, 0), day(26, 10, 30)),
+    sleep(day(26, 15, 0), day(26, 18, 0)),   // 180-min bogus "nap"
+  ];
+
+  it("wake window ignores gaps from incomplete days", () => {
+    const withIncomplete = ctx(8, [...completeDays, ...incompleteDay]);
+    const withoutIncomplete = ctx(8, completeDays);
+
+    expect(getWakeWindow(withIncomplete)).toBe(getWakeWindow(withoutIncomplete));
+  });
+
+  it("nap duration ignores naps from incomplete days", () => {
+    const withIncomplete = ctx(8, [...completeDays, ...incompleteDay]);
+    const withoutIncomplete = ctx(8, completeDays);
+
+    expect(getLearnedNapDuration(withIncomplete)).toBe(getLearnedNapDuration(withoutIncomplete));
+  });
+
+  it("nap predictions are identical with or without incomplete days", () => {
+    const withIncomplete = ctx(8, [...completeDays, ...incompleteDay]);
+    const withoutIncomplete = ctx(8, completeDays);
+
+    const predsWith = predictDayNaps(day(27, 7, 0), withIncomplete);
+    const predsWithout = predictDayNaps(day(27, 7, 0), withoutIncomplete);
+
+    expect(renderNaps(predsWith)).toBe(renderNaps(predsWithout));
   });
 });
