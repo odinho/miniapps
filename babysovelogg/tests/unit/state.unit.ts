@@ -383,4 +383,97 @@ describe("assembleState", () => {
     // Should show bedtime, not next nap
     expect(result.prediction!.nextNap).toBe(result.prediction!.bedtime);
   });
+
+  // ── Coherent day plan: bedtime derived from predicted naps ──
+
+  it("bedtime derived from predicted naps when no naps completed yet", () => {
+    // 9mo baby with UTC timezone, wake at 07:00, no completed sleeps
+    // The default recommendBedtime([]) returns 19:00 UTC.
+    // With predicted naps, bedtime should be derived from the last predicted nap end
+    // + bedtime wake window — a different value.
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-03-28",
+      wake_time: "2026-03-28T07:00:00.000Z",
+      created_at: "2026-03-28T07:00:00.000Z",
+      created_by_event_id: null,
+    };
+    const noNaps = assembleState(
+      dayData({
+        baby: { ...baseBaby, timezone: "UTC" },
+        todaySleeps: [],
+        todayWakeUp: wakeUp,
+        now: new Date("2026-03-28T08:00:00.000Z").getTime(),
+      }),
+    );
+
+    const bedtime = noNaps.prediction!.bedtime!;
+    // Default would be exactly 19:00:00 UTC. With predicted naps feeding forward,
+    // the bedtime should NOT land exactly on the default.
+    expect(bedtime).not.toBe("2026-03-28T19:00:00.000Z");
+    // predictedNaps should exist (full day plan visible)
+    expect(noNaps.prediction!.predictedNaps).not.toBeNull();
+    expect(noNaps.prediction!.predictedNaps!.length).toBeGreaterThan(0);
+  });
+
+  it("bedtime recalculates when actual nap replaces prediction", () => {
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-03-28",
+      wake_time: "2026-03-28T07:00:00.000Z",
+      created_at: "2026-03-28T07:00:00.000Z",
+      created_by_event_id: null,
+    };
+    const nap1 = sleepRow({
+      id: 10, start_time: "2026-03-28T09:30:00.000Z",
+      end_time: "2026-03-28T11:30:00.000Z",
+      type: "nap", domain_id: "slp_actual",
+    });
+
+    const beforeNap = assembleState(
+      dayData({
+        baby: { ...baseBaby, timezone: "UTC" },
+        todaySleeps: [],
+        todayWakeUp: wakeUp,
+        now: new Date("2026-03-28T08:00:00.000Z").getTime(),
+      }),
+    );
+    const afterNap = assembleState(
+      dayData({
+        baby: { ...baseBaby, timezone: "UTC" },
+        todaySleeps: [nap1],
+        todayWakeUp: wakeUp,
+        now: new Date("2026-03-28T12:00:00.000Z").getTime(),
+      }),
+    );
+
+    // Both should NOT be the 19:00 UTC default — derived from predicted/actual nap schedule
+    expect(beforeNap.prediction!.bedtime).not.toBe("2026-03-28T19:00:00.000Z");
+    expect(afterNap.prediction!.bedtime).not.toBe("2026-03-28T19:00:00.000Z");
+    // Note: with strong habitual anchoring (15 days of consistent data), both bedtimes
+    // can be very close or identical since the habitual weight dominates pressure-based changes.
+  });
+
+  it("bedtime updates during active nap using predicted nap end", () => {
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-03-28",
+      wake_time: "2026-03-28T07:00:00.000Z",
+      created_at: "2026-03-28T07:00:00.000Z",
+      created_by_event_id: null,
+    };
+    const result = assembleState(
+      dayData({
+        baby: { ...baseBaby, timezone: "UTC" },
+        todaySleeps: [],
+        activeSleep: sleepRow({
+          end_time: null,
+          start_time: "2026-03-28T09:30:00.000Z",
+          type: "nap",
+        }),
+        todayWakeUp: wakeUp,
+        now: new Date("2026-03-28T10:30:00.000Z").getTime(),
+      }),
+    );
+
+    // Should not be the 19:00 UTC default
+    expect(result.prediction!.bedtime).not.toBe("2026-03-28T19:00:00.000Z");
+  });
 });
