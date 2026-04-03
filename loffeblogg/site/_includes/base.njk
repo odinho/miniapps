@@ -79,7 +79,7 @@
         {% endfor %}
       </nav>
       {% if isPost %}<p class="footer-links"><a href="/">Heim</a> &middot; <a href="#top">Til toppen &uarr;</a></p>{% endif %}
-      {% if buildTime %}<p class="footer-updated">Oppdatert {{ buildTime | datoTid }}</p>{% endif %}
+      {% if isPost and post.lastModified %}<p class="footer-updated">Oppdatert {{ post.lastModified | dato }}</p>{% elif not isPost and buildTime %}<p class="footer-updated">Sist bygd {{ buildTime | datoTid }}</p>{% endif %}
     </div>
   </footer>
 

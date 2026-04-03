@@ -81,6 +81,14 @@ async function main() {
 
       if (cleanHtml) {
         console.log(`Brukar rein cache for: ${doc.name}`);
+        // Keep meta.json in sync with documents.json modifiedTime so check-updates.js
+        // does not see a stale cache and trigger an infinite rebuild loop.
+        const metaPath = path.join(DOCS_DIR, `${doc.id}.meta.json`);
+        await fs.writeFile(metaPath, JSON.stringify({
+          name: doc.name,
+          sourceModifiedTime: doc.modifiedTime,
+          cachedAt: new Date().toISOString()
+        }, null, 2));
       } else {
         // Full pipeline: fetch → images → replace → strip → cache
 
