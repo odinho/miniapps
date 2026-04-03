@@ -13,6 +13,7 @@ import { calibrate } from "./calibration.js";
 import { computeStrategySignals } from "./features.js";
 import { selectStrategy } from "./strategy.js";
 import { predictNewborn } from "./newborn.js";
+import { predictEmerging } from "./emerging.js";
 import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry, BabyContext } from "$lib/types.js";
 import type { PredictedNap } from "./schedule.js";
 import type { Strategy } from "./strategy.js";
@@ -68,8 +69,9 @@ export function assembleState(data: DayData) {
   let prediction: Prediction | null = null;
   if (strategy === "newborn_guidance") {
     prediction = assembleNewbornPrediction(ctx, recentEntries, todaySleeps, now);
+  } else if (strategy === "emerging_rhythm") {
+    prediction = assembleEmergingPrediction(ctx, recentEntries, todaySleeps, activeSleep, todayWakeUp, now);
   } else {
-    // routine_schedule (and emerging_rhythm for now — emerging adapter comes later)
     prediction = assembleSchedulePrediction(
       strategy, ctx, todaySleeps, activeSleep, todayWakeUp, now,
     );
@@ -150,7 +152,66 @@ function assembleNewbornPrediction(
   };
 }
 
-/** Assemble a schedule-based prediction (routine_schedule or emerging_rhythm). */
+/** Assemble an emerging-rhythm prediction (adapter between newborn and schedule). */
+function assembleEmergingPrediction(
+  ctx: BabyContext,
+  recentEntries: SleepEntry[],
+  todaySleeps: SleepLogRow[],
+  activeSleep: SleepLogRow | undefined,
+  todayWakeUp: DayStartRow | undefined,
+  now: number,
+): Prediction {
+  // Find last completed sleep end time
+  const allCompleted = [...todaySleeps, ...recentEntries.map((s) => ({ end_time: s.end_time }))]
+    .filter((s) => s.end_time)
+    .map((s) => new Date(s.end_time!).getTime());
+  const lastSleepEndMs = allCompleted.length > 0 ? Math.max(...allCompleted) : null;
+
+  const lastCompleted = todaySleeps.find((s) => s.end_time);
+  const wakeTimeForPrediction = lastCompleted?.end_time || todayWakeUp?.wake_time;
+
+  const result = predictEmerging({
+    ctx,
+    todaySleeps: todaySleeps.map(toSleepEntry),
+    wakeUpTime: wakeTimeForPrediction ?? null,
+    lastSleepEndMs,
+    now,
+  });
+
+  // Compute expected nap/night end for active sleep (reuse schedule functions)
+  let expectedNapEnd: string | null = null;
+  if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
+    expectedNapEnd = predictNapEndTime(activeSleep.start_time, ctx);
+  }
+  let expectedNightEnd: string | null = null;
+  if (activeSleep && activeSleep.type === "night" && !activeSleep.end_time) {
+    const todayNapMin = todaySleeps
+      .filter((s) => s.type === "nap" && s.end_time)
+      .reduce((sum, s) => sum + (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60000, 0);
+    expectedNightEnd = predictNightEndTime(activeSleep.start_time, ctx, todayNapMin);
+  }
+
+  return {
+    strategy: "emerging_rhythm",
+    nextNap: result.nextNap,
+    bedtime: result.bedtime,
+    predictedNaps: result.predictedNaps,
+    napsAllDone: false,
+    expectedNapEnd,
+    expectedNightEnd,
+    confidence: null,
+    calibration: null,
+    sleepWindow: result.sleepWindow,
+    sleepPressure: result.sleepPressure,
+    totalSleep24h: result.rolling.totalSleep24h,
+    longestStretch: result.rolling.longestStretch,
+    longestStretchTrend: result.longestStretchTrend.direction,
+    ageNorms: result.ageNorms,
+    rolling: result.rolling,
+  };
+}
+
+/** Assemble a schedule-based prediction (routine_schedule). */
 function assembleSchedulePrediction(
   strategy: Strategy,
   ctx: BabyContext,

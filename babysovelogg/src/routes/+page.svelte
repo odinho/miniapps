@@ -17,6 +17,7 @@
 	import TimeInput from '$lib/components/TimeInput.svelte';
 	import DateInput from '$lib/components/DateInput.svelte';
 	import DstBanner from '$lib/components/DstBanner.svelte';
+	import ContextCard from '$lib/components/ContextCard.svelte';
 
 	// --- modal state ---
 	let showTagSheet = $state(false);
@@ -67,7 +68,11 @@
 	const pottyMode = $derived(baby?.potty_mode === 1);
 
 	const paused = $derived(isPaused(activeSleep?.pauses));
-	const showPopulationNorms = $derived(prediction?.calibration?.trust === 'age-default');
+	const strategy = $derived(prediction?.strategy ?? 'routine_schedule');
+	const isNewborn = $derived(strategy === 'newborn_guidance');
+	const isEmerging = $derived(strategy === 'emerging_rhythm');
+	const showContextCard = $derived(isNewborn || isEmerging);
+	const showPopulationNorms = $derived(!showContextCard && prediction?.calibration?.trust === 'age-default');
 	const populationNormsRows = $derived(showPopulationNorms ? buildSleepInfoRows(ageMonths) : []);
 	let pauseBusy = $state(false);
 
@@ -172,6 +177,8 @@
 			if (prediction?.expectedNightEnd) return formatTime(prediction.expectedNightEnd);
 			return null;
 		}
+		// Newborn: no bedtime concept
+		if (isNewborn) return null;
 		// Day: end = predicted bedtime
 		return prediction?.bedtime ? formatTime(prediction.bedtime) : null;
 	});
@@ -461,6 +468,10 @@
 				{pottyMode ? '🚽 Do' : '🧷 Bleie'}
 			</button>
 		</div>
+
+		{#if showContextCard && prediction}
+			<ContextCard {prediction} {ageMonths} />
+		{/if}
 
 		{#if showPopulationNorms}
 			<div class="population-norms" data-testid="population-norms">

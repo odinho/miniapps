@@ -97,6 +97,18 @@
 	{:else if mode.kind === 'after-bedtime'}
 		<div class="arc-center-label">Etter leggetid</div>
 		<span class="countdown-value">{formatTime(mode.bedtime)}</span>
+	{:else if mode.kind === 'sleep-window'}
+		{#if mode.pressure === 'high'}
+			<div class="arc-center-label">Søvnvindauge no</div>
+			<span class="countdown-value" style="color: var(--peach-dark)">💤</span>
+		{:else if mode.windowStart <= 0}
+			<div class="arc-center-label">Søvnvindauge ope</div>
+			<span class="countdown-value">{formatDuration(mode.windowEnd)}</span>
+			<div class="arc-sub-label">att</div>
+		{:else}
+			<div class="arc-center-label">Søvnvindauge om</div>
+			<span class="countdown-value">{formatDuration(mode.windowStart)}</span>
+		{/if}
 	{/if}
 
 	{#if mode.kind !== 'sleeping' && mode.kind !== 'deep-night' && mode.kind !== 'idle' && awakeMs != null}

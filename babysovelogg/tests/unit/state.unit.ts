@@ -38,12 +38,26 @@ function sleepRow(overrides: Partial<SleepLogRow> = {}): SleepLogRow {
   };
 }
 
+/** Generate 7 days of schedule-like recent sleep data for strategy selector. */
+function scheduleRecentSleeps(): SleepLogRow[] {
+  const sleeps: SleepLogRow[] = [];
+  for (let d = 18; d <= 25; d++) {
+    const dateStr = `2026-03-${String(d).padStart(2, "0")}`;
+    sleeps.push(
+      sleepRow({ id: d * 10 + 1, start_time: `${dateStr}T09:30:00Z`, end_time: `${dateStr}T11:00:00Z`, type: "nap", domain_id: `slp_r${d}a` }),
+      sleepRow({ id: d * 10 + 2, start_time: `${dateStr}T14:00:00Z`, end_time: `${dateStr}T15:30:00Z`, type: "nap", domain_id: `slp_r${d}b` }),
+      sleepRow({ id: d * 10 + 3, start_time: `${dateStr}T19:30:00Z`, end_time: `${dateStr}T23:59:00Z`, type: "night", domain_id: `slp_r${d}c` }),
+    );
+  }
+  return sleeps;
+}
+
 function dayData(overrides: Partial<DayData> = {}): DayData {
   return {
     baby: baseBaby,
     activeSleep: undefined,
     todaySleeps: [],
-    recentSleeps: [],
+    recentSleeps: scheduleRecentSleeps(),
     todayWakeUp: undefined,
     pausesBySleep: new Map(),
     diaperCount: 0,
