@@ -14,6 +14,82 @@ function localDate(iso: string, tz: string): string {
   return isoToDateInTz(iso, tz);
 }
 
+// ─── Sleep data cache ──────────────────────────────────────────────────────
+// Precomputes sorted/grouped/parsed data once per BabyContext so downstream
+// functions avoid redundant sorting, filtering, Date parsing, and isoToDateInTz calls.
+
+interface CachedSleep {
+  startMs: number;
+  endMs: number;
+  type: "nap" | "night";
+  localDate: string;
+}
+
+interface SleepCache {
+  /** All completed sleeps sorted by startMs */
+  sorted: CachedSleep[];
+  /** Completed naps sorted by startMs */
+  naps: CachedSleep[];
+  /** Completed nights sorted by startMs */
+  nights: CachedSleep[];
+  /** Completed sleeps grouped by local date (each group in startMs order) */
+  byDay: Map<string, CachedSleep[]>;
+  /** Number of completed naps per local date */
+  napCountByDay: Map<string, number>;
+  /** Day keys sorted chronologically */
+  sortedDayKeys: string[];
+  /** Memoized learned nap count (undefined = not yet computed) */
+  learnedNapCount: number | null | undefined;
+}
+
+function buildCache(ctx: BabyContext): SleepCache {
+  const completed: CachedSleep[] = [];
+
+  for (const s of ctx.recentSleeps) {
+    if (!s.end_time) continue;
+    completed.push({
+      startMs: new Date(s.start_time).getTime(),
+      endMs: new Date(s.end_time).getTime(),
+      type: s.type,
+      localDate: localDate(s.start_time, ctx.tz),
+    });
+  }
+
+  completed.sort((a, b) => a.startMs - b.startMs);
+  // naps and nights are subsets built in insertion order — re-derive from sorted
+  // to avoid 2 extra sorts (they're small arrays but this is cleaner)
+  const sortedNaps: CachedSleep[] = [];
+  const sortedNights: CachedSleep[] = [];
+  for (const cs of completed) {
+    if (cs.type === "nap") sortedNaps.push(cs);
+    else sortedNights.push(cs);
+  }
+
+  const byDay = new Map<string, CachedSleep[]>();
+  const napCountByDay = new Map<string, number>();
+
+  for (const cs of completed) {
+    let dayList = byDay.get(cs.localDate);
+    if (!dayList) {
+      dayList = [];
+      byDay.set(cs.localDate, dayList);
+    }
+    dayList.push(cs); // Already in startMs order
+    if (cs.type === "nap") {
+      napCountByDay.set(cs.localDate, (napCountByDay.get(cs.localDate) ?? 0) + 1);
+    }
+  }
+
+  const sortedDayKeys = [...byDay.keys()].toSorted();
+
+  return { sorted: completed, naps: sortedNaps, nights: sortedNights, byDay, napCountByDay, sortedDayKeys, learnedNapCount: undefined };
+}
+
+function getCache(ctx: BabyContext): SleepCache {
+  if (!ctx._cache) ctx._cache = buildCache(ctx);
+  return ctx._cache as SleepCache;
+}
+
 /** Calculate age in months from birthdate ISO string. */
 export function calculateAgeMonths(birthdate: string, now?: Date): number {
   const birth = new Date(birthdate);
@@ -30,7 +106,8 @@ export function getWakeWindow(ctx: BabyContext): number {
 
   if (ctx.recentSleeps.length < 2) return defaultWW;
 
-  const avgWW = getAverageWakeWindowFromSleeps(ctx.recentSleeps);
+  const cache = getCache(ctx);
+  const avgWW = computeAvgNapWakeWindow(cache);
   if (avgWW === null) return defaultWW;
 
   const clampRange = getAdaptedWakeWindowRange(ctx);
@@ -282,29 +359,16 @@ export function detectNapTransition(
 function getPositionalWakeWindows(ctx: BabyContext): number[] {
   if (ctx.recentSleeps.length < 4) return [];
 
-  // Group sleeps by baby-local day
-  const byDay = new Map<string, SleepEntry[]>();
-  for (const s of ctx.recentSleeps) {
-    if (!s.end_time) continue;
-    const day = localDate(s.start_time, ctx.tz);
-    if (!byDay.has(day)) byDay.set(day, []);
-    byDay.get(day)!.push(s);
-  }
+  const cache = getCache(ctx);
 
   // Collect wake windows by position across all days.
   // Only count gaps before naps (excludes nap->night evening gap).
   const gapsByPosition = new Map<number, number[]>();
-  for (const daySleeps of byDay.values()) {
-    const sorted = [...daySleeps]
-      .filter((s) => s.end_time)
-      .toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-
+  for (const daySleeps of cache.byDay.values()) {
     let napPosition = 0;
-    for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i].type !== "nap") continue; // skip gaps before night sleep
-      const prevEnd = new Date(sorted[i - 1].end_time!).getTime();
-      const nextStart = new Date(sorted[i].start_time).getTime();
-      const gapMin = (nextStart - prevEnd) / 60000;
+    for (let i = 1; i < daySleeps.length; i++) {
+      if (daySleeps[i].type !== "nap") continue; // skip gaps before night sleep
+      const gapMin = (daySleeps[i].startMs - daySleeps[i - 1].endMs) / 60000;
       if (gapMin >= 10 && gapMin <= 480) {
         if (!gapsByPosition.has(napPosition)) gapsByPosition.set(napPosition, []);
         gapsByPosition.get(napPosition)!.push(gapMin);
@@ -338,29 +402,18 @@ function getPositionalDataForNapCount(
 ): { wws: number[]; durs: number[] } {
   if (ctx.recentSleeps.length < 4) return { wws: [], durs: [] };
 
-  // Group sleeps by day
-  const byDay = new Map<string, SleepEntry[]>();
-  for (const s of ctx.recentSleeps) {
-    if (!s.end_time) continue;
-    const day = localDate(s.start_time, ctx.tz);
-    if (!byDay.has(day)) byDay.set(day, []);
-    byDay.get(day)!.push(s);
-  }
+  const cache = getCache(ctx);
 
   // Filter to days with the target nap count
-  const matchingDays: SleepEntry[][] = [];
-  for (const daySleeps of byDay.values()) {
-    const napCount = daySleeps.filter((s) => s.type === "nap").length;
-    if (napCount === targetNapCount) matchingDays.push(daySleeps);
+  const matchingDayKeys: string[] = [];
+  for (const [day, count] of cache.napCountByDay) {
+    if (count === targetNapCount) matchingDayKeys.push(day);
   }
 
   // Only apply filtering if there's actual mixed nap counts (transition).
   // If all days have the same count, or not enough matching days, use unfiltered.
-  const allNapCounts = [...byDay.values()].map(
-    (ds) => ds.filter((s) => s.type === "nap").length,
-  );
-  const uniqueCounts = new Set(allNapCounts);
-  if (uniqueCounts.size <= 1 || matchingDays.length < 2) {
+  const uniqueCounts = new Set(cache.napCountByDay.values());
+  if (uniqueCounts.size <= 1 || matchingDayKeys.length < 2) {
     return {
       wws: getPositionalWakeWindows(ctx),
       durs: feat(ctx, "positionalDuration") ? getPositionalNapDurations(ctx) : [],
@@ -372,17 +425,13 @@ function getPositionalDataForNapCount(
   const gapsByPos = new Map<number, number[]>();
   const dursByPos = new Map<number, number[]>();
 
-  for (const daySleeps of matchingDays) {
-    const sorted = [...daySleeps]
-      .filter((s) => s.end_time)
-      .toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+  for (const dayKey of matchingDayKeys) {
+    const daySleeps = cache.byDay.get(dayKey)!;
 
     let napPos = 0;
-    for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i].type !== "nap") continue;
-      const prevEnd = new Date(sorted[i - 1].end_time!).getTime();
-      const nextStart = new Date(sorted[i].start_time).getTime();
-      const gapMin = (nextStart - prevEnd) / 60000;
+    for (let i = 1; i < daySleeps.length; i++) {
+      if (daySleeps[i].type !== "nap") continue;
+      const gapMin = (daySleeps[i].startMs - daySleeps[i - 1].endMs) / 60000;
       if (gapMin >= 10 && gapMin <= 480) {
         if (!gapsByPos.has(napPos)) gapsByPos.set(napPos, []);
         gapsByPos.get(napPos)!.push(gapMin);
@@ -391,9 +440,9 @@ function getPositionalDataForNapCount(
     }
 
     // Collect durations
-    const naps = sorted.filter((s) => s.type === "nap");
-    for (let i = 0; i < naps.length; i++) {
-      const dur = (new Date(naps[i].end_time!).getTime() - new Date(naps[i].start_time).getTime()) / 60_000;
+    const dayNaps = daySleeps.filter((s) => s.type === "nap");
+    for (let i = 0; i < dayNaps.length; i++) {
+      const dur = (dayNaps[i].endMs - dayNaps[i].startMs) / 60_000;
       if (dur >= 10 && dur <= 180) {
         if (!dursByPos.has(i)) dursByPos.set(i, []);
         dursByPos.get(i)!.push(dur);
@@ -428,23 +477,19 @@ function getPositionalDataForNapCount(
 function getPositionalNapDurations(ctx: BabyContext): number[] {
   if (ctx.recentSleeps.length < 4) return [];
 
-  const byDay = new Map<string, SleepEntry[]>();
-  for (const s of ctx.recentSleeps) {
-    if (s.type !== "nap" || !s.end_time) continue;
-    const day = localDate(s.start_time, ctx.tz);
-    if (!byDay.has(day)) byDay.set(day, []);
-    byDay.get(day)!.push(s);
-  }
-
+  const cache = getCache(ctx);
   const dursByPosition = new Map<number, number[]>();
-  for (const dayNaps of byDay.values()) {
-    const sorted = dayNaps
-      .toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-    for (let i = 0; i < sorted.length; i++) {
-      const dur = (new Date(sorted[i].end_time!).getTime() - new Date(sorted[i].start_time).getTime()) / 60_000;
-      if (dur < 10 || dur > 180) continue;
-      if (!dursByPosition.has(i)) dursByPosition.set(i, []);
-      dursByPosition.get(i)!.push(dur);
+
+  for (const daySleeps of cache.byDay.values()) {
+    let napIdx = 0;
+    for (const s of daySleeps) {
+      if (s.type !== "nap") continue;
+      const dur = (s.endMs - s.startMs) / 60_000;
+      if (dur >= 10 && dur <= 180) {
+        if (!dursByPosition.has(napIdx)) dursByPosition.set(napIdx, []);
+        dursByPosition.get(napIdx)!.push(dur);
+      }
+      napIdx++;
     }
   }
 
@@ -466,22 +511,27 @@ function getPositionalNapDurations(ctx: BabyContext): number[] {
  * Returns null only when there's too little data to form any opinion.
  */
 function getLearnedNapCount(ctx: BabyContext): number | null {
-  if (ctx.recentSleeps.length < 4) return null;
+  const cache = getCache(ctx);
+  if (cache.learnedNapCount !== undefined) return cache.learnedNapCount;
 
-  // Group completed naps by baby-local day, preserving chronological order
-  const napsByDay = new Map<string, number>();
-  for (const s of ctx.recentSleeps) {
-    if (s.type !== "nap" || !s.end_time) continue;
-    const day = localDate(s.start_time, ctx.tz);
-    napsByDay.set(day, (napsByDay.get(day) ?? 0) + 1);
+  if (ctx.recentSleeps.length < 4 || cache.napCountByDay.size < 3) {
+    cache.learnedNapCount = null;
+    return null;
   }
 
-  if (napsByDay.size < 3) return null;
-
-  // Sort days chronologically and apply recency weights.
+  // Sort days with naps chronologically and apply recency weights.
   // Most recent day gets weight 1.0, each prior day decays by 0.8x.
-  const sortedDays = [...napsByDay.entries()]
-    .toSorted(([a], [b]) => a.localeCompare(b));
+  // Use sortedDayKeys (already sorted) filtered for days with naps.
+  const sortedDays: [string, number][] = [];
+  for (const day of cache.sortedDayKeys) {
+    const count = cache.napCountByDay.get(day);
+    if (count !== undefined) sortedDays.push([day, count]);
+  }
+
+  if (sortedDays.length < 3) {
+    cache.learnedNapCount = null;
+    return null;
+  }
 
   const weightedFreq = new Map<number, number>();
   let totalWeight = 0;
@@ -504,18 +554,17 @@ function getLearnedNapCount(ctx: BabyContext): number | null {
   // With enough data (5+ days) and strong dominance (>60%), always trust the mode.
   // With less dominance, still return the recency-weighted winner — this lets
   // the engine adapt faster during transitions instead of falling back to age defaults.
-  if (napsByDay.size >= 5 && bestScore / totalWeight > 0.6) {
-    return bestCount;
+  let result: number | null;
+  if (sortedDays.length >= 5 && bestScore / totalWeight > 0.6) {
+    result = bestCount;
+  } else if (bestScore / totalWeight > 0.4) {
+    result = bestCount;
+  } else {
+    result = null;
   }
 
-  // During transition (no clear winner), use recency-weighted best if it has
-  // reasonable support (>40% weighted). This avoids age-default fallback during
-  // the messy transition period.
-  if (bestScore / totalWeight > 0.4) {
-    return bestCount;
-  }
-
-  return null;
+  cache.learnedNapCount = result;
+  return result;
 }
 
 /** Learn the bedtime wake window (last nap end -> night start) from recent data. */
@@ -525,18 +574,14 @@ function getLearnedBedtimeWakeWindow(ctx: BabyContext): number {
 
   if (ctx.recentSleeps.length < 4) return defaultWW;
 
-  const sorted = [...ctx.recentSleeps]
-    .filter((s) => s.end_time)
-    .toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+  const cache = getCache(ctx);
 
   // Collect gaps where the next sleep is a night (nap->night = bedtime gap)
   const gaps: number[] = [];
-  for (let i = 1; i < sorted.length; i++) {
-    if (sorted[i].type !== "night") continue;
-    if (sorted[i - 1].type !== "nap") continue;
-    const prevEnd = new Date(sorted[i - 1].end_time!).getTime();
-    const nextStart = new Date(sorted[i].start_time).getTime();
-    const gapMin = (nextStart - prevEnd) / 60000;
+  for (let i = 1; i < cache.sorted.length; i++) {
+    if (cache.sorted[i].type !== "night") continue;
+    if (cache.sorted[i - 1].type !== "nap") continue;
+    const gapMin = (cache.sorted[i].startMs - cache.sorted[i - 1].endMs) / 60000;
     if (gapMin >= 60 && gapMin <= 600) {
       gaps.push(gapMin);
     }
@@ -553,18 +598,19 @@ export function getLearnedNightDuration(ctx: BabyContext): number {
   const napCount = resolveNapCount(ctx);
   const defaultNight = (sleepNeed.totalHours * 60) - (napDur * napCount);
 
+  const cache = getCache(ctx);
+
   if (feat(ctx, "weightedRecency")) {
-    const samples = collectWeightedDurations(ctx.recentSleeps, "night", 360, 900);
+    const samples = collectWeightedDurationsFromCache(cache.nights, 360, 900);
     if (samples.length < 2) return Math.round(defaultNight);
     const learned = weightedTrimmedMean(samples);
     return Math.round(blendEstimate(defaultNight, learned, samples.length, 2, 6));
   }
 
   // Simple average fallback
-  const nights = ctx.recentSleeps.filter((s) => s.type === "night" && s.end_time);
-  if (nights.length < 2) return Math.round(defaultNight);
-  const durations = nights
-    .map((s) => (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60000)
+  if (cache.nights.length < 2) return Math.round(defaultNight);
+  const durations = cache.nights
+    .map((s) => (s.endMs - s.startMs) / 60000)
     .filter((d) => d >= 360 && d <= 900);
   if (durations.length < 2) return Math.round(defaultNight);
   return Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);
@@ -576,18 +622,19 @@ export function getLearnedNapDuration(ctx: BabyContext): number {
   const defaultDuration = ageMonths < 6 ? 60 : ageMonths < 12 ? 45 : 30;
   if (ctx.recentSleeps.length === 0) return defaultDuration;
 
+  const cache = getCache(ctx);
+
   if (feat(ctx, "weightedRecency")) {
-    const samples = collectWeightedDurations(ctx.recentSleeps, "nap", 10, 180);
+    const samples = collectWeightedDurationsFromCache(cache.naps, 10, 180);
     if (samples.length < 3) return defaultDuration;
     const learned = weightedTrimmedMean(samples);
     return Math.round(blendEstimate(defaultDuration, learned, samples.length, 3, 8));
   }
 
   // Simple average fallback
-  const naps = ctx.recentSleeps.filter((s) => s.type === "nap" && s.end_time);
-  if (naps.length < 3) return defaultDuration;
-  const durations = naps
-    .map((s) => (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60000)
+  if (cache.naps.length < 3) return defaultDuration;
+  const durations = cache.naps
+    .map((s) => (s.endMs - s.startMs) / 60000)
     .filter((d) => d >= 10 && d <= 180);
   if (durations.length < 3) return defaultDuration;
   return Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);
@@ -649,25 +696,15 @@ export function predictNightEndTime(startTime: string, ctx: BabyContext, todayNa
   return new Date(clamp(Math.round(blendedMs), minWakeMs, maxWakeMs)).toISOString();
 }
 
-/**
- * Compute average wake window before NAPS from a list of sleeps (in minutes).
- * Only counts gaps where the next sleep is a nap — excludes the evening
- * nap-to-bedtime gap which inflates the average for nap prediction.
- */
-function getAverageWakeWindowFromSleeps(sleeps: SleepEntry[]): number | null {
-  const sorted = [...sleeps]
-    .filter((s) => s.end_time)
-    .toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-
-  if (sorted.length < 2) return null;
+/** Compute average wake window before NAPS from cached sorted sleeps. */
+function computeAvgNapWakeWindow(cache: SleepCache): number | null {
+  if (cache.sorted.length < 2) return null;
 
   const gaps: number[] = [];
-  for (let i = 1; i < sorted.length; i++) {
+  for (let i = 1; i < cache.sorted.length; i++) {
     // Only count gaps before naps (not before night sleep)
-    if (sorted[i].type !== "nap") continue;
-    const prevEnd = new Date(sorted[i - 1].end_time!).getTime();
-    const nextStart = new Date(sorted[i].start_time).getTime();
-    const gapMin = (nextStart - prevEnd) / 60000;
+    if (cache.sorted[i].type !== "nap") continue;
+    const gapMin = (cache.sorted[i].startMs - cache.sorted[i - 1].endMs) / 60000;
     if (gapMin >= 10 && gapMin <= 480) {
       gaps.push(gapMin);
     }
@@ -677,19 +714,18 @@ function getAverageWakeWindowFromSleeps(sleeps: SleepEntry[]): number | null {
   return gaps.reduce((a, b) => a + b, 0) / gaps.length;
 }
 
-function collectWeightedDurations(
-  sleeps: SleepEntry[],
-  type: SleepEntry["type"],
+/** Collect recency-weighted duration samples from pre-filtered cached sleeps. */
+function collectWeightedDurationsFromCache(
+  items: CachedSleep[],
   minMinutes: number,
   maxMinutes: number,
 ): WeightedSample[] {
-  const sorted = [...sleeps]
-    .filter((s) => s.type === type && s.end_time)
-    .toSorted((a, b) => new Date(a.end_time!).getTime() - new Date(b.end_time!).getTime());
+  // Sort by endMs for recency weighting (items are already sorted by startMs)
+  const sorted = items.toSorted((a, b) => a.endMs - b.endMs);
 
   return sorted
     .map((s, idx) => ({
-      value: (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60_000,
+      value: (s.endMs - s.startMs) / 60_000,
       weight: Math.pow(0.85, sorted.length - 1 - idx),
     }))
     .filter((sample) => sample.value >= minMinutes && sample.value <= maxMinutes);
@@ -769,7 +805,8 @@ function snapToCycleBoundary(
  */
 function getHabitualVsDurationWeight(ctx: BabyContext): number {
   const wakeSamples = collectNightWakeMinuteSamples(ctx);
-  const durationSamples = collectWeightedDurations(ctx.recentSleeps, "night", 360, 900);
+  const cache = getCache(ctx);
+  const durationSamples = collectWeightedDurationsFromCache(cache.nights, 360, 900);
 
   if (wakeSamples.length < 3 || durationSamples.length < 3) return 0.5;
 
@@ -785,13 +822,11 @@ function getHabitualVsDurationWeight(ctx: BabyContext): number {
 
 /** Collect bedtime (local minute of day) samples from recent nights. */
 function collectBedtimeMinuteSamples(ctx: BabyContext): WeightedSample[] {
-  const nights = [...ctx.recentSleeps]
-    .filter((s) => s.type === "night")
-    .toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-
-  return nights.map((s, idx) => ({
-    value: getLocalMinuteOfDay(new Date(s.start_time), ctx.tz),
-    weight: Math.pow(0.85, nights.length - 1 - idx),
+  const cache = getCache(ctx);
+  // cache.nights is already sorted by startMs
+  return cache.nights.map((s, idx) => ({
+    value: getLocalMinuteOfDay(new Date(s.startMs), ctx.tz),
+    weight: Math.pow(0.85, cache.nights.length - 1 - idx),
   }));
 }
 
@@ -832,13 +867,13 @@ function weightedSD(samples: WeightedSample[]): number {
 }
 
 function collectNightWakeMinuteSamples(ctx: BabyContext): WeightedSample[] {
-  const nights = [...ctx.recentSleeps]
-    .filter((s) => s.type === "night" && s.end_time)
-    .toSorted((a, b) => new Date(a.end_time!).getTime() - new Date(b.end_time!).getTime());
+  const cache = getCache(ctx);
+  // cache.nights are already filtered for end_time; sort by endMs for recency
+  const sorted = cache.nights.toSorted((a, b) => a.endMs - b.endMs);
 
-  return nights.map((s, idx) => ({
-    value: getLocalMinuteOfDay(new Date(s.end_time!), ctx.tz),
-    weight: Math.pow(0.85, nights.length - 1 - idx),
+  return sorted.map((s, idx) => ({
+    value: getLocalMinuteOfDay(new Date(s.endMs), ctx.tz),
+    weight: Math.pow(0.85, sorted.length - 1 - idx),
   }));
 }
 
@@ -871,13 +906,19 @@ function weightedMedian(samples: WeightedSample[]): number {
   return sorted[sorted.length - 1]?.value ?? 0;
 }
 
+const minuteOfDayFormatters = new Map<string, Intl.DateTimeFormat>();
 function getLocalMinuteOfDay(date: Date, tz: string): number {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: tz,
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
+  let fmt = minuteOfDayFormatters.get(tz);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat("en-GB", {
+      timeZone: tz,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    minuteOfDayFormatters.set(tz, fmt);
+  }
+  const parts = fmt.formatToParts(date);
 
   const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
   const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
@@ -904,67 +945,46 @@ function collectHabitualNapData(
   const empty = { startSamples: new Map(), wwSamples: new Map() };
   if (ctx.recentSleeps.length < 4) return empty;
 
-  // Group ALL sleeps by day (needed for wake window gaps between any sleep types)
-  const allByDay = new Map<string, SleepEntry[]>();
-  const napsByDay = new Map<string, SleepEntry[]>();
-  for (const s of ctx.recentSleeps) {
-    if (!s.end_time) continue;
-    const day = localDate(s.start_time, ctx.tz);
-    if (!allByDay.has(day)) allByDay.set(day, []);
-    allByDay.get(day)!.push(s);
-    if (s.type === "nap") {
-      if (!napsByDay.has(day)) napsByDay.set(day, []);
-      napsByDay.get(day)!.push(s);
-    }
-  }
+  const cache = getCache(ctx);
 
   // Filter to days matching target nap count during transitions
-  const allNapCounts = [...napsByDay.values()].map((ds) => ds.length);
-  const uniqueCounts = new Set(allNapCounts);
+  const uniqueCounts = new Set(cache.napCountByDay.values());
   const useFiltered = uniqueCounts.size > 1;
-
-  const sortedDayKeys = [...new Set([...allByDay.keys(), ...napsByDay.keys()])]
-    .toSorted();
 
   const startSamples = new Map<number, WeightedSample[]>();
   const wwSamples = new Map<number, WeightedSample[]>();
 
-  for (let dayIdx = 0; dayIdx < sortedDayKeys.length; dayIdx++) {
-    const dayKey = sortedDayKeys[dayIdx];
-    const dayNaps = napsByDay.get(dayKey);
-    if (!dayNaps) continue;
+  for (let dayIdx = 0; dayIdx < cache.sortedDayKeys.length; dayIdx++) {
+    const dayKey = cache.sortedDayKeys[dayIdx];
+    const napCount = cache.napCountByDay.get(dayKey) ?? 0;
+    if (napCount === 0) continue;
 
     // Skip days with wrong nap count during transitions
-    if (useFiltered && dayNaps.length !== targetNapCount) continue;
+    if (useFiltered && napCount !== targetNapCount) continue;
 
-    const recencyWeight = Math.pow(0.85, sortedDayKeys.length - 1 - dayIdx);
+    const recencyWeight = Math.pow(0.85, cache.sortedDayKeys.length - 1 - dayIdx);
+    const daySleeps = cache.byDay.get(dayKey)!; // already sorted by startMs
 
     // Nap start times by position
-    const sortedNaps = dayNaps.toSorted(
-      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
-    );
-    for (let pos = 0; pos < sortedNaps.length; pos++) {
-      const minuteOfDay = getLocalMinuteOfDay(new Date(sortedNaps[pos].start_time), ctx.tz);
+    let pos = 0;
+    for (const s of daySleeps) {
+      if (s.type !== "nap") continue;
+      const minuteOfDay = getLocalMinuteOfDay(new Date(s.startMs), ctx.tz);
       if (!startSamples.has(pos)) startSamples.set(pos, []);
       startSamples.get(pos)!.push({ value: minuteOfDay, weight: recencyWeight });
+      pos++;
     }
 
     // Wake windows by position (gaps between consecutive sleeps before naps)
-    const allSleeps = allByDay.get(dayKey);
-    if (allSleeps) {
-      const sorted = [...allSleeps].toSorted(
-        (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
-      );
-      let napPos = 0;
-      for (let i = 1; i < sorted.length; i++) {
-        if (sorted[i].type !== "nap") continue;
-        const gapMin = (new Date(sorted[i].start_time).getTime() - new Date(sorted[i - 1].end_time!).getTime()) / 60000;
-        if (gapMin >= 10 && gapMin <= 480) {
-          if (!wwSamples.has(napPos)) wwSamples.set(napPos, []);
-          wwSamples.get(napPos)!.push({ value: gapMin, weight: recencyWeight });
-        }
-        napPos++;
+    let napPos = 0;
+    for (let i = 1; i < daySleeps.length; i++) {
+      if (daySleeps[i].type !== "nap") continue;
+      const gapMin = (daySleeps[i].startMs - daySleeps[i - 1].endMs) / 60000;
+      if (gapMin >= 10 && gapMin <= 480) {
+        if (!wwSamples.has(napPos)) wwSamples.set(napPos, []);
+        wwSamples.get(napPos)!.push({ value: gapMin, weight: recencyWeight });
       }
+      napPos++;
     }
   }
 

@@ -70,9 +70,13 @@ export function assembleState(data: DayData) {
       const expectedNapCount = resolveNapCount(ctx);
 
       // Build predicted naps from day schedule (accounts for custom nap count)
+      // Compute once — reused for predictions and confidence intervals below
+      const allPredictedFromWakeUp = todayWakeUp
+        ? predictDayNaps(todayWakeUp.wake_time, ctx)
+        : [];
       let predictedNaps: PredictedNap[] | null = null;
       if (todayWakeUp) {
-        const allPredicted = predictDayNaps(todayWakeUp.wake_time, ctx);
+        const allPredicted = allPredictedFromWakeUp;
         let remaining = allPredicted.slice(consumedNaps);
 
         // If remaining predictions are stale (actual last wake is past the predicted
@@ -125,9 +129,7 @@ export function assembleState(data: DayData) {
       }
 
       // Compute confidence intervals and calibration
-      const allPredictedForConf = todayWakeUp
-        ? predictDayNaps(todayWakeUp.wake_time, ctx)
-        : [];
+      const allPredictedForConf = allPredictedFromWakeUp;
       const confidence = allPredictedForConf.length > 0
         ? computeConfidence(allPredictedForConf, bedtime, ctx.ageMonths, ctx.recentSleeps, ctx.tz)
         : null;

@@ -2,21 +2,44 @@
  *  All timestamps in the DB are ISO UTC strings. The baby's stored IANA timezone
  *  is used to determine what "today" means locally. */
 
+// Cached Intl.DateTimeFormat instances (constructor is expensive, ~50-100μs each)
+const dateFmts = new Map<string, Intl.DateTimeFormat>();
+const hourFmts = new Map<string, Intl.DateTimeFormat>();
+const minuteFmts = new Map<string, Intl.DateTimeFormat>();
+
+function getDateFmt(tz: string): Intl.DateTimeFormat {
+	let f = dateFmts.get(tz);
+	if (!f) { f = new Intl.DateTimeFormat("en-CA", { timeZone: tz }); dateFmts.set(tz, f); }
+	return f;
+}
+
+function getHourFmt(tz: string): Intl.DateTimeFormat {
+	let f = hourFmts.get(tz);
+	if (!f) { f = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hour12: false }); hourFmts.set(tz, f); }
+	return f;
+}
+
+function getMinuteFmt(tz: string): Intl.DateTimeFormat {
+	let f = minuteFmts.get(tz);
+	if (!f) { f = new Intl.DateTimeFormat("en-US", { timeZone: tz, minute: "numeric" }); minuteFmts.set(tz, f); }
+	return f;
+}
+
 /** Convert a UTC ISO string to a YYYY-MM-DD date in the given IANA timezone. */
 export function isoToDateInTz(iso: string, tz: string): string {
-	return new Date(iso).toLocaleDateString("en-CA", { timeZone: tz });
+	return getDateFmt(tz).format(new Date(iso));
 }
 
 /** Get the fractional hour (e.g. 18.5 = 18:30) of a Date in a given IANA timezone. */
 export function getHourInTz(date: Date, tz: string): number {
-	const h = parseInt(date.toLocaleString("en-US", { timeZone: tz, hour: "numeric", hour12: false }));
-	const m = parseInt(date.toLocaleString("en-US", { timeZone: tz, minute: "numeric" }));
+	const h = parseInt(getHourFmt(tz).format(date));
+	const m = parseInt(getMinuteFmt(tz).format(date));
 	return h + m / 60;
 }
 
 /** Set a Date to a specific local hour in the given IANA timezone, preserving the date. */
 export function setHourInTz(date: Date, hour: number, minute: number, tz: string): Date {
-	const dateStr = date.toLocaleDateString("en-CA", { timeZone: tz });
+	const dateStr = getDateFmt(tz).format(date);
 	// Treat the target time as UTC, then subtract the TZ offset to get the real UTC instant.
 	// Same pattern as todayInTz for midnight.
 	const asUtc = new Date(`${dateStr}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00Z`);
