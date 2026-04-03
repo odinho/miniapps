@@ -41,7 +41,7 @@ export interface EndSleepResult {
 }
 
 /** Build the events needed to end an active sleep. */
-export function buildEndSleep(activeSleep: SleepLogRow, babyId: number): EndSleepResult {
+export function buildEndSleep(activeSleep: SleepLogRow, _babyId: number): EndSleepResult {
 	const endTime = new Date().toISOString();
 	const events: Array<{ type: string; payload: Record<string, unknown> }> = [
 		{

@@ -136,7 +136,6 @@ test("After rebuild, GET /api/state returns correct current state", async () => 
   const mm = String(today.getMonth() + 1).padStart(2, "0");
   const dd = String(today.getDate()).padStart(2, "0");
   const todayDate = `${yyyy}-${mm}-${dd}`;
-  const todayWake = `${todayDate}T07:00:00Z`;
   const todayDiaper = `${todayDate}T11:00:00Z`;
   const did = generateDiaperId();
 
