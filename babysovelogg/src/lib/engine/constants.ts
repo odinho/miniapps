@@ -7,7 +7,9 @@ export interface WakeWindowRange {
 }
 
 export const WAKE_WINDOWS: WakeWindowRange[] = [
-  { minMonths: 0, maxMonths: 3, minMinutes: 60, maxMinutes: 90 },
+  { minMonths: 0, maxMonths: 1, minMinutes: 30, maxMinutes: 60 },
+  { minMonths: 1, maxMonths: 2, minMinutes: 45, maxMinutes: 75 },
+  { minMonths: 2, maxMonths: 3, minMinutes: 60, maxMinutes: 90 },
   { minMonths: 3, maxMonths: 4, minMinutes: 75, maxMinutes: 120 },
   { minMonths: 4, maxMonths: 6, minMinutes: 105, maxMinutes: 150 },
   { minMonths: 6, maxMonths: 8, minMinutes: 120, maxMinutes: 180 },
@@ -26,7 +28,8 @@ export interface NapCountRange {
 }
 
 export const NAP_COUNTS: NapCountRange[] = [
-  { minMonths: 0, maxMonths: 3, naps: 4, range: [3, 5] },
+  { minMonths: 0, maxMonths: 2, naps: 6, range: [4, 8] },
+  { minMonths: 2, maxMonths: 3, naps: 4, range: [3, 5] },
   { minMonths: 3, maxMonths: 6, naps: 3, range: [3, 4] },
   { minMonths: 6, maxMonths: 9, naps: 2, range: [2, 3] },
   { minMonths: 9, maxMonths: 12, naps: 2, range: [1, 2] },
@@ -43,7 +46,8 @@ export interface SleepNeed {
 }
 
 export const SLEEP_NEEDS: SleepNeed[] = [
-  { minMonths: 0, maxMonths: 3, totalHours: 16, range: [14, 17] },
+  { minMonths: 0, maxMonths: 1, totalHours: 16.5, range: [14, 18] },
+  { minMonths: 1, maxMonths: 3, totalHours: 15.5, range: [13, 17] },
   { minMonths: 3, maxMonths: 6, totalHours: 15, range: [13, 16] },
   { minMonths: 6, maxMonths: 9, totalHours: 14, range: [12, 15] },
   { minMonths: 9, maxMonths: 12, totalHours: 14, range: [12, 15] },
