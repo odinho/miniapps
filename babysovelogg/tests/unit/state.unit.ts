@@ -2,6 +2,8 @@ import { describe, expect, it } from "bun:test";
 import { assembleState, type DayData } from "$lib/engine/state.js";
 import type { Baby, SleepLogRow, DayStartRow } from "$lib/types.js";
 
+function fmtTime(iso: string): string { return iso.slice(11, 16); }
+
 const baseBaby: Baby = {
   id: 1,
   name: "Testa",
@@ -385,12 +387,9 @@ describe("assembleState", () => {
   });
 
   // ── Coherent day plan: bedtime derived from predicted naps ──
-  // These tests use sparse recent data (< 3 nights) so habitual bedtime weight
-  // is 0 and bedtime is purely pressure-based. This lets us verify the coherent
-  // day plan without habitual blending masking the change.
 
-  /** Sparse recent sleeps: enough for strategy to pick routine_schedule, but
-   *  too few nights for habitual bedtime weight (needs ≥ 3). */
+  /** Sparse recent sleeps: enough for strategy selection, but < 3 nights
+   *  so habitual bedtime weight is 0 and bedtime is purely pressure-based. */
   function sparseRecentSleeps(): SleepLogRow[] {
     const sleeps: SleepLogRow[] = [];
     for (let d = 11; d <= 25; d++) {
@@ -400,7 +399,6 @@ describe("assembleState", () => {
         sleepRow({ id: d * 10 + 2, start_time: `${ds}T14:00:00Z`, end_time: `${ds}T15:30:00Z`, type: "nap", domain_id: `r${d}b` }),
       );
     }
-    // Only 2 nights — below the habitual bedtime threshold of 3
     sleeps.push(
       sleepRow({ id: 901, start_time: "2026-03-24T19:30:00Z", end_time: "2026-03-24T23:59:00Z", type: "night", domain_id: "rn1" }),
       sleepRow({ id: 902, start_time: "2026-03-25T19:30:00Z", end_time: "2026-03-25T23:59:00Z", type: "night", domain_id: "rn2" }),
@@ -408,110 +406,83 @@ describe("assembleState", () => {
     return sleeps;
   }
 
-  it("bedtime derived from predicted naps when no naps completed yet", () => {
-    // 9mo baby, wake at 07:00 UTC, no completed sleeps.
-    // Without coherent day plan: recommendBedtime([]) → 19:00 UTC default.
-    // With coherent day plan: bedtime = last predicted nap end + bedtime wake window.
-    const wakeUp: DayStartRow = {
-      id: 1, baby_id: 1, date: "2026-03-28",
-      wake_time: "2026-03-28T07:00:00.000Z",
-      created_at: "2026-03-28T07:00:00.000Z",
-      created_by_event_id: null,
-    };
-    const result = assembleState(
-      dayData({
-        baby: { ...baseBaby, timezone: "UTC" },
-        recentSleeps: sparseRecentSleeps(),
-        todaySleeps: [],
-        todayWakeUp: wakeUp,
-        now: new Date("2026-03-28T08:00:00.000Z").getTime(),
-      }),
+  const utcBaby = { ...baseBaby, timezone: "UTC" };
+  const sparse = sparseRecentSleeps();
+  const wake28 = {
+    id: 1, baby_id: 1, date: "2026-03-28",
+    wake_time: "2026-03-28T07:00:00.000Z",
+    created_at: "2026-03-28T07:00:00.000Z",
+    created_by_event_id: null,
+  } satisfies DayStartRow;
+
+  /** Render prediction day plan as a compact readable string. */
+  function renderDayPlan(result: ReturnType<typeof assembleState>): string {
+    const p = result.prediction;
+    if (!p) return "no prediction";
+    const lines: string[] = [];
+    lines.push(`strategy: ${p.strategy}`);
+    if (p.predictedNaps) {
+      for (let i = 0; i < p.predictedNaps.length; i++) {
+        const n = p.predictedNaps[i];
+        lines.push(`lur ${i + 1}: ${fmtTime(n.startTime)}–${fmtTime(n.endTime)}`);
+      }
+    }
+    if (p.expectedNapEnd) lines.push(`nap ends: ~${fmtTime(p.expectedNapEnd)}`);
+    lines.push(`bedtime: ${p.bedtime ? fmtTime(p.bedtime) : "(none)"}`);
+    lines.push(`naps done: ${p.napsAllDone} (${p.expectedNapCount} expected)`);
+    return lines.join("\n");
+  }
+
+  it("coherent day plan: morning, during nap, after nap", () => {
+    const morning = assembleState(
+      dayData({ baby: utcBaby, recentSleeps: sparse, todaySleeps: [],
+        todayWakeUp: wake28, now: new Date("2026-03-28T08:00:00Z").getTime() }),
     );
 
-    const bedtime = result.prediction!.bedtime!;
-    const predictedNaps = result.prediction!.predictedNaps!;
+    expect(renderDayPlan(morning)).toMatchInlineSnapshot(`
+"strategy: emerging_rhythm
+lur 1: 10:00–11:30
+lur 2: 14:30–16:00
+bedtime: 20:00
+naps done: false (2 expected)"
+`);
 
-    // Full day plan should be visible
-    expect(predictedNaps.length).toBeGreaterThan(0);
-
-    // Bedtime must NOT be the empty-data default of exactly 19:00 UTC
-    expect(bedtime).not.toBe("2026-03-28T19:00:00.000Z");
-
-    // Bedtime should be AFTER the last predicted nap ends (pressure-based)
-    const lastNapEnd = new Date(predictedNaps[predictedNaps.length - 1].endTime).getTime();
-    const bedtimeMs = new Date(bedtime).getTime();
-    expect(bedtimeMs).toBeGreaterThan(lastNapEnd);
-  });
-
-  it("bedtime shifts when actual nap ends later than predicted", () => {
-    // Compare bedtime before any naps vs after a nap that ended significantly
-    // later than predicted. With pressure-based bedtime (no habitual), the
-    // later nap end should push bedtime later.
-    const wakeUp: DayStartRow = {
-      id: 1, baby_id: 1, date: "2026-03-28",
-      wake_time: "2026-03-28T07:00:00.000Z",
-      created_at: "2026-03-28T07:00:00.000Z",
-      created_by_event_id: null,
-    };
-    const sparse = sparseRecentSleeps();
-
-    const beforeNap = assembleState(
-      dayData({
-        baby: { ...baseBaby, timezone: "UTC" },
-        recentSleeps: sparse,
-        todaySleeps: [],
-        todayWakeUp: wakeUp,
-        now: new Date("2026-03-28T08:00:00.000Z").getTime(),
-      }),
+    const duringNap = assembleState(
+      dayData({ baby: utcBaby, recentSleeps: sparse, todaySleeps: [],
+        activeSleep: sleepRow({ end_time: null, start_time: "2026-03-28T09:30:00Z", type: "nap" }),
+        todayWakeUp: wake28, now: new Date("2026-03-28T10:30:00Z").getTime() }),
     );
 
-    // Nap that ran much longer than typical (ending 13:00 instead of ~11:00)
-    const lateNap = sleepRow({
-      id: 10, start_time: "2026-03-28T09:30:00.000Z",
-      end_time: "2026-03-28T13:00:00.000Z",
-      type: "nap", domain_id: "slp_late",
-    });
+    expect(renderDayPlan(duringNap)).toMatchInlineSnapshot(`
+"strategy: emerging_rhythm
+lur 1: 14:30–16:00
+nap ends: ~10:29
+bedtime: 20:00
+naps done: false (2 expected)"
+`);
+
+    // Nap ran so long it overshot the predicted nap2 start (14:30), forcing
+    // stale recalculation → nap2 shifts forward → bedtime shifts later.
     const afterLateNap = assembleState(
-      dayData({
-        baby: { ...baseBaby, timezone: "UTC" },
-        recentSleeps: sparse,
-        todaySleeps: [lateNap],
-        todayWakeUp: wakeUp,
-        now: new Date("2026-03-28T13:30:00.000Z").getTime(),
-      }),
+      dayData({ baby: utcBaby, recentSleeps: sparse,
+        todaySleeps: [sleepRow({ id: 10, start_time: "2026-03-28T09:30:00Z",
+          end_time: "2026-03-28T15:00:00Z", type: "nap", domain_id: "slp_late" })],
+        todayWakeUp: wake28, now: new Date("2026-03-28T15:30:00Z").getTime() }),
     );
 
-    // Both should have real bedtimes, not the 19:00 default
-    expect(beforeNap.prediction!.bedtime).not.toBe("2026-03-28T19:00:00.000Z");
-    expect(afterLateNap.prediction!.bedtime).not.toBe("2026-03-28T19:00:00.000Z");
-    // The late nap should push bedtime later
+    expect(renderDayPlan(afterLateNap)).toMatchInlineSnapshot(`
+"strategy: emerging_rhythm
+lur 1: 18:00–19:30
+bedtime: 23:00
+naps done: false (2 expected)"
+`);
+
+    // Pin: bedtime always after last predicted nap, never the 19:00 default
+    for (const r of [morning, duringNap, afterLateNap]) {
+      expect(r.prediction!.bedtime).not.toBe("2026-03-28T19:00:00.000Z");
+    }
+    // Pin: late nap pushes bedtime later than the predicted schedule
     expect(new Date(afterLateNap.prediction!.bedtime!).getTime())
-      .toBeGreaterThan(new Date(beforeNap.prediction!.bedtime!).getTime());
-  });
-
-  it("bedtime updates during active nap using predicted nap end", () => {
-    const wakeUp: DayStartRow = {
-      id: 1, baby_id: 1, date: "2026-03-28",
-      wake_time: "2026-03-28T07:00:00.000Z",
-      created_at: "2026-03-28T07:00:00.000Z",
-      created_by_event_id: null,
-    };
-    const result = assembleState(
-      dayData({
-        baby: { ...baseBaby, timezone: "UTC" },
-        recentSleeps: sparseRecentSleeps(),
-        todaySleeps: [],
-        activeSleep: sleepRow({
-          end_time: null,
-          start_time: "2026-03-28T09:30:00.000Z",
-          type: "nap",
-        }),
-        todayWakeUp: wakeUp,
-        now: new Date("2026-03-28T10:30:00.000Z").getTime(),
-      }),
-    );
-
-    // Should not be the 19:00 UTC default
-    expect(result.prediction!.bedtime).not.toBe("2026-03-28T19:00:00.000Z");
+      .toBeGreaterThan(new Date(morning.prediction!.bedtime!).getTime());
   });
 });

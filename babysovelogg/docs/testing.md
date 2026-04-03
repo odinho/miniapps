@@ -3,8 +3,8 @@
 ## Commands
 
 ```bash
-bun run test:unit              # Vitest unit tests
-bunx vitest run tests/integration/  # Vitest integration tests
+bun run test:unit              # bun:test unit tests
+bun run test:integration       # bun:test integration tests
 bun run test:e2e               # Playwright E2E tests (requires build)
 bun run typecheck              # svelte-check
 bun run lint                   # oxlint

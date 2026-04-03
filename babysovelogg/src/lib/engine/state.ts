@@ -231,15 +231,18 @@ function assembleEmergingPrediction(
     now,
   });
 
-  // --- Align predictedNaps with schedule strategy (remaining only) ---
   const completedNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time);
   const consumedNaps = completedNaps.length + (activeSleep?.type === "nap" ? 1 : 0);
   const expectedNapCount = resolveNapCount(ctx);
 
-  // ── Align predictedNaps with schedule strategy (remaining only) ──
+  // ── Compute remaining predicted naps from the MORNING wake (like schedule) ──
+  // predictEmerging shifts its wake point as naps complete, so result.predictedNaps
+  // already excludes completed naps — slicing by consumedNaps would double-count.
+  // Instead, recompute from the fixed morning wake and apply the same remaining logic.
   let remaining: PredictedNap[] = [];
-  if (result.predictedNaps) {
-    remaining = result.predictedNaps.slice(consumedNaps);
+  if (todayWakeUp) {
+    const allPredicted = predictDayNaps(todayWakeUp.wake_time, ctx);
+    remaining = allPredicted.slice(consumedNaps);
 
     // Recalculate from actual wake time if schedule drifted
     if (remaining.length > 0 && wakeTimeForPrediction) {
