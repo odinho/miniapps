@@ -6,18 +6,75 @@
  * - newborn_guidance:  0–~8 weeks, no schedule structure
  * - emerging_rhythm:   ~6 weeks – ~5 months, transitional
  * - routine_schedule:  5+ months, the existing schedule engine
+ *
+ * Hysteresis rules:
+ * - Transitions require 3+ consecutive qualifying days (except age-gated newborn)
+ * - Default direction: newborn → emerging → schedule
+ * - Regression (schedule → emerging) only on 5+ days of sustained disruption
+ * - Manual override bypasses all rules
  */
 import type { StrategySignals } from "./features.js";
 
 export type Strategy = "newborn_guidance" | "emerging_rhythm" | "routine_schedule";
 
+/** Manual strategy override from settings. null = auto. */
+export type StrategyOverride = Strategy | null;
+
+const STRATEGY_ORDER: Record<Strategy, number> = {
+  newborn_guidance: 0,
+  emerging_rhythm: 1,
+  routine_schedule: 2,
+};
+
+export interface StrategyContext {
+  /** The strategy that was active previously (null on first run) */
+  previous: Strategy | null;
+  /** How many consecutive days the raw selector has suggested a different strategy */
+  consecutiveDaysAtCandidate: number;
+  /** Manual override from settings (null = auto) */
+  override: StrategyOverride;
+}
+
 /**
  * Select a prediction strategy from computed signals.
  *
- * Initial rules are deliberately simple and age-heavy.
- * Data-quality overrides can promote or demote.
+ * @param signals - Computed strategy signals
+ * @param ctx - Optional hysteresis context. Without it, behaves statelessly.
  */
-export function selectStrategy(signals: StrategySignals): Strategy {
+export function selectStrategy(
+  signals: StrategySignals,
+  ctx?: StrategyContext,
+): Strategy {
+  // Manual override always wins
+  if (ctx?.override) return ctx.override;
+
+  const raw = selectRaw(signals);
+
+  // Without hysteresis context, return raw selection
+  if (!ctx?.previous) return raw;
+
+  // Age-gated newborn: no hysteresis needed — if age says newborn, it's newborn
+  if (raw === "newborn_guidance") return raw;
+
+  const prevOrder = STRATEGY_ORDER[ctx.previous];
+  const rawOrder = STRATEGY_ORDER[raw];
+
+  // Forward progression (newborn → emerging → schedule): require 3+ days
+  if (rawOrder > prevOrder) {
+    return ctx.consecutiveDaysAtCandidate >= 3 ? raw : ctx.previous;
+  }
+
+  // Regression (schedule → emerging, or emerging → newborn): require 5+ days
+  if (rawOrder < prevOrder) {
+    return ctx.consecutiveDaysAtCandidate >= 5 ? raw : ctx.previous;
+  }
+
+  // Same strategy — no change
+  return raw;
+}
+
+/** Raw (stateless) strategy selection from signals. */
+function selectRaw(signals: StrategySignals): Strategy {
   // Rule 1: Very young babies → newborn guidance
   if (signals.ageWeeks < 6) {
     return "newborn_guidance";

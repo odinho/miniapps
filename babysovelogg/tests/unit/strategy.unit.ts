@@ -2,7 +2,8 @@ import { describe, it, expect } from "bun:test";
 import { selectStrategy, type Strategy } from "$lib/engine/strategy.js";
 import { computeStrategySignals, type StrategySignals } from "$lib/engine/features.js";
 import { predictNewborn } from "$lib/engine/newborn.js";
-import type { SleepEntry } from "$lib/types.js";
+import { predictEmerging } from "$lib/engine/emerging.js";
+import type { SleepEntry, BabyContext } from "$lib/types.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -264,5 +265,166 @@ describe("strategy integration", () => {
       new Date("2026-04-01T12:00:00Z").getTime());
 
     expect(selectStrategy(s3mo)).toBe("emerging_rhythm");
+  });
+});
+
+// ─── Emerging engine ──────────────────────────────────────────────────────────
+
+/** Generate emerging-phase sleep: 3-4 naps with some structure. */
+function emergingDay(dateStr: string): SleepEntry[] {
+  return [
+    sleep(`${dateStr}T06:00:00Z`, `${dateStr}T06:30:00Z`, "night"),
+    sleep(`${dateStr}T08:30:00Z`, `${dateStr}T10:00:00Z`, "nap"),
+    sleep(`${dateStr}T12:00:00Z`, `${dateStr}T13:00:00Z`, "nap"),
+    sleep(`${dateStr}T15:00:00Z`, `${dateStr}T16:00:00Z`, "nap"),
+    sleep(`${dateStr}T19:00:00Z`, `${dateStr}T23:59:00Z`, "night"),
+  ];
+}
+
+function emergingCtx(recentSleeps: SleepEntry[]): BabyContext {
+  return {
+    birthdate: "2026-01-01",
+    ageMonths: 3,
+    tz: "UTC",
+    customNapCount: null,
+    recentSleeps,
+  };
+}
+
+describe("predictEmerging", () => {
+  const recentSleeps = [
+    ...emergingDay("2026-03-22"),
+    ...emergingDay("2026-03-23"),
+    ...emergingDay("2026-03-24"),
+    ...emergingDay("2026-03-25"),
+  ];
+
+  it("returns schedule-derived nap predictions with wake time", () => {
+    const result = predictEmerging({
+      ctx: emergingCtx(recentSleeps),
+      todaySleeps: [],
+      wakeUpTime: "2026-03-26T07:00:00Z",
+      lastSleepEndMs: new Date("2026-03-25T23:59:00Z").getTime(),
+      now: new Date("2026-03-26T08:00:00Z").getTime(),
+    });
+
+    expect(result.strategy).toBe("emerging_rhythm");
+    expect(result.predictedNaps).not.toBeNull();
+    expect(result.predictedNaps!.length).toBeGreaterThan(0);
+    expect(result.bedtime).not.toBeNull();
+  });
+
+  it("assigns per-nap confidence from start time consistency", () => {
+    const result = predictEmerging({
+      ctx: emergingCtx(recentSleeps),
+      todaySleeps: [],
+      wakeUpTime: "2026-03-26T07:00:00Z",
+      lastSleepEndMs: new Date("2026-03-25T23:59:00Z").getTime(),
+      now: new Date("2026-03-26T08:00:00Z").getTime(),
+    });
+
+    // With 4 identical days, first nap should be highly consistent
+    expect(result.napConfidence.length).toBeGreaterThan(0);
+    expect(result.napConfidence[0]).toBe("high");
+  });
+
+  it("provides sleep window fallback", () => {
+    const result = predictEmerging({
+      ctx: emergingCtx(recentSleeps),
+      todaySleeps: [],
+      wakeUpTime: "2026-03-26T07:00:00Z",
+      lastSleepEndMs: new Date("2026-03-25T23:59:00Z").getTime(),
+      now: new Date("2026-03-26T08:00:00Z").getTime(),
+    });
+
+    expect(result.sleepWindow).not.toBeNull();
+    expect(result.sleepPressure).not.toBeNull();
+  });
+
+  it("provides rolling stats and age norms", () => {
+    const result = predictEmerging({
+      ctx: emergingCtx(recentSleeps),
+      todaySleeps: [],
+      wakeUpTime: null,
+      lastSleepEndMs: null,
+      now: new Date("2026-03-26T08:00:00Z").getTime(),
+    });
+
+    expect(result.rolling.totalSleep24h).toBeGreaterThan(0);
+    expect(result.ageNorms.totalSleepHours.typical).toBe(15); // 3mo falls in 3-6mo bracket
+  });
+
+  it("handles no wake time gracefully", () => {
+    const result = predictEmerging({
+      ctx: emergingCtx(recentSleeps),
+      todaySleeps: [],
+      wakeUpTime: null,
+      lastSleepEndMs: null,
+      now: new Date("2026-03-26T08:00:00Z").getTime(),
+    });
+
+    expect(result.strategy).toBe("emerging_rhythm");
+    expect(result.predictedNaps).toBeNull();
+    expect(result.nextNap).toBeNull();
+  });
+});
+
+// ─── Hysteresis ───────────────────────────────────────────────────────────────
+
+describe("selectStrategy hysteresis", () => {
+  const emergingSignals = signals({ ageWeeks: 12, ageMonths: 3 }); // raw = emerging
+  const scheduleSignals = signals({ ageWeeks: 26, ageMonths: 6, completeDays: 10, nightDayRatio: 0.6 }); // raw = routine
+
+  it("forward transition requires 3 consecutive days", () => {
+    // Day 1-2: raw says schedule, but hysteresis holds on emerging
+    expect(selectStrategy(scheduleSignals, {
+      previous: "emerging_rhythm", consecutiveDaysAtCandidate: 1, override: null,
+    })).toBe("emerging_rhythm");
+
+    expect(selectStrategy(scheduleSignals, {
+      previous: "emerging_rhythm", consecutiveDaysAtCandidate: 2, override: null,
+    })).toBe("emerging_rhythm");
+
+    // Day 3: transition happens
+    expect(selectStrategy(scheduleSignals, {
+      previous: "emerging_rhythm", consecutiveDaysAtCandidate: 3, override: null,
+    })).toBe("routine_schedule");
+  });
+
+  it("regression requires 5 consecutive days", () => {
+    // Days 1-4: raw says emerging, but hysteresis holds on routine
+    for (let d = 1; d <= 4; d++) {
+      expect(selectStrategy(emergingSignals, {
+        previous: "routine_schedule", consecutiveDaysAtCandidate: d, override: null,
+      })).toBe("routine_schedule");
+    }
+
+    // Day 5: regression happens
+    expect(selectStrategy(emergingSignals, {
+      previous: "routine_schedule", consecutiveDaysAtCandidate: 5, override: null,
+    })).toBe("emerging_rhythm");
+  });
+
+  it("newborn age gate bypasses hysteresis", () => {
+    const newbornSignals = signals({ ageWeeks: 3, ageMonths: 0 });
+    // Even with previous = emerging and 0 consecutive days
+    expect(selectStrategy(newbornSignals, {
+      previous: "emerging_rhythm", consecutiveDaysAtCandidate: 0, override: null,
+    })).toBe("newborn_guidance");
+  });
+
+  it("manual override bypasses all rules", () => {
+    expect(selectStrategy(emergingSignals, {
+      previous: "emerging_rhythm", consecutiveDaysAtCandidate: 0, override: "routine_schedule",
+    })).toBe("routine_schedule");
+
+    expect(selectStrategy(scheduleSignals, {
+      previous: "routine_schedule", consecutiveDaysAtCandidate: 0, override: "newborn_guidance",
+    })).toBe("newborn_guidance");
+  });
+
+  it("no context = stateless selection", () => {
+    expect(selectStrategy(scheduleSignals)).toBe("routine_schedule");
+    expect(selectStrategy(emergingSignals)).toBe("emerging_rhythm");
   });
 });
