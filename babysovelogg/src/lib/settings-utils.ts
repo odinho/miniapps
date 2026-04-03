@@ -162,14 +162,13 @@ export function buildPredictionRows(opts: {
 	completedNaps: number;
 	wakeTime: string | null;
 	recentSleeps: SleepEntry[];
-	serverPrediction: { predictedNaps: PredictedNap[] | null; bedtime: string } | null;
+	serverPrediction: { predictedNaps: PredictedNap[] | null; expectedNapCount?: number; bedtime: string } | null;
 	totalSleepMinutes: number;
 }): PredictionRow[] {
-	// Derive expected nap count from server prediction when available (reflects learned data),
+	// Use the engine's resolved nap count when available (reflects learned data + custom override),
 	// otherwise fall back to age-based default.
-	const expected = opts.serverPrediction?.predictedNaps
-		? opts.completedNaps + opts.serverPrediction.predictedNaps.length
-		: getExpectedNapCount(opts.ageMonths, opts.napCount ?? undefined);
+	const expected = opts.serverPrediction?.expectedNapCount
+		?? getExpectedNapCount(opts.ageMonths, opts.napCount ?? undefined);
 	const rows: PredictionRow[] = [
 		{ label: 'Forventa lurar i dag', value: `${opts.completedNaps} av ${expected}` },
 	];

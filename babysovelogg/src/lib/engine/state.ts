@@ -184,6 +184,7 @@ function assembleNewbornPrediction(
     nextNap: null,
     bedtime: null,
     predictedNaps: null,
+    expectedNapCount: 0,
     napsAllDone: false,
     expectedNapEnd: null,
     expectedNightEnd: null,
@@ -230,6 +231,64 @@ function assembleEmergingPrediction(
     now,
   });
 
+  // --- Align predictedNaps with schedule strategy (remaining only) ---
+  const completedNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time);
+  const consumedNaps = completedNaps.length + (activeSleep?.type === "nap" ? 1 : 0);
+  const expectedNapCount = resolveNapCount(ctx);
+
+  let predictedNaps = result.predictedNaps;
+  let nextNap = result.nextNap;
+  const bedtime = result.bedtime;
+  const bedtimeMs = bedtime ? new Date(bedtime).getTime() : Infinity;
+
+  if (predictedNaps) {
+    // Slice to remaining naps only (predictEmerging returns ALL predicted naps)
+    let remaining = predictedNaps.slice(consumedNaps);
+
+    // Recalculate from actual wake time if schedule drifted
+    if (remaining.length > 0 && wakeTimeForPrediction) {
+      const actualWakeMs = new Date(wakeTimeForPrediction).getTime();
+      const predictedStartMs = new Date(remaining[0].startTime).getTime();
+      if (actualWakeMs > predictedStartMs) {
+        remaining = predictDayNaps(
+          wakeTimeForPrediction,
+          { ...ctx, customNapCount: remaining.length },
+        );
+      }
+    }
+
+    // B8: Filter out predicted naps starting within 60 min of bedtime
+    remaining = remaining.filter(
+      (n) => new Date(n.startTime).getTime() < bedtimeMs - 60 * 60000,
+    );
+
+    predictedNaps = remaining.length > 0 ? remaining : null;
+  }
+
+  // Derive nextNap from remaining predictions
+  if (predictedNaps && predictedNaps.length > 0) {
+    nextNap = predictedNaps[0].startTime;
+  }
+
+  // Detect skipped naps and determine if all naps are done
+  const nextNapMs = nextNap ? new Date(nextNap).getTime() : 0;
+  const overdueMs = nextNapMs ? now - nextNapMs : 0;
+  const napSkipped = !activeSleep && overdueMs > 90 * 60000 && overdueMs < 18 * 60 * 60000;
+  const napsAllDone = consumedNaps >= expectedNapCount || napSkipped;
+
+  if (nextNapMs > bedtimeMs - 60 * 60000 || napsAllDone) {
+    nextNap = bedtime;
+  }
+
+  if (napsAllDone) {
+    predictedNaps = null;
+  }
+
+  // During active night sleep, don't show stale daytime nap predictions
+  if (activeSleep && activeSleep.type === "night") {
+    predictedNaps = null;
+  }
+
   // Compute expected nap/night end for active sleep (reuse schedule functions)
   let expectedNapEnd: string | null = null;
   if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
@@ -245,10 +304,11 @@ function assembleEmergingPrediction(
 
   return {
     strategy: "emerging_rhythm",
-    nextNap: result.nextNap,
-    bedtime: result.bedtime,
-    predictedNaps: result.predictedNaps,
-    napsAllDone: false,
+    nextNap,
+    bedtime,
+    predictedNaps,
+    expectedNapCount,
+    napsAllDone: napsAllDone || activeSleep?.type === "night",
     expectedNapEnd,
     expectedNightEnd,
     confidence: null,
@@ -374,6 +434,7 @@ function assembleSchedulePrediction(
     nextNap,
     bedtime,
     predictedNaps,
+    expectedNapCount,
     napsAllDone: napsAllDone || activeSleep?.type === "night",
     expectedNapEnd,
     expectedNightEnd,

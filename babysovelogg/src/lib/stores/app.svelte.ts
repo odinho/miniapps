@@ -13,6 +13,8 @@ export interface Prediction {
 	nextNap: string | null;
 	bedtime: string | null;
 	predictedNaps: PredictedNap[] | null;
+	/** Total expected naps for today (from learned data / custom override / age default) */
+	expectedNapCount: number;
 	napsAllDone: boolean;
 	/** Expected end time for the current active nap (null when not napping) */
 	expectedNapEnd: string | null;

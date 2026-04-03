@@ -33,6 +33,7 @@ function makePrediction(overrides: Partial<Prediction> = {}): Prediction {
     nextNap: "2026-03-27T14:00:00.000Z",
     bedtime: "2026-03-27T19:00:00.000Z",
     predictedNaps: null,
+    expectedNapCount: 2,
     napsAllDone: false,
     expectedNapEnd: null,
     expectedNightEnd: null,

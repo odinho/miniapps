@@ -162,10 +162,10 @@
 				filter = 'url(#arc-glow)';
 				cssClass = 'arc-active-pulse';
 			} else {
-				stroke = 'var(--moon)';
+				stroke = bubble.type === 'night' ? 'var(--moon)' : 'var(--peach-dark)';
 				strokeWidth = trackWidth + 2;
 				dashArray = '6 4';
-				opacity = 0.35;
+				opacity = 0.5;
 			}
 
 			let label: RenderedBubble['label'] = null;

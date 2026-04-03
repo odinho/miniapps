@@ -36,7 +36,7 @@
 						end_time: sl.end_time,
 						type: sl.type as 'nap' | 'night',
 					})),
-					serverPrediction: s.prediction?.bedtime ? { predictedNaps: s.prediction.predictedNaps, bedtime: s.prediction.bedtime } : null,
+					serverPrediction: s.prediction?.bedtime ? { predictedNaps: s.prediction.predictedNaps, expectedNapCount: s.prediction.expectedNapCount, bedtime: s.prediction.bedtime } : null,
 					totalSleepMinutes:
 						(s.stats?.totalNapMinutes ?? 0) + (s.stats?.totalNightMinutes ?? 0),
 				})
