@@ -13,6 +13,8 @@
  * Since the Kaggle data has no birthdates, we estimate: first data point ≈ birth.
  */
 
+import { isoToDateInTz, getHourInTz } from "$lib/tz.js";
+
 interface DayRecord {
   date: string;
   wakeTime: string;
@@ -90,31 +92,31 @@ function classifySleep(entry: SleepEntry, hour: number): "nap" | "night" {
   return "nap";
 }
 
-function entriesToDays(entries: SleepEntry[]): DayRecord[] {
+function entriesToDays(entries: SleepEntry[], tz: string): DayRecord[] {
   const sorted = [...entries].sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
 
-  // Classify all entries
+  // Classify all entries using local-timezone hours
   const classified = sorted.map((e) => ({
     ...e,
-    type: classifySleep(e, e.startTime.getUTCHours()),
+    type: classifySleep(e, Math.floor(getHourInTz(e.startTime, tz))),
   }));
 
-  // Group naps by start date
+  // Group naps by local date
   const napsByDate = new Map<string, typeof classified>();
   for (const e of classified) {
     if (e.type !== "nap") continue;
-    const date = e.startTime.toISOString().slice(0, 10);
+    const date = isoToDateInTz(e.startTime.toISOString(), tz);
     if (!napsByDate.has(date)) napsByDate.set(date, []);
     napsByDate.get(date)!.push(e);
   }
 
-  // Index night sleeps by start date (= bedtime day) and end date (= wake-up day)
+  // Index night sleeps by local start date (= bedtime day) and local end date (= wake-up day)
   const nightByStartDate = new Map<string, typeof classified[0]>();
   const nightByEndDate = new Map<string, typeof classified[0]>();
   for (const e of classified) {
     if (e.type !== "night") continue;
-    nightByStartDate.set(e.startTime.toISOString().slice(0, 10), e);
-    nightByEndDate.set(e.endTime.toISOString().slice(0, 10), e);
+    nightByStartDate.set(isoToDateInTz(e.startTime.toISOString(), tz), e);
+    nightByEndDate.set(isoToDateInTz(e.endTime.toISOString(), tz), e);
   }
 
   // Build day records: wake-up from last night ending today,
@@ -174,7 +176,7 @@ for (const e of allEntries) {
 await Bun.write(`${outputDir}/.gitkeep`, "");
 
 for (const [babyId, entries] of byBaby) {
-  const days = entriesToDays(entries);
+  const days = entriesToDays(entries, sourceTz);
   if (days.length < 7) {
     console.error(`${babyId}: only ${days.length} days, skipping`);
     continue;
