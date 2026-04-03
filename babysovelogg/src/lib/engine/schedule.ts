@@ -955,13 +955,30 @@ function collectHabitualNapData(
       const sorted = [...allSleeps].toSorted(
         (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
       );
+
+      // Previous day's last sleep end — needed for gap before the first nap,
+      // since overnight sleeps are keyed to the day they started.
+      let prevSleepEnd: string | undefined;
+      if (dayIdx > 0) {
+        const prevSleeps = allByDay.get(sortedDayKeys[dayIdx - 1]);
+        if (prevSleeps) {
+          const last = [...prevSleeps]
+            .filter((s) => s.end_time)
+            .toSorted((a, b) => new Date(b.end_time!).getTime() - new Date(a.end_time!).getTime())[0];
+          if (last) prevSleepEnd = last.end_time!;
+        }
+      }
+
       let napPos = 0;
-      for (let i = 1; i < sorted.length; i++) {
+      for (let i = 0; i < sorted.length; i++) {
         if (sorted[i].type !== "nap") continue;
-        const gapMin = (new Date(sorted[i].start_time).getTime() - new Date(sorted[i - 1].end_time!).getTime()) / 60000;
-        if (gapMin >= 10 && gapMin <= 480) {
-          if (!wwSamples.has(napPos)) wwSamples.set(napPos, []);
-          wwSamples.get(napPos)!.push({ value: gapMin, weight: recencyWeight });
+        const prevEnd = i > 0 ? sorted[i - 1].end_time! : prevSleepEnd;
+        if (prevEnd) {
+          const gapMin = (new Date(sorted[i].start_time).getTime() - new Date(prevEnd).getTime()) / 60000;
+          if (gapMin >= 10 && gapMin <= 480) {
+            if (!wwSamples.has(napPos)) wwSamples.set(napPos, []);
+            wwSamples.get(napPos)!.push({ value: gapMin, weight: recencyWeight });
+          }
         }
         napPos++;
       }

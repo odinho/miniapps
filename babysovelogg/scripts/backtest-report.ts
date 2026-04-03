@@ -29,6 +29,7 @@ import {
 } from "$lib/engine/backtest.js";
 import type { DayRecord, BacktestResult, DayResult } from "$lib/engine/backtest.js";
 import type { PredictionFeatures } from "$lib/types.js";
+import { isoToDateInTz } from "$lib/tz.js";
 import { DEFAULT_FEATURES } from "$lib/types.js";
 
 // ── Argument parsing ────────────────────────────────────────────────────────
@@ -125,7 +126,7 @@ function parseArgs(argv: string[]): Options | null {
 
 // ── DB → DayRecords ─────────────────────────────────────────────────────────
 
-async function loadFromDb(dbPath: string): Promise<DayRecord[]> {
+async function loadFromDb(dbPath: string, tz: string): Promise<DayRecord[]> {
   const Database = (await import("bun:sqlite")).default;
   const db = new Database(dbPath, { readonly: true });
 
@@ -144,7 +145,7 @@ async function loadFromDb(dbPath: string): Promise<DayRecord[]> {
   const wakeByDate = new Map(dayStarts.map((d) => [d.date, d.wake_time]));
   const byDate = new Map<string, typeof sleeps>();
   for (const s of sleeps) {
-    const date = s.start_time.slice(0, 10);
+    const date = isoToDateInTz(s.start_time, tz);
     const list = byDate.get(date) ?? [];
     list.push(s);
     byDate.set(date, list);
@@ -284,7 +285,7 @@ if (!options) process.exit(0);
 
 let days: DayRecord[];
 if (options.dbPath) {
-  days = await loadFromDb(options.dbPath);
+  days = await loadFromDb(options.dbPath, options.tz);
   console.error(`Loaded ${days.length} days from ${options.dbPath}`);
 } else {
   const file = Bun.file(options.fixturePath!);

@@ -13,6 +13,7 @@
  */
 
 import { parseNapperCsv } from "$lib/server/import-napper.js";
+import { isoToDateInTz } from "$lib/tz.js";
 import Database from "bun:sqlite";
 
 interface DayRecord {
@@ -27,7 +28,7 @@ function toUtc(ts: string): string {
   return new Date(ts).toISOString();
 }
 
-function napperToDays(csv: string): DayRecord[] {
+function napperToDays(csv: string, tz: string): DayRecord[] {
   const rows = parseNapperCsv(csv);
   const sorted = [...rows].toSorted(
     (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
@@ -49,7 +50,7 @@ function napperToDays(csv: string): DayRecord[] {
           pendingBedtime = null;
         }
         current = {
-          date: toUtc(row.start).slice(0, 10),
+          date: isoToDateInTz(toUtc(row.start), tz),
           wakeTime: toUtc(row.start),
           sleeps: [],
         };
@@ -59,7 +60,7 @@ function napperToDays(csv: string): DayRecord[] {
       case "NAP": {
         if (!current) {
           current = {
-            date: toUtc(row.start).slice(0, 10),
+            date: isoToDateInTz(toUtc(row.start), tz),
             wakeTime: toUtc(row.start),
             sleeps: [],
           };
@@ -84,7 +85,7 @@ function napperToDays(csv: string): DayRecord[] {
 
 // ── DB → DayRecords ─────────────────────────────────────────────────────────
 
-function dbToDays(dbPath: string): DayRecord[] {
+function dbToDays(dbPath: string, tz: string): DayRecord[] {
   const db = new Database(dbPath, { readonly: true });
 
   const sleeps = db.prepare(`
@@ -102,7 +103,7 @@ function dbToDays(dbPath: string): DayRecord[] {
   const wakeByDate = new Map(dayStarts.map((d) => [d.date, d.wake_time]));
   const byDate = new Map<string, typeof sleeps>();
   for (const s of sleeps) {
-    const date = s.start_time.slice(0, 10);
+    const date = isoToDateInTz(s.start_time, tz);
     const list = byDate.get(date) ?? [];
     list.push(s);
     byDate.set(date, list);
@@ -195,8 +196,14 @@ if (!napperCsvPath || !dbPath || !outputPath) {
   process.exit(1);
 }
 
-const napperDays = napperToDays(await Bun.file(napperCsvPath).text());
-const dbDays = dbToDays(dbPath);
+// Read the baby's timezone from the DB for correct day-boundary bucketing
+const tzDb = new Database(dbPath, { readonly: true });
+const babyRow = tzDb.prepare("SELECT timezone FROM baby ORDER BY id DESC LIMIT 1").get() as { timezone: string | null } | undefined;
+tzDb.close();
+const tz = babyRow?.timezone || "Europe/Oslo";
+
+const napperDays = napperToDays(await Bun.file(napperCsvPath).text(), tz);
+const dbDays = dbToDays(dbPath, tz);
 
 console.error(`Napper: ${napperDays.length} days (${napperDays[0]?.date} to ${napperDays.at(-1)?.date})`);
 console.error(`DB: ${dbDays.length} days (${dbDays[0]?.date} to ${dbDays.at(-1)?.date})`);

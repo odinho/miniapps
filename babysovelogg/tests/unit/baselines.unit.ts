@@ -58,7 +58,7 @@ describe("baseline comparison", () => {
   it("all strategies summary", () => {
     const lines = [engine, ageDefault, yesterday, movingAvg, weighted].map(summaryLine);
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "engine: 86 days, count 81% (70/86), nap MAE 44.3, dur MAE 23.1, bed MAE 22.6, wake MAE 25.6, nap bias -3.1, count bias +0.07
+      "engine: 86 days, count 81% (70/86), nap MAE 44.5, dur MAE 23.1, bed MAE 22.6, wake MAE 25.6, nap bias -3, count bias +0.07
       age-default: 86 days, count 63% (54/86), nap MAE 63.7, dur MAE 29.4, bed MAE 59.7, wake MAE 25.6, nap bias -34.3, count bias +0.26
       yesterday: 86 days, count 76% (65/86), nap MAE 56.7, dur MAE 32.4, bed MAE 26.6, wake MAE 25.6, nap bias +5.8, count bias +0.01
       3d-avg: 86 days, count 80% (69/86), nap MAE 48.2, dur MAE 25.2, bed MAE 41.8, wake MAE 25.6, nap bias +0.3, count bias +0.06
@@ -70,9 +70,9 @@ describe("baseline comparison", () => {
     const lines = [engine, ageDefault, yesterday, movingAvg, weighted].map(perMonth);
     expect(lines.join("\n\n")).toMatchInlineSnapshot(`
       "engine 6mo: 5 days, count 60% (3/5), nap MAE 54.7, dur MAE 23.5, bed MAE 28.7, wake MAE 11.3, nap bias +9.2, count bias -0.4
-      engine 7mo: 31 days, count 74% (23/31), nap MAE 49.8, dur MAE 27, bed MAE 24.3, wake MAE 28.9, nap bias -6.9, count bias +0.13
-      engine 8mo: 28 days, count 89% (25/28), nap MAE 26.1, dur MAE 18.8, bed MAE 18.1, wake MAE 21.8, nap bias +2.5, count bias +0.11
-      engine 9mo: 22 days, count 86% (19/22), nap MAE 64, dur MAE 23.4, bed MAE 24.1, wake MAE 28.8, nap bias -12.5, count bias +0.05
+      engine 7mo: 31 days, count 74% (23/31), nap MAE 50.1, dur MAE 27, bed MAE 24.3, wake MAE 28.9, nap bias -7.2, count bias +0.13
+      engine 8mo: 28 days, count 89% (25/28), nap MAE 26.4, dur MAE 18.8, bed MAE 18.1, wake MAE 21.8, nap bias +3.3, count bias +0.11
+      engine 9mo: 22 days, count 86% (19/22), nap MAE 64.1, dur MAE 23.4, bed MAE 24.1, wake MAE 28.8, nap bias -12.5, count bias +0.05
 
       age-default 6mo: 5 days, count 20% (1/5), nap MAE 40, dur MAE 20.8, bed MAE 44.9, wake MAE 11.3, nap bias +25.6, count bias -0.8
       age-default 7mo: 31 days, count 84% (26/31), nap MAE 68.6, dur MAE 30.6, bed MAE 64.9, wake MAE 28.9, nap bias -50.7, count bias +0.1
