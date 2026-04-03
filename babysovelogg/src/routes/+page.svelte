@@ -310,7 +310,6 @@
 	</div>
 {:else}
 	<div class="dashboard" data-testid="dashboard">
-		{/if}
 
 		<DstBanner timezone={baby.timezone} bedtime={prediction?.bedtime} />
 
