@@ -90,6 +90,7 @@ describe("getWakeWindow", () => {
       sleep(t(7, 0), t(8, 0)),
       sleep(t(10, 0), t(11, 0)),
       sleep(t(13, 0), t(14, 0)),
+      sleep(t(19, 0), t(7, 0), "night"), // night entry makes the day complete
     ];
     // Wake windows: 10:00-8:00=120min, 13:00-11:00=120min -> avg 120
     const ww = getWakeWindow(ctx(6, recentSleeps));

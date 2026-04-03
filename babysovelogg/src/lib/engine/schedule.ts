@@ -488,7 +488,8 @@ function getPositionalNapDurations(ctx: BabyContext): number[] {
   const cache = getCache(ctx);
   const dursByPosition = new Map<number, number[]>();
 
-  for (const daySleeps of cache.byDay.values()) {
+  for (const [dayKey, daySleeps] of cache.byDay) {
+    if (!cache.daysWithNight.has(dayKey)) continue;
     let napIdx = 0;
     for (const s of daySleeps) {
       if (s.type !== "nap") continue;
@@ -633,16 +634,20 @@ export function getLearnedNapDuration(ctx: BabyContext): number {
 
   const cache = getCache(ctx);
 
+  // Only learn from naps on complete days (have a night entry).
+  // Naps from incomplete days may include misclassified overnight fragments.
+  const completeNaps = cache.naps.filter((s) => cache.daysWithNight.has(s.localDate));
+
   if (feat(ctx, "weightedRecency")) {
-    const samples = collectWeightedDurationsFromCache(cache.naps, 10, 180);
+    const samples = collectWeightedDurationsFromCache(completeNaps, 10, 180);
     if (samples.length < 3) return defaultDuration;
     const learned = weightedTrimmedMean(samples);
     return Math.round(blendEstimate(defaultDuration, learned, samples.length, 3, 8));
   }
 
   // Simple average fallback
-  if (cache.naps.length < 3) return defaultDuration;
-  const durations = cache.naps
+  if (completeNaps.length < 3) return defaultDuration;
+  const durations = completeNaps
     .map((s) => (s.endMs - s.startMs) / 60000)
     .filter((d) => d >= 10 && d <= 180);
   if (durations.length < 3) return defaultDuration;
@@ -705,14 +710,17 @@ export function predictNightEndTime(startTime: string, ctx: BabyContext, todayNa
   return new Date(clamp(Math.round(blendedMs), minWakeMs, maxWakeMs)).toISOString();
 }
 
-/** Compute average wake window before NAPS from cached sorted sleeps. */
+/** Compute average wake window before NAPS from cached sorted sleeps.
+ *  Only includes gaps where both sleeps are from complete days (have a night). */
 function computeAvgNapWakeWindow(cache: SleepCache): number | null {
   if (cache.sorted.length < 2) return null;
 
   const gaps: number[] = [];
   for (let i = 1; i < cache.sorted.length; i++) {
-    // Only count gaps before naps (not before night sleep)
     if (cache.sorted[i].type !== "nap") continue;
+    // Skip if either sleep's day is incomplete — the gap could span a missing night
+    if (!cache.daysWithNight.has(cache.sorted[i].localDate)) continue;
+    if (!cache.daysWithNight.has(cache.sorted[i - 1].localDate)) continue;
     const gapMin = (cache.sorted[i].startMs - cache.sorted[i - 1].endMs) / 60000;
     if (gapMin >= 10 && gapMin <= 480) {
       gaps.push(gapMin);

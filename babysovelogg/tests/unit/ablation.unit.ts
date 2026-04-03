@@ -80,7 +80,7 @@ describe("feature ablation", () => {
     const lines = ablations.map((a) => renderAblation(allOn, a.label, a.result));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "positional nap duration:
-        nap MAE +0.1 (helps)
+        nap MAE 0 (neutral)
         dur MAE +0.6 (helps)
         bed MAE 0 (neutral)
         wake MAE 0 (neutral)
@@ -88,7 +88,7 @@ describe("feature ablation", () => {
         nap MAE 0 (neutral)
         dur MAE 0 (neutral)
         bed MAE 0 (neutral)
-        wake MAE +3.3 (helps)
+        wake MAE +3.4 (helps)
       habitual bedtime anchor:
         nap MAE 0 (neutral)
         dur MAE 0 (neutral)

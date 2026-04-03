@@ -75,7 +75,7 @@ describe("baseline comparison", () => {
     expect(lines.join("\n\n")).toMatchInlineSnapshot(`
       "engine 6mo: 5 days, count 60% (3/5), nap MAE 54.7, dur MAE 23.5, bed MAE 28.7, wake MAE 11.3, nap bias +9.2, count bias -0.4
       engine 7mo: 31 days, count 77% (24/31), nap MAE 48.9, dur MAE 26.8, bed MAE 24.3, wake MAE 29.1, nap bias -8.8, count bias +0.16
-      engine 8mo: 28 days, count 89% (25/28), nap MAE 27, dur MAE 18.8, bed MAE 18.1, wake MAE 21.8, nap bias +4.2, count bias +0.11
+      engine 8mo: 28 days, count 89% (25/28), nap MAE 26.9, dur MAE 18.9, bed MAE 18.1, wake MAE 21.8, nap bias +4.1, count bias +0.11
       engine 9mo: 22 days, count 86% (19/22), nap MAE 64.1, dur MAE 23.4, bed MAE 24.1, wake MAE 28.8, nap bias -12.5, count bias +0.05
 
       age-default 6mo: 5 days, count 20% (1/5), nap MAE 40, dur MAE 20.8, bed MAE 44.9, wake MAE 28, nap bias +25.6, count bias -0.8
