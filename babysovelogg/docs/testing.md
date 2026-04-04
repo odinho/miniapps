@@ -191,6 +191,12 @@ const renderSleep = (s: { start_time: string; end_time: string | null; type: str
 
 ## Layers
 
+Naming:
+- `.unit.ts` — unit tests (bun:test)
+- `.test.ts` — integration tests (bun:test)
+- `.e2e.ts` — E2E tests (Playwright)
+- Never use `.spec.ts`
+
 ### Integration tests
 
 Default to these when they can express the behavior clearly.
