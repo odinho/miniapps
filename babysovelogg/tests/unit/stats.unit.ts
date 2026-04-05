@@ -293,6 +293,19 @@ describe("buildSleepHeatmap", () => {
     expect(rows[0].hours[9]).toBe(60); // capped
   });
 
+  it("distributes cross-midnight sleep across correct hour slots", () => {
+    const sleeps: SleepEntry[] = [
+      sleep("2026-03-25T22:30:00.000Z", "2026-03-26T02:15:00.000Z", "night"),
+    ];
+    const rows = buildSleepHeatmap(sleeps);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].hours[22]).toBe(30);   // 22:30–23:00
+    expect(rows[0].hours[23]).toBe(60);   // 23:00–00:00
+    expect(rows[0].hours[0]).toBe(60);    // 00:00–01:00
+    expect(rows[0].hours[1]).toBe(60);    // 01:00–02:00
+    expect(rows[0].hours[2]).toBe(15);    // 02:00–02:15
+  });
+
   it("groups multiple days", () => {
     const sleeps: SleepEntry[] = [
       sleep("2026-03-25T09:00:00.000Z", "2026-03-25T10:00:00.000Z"),

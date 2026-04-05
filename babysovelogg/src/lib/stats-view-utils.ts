@@ -449,9 +449,12 @@ export function buildBedtimeChart(
 	// Y-axis: bedtime hours. Inverted — earlier bedtime at top, later at bottom.
 	// Typical range: 17:00–23:00
 	const hours = bedtimes.map((b) => b.hour);
-	const minH = Math.floor(Math.min(...hours));
-	const maxH = Math.ceil(Math.max(...hours));
-	const range = maxH - minH || 1;
+	const rawMin = Math.floor(Math.min(...hours));
+	const rawMax = Math.ceil(Math.max(...hours));
+	// Pad range when all bedtimes cluster near same hour
+	const minH = rawMax - rawMin < 1 ? rawMin - 1 : rawMin;
+	const maxH = rawMax - rawMin < 1 ? rawMax + 1 : rawMax;
+	const range = maxH - minH;
 	const plotH = tsPlotH();
 
 	// Inverted Y: higher hour value = lower on chart (later bedtime = lower)
@@ -644,12 +647,12 @@ export function buildGanttChart(
 		byGanttDate.get(ganttDate)!.push(s);
 	}
 
-	// Build continuous calendar date range for last N days (no gaps)
-	const allDates = [...byGanttDate.keys()].toSorted();
-	const lastDate = allDates.at(-1);
-	if (!lastDate) return { rows: [], hourLabels: [], height: 0 };
+	// Build continuous calendar date range for last N days, anchored to today
+	const nowDate = tz
+		? new Date().toLocaleDateString("en-CA", { timeZone: tz })
+		: new Date().toISOString().slice(0, 10);
 	const calendarDates: string[] = [];
-	const end = new Date(lastDate + "T12:00:00");
+	const end = new Date(nowDate + "T12:00:00");
 	for (let i = days - 1; i >= 0; i--) {
 		const d = new Date(end);
 		d.setDate(d.getDate() - i);
@@ -757,8 +760,9 @@ export function buildHeatmapChart(heatmapRows: HeatmapRow[], days: number): Heat
 			label: new Date(row.date + "T12:00:00").toLocaleDateString("nb-NO", { weekday: "short", day: "numeric" }),
 		});
 
-		for (let h = 0; h < 24; h++) {
-			const x = HEATMAP.PAD_L + h * (cellW + gap);
+		for (let offset = 0; offset < 24; offset++) {
+			const h = (18 + offset) % 24; // 18:00-start to match Gantt
+			const x = HEATMAP.PAD_L + offset * (cellW + gap);
 			const minutes = row.hours[h];
 			const opacity = Math.min(1, minutes / 60);
 			cells.push({ x, y, w: cellW, h: cellH, minutes, opacity });
@@ -766,10 +770,11 @@ export function buildHeatmapChart(heatmapRows: HeatmapRow[], days: number): Heat
 	}
 
 	const hourLabels: { x: number; label: string }[] = [];
-	for (let h = 0; h < 24; h += 3) {
+	for (let offset = 0; offset < 24; offset += 3) {
+		const displayH = (18 + offset) % 24;
 		hourLabels.push({
-			x: HEATMAP.PAD_L + h * (cellW + gap) + cellW / 2,
-			label: `${String(h).padStart(2, "0")}`,
+			x: HEATMAP.PAD_L + offset * (cellW + gap) + cellW / 2,
+			label: `${String(displayH).padStart(2, "0")}`,
 		});
 	}
 
