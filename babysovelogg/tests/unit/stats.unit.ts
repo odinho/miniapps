@@ -6,6 +6,7 @@ import {
   getWakeWindowGaps,
   getLongestNightStretches,
   buildSleepHeatmap,
+  getBedtimes,
 } from "$lib/engine/stats.js";
 import type { SleepEntry } from "$lib/types.js";
 
@@ -301,5 +302,45 @@ describe("buildSleepHeatmap", () => {
     expect(rows).toHaveLength(2);
     expect(rows[0].date).toBe("2026-03-25");
     expect(rows[1].date).toBe("2026-03-26");
+  });
+});
+
+// --- getBedtimes ---
+
+describe("getBedtimes", () => {
+  it("returns empty for no night sleeps", () => {
+    expect(getBedtimes([])).toEqual([]);
+    expect(getBedtimes([sleep(t(9, 0), t(10, 0), "nap")])).toEqual([]);
+  });
+
+  it("extracts bedtime as fractional hour", () => {
+    const sleeps: SleepEntry[] = [
+      sleep("2026-03-25T19:30:00.000Z", "2026-03-26T06:00:00.000Z", "night"),
+    ];
+    const bedtimes = getBedtimes(sleeps);
+    expect(bedtimes).toHaveLength(1);
+    expect(bedtimes[0].date).toBe("2026-03-25");
+    expect(bedtimes[0].hour).toBe(19.5);
+  });
+
+  it("keeps earliest night sleep per date", () => {
+    const sleeps: SleepEntry[] = [
+      sleep("2026-03-25T20:00:00.000Z", "2026-03-25T22:00:00.000Z", "night"),
+      sleep("2026-03-25T19:00:00.000Z", "2026-03-25T20:00:00.000Z", "night"), // earlier
+    ];
+    const bedtimes = getBedtimes(sleeps);
+    expect(bedtimes).toHaveLength(1);
+    expect(bedtimes[0].hour).toBe(19);
+  });
+
+  it("sorts by date", () => {
+    const sleeps: SleepEntry[] = [
+      sleep("2026-03-26T20:00:00.000Z", "2026-03-27T06:00:00.000Z", "night"),
+      sleep("2026-03-25T19:00:00.000Z", "2026-03-26T06:00:00.000Z", "night"),
+    ];
+    const bedtimes = getBedtimes(sleeps);
+    expect(bedtimes).toHaveLength(2);
+    expect(bedtimes[0].date).toBe("2026-03-25");
+    expect(bedtimes[1].date).toBe("2026-03-26");
   });
 });

@@ -174,6 +174,39 @@ export function getLongestNightStretches(sleeps: SleepEntry[], tz?: string): Nig
     .map(([date, minutes]) => ({ date, minutes: Math.round(minutes) }));
 }
 
+/** Per-night bedtime (start of night sleep) as fractional hour. */
+export interface BedtimePoint {
+  date: string;
+  /** Bedtime as fractional hour (e.g. 19.5 = 19:30) */
+  hour: number;
+}
+
+/** Extract bedtime per night — the start time of the earliest night sleep entry per date. */
+export function getBedtimes(sleeps: SleepEntry[], tz?: string): BedtimePoint[] {
+  const nights = sleeps.filter((s) => s.type === "night" && s.end_time);
+  const byDate = new Map<string, number>();
+
+  for (const s of nights) {
+    const date = tz ? isoToDateInTz(s.start_time, tz) : s.start_time.slice(0, 10);
+    const startDate = new Date(s.start_time);
+    const hour = tz
+      ? getHourInTz(startDate, tz)
+      : startDate.getHours() + startDate.getMinutes() / 60;
+
+    const existing = byDate.get(date);
+    // Keep the earliest night sleep start as "bedtime"
+    // But for bedtimes, earlier in the evening means a higher hour (e.g. 19:00 > 18:00)
+    // We want the first night sleep of the evening, which is the one with the earliest start
+    if (existing === undefined || hour < existing) {
+      byDate.set(date, hour);
+    }
+  }
+
+  return [...byDate.entries()]
+    .toSorted(([a], [b]) => a.localeCompare(b))
+    .map(([date, hour]) => ({ date, hour: Math.round(hour * 100) / 100 }));
+}
+
 /** Heatmap row: sleep minutes per hour-of-day for a single date. */
 export interface HeatmapRow {
   date: string;

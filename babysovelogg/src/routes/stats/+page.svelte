@@ -151,6 +151,9 @@
 						{/each}
 						<path d={stats.stackedArea.nightPath} fill="var(--moon)" opacity="0.7" />
 						<path d={stats.stackedArea.napPath} fill="var(--peach-dark)" opacity="0.7" />
+						{#if stats.stackedArea.rollingAvgPath}
+							<path d={stats.stackedArea.rollingAvgPath} fill="none" stroke="var(--text)" stroke-width="1.5" stroke-dasharray="4,2" opacity="0.6" />
+						{/if}
 						{#each stats.stackedArea.xLabels as lbl}
 							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="9" font-family="var(--font)">{lbl.label}</text>
 						{/each}
@@ -211,6 +214,10 @@
 						{/each}
 						<!-- Area fill -->
 						<path d={stats.nightStretchChart.areaPath} fill="var(--moon-glow)" opacity="0.3" />
+						<!-- Rolling average -->
+						{#if stats.nightStretchChart.rollingAvgPath}
+							<path d={stats.nightStretchChart.rollingAvgPath} fill="none" stroke="var(--text)" stroke-width="1.5" stroke-dasharray="4,2" opacity="0.5" />
+						{/if}
 						<!-- Line -->
 						<path d={stats.nightStretchChart.linePath} fill="none" stroke="var(--moon)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
 						<!-- Dots -->
@@ -218,6 +225,62 @@
 							<circle cx={dot.x} cy={dot.y} r="3" fill="var(--moon)" stroke="var(--white)" stroke-width="1" />
 						{/each}
 						{#each stats.nightStretchChart.xLabels as lbl}
+							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="9" font-family="var(--font)">{lbl.label}</text>
+						{/each}
+					</svg>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Chart: Bedtime Consistency -->
+		{#if stats.bedtimeChart.linePath}
+			<div class="stats-section">
+				<h3 class="stats-section-title">Leggetid</h3>
+				<div class="stats-chart-wrap">
+					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
+						{#each stats.bedtimeChart.gridLines as y}
+							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="0.5" />
+						{/each}
+						{#each stats.bedtimeChart.yTicks as tick}
+							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
+						{/each}
+						<!-- Average line -->
+						<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={stats.bedtimeChart.avgY} y2={stats.bedtimeChart.avgY} stroke="var(--lavender-dark)" stroke-width="1" stroke-dasharray="4,3" />
+						<text x={TS_CHART.W - TS_CHART.PAD_R} y={stats.bedtimeChart.avgY - 4} text-anchor="end" fill="var(--lavender-dark)" font-size="9" font-family="var(--font)">snitt {stats.bedtimeChart.avgLabel}</text>
+						<!-- Line -->
+						<path d={stats.bedtimeChart.linePath} fill="none" stroke="var(--moon)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+						<!-- Dots -->
+						{#each stats.bedtimeChart.dots as dot}
+							<circle cx={dot.x} cy={dot.y} r="3" fill="var(--moon)" stroke="var(--white)" stroke-width="1" />
+						{/each}
+						{#each stats.bedtimeChart.xLabels as lbl}
+							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="9" font-family="var(--font)">{lbl.label}</text>
+						{/each}
+					</svg>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Nap Count Trend -->
+		{#if stats.napCountChart.linePath}
+			<div class="stats-section">
+				<h3 class="stats-section-title">Lurar per dag</h3>
+				<div class="stats-chart-wrap">
+					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
+						{#each stats.napCountChart.gridLines as y}
+							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="0.5" />
+						{/each}
+						{#each stats.napCountChart.yTicks as tick}
+							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
+						{/each}
+						{#if stats.napCountChart.rollingAvgPath}
+							<path d={stats.napCountChart.rollingAvgPath} fill="none" stroke="var(--text)" stroke-width="1.5" stroke-dasharray="4,2" opacity="0.5" />
+						{/if}
+						<path d={stats.napCountChart.linePath} fill="none" stroke="var(--peach-dark)" stroke-width="2" stroke-linecap="round" />
+						{#each stats.napCountChart.dots as dot}
+							<circle cx={dot.x} cy={dot.y} r="3" fill="var(--peach-dark)" stroke="var(--white)" stroke-width="1" />
+						{/each}
+						{#each stats.napCountChart.xLabels as lbl}
 							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="9" font-family="var(--font)">{lbl.label}</text>
 						{/each}
 					</svg>
@@ -297,7 +360,7 @@
 				style="font-size: 0.85rem; color: var(--text-light);"
 				onclick={toggleAdvanced}
 			>
-				{showAdvanced ? 'Gøym avansert statistikk' : 'Vis avansert statistikk'}
+				{showAdvanced ? 'Gøym fleire diagram' : 'Vis fleire diagram'}
 			</button>
 		</div>
 

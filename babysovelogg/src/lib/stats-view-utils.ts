@@ -5,10 +5,12 @@ import {
 	getLongestNightStretches,
 	getWakeWindowGaps,
 	buildSleepHeatmap,
+	getBedtimes,
 	type WeekStats,
 	type NightStretch,
 	type WakeWindowGap,
 	type HeatmapRow,
+	type BedtimePoint,
 } from "$lib/engine/stats.js";
 import { formatDuration } from "$lib/utils.js";
 import { isoToDateInTz } from "$lib/tz.js";
@@ -122,6 +124,28 @@ export const TS_CHART = {
 function tsPlotW(): number { return TS_CHART.W - TS_CHART.PAD_L - TS_CHART.PAD_R; }
 function tsPlotH(): number { return TS_CHART.H - TS_CHART.PAD_T - TS_CHART.PAD_B; }
 
+/** Compute a rolling average over an array of values. Returns same-length array with nulls where window is incomplete. */
+function rollingAvg(values: number[], window: number): (number | null)[] {
+	return values.map((_, i) => {
+		if (i < window - 1) return null;
+		let sum = 0;
+		for (let j = i - window + 1; j <= i; j++) sum += values[j];
+		return sum / window;
+	});
+}
+
+/** Build an SVG path from points, skipping nulls. */
+function rollingAvgPath(xs: number[], ys: (number | null)[]): string {
+	const segments: string[] = [];
+	let inSegment = false;
+	for (let i = 0; i < xs.length; i++) {
+		if (ys[i] == null) { inSegment = false; continue; }
+		segments.push(`${inSegment ? "L" : "M"}${xs[i]},${ys[i]}`);
+		inSegment = true;
+	}
+	return segments.join(" ");
+}
+
 /** Map a day index to X coordinate within the time-series plot area. */
 function tsX(index: number, total: number): number {
 	if (total <= 1) return TS_CHART.PAD_L + tsPlotW() / 2;
@@ -170,9 +194,11 @@ function gallandRange(ageMonths: number): { min: number; max: number; typical: n
 }
 
 export function buildSleepVsNorm(
-	days: { date: string; totalHours: number }[],
+	allDays: { date: string; totalHours: number }[],
 	birthdate: string,
 ): SleepVsNormData {
+	// Filter out days with no data to avoid misleading drops to zero
+	const days = allDays.filter((d) => d.totalHours > 0);
 	if (days.length === 0) {
 		return { actualPath: "", bandPath: "", typicalPath: "", dots: [], yTicks: [], xLabels: [], gridLines: [], maxHours: 0 };
 	}
@@ -250,6 +276,8 @@ export interface StackedAreaData {
 	nightPath: string;
 	/** SVG path for nap sleep (top area, stacked on night) */
 	napPath: string;
+	/** 7-day rolling average path for total sleep */
+	rollingAvgPath: string;
 	/** Y-axis ticks */
 	yTicks: { y: number; label: string }[];
 	/** X-axis labels */
@@ -260,10 +288,12 @@ export interface StackedAreaData {
 }
 
 export function buildStackedArea(
-	days: { date: string; napMin: number; nightMin: number }[],
+	allDays: { date: string; napMin: number; nightMin: number }[],
 ): StackedAreaData {
+	// Filter out days with no data to avoid misleading drops to zero
+	const days = allDays.filter((d) => d.napMin + d.nightMin > 0);
 	if (days.length === 0) {
-		return { nightPath: "", napPath: "", yTicks: [], xLabels: [], gridLines: [], maxHours: 0 };
+		return { nightPath: "", napPath: "", rollingAvgPath: "", yTicks: [], xLabels: [], gridLines: [], maxHours: 0 };
 	}
 
 	const n = days.length;
@@ -281,6 +311,13 @@ export function buildStackedArea(
 	// Nap area: night top → total top → night top (reversed)
 	const totalTopPoints = days.map((d, i) => `${tsX(i, n)},${yMap(d.nightMin + d.napMin)}`);
 	const napPath = `M${nightTopPoints.join(" L")} L${totalTopPoints.toReversed().join(" L")} Z`;
+
+	// 7-day rolling average for total sleep
+	const totals = days.map((d) => d.napMin + d.nightMin);
+	const avgValues = rollingAvg(totals, 7);
+	const xs = days.map((_, i) => tsX(i, n));
+	const avgYs = avgValues.map((v) => v != null ? yMap(v) : null);
+	const avgPath = rollingAvgPath(xs, avgYs);
 
 	// Y-axis ticks
 	const yTicks: { y: number; label: string }[] = [];
@@ -304,7 +341,7 @@ export function buildStackedArea(
 		});
 	}
 
-	return { nightPath, napPath, yTicks, xLabels, gridLines, maxHours };
+	return { nightPath, napPath, rollingAvgPath: avgPath, yTicks, xLabels, gridLines, maxHours };
 }
 
 // ── Chart C: Night Stretch Growth ─────────────────────────────
@@ -314,6 +351,8 @@ export interface NightStretchChartData {
 	linePath: string;
 	/** SVG area path (filled under line) */
 	areaPath: string;
+	/** 7-day rolling average path */
+	rollingAvgPath: string;
 	/** Dot positions */
 	dots: { x: number; y: number; hours: number; date: string }[];
 	/** Y-axis ticks */
@@ -329,7 +368,7 @@ export function buildNightStretchChart(
 	stretches: NightStretch[],
 ): NightStretchChartData {
 	if (stretches.length === 0) {
-		return { linePath: "", areaPath: "", dots: [], yTicks: [], xLabels: [], gridLines: [], maxHours: 0 };
+		return { linePath: "", areaPath: "", rollingAvgPath: "", dots: [], yTicks: [], xLabels: [], gridLines: [], maxHours: 0 };
 	}
 
 	const n = stretches.length;
@@ -343,6 +382,13 @@ export function buildNightStretchChart(
 	const linePoints = stretches.map((s, i) => `${tsX(i, n)},${yMap(s.minutes)}`);
 	const linePath = `M${linePoints.join(" L")}`;
 	const areaPath = `M${tsX(0, n)},${baseY} L${linePoints.join(" L")} L${tsX(n - 1, n)},${baseY} Z`;
+
+	// 7-day rolling average
+	const mins = stretches.map((s) => s.minutes);
+	const avgValues = rollingAvg(mins, 7);
+	const xs = stretches.map((_, i) => tsX(i, n));
+	const avgYs = avgValues.map((v) => v != null ? yMap(v) : null);
+	const avgPath = rollingAvgPath(xs, avgYs);
 
 	const dots = stretches.map((s, i) => ({
 		x: tsX(i, n),
@@ -371,7 +417,159 @@ export function buildNightStretchChart(
 		});
 	}
 
-	return { linePath, areaPath, dots, yTicks, xLabels, gridLines, maxHours };
+	return { linePath, areaPath, rollingAvgPath: avgPath, dots, yTicks, xLabels, gridLines, maxHours };
+}
+
+// ── Bedtime Consistency Chart ─────────────────────────────────
+
+function fmtHour(h: number): string {
+	const hh = Math.floor(h);
+	const mm = Math.round((h - hh) * 60);
+	return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+
+export interface BedtimeChartData {
+	linePath: string;
+	dots: { x: number; y: number; label: string; date: string }[];
+	yTicks: { y: number; label: string }[];
+	xLabels: { x: number; label: string }[];
+	gridLines: number[];
+	avgY: number;
+	avgLabel: string;
+}
+
+export function buildBedtimeChart(
+	bedtimes: BedtimePoint[],
+): BedtimeChartData {
+	if (bedtimes.length === 0) {
+		return { linePath: "", dots: [], yTicks: [], xLabels: [], gridLines: [], avgY: 0, avgLabel: "" };
+	}
+
+	const n = bedtimes.length;
+	// Y-axis: bedtime hours. Inverted — earlier bedtime at top, later at bottom.
+	// Typical range: 17:00–23:00
+	const hours = bedtimes.map((b) => b.hour);
+	const minH = Math.floor(Math.min(...hours));
+	const maxH = Math.ceil(Math.max(...hours));
+	const range = maxH - minH || 1;
+	const plotH = tsPlotH();
+
+	// Inverted Y: higher hour value = lower on chart (later bedtime = lower)
+	const yMap = (h: number) => TS_CHART.PAD_T + ((h - minH) / range) * plotH;
+
+	const linePoints = bedtimes.map((b, i) => `${tsX(i, n)},${yMap(b.hour)}`);
+	const linePath = `M${linePoints.join(" L")}`;
+
+	const dots = bedtimes.map((b, i) => ({
+		x: tsX(i, n),
+		y: yMap(b.hour),
+		label: fmtHour(b.hour),
+		date: b.date,
+	}));
+
+	// Average bedtime line
+	const avgH = hours.reduce((a, b) => a + b, 0) / hours.length;
+	const avgY = yMap(avgH);
+	const avgLabel = fmtHour(avgH);
+
+	// Y-axis ticks: every hour
+	const yTicks: { y: number; label: string }[] = [];
+	const gridLines: number[] = [];
+	for (let h = minH; h <= maxH; h++) {
+		const y = yMap(h);
+		yTicks.push({ y, label: fmtHour(h) });
+		gridLines.push(y);
+	}
+
+	const xLabels: { x: number; label: string }[] = [];
+	const labelIndices = n <= 7
+		? bedtimes.map((_, i) => i)
+		: [0, Math.floor(n / 2), n - 1];
+	for (const i of labelIndices) {
+		xLabels.push({
+			x: tsX(i, n),
+			label: new Date(bedtimes[i].date + "T12:00:00").toLocaleDateString("nb-NO", { day: "numeric", month: "short" }),
+		});
+	}
+
+	return { linePath, dots, yTicks, xLabels, gridLines, avgY, avgLabel };
+}
+
+// ── Nap Count Trend Chart ─────────────────────────────────────
+
+export interface NapCountChartData {
+	linePath: string;
+	rollingAvgPath: string;
+	dots: { x: number; y: number; count: number; date: string }[];
+	yTicks: { y: number; label: string }[];
+	xLabels: { x: number; label: string }[];
+	gridLines: number[];
+	maxCount: number;
+}
+
+export function buildNapCountChart(
+	days: { date: string; napCount: number }[],
+): NapCountChartData {
+	const filtered = days.filter((d) => d.napCount > 0);
+	if (filtered.length === 0) {
+		return { linePath: "", rollingAvgPath: "", dots: [], yTicks: [], xLabels: [], gridLines: [], maxCount: 0 };
+	}
+
+	const n = filtered.length;
+	const maxCount = Math.max(1, ...filtered.map((d) => d.napCount));
+	const plotH = tsPlotH();
+	const baseY = TS_CHART.PAD_T + plotH;
+
+	const yMap = (count: number) => baseY - (count / maxCount) * plotH;
+
+	// Step-style line: horizontal segments between points
+	const segments: string[] = [];
+	for (let i = 0; i < n; i++) {
+		const x = tsX(i, n);
+		const y = yMap(filtered[i].napCount);
+		if (i === 0) {
+			segments.push(`M${x},${y}`);
+		} else {
+			// Horizontal then vertical (step)
+			segments.push(`H${x} V${y}`);
+		}
+	}
+	const linePath = segments.join(" ");
+
+	// Rolling average
+	const counts = filtered.map((d) => d.napCount);
+	const avgValues = rollingAvg(counts, 7);
+	const xs = filtered.map((_, i) => tsX(i, n));
+	const avgYs = avgValues.map((v) => v != null ? yMap(v) : null);
+	const avgPath = rollingAvgPath(xs, avgYs);
+
+	const dots = filtered.map((d, i) => ({
+		x: tsX(i, n),
+		y: yMap(d.napCount),
+		count: d.napCount,
+		date: d.date,
+	}));
+
+	const yTicks: { y: number; label: string }[] = [];
+	const gridLines: number[] = [];
+	for (let c = 1; c <= maxCount; c++) {
+		const y = yMap(c);
+		yTicks.push({ y, label: `${c}` });
+		gridLines.push(y);
+	}
+
+	const xLabels: { x: number; label: string }[] = [];
+	const labelIndices = n <= 7
+		? filtered.map((_, i) => i)
+		: [0, Math.floor(n / 2), n - 1];
+	for (const i of labelIndices) {
+		xLabels.push({
+			x: tsX(i, n),
+			label: new Date(filtered[i].date + "T12:00:00").toLocaleDateString("nb-NO", { day: "numeric", month: "short" }),
+		});
+	}
+
+	return { linePath, rollingAvgPath: avgPath, dots, yTicks, xLabels, gridLines, maxCount };
 }
 
 // ── Chart D: Sleep Timeline (Gantt) ───────────────────────────
@@ -789,6 +987,8 @@ export interface ComputedStats {
 	stackedArea: StackedAreaData;
 	sleepVsNorm: SleepVsNormData | null;
 	nightStretchChart: NightStretchChartData;
+	bedtimeChart: BedtimeChartData;
+	napCountChart: NapCountChartData;
 	// Tier 2 (advanced) charts
 	gantt: GanttChartData;
 	heatmapChart: HeatmapChartData;
@@ -858,6 +1058,14 @@ export function computeAllStats(
 	const nightStretches = getLongestNightStretches(mapped, tz);
 	const nightStretchChart = buildNightStretchChart(nightStretches);
 
+	// Bedtime consistency
+	const bedtimes = getBedtimes(mapped, tz);
+	const bedtimeChart = buildBedtimeChart(bedtimes);
+
+	// Nap count trend
+	const napCountDays = allStats.days.map((d) => ({ date: d.date, napCount: d.stats.napCount }));
+	const napCountChart = buildNapCountChart(napCountDays);
+
 	// Tier 2: advanced charts
 	const wakeGaps = getWakeWindowGaps(week7);
 	const heatmap = buildSleepHeatmap(mapped, tz);
@@ -881,6 +1089,8 @@ export function computeAllStats(
 		stackedArea,
 		sleepVsNorm,
 		nightStretchChart,
+		bedtimeChart,
+		napCountChart,
 		gantt,
 		heatmapChart,
 		wakeScatter,
