@@ -3,6 +3,7 @@ export { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, findByAge } from "./constants.js
 export type { SleepEntry } from "$lib/types.js";
 import type { SleepEntry, BabyContext, PredictionFeatures } from "$lib/types.js";
 import { getHourInTz, setHourInTz, isoToDateInTz } from "$lib/tz.js";
+import type { SleepLogRow } from "$lib/types.js";
 
 /** Check if a feature is enabled (defaults to true if not specified). */
 function feat(ctx: BabyContext, key: keyof PredictionFeatures): boolean {
@@ -1117,4 +1118,203 @@ function computeHabitualNapWeights(
   }
 
   return weights;
+}
+
+// ─── Plan scoring and selection ──────────────────────────────────────────────
+
+export interface PlanCandidate {
+  naps: PredictedNap[];
+  bedtime: string;
+}
+
+export interface PlanScore {
+  feasible: boolean;
+  cost: number;
+  hardViolations: string[];
+}
+
+export interface SelectedPlan extends PlanCandidate {
+  source: "natural" | "target-guided";
+}
+
+const DAILY_SHIFT_CAP_MS = 15 * 60_000;
+
+/** Convert a "HH:MM" target bedtime to an ISO timestamp for today in the baby's timezone. */
+export function targetBedtimeToISO(hhmm: string, now: number, tz: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  return setHourInTz(new Date(now), h, m, tz).toISOString();
+}
+
+/**
+ * Build the sleep list for recommendBedtime: actual completed sleeps + synthetic
+ * entries for active nap (predicted end) and remaining predicted naps.
+ */
+export function buildSleepsForBedtime(
+  todaySleeps: SleepEntry[],
+  activeSleep: SleepLogRow | undefined,
+  remainingPredicted: PredictedNap[],
+  ctx: BabyContext,
+): SleepEntry[] {
+  const sleeps = [...todaySleeps];
+  if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
+    sleeps.push({
+      start_time: activeSleep.start_time,
+      end_time: predictNapEndTime(activeSleep.start_time, ctx),
+      type: "nap",
+    });
+  }
+  for (const pn of remainingPredicted) {
+    sleeps.push({ start_time: pn.startTime, end_time: pn.endTime, type: "nap" });
+  }
+  return sleeps;
+}
+
+// Scoring weights
+const W_TARGET = 1.0;
+const W_WW = 0.5;
+const W_DUR = 0.3;
+const W_CYCLE = 0.1;
+
+/** Score a candidate day plan against hard and soft constraints. */
+export function scorePlan(
+  plan: PlanCandidate,
+  ctx: BabyContext,
+  wakeUpTimeMs: number,
+  now: number,
+  targetBedtimeMs: number | null,
+): PlanScore {
+  const hardViolations: string[] = [];
+  const range = getAdaptedWakeWindowRange(ctx);
+  const positionalWWs = getPositionalWakeWindows(ctx);
+  const positionalDurs = getPositionalNapDurations(ctx);
+  const cycleMin = getSleepCycleMinutes(ctx.ageMonths);
+  const bedtimeMs = new Date(plan.bedtime).getTime();
+
+  // Collect wake windows and nap durations
+  let prevEnd = wakeUpTimeMs;
+  const wws: number[] = [];
+  const durs: number[] = [];
+
+  for (let i = 0; i < plan.naps.length; i++) {
+    const startMs = new Date(plan.naps[i].startTime).getTime();
+    const endMs = new Date(plan.naps[i].endTime).getTime();
+    const ww = (startMs - prevEnd) / 60_000;
+    const dur = (endMs - startMs) / 60_000;
+
+    wws.push(ww);
+    durs.push(dur);
+
+    // Hard: wake window within adapted range
+    if (ww < range.minMinutes - 1 || ww > range.maxMinutes + 1) {
+      hardViolations.push(`nap${i} ww ${Math.round(ww)}min outside [${range.minMinutes},${range.maxMinutes}]`);
+    }
+
+    // Hard: no remaining nap before now
+    if (startMs < now - 60_000) {
+      hardViolations.push(`nap${i} starts before now`);
+    }
+
+    // Hard: B8 — no nap within 60 min of bedtime
+    if (startMs >= bedtimeMs - 60 * 60_000) {
+      hardViolations.push(`nap${i} within 60min of bedtime`);
+    }
+
+    prevEnd = endMs;
+  }
+
+  // Hard: final wake window (last nap end → bedtime)
+  // The pre-bedtime wake window is naturally longer than mid-day wake windows,
+  // so we use a wider range: up to 1.3× the normal max (matching the 15% bedtime-WW
+  // multiplier in getLearnedBedtimeWakeWindow, with extra margin for data variance).
+  if (plan.naps.length > 0) {
+    const finalWW = (bedtimeMs - prevEnd) / 60_000;
+    const finalMax = Math.round(range.maxMinutes * 1.3);
+    if (finalWW < range.minMinutes - 1 || finalWW > finalMax + 1) {
+      hardViolations.push(`final ww ${Math.round(finalWW)}min outside [${range.minMinutes},${finalMax}]`);
+    }
+  }
+
+  if (hardViolations.length > 0) {
+    return { feasible: false, cost: Infinity, hardViolations };
+  }
+
+  // Soft costs (minutes²)
+  let cost = 0;
+
+  // Target proximity
+  if (targetBedtimeMs !== null) {
+    const diffMin = (bedtimeMs - targetBedtimeMs) / 60_000;
+    cost += W_TARGET * diffMin * diffMin;
+  }
+
+  // Wake window deviation from learned positional values
+  for (let i = 0; i < wws.length; i++) {
+    const learned = positionalWWs[i];
+    if (learned !== undefined) {
+      const diff = wws[i] - learned;
+      cost += W_WW * diff * diff;
+    }
+  }
+
+  // Nap duration deviation from learned positional values
+  for (let i = 0; i < durs.length; i++) {
+    const learned = positionalDurs[i];
+    if (learned !== undefined) {
+      const diff = durs[i] - learned;
+      cost += W_DUR * diff * diff;
+    }
+  }
+
+  // Cycle alignment
+  for (const dur of durs) {
+    const snapped = snapToCycleBoundary(dur, cycleMin, 1, 3, 10, 180);
+    const diff = dur - snapped;
+    cost += W_CYCLE * diff * diff;
+  }
+
+  return { feasible: true, cost, hardViolations: [] };
+}
+
+/**
+ * Generate and score natural + target-guided plans, return the best feasible one.
+ * When no target is set, returns the natural (forward-walk) plan directly.
+ */
+export function selectBestPlan(
+  wakeUpTime: string,
+  todaySleeps: SleepEntry[],
+  activeSleep: SleepLogRow | undefined,
+  ctx: BabyContext,
+  now: number,
+): SelectedPlan {
+  const wakeUpMs = new Date(wakeUpTime).getTime();
+
+  // Natural plan: forward walk + learned bedtime
+  const naturalNaps = predictDayNaps(wakeUpTime, ctx);
+  const sleepsForBedtime = buildSleepsForBedtime(todaySleeps, activeSleep, naturalNaps, ctx);
+  const naturalBedtime = recommendBedtime(sleepsForBedtime, ctx);
+  const naturalPlan: PlanCandidate = { naps: naturalNaps, bedtime: naturalBedtime };
+
+  if (!ctx.targetBedtime) {
+    return { ...naturalPlan, source: "natural" };
+  }
+
+  // Compute effective target (capped ±15 min from natural bedtime)
+  const naturalBedtimeMs = new Date(naturalBedtime).getTime();
+  const rawTargetMs = new Date(targetBedtimeToISO(ctx.targetBedtime, now, ctx.tz)).getTime();
+  const shift = Math.max(-DAILY_SHIFT_CAP_MS, Math.min(DAILY_SHIFT_CAP_MS, rawTargetMs - naturalBedtimeMs));
+  const effectiveTargetMs = naturalBedtimeMs + shift;
+  const effectiveTarget = new Date(effectiveTargetMs).toISOString();
+
+  // Target-guided plan: backward walk from effective target
+  const targetNaps = planBackwardFromBedtime(wakeUpTime, effectiveTarget, ctx);
+  const targetPlan: PlanCandidate = { naps: targetNaps, bedtime: effectiveTarget };
+
+  // Score both
+  const naturalScore = scorePlan(naturalPlan, ctx, wakeUpMs, now, rawTargetMs);
+  const targetScore = scorePlan(targetPlan, ctx, wakeUpMs, now, rawTargetMs);
+
+  if (targetScore.feasible && targetScore.cost <= naturalScore.cost) {
+    return { ...targetPlan, source: "target-guided" };
+  }
+  return { ...naturalPlan, source: "natural" };
 }

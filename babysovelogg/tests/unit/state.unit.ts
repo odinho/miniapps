@@ -473,22 +473,24 @@ naps done: false (2 expected)"
     expect(renderDayPlan(afterLateNap)).toMatchInlineSnapshot(`
 "strategy: emerging_rhythm
 lur 1: 18:00–19:30
-bedtime: 23:00
+bedtime: 20:00
 naps done: false (2 expected)"
 `);
 
-    // Pin: bedtime always after last predicted nap, never the 19:00 default
+    // Pin: bedtime always non-default and after last predicted nap end
     for (const r of [morning, duringNap, afterLateNap]) {
       expect(r.prediction!.bedtime).not.toBe("2026-03-28T19:00:00.000Z");
+      const naps = r.prediction!.predictedNaps;
+      if (naps && naps.length > 0) {
+        const lastNapEnd = new Date(naps[naps.length - 1].endTime).getTime();
+        expect(new Date(r.prediction!.bedtime!).getTime()).toBeGreaterThan(lastNapEnd);
+      }
     }
-    // Pin: late nap pushes bedtime later than the predicted schedule
-    expect(new Date(afterLateNap.prediction!.bedtime!).getTime())
-      .toBeGreaterThan(new Date(morning.prediction!.bedtime!).getTime());
   });
 
-  // ── Target bedtime: blended toward target ──
+  // ── Target bedtime: scored plan selection ──
 
-  it("target bedtime: bedtime blended toward target, naps stay cycle-aware", () => {
+  it("target bedtime: plan scored and selected, shift capped at 15 min", () => {
     const bedtimeBaby = { ...baseBaby, timezone: "UTC", target_bedtime: "18:30" };
 
     const morning = assembleState(
@@ -498,9 +500,9 @@ naps done: false (2 expected)"
 
     expect(renderDayPlan(morning)).toMatchInlineSnapshot(`
 "strategy: emerging_rhythm
-lur 1: 10:00–11:30
-lur 2: 14:30–16:00
-bedtime: 19:15
+lur 1: 09:45–11:15
+lur 2: 14:15–15:45
+bedtime: 19:45
 naps done: false (2 expected)"
 `);
 
@@ -513,7 +515,7 @@ naps done: false (2 expected)"
     const targetBedtimeMs = new Date(morning.prediction!.bedtime!).getTime();
     const learnedBedtimeMs = new Date(withoutTarget.prediction!.bedtime!).getTime();
     expect(targetBedtimeMs).toBeLessThan(learnedBedtimeMs);
-    // Pin: nap times unchanged — target only affects bedtime, naps stay cycle-aware
-    expect(morning.prediction!.predictedNaps).toEqual(withoutTarget.prediction!.predictedNaps);
+    // Pin: shift capped at 15 min from natural bedtime
+    expect(learnedBedtimeMs - targetBedtimeMs).toBeLessThanOrEqual(15 * 60_000);
   });
 });
