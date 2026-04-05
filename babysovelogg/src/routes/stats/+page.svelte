@@ -4,9 +4,13 @@
 		TS_CHART,
 		GANTT,
 		fetchStatsData,
+		fetchFullHistory,
 		computeAllStats,
+		buildHeatmapChart,
 		type ComputedStats,
+		type HeatmapChartData,
 	} from '$lib/stats-view-utils.js';
+	import { buildSleepHeatmap } from '$lib/engine/stats.js';
 	import { appState } from '$lib/stores/app.svelte.js';
 	import { calculateAgeMonths } from '$lib/engine/schedule.js';
 	import {
@@ -49,10 +53,23 @@
 	let empty = $state(false);
 	let stats = $state<ComputedStats | null>(null);
 	let showAdvanced = $state(typeof localStorage !== 'undefined' && localStorage.getItem('stats_advanced') === '1');
+	let fullHeatmap = $state<HeatmapChartData | null>(null);
+	let loadingFullHeatmap = $state(false);
 
 	function toggleAdvanced() {
 		showAdvanced = !showAdvanced;
 		localStorage.setItem('stats_advanced', showAdvanced ? '1' : '0');
+	}
+
+	async function loadFullHeatmap() {
+		loadingFullHeatmap = true;
+		try {
+			const allSleeps = await fetchFullHistory();
+			const heatmapRows = buildSleepHeatmap(allSleeps, baby?.timezone ?? undefined);
+			fullHeatmap = buildHeatmapChart(heatmapRows, heatmapRows.length);
+		} finally {
+			loadingFullHeatmap = false;
+		}
 	}
 
 	async function load() {
@@ -144,7 +161,7 @@
 				<div class="stats-chart-wrap">
 					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
 						{#each stats.stackedArea.gridLines as y}
-							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="0.5" />
+							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
 						{/each}
 						{#each stats.stackedArea.yTicks as tick}
 							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
@@ -155,7 +172,7 @@
 							<path d={stats.stackedArea.rollingAvgPath} fill="none" stroke="var(--text)" stroke-width="1.5" stroke-dasharray="4,2" opacity="0.6" />
 						{/if}
 						{#each stats.stackedArea.xLabels as lbl}
-							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="9" font-family="var(--font)">{lbl.label}</text>
+							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
 						{/each}
 					</svg>
 					<div class="stats-legend">
@@ -173,7 +190,7 @@
 				<div class="stats-chart-wrap">
 					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
 						{#each stats.sleepVsNorm.gridLines as y}
-							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="0.5" />
+							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
 						{/each}
 						{#each stats.sleepVsNorm.yTicks as tick}
 							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
@@ -189,12 +206,12 @@
 							<circle cx={dot.x} cy={dot.y} r="2.5" fill="var(--moon)" stroke="var(--white)" stroke-width="0.5" />
 						{/each}
 						{#each stats.sleepVsNorm.xLabels as lbl}
-							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="9" font-family="var(--font)">{lbl.label}</text>
+							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
 						{/each}
 					</svg>
 					<div class="stats-legend">
 						<span class="stats-legend-item"><span class="stats-dot" style="background: var(--moon)"></span> Faktisk søvn</span>
-						<span class="stats-legend-item"><span class="stats-dot" style="background: var(--lavender)"></span> Anbefalt (Galland)</span>
+						<span class="stats-legend-item"><span class="stats-dot" style="background: var(--lavender)"></span> Anbefalt</span>
 					</div>
 				</div>
 			</div>
@@ -207,7 +224,7 @@
 				<div class="stats-chart-wrap">
 					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
 						{#each stats.nightStretchChart.gridLines as y}
-							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="0.5" />
+							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
 						{/each}
 						{#each stats.nightStretchChart.yTicks as tick}
 							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
@@ -225,7 +242,7 @@
 							<circle cx={dot.x} cy={dot.y} r="3" fill="var(--moon)" stroke="var(--white)" stroke-width="1" />
 						{/each}
 						{#each stats.nightStretchChart.xLabels as lbl}
-							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="9" font-family="var(--font)">{lbl.label}</text>
+							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
 						{/each}
 					</svg>
 				</div>
@@ -239,14 +256,14 @@
 				<div class="stats-chart-wrap">
 					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
 						{#each stats.bedtimeChart.gridLines as y}
-							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="0.5" />
+							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
 						{/each}
 						{#each stats.bedtimeChart.yTicks as tick}
 							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
 						{/each}
 						<!-- Average line -->
 						<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={stats.bedtimeChart.avgY} y2={stats.bedtimeChart.avgY} stroke="var(--lavender-dark)" stroke-width="1" stroke-dasharray="4,3" />
-						<text x={TS_CHART.W - TS_CHART.PAD_R} y={stats.bedtimeChart.avgY - 4} text-anchor="end" fill="var(--lavender-dark)" font-size="9" font-family="var(--font)">snitt {stats.bedtimeChart.avgLabel}</text>
+						<text x={TS_CHART.W - TS_CHART.PAD_R} y={stats.bedtimeChart.avgY - 4} text-anchor="end" fill="var(--lavender-dark)" font-size="10" font-family="var(--font)">snitt {stats.bedtimeChart.avgLabel}</text>
 						<!-- Line -->
 						<path d={stats.bedtimeChart.linePath} fill="none" stroke="var(--moon)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
 						<!-- Dots -->
@@ -254,7 +271,7 @@
 							<circle cx={dot.x} cy={dot.y} r="3" fill="var(--moon)" stroke="var(--white)" stroke-width="1" />
 						{/each}
 						{#each stats.bedtimeChart.xLabels as lbl}
-							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="9" font-family="var(--font)">{lbl.label}</text>
+							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
 						{/each}
 					</svg>
 				</div>
@@ -268,7 +285,7 @@
 				<div class="stats-chart-wrap">
 					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
 						{#each stats.napCountChart.gridLines as y}
-							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="0.5" />
+							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
 						{/each}
 						{#each stats.napCountChart.yTicks as tick}
 							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
@@ -281,7 +298,7 @@
 							<circle cx={dot.x} cy={dot.y} r="3" fill="var(--peach-dark)" stroke="var(--white)" stroke-width="1" />
 						{/each}
 						{#each stats.napCountChart.xLabels as lbl}
-							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="9" font-family="var(--font)">{lbl.label}</text>
+							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
 						{/each}
 					</svg>
 				</div>
@@ -374,12 +391,12 @@
 						<svg viewBox="0 0 {GANTT.W} {stats.gantt.height}" width="100%" class="stats-chart" shape-rendering="crispEdges">
 							<!-- Hour labels -->
 							{#each stats.gantt.hourLabels as lbl}
-								<text x={lbl.x} y={14} text-anchor="middle" fill="var(--text-light)" font-size="9" font-family="var(--font)" shape-rendering="auto">{lbl.label}</text>
+								<text x={lbl.x} y={14} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)" shape-rendering="auto">{lbl.label}</text>
 							{/each}
 							<!-- Rows -->
 							{#each stats.gantt.rows as row}
 								<!-- Date label -->
-								<text x={GANTT.PAD_L - 4} y={row.y + GANTT.ROW_H / 2 + 3} text-anchor="end" fill="var(--text-light)" font-size="9" font-family="var(--font)" shape-rendering="auto">{row.dateLabel}</text>
+								<text x={GANTT.PAD_L - 4} y={row.y + GANTT.ROW_H / 2 + 3} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)" shape-rendering="auto">{row.dateLabel}</text>
 								<!-- Row background -->
 								<rect x={GANTT.PAD_L} y={row.y} width={GANTT.W - GANTT.PAD_L - GANTT.PAD_R} height={GANTT.ROW_H - 2} fill="var(--cream-dark)" opacity="0.3" />
 								<!-- Sleep blocks -->
@@ -403,21 +420,24 @@
 			{/if}
 
 			<!-- Chart E: 24h Sleep Heatmap -->
-			{#if stats.heatmapChart.cells.length > 0}
+			{@const hm = fullHeatmap ?? stats.heatmapChart}
+			{#if hm.cells.length > 0}
 				<div class="stats-section">
-					<h3 class="stats-section-title">Søvnkart (14 dagar)</h3>
-					<div class="stats-chart-wrap" style="overflow-x: auto;">
-						<svg viewBox="0 0 {stats.heatmapChart.width} {stats.heatmapChart.height}" width="100%" class="stats-chart" shape-rendering="crispEdges">
+					<h3 class="stats-section-title">
+						Søvnkart {fullHeatmap ? '(all data)' : '(14 dagar)'}
+					</h3>
+					<div class="stats-chart-wrap" style="overflow-y: auto; max-height: {fullHeatmap ? '70vh' : 'none'};">
+						<svg viewBox="0 0 {hm.width} {hm.height}" width="100%" class="stats-chart" shape-rendering="crispEdges" style={fullHeatmap ? `height: ${hm.height}px; width: 100%;` : ''}>
 							<!-- Hour labels -->
-							{#each stats.heatmapChart.hourLabels as lbl}
-								<text x={lbl.x} y={12} text-anchor="middle" fill="var(--text-light)" font-size="8" font-family="var(--font)" shape-rendering="auto">{lbl.label}</text>
+							{#each hm.hourLabels as lbl}
+								<text x={lbl.x} y={12} text-anchor="middle" fill="var(--text-light)" font-size="9" font-family="var(--font)" shape-rendering="auto">{lbl.label}</text>
 							{/each}
 							<!-- Date labels -->
-							{#each stats.heatmapChart.dateLabels as lbl}
+							{#each hm.dateLabels as lbl}
 								<text x={lbl.x} y={lbl.y} text-anchor="end" fill="var(--text-light)" font-size="8" font-family="var(--font)" shape-rendering="auto">{lbl.label}</text>
 							{/each}
 							<!-- Cells -->
-							{#each stats.heatmapChart.cells as cell}
+							{#each hm.cells as cell}
 								<rect
 									x={cell.x}
 									y={cell.y}
@@ -429,6 +449,16 @@
 							{/each}
 						</svg>
 					</div>
+					{#if !fullHeatmap}
+						<button
+							class="btn btn-ghost"
+							style="margin-top: 8px; font-size: 0.8rem; color: var(--text-light);"
+							onclick={loadFullHeatmap}
+							disabled={loadingFullHeatmap}
+						>
+							{loadingFullHeatmap ? 'Lastar...' : 'Vis heile historia'}
+						</button>
+					{/if}
 				</div>
 			{/if}
 
@@ -439,7 +469,7 @@
 					<div class="stats-chart-wrap">
 						<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
 							{#each stats.wakeScatter.gridLines as y}
-								<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="0.5" />
+								<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
 							{/each}
 							{#each stats.wakeScatter.yTicks as tick}
 								<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>

@@ -614,19 +614,19 @@ export function buildGanttChart(
 	const plotW = GANTT.W - GANTT.PAD_L - GANTT.PAD_R;
 	const hoursSpan = 24;
 
-	// Map an hour (0-23) to x position on the 18:00–18:00 axis
+	// Map a fractional hour to x position on the 18:00–18:00 axis
 	const hourToX = (h: number): number => {
 		let offset = h - GANTT.HOUR_START;
 		if (offset < 0) offset += 24;
 		return GANTT.PAD_L + (offset / hoursSpan) * plotW;
 	};
 
-	// Group by "gantt date" — a day runs 18:00 to 18:00, so we key on the evening date
+	// Group by "gantt date" — each row covers 18:00 → next 18:00
 	const byGanttDate = new Map<string, SleepEntry[]>();
 	for (const s of completed) {
 		const startDate = new Date(s.start_time);
 		const localHour = tz
-			? parseFloat(new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false }).format(startDate).replace(":", "."))
+			? getLocalHourFrac(startDate, tz)
 			: startDate.getHours() + startDate.getMinutes() / 60;
 		const dateStr = tz ? isoToDateInTz(s.start_time, tz) : s.start_time.slice(0, 10);
 
@@ -644,10 +644,19 @@ export function buildGanttChart(
 		byGanttDate.get(ganttDate)!.push(s);
 	}
 
-	// Sort dates and take last N days
-	const sortedDates = [...byGanttDate.keys()].toSorted().slice(-days);
+	// Build continuous calendar date range for last N days (no gaps)
+	const allDates = [...byGanttDate.keys()].toSorted();
+	const lastDate = allDates.at(-1);
+	if (!lastDate) return { rows: [], hourLabels: [], height: 0 };
+	const calendarDates: string[] = [];
+	const end = new Date(lastDate + "T12:00:00");
+	for (let i = days - 1; i >= 0; i--) {
+		const d = new Date(end);
+		d.setDate(d.getDate() - i);
+		calendarDates.push(d.toISOString().slice(0, 10));
+	}
 
-	const rows: GanttRow[] = sortedDates.map((date, i) => {
+	const rows: GanttRow[] = calendarDates.map((date, i) => {
 		const y = GANTT.PAD_T + i * GANTT.ROW_H;
 		const entries = byGanttDate.get(date) ?? [];
 		const blocks: GanttBlock[] = [];
@@ -659,11 +668,11 @@ export function buildGanttChart(
 			const startH = tz
 				? getLocalHourFrac(startDate, tz)
 				: startDate.getHours() + startDate.getMinutes() / 60;
-			const durationH = (endDate.getTime() - startDate.getTime()) / 3600000;
+			const durationH = Math.min(24, (endDate.getTime() - startDate.getTime()) / 3600000);
 
 			const x = hourToX(startH);
 			const endX = hourToX((startH + durationH) % 24);
-			// Handle wrap-around (sleep crossing the 18:00 boundary is rare but possible)
+			// Handle wrap-around
 			const w = endX > x ? endX - x : Math.max(2, (plotW - (x - GANTT.PAD_L)) + (endX - GANTT.PAD_L));
 
 			blocks.push({ x, w: Math.max(2, w), y: y + 2, type: s.type });
@@ -684,7 +693,7 @@ export function buildGanttChart(
 		hourLabels.push({ x: hourToX(displayH), label: `${String(displayH).padStart(2, "0")}` });
 	}
 
-	const height = GANTT.PAD_T + sortedDates.length * GANTT.ROW_H + 8;
+	const height = GANTT.PAD_T + calendarDates.length * GANTT.ROW_H + 8;
 
 	return { rows, hourLabels, height };
 }
@@ -835,6 +844,12 @@ export async function fetchStatsData(): Promise<StatsData> {
 	const sleeps = await sleepRes.json();
 	const diapers = await diaperRes.json();
 	return { sleeps, diapers };
+}
+
+/** Fetch all sleep data (no time limit) for full-history views. */
+export async function fetchFullHistory(): Promise<SleepEntry[]> {
+	const res = await fetch("/api/sleeps?limit=10000");
+	return res.json();
 }
 
 // ── Diaper stats ───────────────────────────────────────────────
@@ -1036,8 +1051,14 @@ export function computeAllStats(
 	const diaperStats7 = diapers.length > 0 ? computeDiaperStats(week7Diapers, tz) : null;
 	const diaperStats30 = diapers.length > 0 ? computeDiaperStats(diapers, tz) : null;
 
-	// New charts: stacked area from allStats days
-	const stackedAreaDays = allStats.days.map((d) => ({
+	// Exclude today's incomplete data from charts
+	const today = tz
+		? new Date().toLocaleDateString("en-CA", { timeZone: tz })
+		: new Date().toISOString().slice(0, 10);
+	const completeDays = allStats.days.filter((d) => d.date !== today);
+
+	// New charts: stacked area from completed days
+	const stackedAreaDays = completeDays.map((d) => ({
 		date: d.date,
 		napMin: d.stats.totalNapMinutes,
 		nightMin: d.stats.totalNightMinutes,
@@ -1047,7 +1068,7 @@ export function computeAllStats(
 	// Sleep vs age norms (requires birthdate)
 	let sleepVsNorm: SleepVsNormData | null = null;
 	if (birthdate) {
-		const normDays = allStats.days.map((d) => ({
+		const normDays = completeDays.map((d) => ({
 			date: d.date,
 			totalHours: (d.stats.totalNapMinutes + d.stats.totalNightMinutes) / 60,
 		}));
@@ -1063,7 +1084,7 @@ export function computeAllStats(
 	const bedtimeChart = buildBedtimeChart(bedtimes);
 
 	// Nap count trend
-	const napCountDays = allStats.days.map((d) => ({ date: d.date, napCount: d.stats.napCount }));
+	const napCountDays = completeDays.map((d) => ({ date: d.date, napCount: d.stats.napCount }));
 	const napCountChart = buildNapCountChart(napCountDays);
 
 	// Tier 2: advanced charts
