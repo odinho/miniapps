@@ -583,7 +583,7 @@ export const GANTT = {
 	PAD_L: 56,
 	PAD_R: 8,
 	PAD_T: 24,
-	HOUR_START: 18, // 18:00 left edge (night-centered)
+	HOUR_START: 0, // 00:00 left edge — night sleep in the middle
 } as const;
 
 export interface GanttBlock {
@@ -624,27 +624,12 @@ export function buildGanttChart(
 		return GANTT.PAD_L + (offset / hoursSpan) * plotW;
 	};
 
-	// Group by "gantt date" — each row covers 18:00 → next 18:00
+	// Group by calendar date (00:00–00:00 rows)
 	const byGanttDate = new Map<string, SleepEntry[]>();
 	for (const s of completed) {
-		const startDate = new Date(s.start_time);
-		const localHour = tz
-			? getLocalHourFrac(startDate, tz)
-			: startDate.getHours() + startDate.getMinutes() / 60;
 		const dateStr = tz ? isoToDateInTz(s.start_time, tz) : s.start_time.slice(0, 10);
-
-		// If before 18:00, belongs to previous evening's row
-		let ganttDate: string;
-		if (localHour < GANTT.HOUR_START) {
-			const prevDay = new Date(dateStr + "T12:00:00");
-			prevDay.setDate(prevDay.getDate() - 1);
-			ganttDate = prevDay.toISOString().slice(0, 10);
-		} else {
-			ganttDate = dateStr;
-		}
-
-		if (!byGanttDate.has(ganttDate)) byGanttDate.set(ganttDate, []);
-		byGanttDate.get(ganttDate)!.push(s);
+		if (!byGanttDate.has(dateStr)) byGanttDate.set(dateStr, []);
+		byGanttDate.get(dateStr)!.push(s);
 	}
 
 	// Build continuous calendar date range for last N days, anchored to today
@@ -761,7 +746,7 @@ export function buildHeatmapChart(heatmapRows: HeatmapRow[], days: number): Heat
 		});
 
 		for (let offset = 0; offset < 24; offset++) {
-			const h = (18 + offset) % 24; // 18:00-start to match Gantt
+			const h = offset; // 00:00-start — night sleep in the middle
 			const x = HEATMAP.PAD_L + offset * (cellW + gap);
 			const minutes = row.hours[h];
 			const opacity = Math.min(1, minutes / 60);
@@ -771,7 +756,7 @@ export function buildHeatmapChart(heatmapRows: HeatmapRow[], days: number): Heat
 
 	const hourLabels: { x: number; label: string }[] = [];
 	for (let offset = 0; offset < 24; offset += 3) {
-		const displayH = (18 + offset) % 24;
+		const displayH = offset;
 		hourLabels.push({
 			x: HEATMAP.PAD_L + offset * (cellW + gap) + cellW / 2,
 			label: `${String(displayH).padStart(2, "0")}`,
@@ -1095,8 +1080,8 @@ export function computeAllStats(
 	// Tier 2: advanced charts
 	const wakeGaps = getWakeWindowGaps(week7);
 	const heatmap = buildSleepHeatmap(mapped, tz);
-	const gantt = buildGanttChart(mapped, 14, tz);
-	const heatmapChart = buildHeatmapChart(heatmap, 14);
+	const gantt = buildGanttChart(mapped, 30, tz);
+	const heatmapChart = buildHeatmapChart(heatmap, heatmap.length);
 	const wakeScatter = buildWakeScatter(wakeGaps);
 
 	return {
