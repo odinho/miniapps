@@ -22,7 +22,7 @@ function plan(napTimes: [string, string][], bedtime: string): PlanCandidate {
 }
 
 const WAKE = new Date("2026-03-28T07:00:00Z").getTime();
-const NOW = new Date("2026-03-28T08:00:00Z").getTime();
+const NOW = new Date("2026-03-28T08:00:00Z").getTime(); // used by selectBestPlan
 
 describe("scorePlan", () => {
   it("feasible plan with reasonable wake windows", () => {
@@ -30,7 +30,7 @@ describe("scorePlan", () => {
     // Wake 07:00, nap1 09:30-11:00 (WW=150), nap2 14:00-15:30 (WW=180), bed 19:30 (finalWW=240)
     const result = scorePlan(
       plan([["09:30", "11:00"], ["14:00", "15:30"]], "19:30"),
-      ctx(), WAKE, NOW, null,
+      ctx(), WAKE,
     );
 
     expect(result.feasible).toBe(true);
@@ -41,7 +41,7 @@ describe("scorePlan", () => {
     // Nap1 at 08:00 = only 60 min WW, way below 150 min minimum
     const result = scorePlan(
       plan([["08:00", "09:00"], ["12:00", "13:00"]], "18:00"),
-      ctx(), WAKE, NOW, null,
+      ctx(), WAKE,
     );
 
     expect(result.feasible).toBe(false);
@@ -52,7 +52,7 @@ describe("scorePlan", () => {
     // Nap2 starts at 18:30, bedtime at 19:00 → within 60 min
     const result = scorePlan(
       plan([["09:30", "11:00"], ["18:30", "19:00"]], "19:15"),
-      ctx(), WAKE, NOW, null,
+      ctx(), WAKE,
     );
 
     expect(result.feasible).toBe(false);

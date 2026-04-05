@@ -242,6 +242,7 @@ function assembleEmergingPrediction(
 
   let remaining = selected ? selected.naps.slice(consumedNaps) : [] as PredictedNap[];
 
+  let bedtime: string | null = selected?.bedtime ?? null;
   if (remaining.length > 0 && wakeTimeForPrediction) {
     const actualWakeMs = new Date(wakeTimeForPrediction).getTime();
     if (actualWakeMs > new Date(remaining[0].startTime).getTime()) {
@@ -250,10 +251,10 @@ function assembleEmergingPrediction(
         { ...ctx, customNapCount: remaining.length }, now,
       );
       remaining = adjusted.naps;
+      bedtime = adjusted.bedtime;
     }
   }
 
-  let bedtime: string | null = selected?.bedtime ?? null;
   let bedtimeMs = bedtime ? new Date(bedtime).getTime() : Infinity;
 
   // Safety B8 filter
@@ -352,7 +353,8 @@ function assembleSchedulePrediction(
   let remaining = allPredictedFromWakeUp.slice(consumedNaps);
 
   // Stale check: if actual wake time is past the first predicted nap start,
-  // re-select with adjusted context
+  // re-select with adjusted context (updates both naps AND bedtime)
+  let bedtime = selected?.bedtime ?? new Date(now).toISOString();
   if (remaining.length > 0) {
     const actualWakeMs = new Date(wakeTimeForPrediction).getTime();
     if (actualWakeMs > new Date(remaining[0].startTime).getTime()) {
@@ -361,10 +363,10 @@ function assembleSchedulePrediction(
         { ...ctx, customNapCount: remaining.length }, now,
       );
       remaining = adjusted.naps;
+      bedtime = adjusted.bedtime;
     }
   }
 
-  let bedtime = selected?.bedtime ?? new Date(now).toISOString();
   let bedtimeMs = new Date(bedtime).getTime();
 
   // Safety B8 filter

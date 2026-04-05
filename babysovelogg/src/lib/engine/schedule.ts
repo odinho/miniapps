@@ -1175,13 +1175,14 @@ const W_WW = 0.5;
 const W_DUR = 0.3;
 const W_CYCLE = 0.1;
 
-/** Score a candidate day plan against hard and soft constraints. */
+/** Score a candidate day plan against hard and soft constraints.
+ *  @param expectedNapCount — the natural plan's nap count; plans with fewer naps get penalized. */
 export function scorePlan(
   plan: PlanCandidate,
   ctx: BabyContext,
   wakeUpTimeMs: number,
-  now: number,
-  targetBedtimeMs: number | null,
+  targetBedtimeMs?: number | null,
+  expectedNapCount?: number,
 ): PlanScore {
   const hardViolations: string[] = [];
   const range = getAdaptedWakeWindowRange(ctx);
@@ -1207,11 +1208,6 @@ export function scorePlan(
     // Hard: wake window within adapted range
     if (ww < range.minMinutes - 1 || ww > range.maxMinutes + 1) {
       hardViolations.push(`nap${i} ww ${Math.round(ww)}min outside [${range.minMinutes},${range.maxMinutes}]`);
-    }
-
-    // Hard: no remaining nap before now
-    if (startMs < now - 60_000) {
-      hardViolations.push(`nap${i} starts before now`);
     }
 
     // Hard: B8 — no nap within 60 min of bedtime
@@ -1242,7 +1238,7 @@ export function scorePlan(
   let cost = 0;
 
   // Target proximity
-  if (targetBedtimeMs !== null) {
+  if (targetBedtimeMs != null) {
     const diffMin = (bedtimeMs - targetBedtimeMs) / 60_000;
     cost += W_TARGET * diffMin * diffMin;
   }
@@ -1270,6 +1266,12 @@ export function scorePlan(
     const snapped = snapToCycleBoundary(dur, cycleMin, 1, 3, 10, 180);
     const diff = dur - snapped;
     cost += W_CYCLE * diff * diff;
+  }
+
+  // Nap count penalty: dropping naps to hit a target is too aggressive
+  if (expectedNapCount !== undefined && plan.naps.length < expectedNapCount) {
+    const dropped = expectedNapCount - plan.naps.length;
+    cost += 500 * dropped; // Heavy penalty per dropped nap
   }
 
   return { feasible: true, cost, hardViolations: [] };
@@ -1309,9 +1311,9 @@ export function selectBestPlan(
   const targetNaps = planBackwardFromBedtime(wakeUpTime, effectiveTarget, ctx);
   const targetPlan: PlanCandidate = { naps: targetNaps, bedtime: effectiveTarget };
 
-  // Score both
-  const naturalScore = scorePlan(naturalPlan, ctx, wakeUpMs, now, rawTargetMs);
-  const targetScore = scorePlan(targetPlan, ctx, wakeUpMs, now, rawTargetMs);
+  // Score both against the effective target (today's objective), not the raw target
+  const naturalScore = scorePlan(naturalPlan, ctx, wakeUpMs, effectiveTargetMs, naturalNaps.length);
+  const targetScore = scorePlan(targetPlan, ctx, wakeUpMs, effectiveTargetMs, naturalNaps.length);
 
   if (targetScore.feasible && targetScore.cost <= naturalScore.cost) {
     return { ...targetPlan, source: "target-guided" };
