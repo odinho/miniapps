@@ -3,10 +3,12 @@ import {
   predictNextNap,
   recommendBedtime,
   predictDayNaps,
+  planBackwardFromBedtime,
   resolveNapCount,
   predictNapEndTime,
   predictNightEndTime,
 } from "./schedule.js";
+import { setHourInTz } from "$lib/tz.js";
 import { getTodayStats } from "./stats.js";
 import { computeConfidence } from "./confidence.js";
 import { calibrate } from "./calibration.js";
@@ -46,6 +48,7 @@ function buildContext(baby: Baby, recentSleeps: SleepEntry[]): BabyContext {
     ageMonths: calculateAgeMonths(baby.birthdate),
     tz: baby.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
     customNapCount: baby.custom_nap_count ?? null,
+    targetBedtime: baby.target_bedtime ?? null,
     recentSleeps,
   };
 }
@@ -235,54 +238,68 @@ function assembleEmergingPrediction(
   const consumedNaps = completedNaps.length + (activeSleep?.type === "nap" ? 1 : 0);
   const expectedNapCount = resolveNapCount(ctx);
 
-  // ── Compute remaining predicted naps from the MORNING wake (like schedule) ──
-  // predictEmerging shifts its wake point as naps complete, so result.predictedNaps
-  // already excludes completed naps — slicing by consumedNaps would double-count.
-  // Instead, recompute from the fixed morning wake and apply the same remaining logic.
+  // ── Compute remaining predicted naps + bedtime (same branching as schedule) ──
   let remaining: PredictedNap[] = [];
-  if (todayWakeUp) {
-    const allPredicted = predictDayNaps(todayWakeUp.wake_time, ctx);
+  let bedtime: string | null;
+  let bedtimeMs: number;
+  let predictedNaps: PredictedNap[] | null;
+
+  if (ctx.targetBedtime && todayWakeUp) {
+    bedtime = targetBedtimeToISO(ctx.targetBedtime, now, ctx.tz);
+    bedtimeMs = new Date(bedtime).getTime();
+
+    const allPredicted = planBackwardFromBedtime(todayWakeUp.wake_time, bedtime, ctx);
     remaining = allPredicted.slice(consumedNaps);
 
-    // Recalculate from actual wake time if schedule drifted
     if (remaining.length > 0 && wakeTimeForPrediction) {
       const actualWakeMs = new Date(wakeTimeForPrediction).getTime();
-      const predictedStartMs = new Date(remaining[0].startTime).getTime();
-      if (actualWakeMs > predictedStartMs) {
-        remaining = predictDayNaps(
-          wakeTimeForPrediction,
+      if (actualWakeMs > new Date(remaining[0].startTime).getTime()) {
+        remaining = planBackwardFromBedtime(
+          wakeTimeForPrediction, bedtime,
           { ...ctx, customNapCount: remaining.length },
         );
       }
     }
-  }
 
-  // ── Coherent bedtime: recompute from the full predicted day ──
-  // predictEmerging calls recommendBedtime with raw todaySleeps which may have
-  // no completed entries, causing a 19:00 default. Recompute with the full picture.
-  let nextNap = result.nextNap;
-  const sleepsForBedtime = buildSleepsForBedtime(todaySleeps.map(toSleepEntry), activeSleep, remaining, ctx);
-  let bedtime = recommendBedtime(sleepsForBedtime, ctx);
-  let bedtimeMs = bedtime ? new Date(bedtime).getTime() : Infinity;
+    predictedNaps = remaining.length > 0 ? remaining : null;
+  } else {
+    if (todayWakeUp) {
+      const allPredicted = predictDayNaps(todayWakeUp.wake_time, ctx);
+      remaining = allPredicted.slice(consumedNaps);
 
-  // B8: Filter out predicted naps starting within 60 min of bedtime
-  let predictedNaps: PredictedNap[] | null = remaining.filter(
-    (n) => new Date(n.startTime).getTime() < bedtimeMs - 60 * 60000,
-  );
+      if (remaining.length > 0 && wakeTimeForPrediction) {
+        const actualWakeMs = new Date(wakeTimeForPrediction).getTime();
+        if (actualWakeMs > new Date(remaining[0].startTime).getTime()) {
+          remaining = predictDayNaps(
+            wakeTimeForPrediction,
+            { ...ctx, customNapCount: remaining.length },
+          );
+        }
+      }
+    }
 
-  // Pass 2: If B8 removed naps, bedtime anchor changed — recompute
-  if (predictedNaps.length < remaining.length) {
-    const pass2Sleeps = buildSleepsForBedtime(todaySleeps.map(toSleepEntry), activeSleep, predictedNaps, ctx);
-    bedtime = recommendBedtime(pass2Sleeps, ctx);
+    const sleepsForBedtime = buildSleepsForBedtime(todaySleeps.map(toSleepEntry), activeSleep, remaining, ctx);
+    bedtime = recommendBedtime(sleepsForBedtime, ctx);
     bedtimeMs = new Date(bedtime).getTime();
-    predictedNaps = predictedNaps.filter(
+
+    predictedNaps = remaining.filter(
       (n) => new Date(n.startTime).getTime() < bedtimeMs - 60 * 60000,
     );
+
+    if (predictedNaps.length < remaining.length) {
+      const pass2Sleeps = buildSleepsForBedtime(todaySleeps.map(toSleepEntry), activeSleep, predictedNaps, ctx);
+      bedtime = recommendBedtime(pass2Sleeps, ctx);
+      bedtimeMs = new Date(bedtime).getTime();
+      predictedNaps = predictedNaps.filter(
+        (n) => new Date(n.startTime).getTime() < bedtimeMs - 60 * 60000,
+      );
+    }
+
+    if (predictedNaps.length === 0) predictedNaps = null;
   }
 
-  if (predictedNaps.length === 0) predictedNaps = null;
-
   // Derive nextNap from remaining predictions
+  let nextNap = result.nextNap;
   if (predictedNaps && predictedNaps.length > 0) {
     nextNap = predictedNaps[0].startTime;
   }
@@ -343,6 +360,12 @@ function assembleEmergingPrediction(
   };
 }
 
+/** Convert a "HH:MM" target bedtime to an ISO timestamp for today in the baby's timezone. */
+function targetBedtimeToISO(hhmm: string, now: number, tz: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  return setHourInTz(new Date(now), h, m, tz).toISOString();
+}
+
 /**
  * Build the sleep list for recommendBedtime: actual completed sleeps + synthetic
  * entries for active nap (predicted end) and remaining predicted naps.
@@ -393,52 +416,76 @@ function assembleSchedulePrediction(
   const consumedNaps = completedNaps.length + (activeSleep?.type === "nap" ? 1 : 0);
   const expectedNapCount = resolveNapCount(ctx);
 
-  // ── Step 1: Predict all naps for the day (coherent forward walk) ──
-  const allPredictedFromWakeUp = todayWakeUp
-    ? predictDayNaps(todayWakeUp.wake_time, ctx)
-    : [];
-  let remaining: PredictedNap[] = [];
-  if (todayWakeUp) {
-    remaining = allPredictedFromWakeUp.slice(consumedNaps);
+  // ── Step 1–3: Predict naps + bedtime as a coherent day plan ──
+  let bedtime: string;
+  let bedtimeMs: number;
+  let predictedNaps: PredictedNap[] | null;
+  const allPredictedFromWakeUp: PredictedNap[] = [];
 
-    // If remaining predictions are stale (actual last wake is past the predicted
-    // nap start), the schedule drifted — recalculate from the actual wake time
+  if (ctx.targetBedtime && todayWakeUp) {
+    // ── Target bedtime path: plan naps backward from the user's preferred bedtime ──
+    bedtime = targetBedtimeToISO(ctx.targetBedtime, now, ctx.tz);
+    bedtimeMs = new Date(bedtime).getTime();
+
+    const allPredicted = planBackwardFromBedtime(todayWakeUp.wake_time, bedtime, ctx);
+    allPredictedFromWakeUp.push(...allPredicted);
+    let remaining = allPredicted.slice(consumedNaps);
+
+    // Stale check: if actual wake is past the next predicted nap start, recalculate
+    // backward for the remaining slots only
     if (remaining.length > 0) {
       const actualWakeMs = new Date(wakeTimeForPrediction).getTime();
-      const predictedStartMs = new Date(remaining[0].startTime).getTime();
-      if (actualWakeMs > predictedStartMs) {
-        remaining = predictDayNaps(
-          wakeTimeForPrediction,
+      if (actualWakeMs > new Date(remaining[0].startTime).getTime()) {
+        remaining = planBackwardFromBedtime(
+          wakeTimeForPrediction, bedtime,
           { ...ctx, customNapCount: remaining.length },
         );
       }
     }
-  }
 
-  // ── Step 2: Compute bedtime from the coherent day plan ──
-  // Build the full picture: actual completed sleeps + active nap estimate + predicted future naps
-  // so recommendBedtime sees the complete day, not just what's happened so far.
-  const sleepsForBedtime = buildSleepsForBedtime(todaySleeps.map(toSleepEntry), activeSleep, remaining, ctx);
-  let bedtime = recommendBedtime(sleepsForBedtime, ctx);
-  let bedtimeMs = new Date(bedtime).getTime();
+    predictedNaps = remaining.length > 0 ? remaining : null;
+  } else {
+    // ── Forward path: predict naps forward, derive bedtime from the schedule ──
+    const allPredicted = todayWakeUp
+      ? predictDayNaps(todayWakeUp.wake_time, ctx)
+      : [];
+    allPredictedFromWakeUp.push(...allPredicted);
+    let remaining: PredictedNap[] = [];
+    if (todayWakeUp) {
+      remaining = allPredicted.slice(consumedNaps);
 
-  // ── Step 3: B8 filter — remove predicted naps starting within 60 min of bedtime ──
-  let predictedNaps: PredictedNap[] | null = remaining.filter(
-    (n) => new Date(n.startTime).getTime() < bedtimeMs - 60 * 60000,
-  );
+      if (remaining.length > 0) {
+        const actualWakeMs = new Date(wakeTimeForPrediction).getTime();
+        if (actualWakeMs > new Date(remaining[0].startTime).getTime()) {
+          remaining = predictDayNaps(
+            wakeTimeForPrediction,
+            { ...ctx, customNapCount: remaining.length },
+          );
+        }
+      }
+    }
 
-  // Pass 2: If B8 removed naps, bedtime anchor changed — recompute
-  if (predictedNaps.length < remaining.length) {
-    const pass2Sleeps = buildSleepsForBedtime(todaySleeps.map(toSleepEntry), activeSleep, predictedNaps, ctx);
-    bedtime = recommendBedtime(pass2Sleeps, ctx);
+    const sleepsForBedtime = buildSleepsForBedtime(todaySleeps.map(toSleepEntry), activeSleep, remaining, ctx);
+    bedtime = recommendBedtime(sleepsForBedtime, ctx);
     bedtimeMs = new Date(bedtime).getTime();
-    // Re-filter (stable — removing naps only moves bedtime earlier)
-    predictedNaps = predictedNaps.filter(
+
+    // B8 filter — remove predicted naps starting within 60 min of bedtime
+    predictedNaps = remaining.filter(
       (n) => new Date(n.startTime).getTime() < bedtimeMs - 60 * 60000,
     );
-  }
 
-  if (predictedNaps.length === 0) predictedNaps = null;
+    // Pass 2: If B8 removed naps, bedtime anchor changed — recompute
+    if (predictedNaps.length < remaining.length) {
+      const pass2Sleeps = buildSleepsForBedtime(todaySleeps.map(toSleepEntry), activeSleep, predictedNaps, ctx);
+      bedtime = recommendBedtime(pass2Sleeps, ctx);
+      bedtimeMs = new Date(bedtime).getTime();
+      predictedNaps = predictedNaps.filter(
+        (n) => new Date(n.startTime).getTime() < bedtimeMs - 60 * 60000,
+      );
+    }
+
+    if (predictedNaps.length === 0) predictedNaps = null;
+  }
 
   // ── Step 4: Derive nextNap, napsAllDone, and final cleanup ──
   let nextNap: string;

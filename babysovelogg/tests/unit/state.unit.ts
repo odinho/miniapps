@@ -485,4 +485,55 @@ naps done: false (2 expected)"
     expect(new Date(afterLateNap.prediction!.bedtime!).getTime())
       .toBeGreaterThan(new Date(morning.prediction!.bedtime!).getTime());
   });
+
+  // ── Target bedtime: backward planning ──
+
+  it("target bedtime: naps planned backward, bedtime anchored", () => {
+    const bedtimeBaby = { ...baseBaby, timezone: "UTC", target_bedtime: "18:30" };
+
+    const morning = assembleState(
+      dayData({ baby: bedtimeBaby, recentSleeps: sparse, todaySleeps: [],
+        todayWakeUp: wake28, now: new Date("2026-03-28T08:00:00Z").getTime() }),
+    );
+
+    expect(renderDayPlan(morning)).toMatchInlineSnapshot(`
+"strategy: emerging_rhythm
+lur 1: 08:30–10:00
+lur 2: 13:00–14:30
+bedtime: 18:30
+naps done: false (2 expected)"
+`);
+
+    const duringNap = assembleState(
+      dayData({ baby: bedtimeBaby, recentSleeps: sparse, todaySleeps: [],
+        activeSleep: sleepRow({ end_time: null, start_time: "2026-03-28T09:30:00Z", type: "nap" }),
+        todayWakeUp: wake28, now: new Date("2026-03-28T10:30:00Z").getTime() }),
+    );
+
+    expect(renderDayPlan(duringNap)).toMatchInlineSnapshot(`
+"strategy: emerging_rhythm
+lur 1: 13:00–14:30
+nap ends: ~10:29
+bedtime: 18:30
+naps done: false (2 expected)"
+`);
+
+    const afterLateNap = assembleState(
+      dayData({ baby: bedtimeBaby, recentSleeps: sparse,
+        todaySleeps: [sleepRow({ id: 10, start_time: "2026-03-28T09:30:00Z",
+          end_time: "2026-03-28T15:00:00Z", type: "nap", domain_id: "slp_late" })],
+        todayWakeUp: wake28, now: new Date("2026-03-28T15:30:00Z").getTime() }),
+    );
+
+    expect(renderDayPlan(afterLateNap)).toMatchInlineSnapshot(`
+"strategy: emerging_rhythm
+bedtime: 18:30
+naps done: false (2 expected)"
+`);
+
+    // Pin: bedtime is always the user's target, not learned/default
+    for (const r of [morning, duringNap, afterLateNap]) {
+      expect(r.prediction!.bedtime).toContain("T18:30:");
+    }
+  });
 });
