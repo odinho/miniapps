@@ -131,6 +131,10 @@ describe("scorePlan", () => {
       plan([["09:30", "11:00"], ["18:30", "19:00"]], "19:15"), false],
     ["final WW too long (300 min)",
       plan([["09:30", "11:00"]], "16:00"), false],
+    ["zero naps, bedtime too far from wake (780 min)",
+      plan([], "20:00"), false],
+    ["zero naps, bedtime within range",
+      plan([], "10:30"), true],
   ];
 
   for (const [label, candidate, expected] of feasibleCases) {
@@ -278,5 +282,34 @@ naps done: false (2 expected)"
     expect(targetBedtimeMs).toBeLessThan(learnedBedtimeMs);
     // Pin: shift capped at 15 min from natural bedtime
     expect(learnedBedtimeMs - targetBedtimeMs).toBeLessThanOrEqual(15 * 60_000);
+  });
+
+  it("midday replan after completed nap: naps and bedtime stay coherent", () => {
+    const nap1 = sleepRow({
+      id: 10, start_time: "2026-03-28T10:00:00Z",
+      end_time: "2026-03-28T11:30:00Z", type: "nap", domain_id: "slp_1",
+    });
+
+    const result = assembleState(
+      dayData({ baby: utcBaby, recentSleeps: sparseRows,
+        todaySleeps: [nap1], todayWakeUp: wake28,
+        now: new Date("2026-03-28T12:00:00Z").getTime() }),
+    );
+
+    expect(renderDayPlan(result)).toMatchInlineSnapshot(`
+"strategy: emerging_rhythm
+lur 1: 14:30–16:00
+bedtime: 20:00
+naps done: false (2 expected)"
+`);
+
+    // Pin: remaining nap is after the completed nap
+    const naps = result.prediction!.predictedNaps!;
+    expect(naps.length).toBe(1);
+    expect(new Date(naps[0].startTime).getTime())
+      .toBeGreaterThan(new Date(nap1.end_time!).getTime());
+    // Pin: bedtime is after the remaining nap
+    expect(new Date(result.prediction!.bedtime!).getTime())
+      .toBeGreaterThan(new Date(naps[0].endTime).getTime());
   });
 });

@@ -1218,11 +1218,10 @@ export function scorePlan(
     prevEnd = endMs;
   }
 
-  // Hard: final wake window (last nap end → bedtime)
+  // Hard: final wake window (last sleep end → bedtime, or wake → bedtime if no naps)
   // The pre-bedtime wake window is naturally longer than mid-day wake windows,
-  // so we use a wider range: up to 1.3× the normal max (matching the 15% bedtime-WW
-  // multiplier in getLearnedBedtimeWakeWindow, with extra margin for data variance).
-  if (plan.naps.length > 0) {
+  // so we use a wider range: up to 1.3× the normal max.
+  {
     const finalWW = (bedtimeMs - prevEnd) / 60_000;
     const finalMax = Math.round(range.maxMinutes * 1.3);
     if (finalWW < range.minMinutes - 1 || finalWW > finalMax + 1) {
