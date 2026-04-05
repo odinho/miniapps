@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { formatDuration } from '$lib/utils.js';
 	import {
-		CHART,
+		TS_CHART,
+		GANTT,
 		fetchStatsData,
 		computeAllStats,
 		type ComputedStats,
@@ -47,6 +48,12 @@
 	let error = $state(false);
 	let empty = $state(false);
 	let stats = $state<ComputedStats | null>(null);
+	let showAdvanced = $state(typeof localStorage !== 'undefined' && localStorage.getItem('stats_advanced') === '1');
+
+	function toggleAdvanced() {
+		showAdvanced = !showAdvanced;
+		localStorage.setItem('stats_advanced', showAdvanced ? '1' : '0');
+	}
 
 	async function load() {
 		loading = true;
@@ -57,7 +64,7 @@
 				empty = true;
 			} else {
 				empty = false;
-				stats = computeAllStats(data.sleeps, data.diapers, baby?.timezone ?? undefined);
+				stats = computeAllStats(data.sleeps, data.diapers, baby?.timezone ?? undefined, baby?.birthdate ?? undefined);
 			}
 		} catch {
 			error = true;
@@ -130,104 +137,95 @@
 			</div>
 		</div>
 	{:else if stats}
-		<!-- 1. Weekly bar chart -->
-		<div class="stats-section">
-			<h3 class="stats-section-title">Siste 7 dagar</h3>
-			<div class="stats-chart-wrap">
-				{#if stats.bars.length === 0}
-					<svg viewBox="0 0 {CHART.W} {CHART.H}" width="100%" class="stats-chart">
-						<text
-							x={CHART.W / 2}
-							y={CHART.H / 2}
-							text-anchor="middle"
-							fill="var(--text-light)"
-							font-size="14"
-						>
-							Ingen data enno
-						</text>
-					</svg>
-				{:else}
-					<svg viewBox="0 0 {CHART.W} {CHART.H}" width="100%" class="stats-chart">
-						<!-- Grid lines -->
-						{#each stats.gridLines as y}
-							<line
-								x1={CHART.PAD_L}
-								x2={CHART.W - CHART.PAD_R}
-								y1={y}
-								y2={y}
-								stroke="var(--cream-dark)"
-								stroke-width="1"
-							/>
+		<!-- Chart A: 30-Day Stacked Area Trend -->
+		{#if stats.stackedArea.nightPath}
+			<div class="stats-section">
+				<h3 class="stats-section-title">Søvntrend (30 dagar)</h3>
+				<div class="stats-chart-wrap">
+					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
+						{#each stats.stackedArea.gridLines as y}
+							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="0.5" />
 						{/each}
-
-						<!-- Y-axis labels -->
-						{#each stats.yTicks as tick}
-							<text
-								x={CHART.PAD_L - 4}
-								y={tick.y + 4}
-								text-anchor="end"
-								fill="var(--text-light)"
-								font-size="10"
-								font-family="var(--font)"
-							>
-								{tick.label}
-							</text>
+						{#each stats.stackedArea.yTicks as tick}
+							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
 						{/each}
-
-						<!-- Bars -->
-						{#each stats.barGeometries as g}
-							<!-- Night bar (bottom) -->
-							{#if g.nightH > 0}
-								<rect
-									x={g.x}
-									y={g.baseY - g.napH - g.nightH}
-									width={g.barW}
-									height={g.nightH}
-									rx="4"
-									fill="var(--moon)"
-								/>
-							{/if}
-							<!-- Nap bar (top of night) -->
-							{#if g.napH > 0}
-								<rect
-									x={g.x}
-									y={g.baseY - g.napH}
-									width={g.barW}
-									height={g.napH}
-									rx="4"
-									fill="var(--peach-dark)"
-								/>
-							{/if}
-							<!-- Day label -->
-							<text
-								x={g.x + g.barW / 2}
-								y={CHART.H - 6}
-								text-anchor="middle"
-								fill="var(--text-light)"
-								font-size="10"
-								font-family="var(--font)"
-							>
-								{g.bar.dayLabel}
-							</text>
+						<path d={stats.stackedArea.nightPath} fill="var(--moon)" opacity="0.7" />
+						<path d={stats.stackedArea.napPath} fill="var(--peach-dark)" opacity="0.7" />
+						{#each stats.stackedArea.xLabels as lbl}
+							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="9" font-family="var(--font)">{lbl.label}</text>
 						{/each}
 					</svg>
-				{/if}
-
-				<!-- Legend -->
-				<div class="stats-legend">
-					<span class="stats-legend-item">
-						<span class="stats-dot" style="background: var(--peach-dark)"></span>
-						Lurar
-					</span>
-					<span class="stats-legend-item">
-						<span class="stats-dot" style="background: var(--moon)"></span>
-						Natt
-					</span>
+					<div class="stats-legend">
+						<span class="stats-legend-item"><span class="stats-dot" style="background: var(--peach-dark)"></span> Lurar</span>
+						<span class="stats-legend-item"><span class="stats-dot" style="background: var(--moon)"></span> Natt</span>
+					</div>
 				</div>
 			</div>
-		</div>
+		{/if}
 
-		<!-- 2. Wake windows -->
+		<!-- Chart B: Total Sleep vs Age Norms (hero chart) -->
+		{#if stats.sleepVsNorm && stats.sleepVsNorm.actualPath}
+			<div class="stats-section">
+				<h3 class="stats-section-title">Total søvn vs. anbefalt</h3>
+				<div class="stats-chart-wrap">
+					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
+						{#each stats.sleepVsNorm.gridLines as y}
+							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="0.5" />
+						{/each}
+						{#each stats.sleepVsNorm.yTicks as tick}
+							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
+						{/each}
+						<!-- Galland norm band -->
+						<path d={stats.sleepVsNorm.bandPath} fill="var(--lavender)" opacity="0.4" />
+						<!-- Typical line -->
+						<path d={stats.sleepVsNorm.typicalPath} fill="none" stroke="var(--lavender-dark)" stroke-width="1" stroke-dasharray="4,3" />
+						<!-- Actual sleep area -->
+						<path d={stats.sleepVsNorm.actualPath} fill="var(--moon)" opacity="0.6" />
+						<!-- Dots -->
+						{#each stats.sleepVsNorm.dots as dot}
+							<circle cx={dot.x} cy={dot.y} r="2.5" fill="var(--moon)" stroke="var(--white)" stroke-width="0.5" />
+						{/each}
+						{#each stats.sleepVsNorm.xLabels as lbl}
+							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="9" font-family="var(--font)">{lbl.label}</text>
+						{/each}
+					</svg>
+					<div class="stats-legend">
+						<span class="stats-legend-item"><span class="stats-dot" style="background: var(--moon)"></span> Faktisk søvn</span>
+						<span class="stats-legend-item"><span class="stats-dot" style="background: var(--lavender)"></span> Anbefalt (Galland)</span>
+					</div>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Chart C: Night Stretch Growth -->
+		{#if stats.nightStretchChart.linePath}
+			<div class="stats-section">
+				<h3 class="stats-section-title">Lengste nattestrekk</h3>
+				<div class="stats-chart-wrap">
+					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
+						{#each stats.nightStretchChart.gridLines as y}
+							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="0.5" />
+						{/each}
+						{#each stats.nightStretchChart.yTicks as tick}
+							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
+						{/each}
+						<!-- Area fill -->
+						<path d={stats.nightStretchChart.areaPath} fill="var(--moon-glow)" opacity="0.3" />
+						<!-- Line -->
+						<path d={stats.nightStretchChart.linePath} fill="none" stroke="var(--moon)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+						<!-- Dots -->
+						{#each stats.nightStretchChart.dots as dot}
+							<circle cx={dot.x} cy={dot.y} r="3" fill="var(--moon)" stroke="var(--white)" stroke-width="1" />
+						{/each}
+						{#each stats.nightStretchChart.xLabels as lbl}
+							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="9" font-family="var(--font)">{lbl.label}</text>
+						{/each}
+					</svg>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Wake windows -->
 		<div class="stats-section">
 			<h3 class="stats-section-title">Vakevindu</h3>
 			<div class="stats-row">
@@ -238,7 +236,7 @@
 			</div>
 		</div>
 
-		<!-- 3. Sleep trends 7d vs 30d -->
+		<!-- Sleep trends 7d vs 30d -->
 		<div class="stats-section">
 			<h3 class="stats-section-title">Søvntrendar</h3>
 			<div class="stats-trends-table">
@@ -252,7 +250,7 @@
 			</div>
 		</div>
 
-		<!-- 4. Best/worst days -->
+		<!-- Best/worst days -->
 		{#if stats.bestWorst}
 			<div class="stats-section">
 				<h3 class="stats-section-title">Best og verst</h3>
@@ -269,7 +267,7 @@
 			</div>
 		{/if}
 
-		<!-- 5. Diaper stats -->
+		<!-- Diaper stats -->
 		{#if stats.diaperStats7}
 			<div class="stats-section">
 				<h3 class="stats-section-title">Bleie/Do</h3>
@@ -292,7 +290,120 @@
 			</div>
 		{/if}
 
-		<!-- 6. Export -->
+		<!-- Advanced toggle -->
+		<div class="stats-section" style="text-align: center;">
+			<button
+				class="btn btn-ghost"
+				style="font-size: 0.85rem; color: var(--text-light);"
+				onclick={toggleAdvanced}
+			>
+				{showAdvanced ? 'Gøym avansert statistikk' : 'Vis avansert statistikk'}
+			</button>
+		</div>
+
+		<!-- Tier 2: Advanced charts -->
+		{#if showAdvanced}
+			<!-- Chart D: Sleep Timeline (Gantt) -->
+			{#if stats.gantt.rows.length > 0}
+				<div class="stats-section">
+					<h3 class="stats-section-title">Døgnrytme (14 dagar)</h3>
+					<div class="stats-chart-wrap" style="overflow-x: auto;">
+						<svg viewBox="0 0 {GANTT.W} {stats.gantt.height}" width="100%" class="stats-chart" shape-rendering="crispEdges">
+							<!-- Hour labels -->
+							{#each stats.gantt.hourLabels as lbl}
+								<text x={lbl.x} y={14} text-anchor="middle" fill="var(--text-light)" font-size="9" font-family="var(--font)" shape-rendering="auto">{lbl.label}</text>
+							{/each}
+							<!-- Rows -->
+							{#each stats.gantt.rows as row}
+								<!-- Date label -->
+								<text x={GANTT.PAD_L - 4} y={row.y + GANTT.ROW_H / 2 + 3} text-anchor="end" fill="var(--text-light)" font-size="9" font-family="var(--font)" shape-rendering="auto">{row.dateLabel}</text>
+								<!-- Row background -->
+								<rect x={GANTT.PAD_L} y={row.y} width={GANTT.W - GANTT.PAD_L - GANTT.PAD_R} height={GANTT.ROW_H - 2} fill="var(--cream-dark)" opacity="0.3" />
+								<!-- Sleep blocks -->
+								{#each row.blocks as block}
+									<rect
+										x={block.x}
+										y={block.y}
+										width={block.w}
+										height={GANTT.ROW_H - 6}
+										fill={block.type === 'nap' ? 'var(--peach-dark)' : 'var(--moon)'}
+									/>
+								{/each}
+							{/each}
+						</svg>
+						<div class="stats-legend">
+							<span class="stats-legend-item"><span class="stats-dot" style="background: var(--peach-dark)"></span> Lurar</span>
+							<span class="stats-legend-item"><span class="stats-dot" style="background: var(--moon)"></span> Natt</span>
+						</div>
+					</div>
+				</div>
+			{/if}
+
+			<!-- Chart E: 24h Sleep Heatmap -->
+			{#if stats.heatmapChart.cells.length > 0}
+				<div class="stats-section">
+					<h3 class="stats-section-title">Søvnkart (14 dagar)</h3>
+					<div class="stats-chart-wrap" style="overflow-x: auto;">
+						<svg viewBox="0 0 {stats.heatmapChart.width} {stats.heatmapChart.height}" width="100%" class="stats-chart" shape-rendering="crispEdges">
+							<!-- Hour labels -->
+							{#each stats.heatmapChart.hourLabels as lbl}
+								<text x={lbl.x} y={12} text-anchor="middle" fill="var(--text-light)" font-size="8" font-family="var(--font)" shape-rendering="auto">{lbl.label}</text>
+							{/each}
+							<!-- Date labels -->
+							{#each stats.heatmapChart.dateLabels as lbl}
+								<text x={lbl.x} y={lbl.y} text-anchor="end" fill="var(--text-light)" font-size="8" font-family="var(--font)" shape-rendering="auto">{lbl.label}</text>
+							{/each}
+							<!-- Cells -->
+							{#each stats.heatmapChart.cells as cell}
+								<rect
+									x={cell.x}
+									y={cell.y}
+									width={cell.w}
+									height={cell.h}
+									fill="var(--moon)"
+									opacity={Math.max(0.05, cell.opacity)}
+								/>
+							{/each}
+						</svg>
+					</div>
+				</div>
+			{/if}
+
+			<!-- Chart F: Wake Window Scatter -->
+			{#if stats.wakeScatter.dots.length > 0}
+				<div class="stats-section">
+					<h3 class="stats-section-title">Vakevindu-spreiing (7 dagar)</h3>
+					<div class="stats-chart-wrap">
+						<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
+							{#each stats.wakeScatter.gridLines as y}
+								<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="0.5" />
+							{/each}
+							{#each stats.wakeScatter.yTicks as tick}
+								<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
+							{/each}
+							<!-- Recommended range band -->
+							{#if stats.wakeScatter.bandY}
+								<rect
+									x={TS_CHART.PAD_L}
+									y={stats.wakeScatter.bandY.top}
+									width={TS_CHART.W - TS_CHART.PAD_L - TS_CHART.PAD_R}
+									height={stats.wakeScatter.bandY.bottom - stats.wakeScatter.bandY.top}
+									fill="var(--lavender)"
+									opacity="0.3"
+									rx="4"
+								/>
+							{/if}
+							<!-- Dots -->
+							{#each stats.wakeScatter.dots as dot}
+								<circle cx={dot.x} cy={dot.y} r="4" fill="var(--peach-dark)" stroke="var(--white)" stroke-width="1" opacity="0.8" />
+							{/each}
+						</svg>
+					</div>
+				</div>
+			{/if}
+		{/if}
+
+		<!-- Export -->
 		<div class="stats-section">
 			<h3 class="stats-section-title">Eksport</h3>
 			<div class="stats-row" style="gap: 8px;">

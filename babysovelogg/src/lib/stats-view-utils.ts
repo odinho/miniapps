@@ -1,7 +1,18 @@
 import type { SleepEntry, DiaperLogRow } from "$lib/types.js";
-import { getWeekStats, getAverageWakeWindow, type WeekStats } from "$lib/engine/stats.js";
+import {
+	getWeekStats,
+	getAverageWakeWindow,
+	getLongestNightStretches,
+	getWakeWindowGaps,
+	buildSleepHeatmap,
+	type WeekStats,
+	type NightStretch,
+	type WakeWindowGap,
+	type HeatmapRow,
+} from "$lib/engine/stats.js";
 import { formatDuration } from "$lib/utils.js";
 import { isoToDateInTz } from "$lib/tz.js";
+import { regressionEquations, sleepDuration } from "$lib/data/galland2012.js";
 
 // ── SVG bar chart helpers ──────────────────────────────────────
 
@@ -95,6 +106,519 @@ export function buildBarGeometries(bars: BarData[], maxMin: number): BarGeometry
 		const nightH = (bar.nightMin / maxMin) * chartH;
 		return { bar, x, barW, baseY, napH, nightH };
 	});
+}
+
+// ── Time-series chart shared config ────────────────────────────
+
+export const TS_CHART = {
+	W: 360,
+	H: 200,
+	PAD_L: 40,
+	PAD_R: 12,
+	PAD_T: 16,
+	PAD_B: 32,
+} as const;
+
+function tsPlotW(): number { return TS_CHART.W - TS_CHART.PAD_L - TS_CHART.PAD_R; }
+function tsPlotH(): number { return TS_CHART.H - TS_CHART.PAD_T - TS_CHART.PAD_B; }
+
+/** Map a day index to X coordinate within the time-series plot area. */
+function tsX(index: number, total: number): number {
+	if (total <= 1) return TS_CHART.PAD_L + tsPlotW() / 2;
+	return TS_CHART.PAD_L + (index / (total - 1)) * tsPlotW();
+}
+
+// ── Chart B: Total Sleep vs Age Norms ─────────────────────────
+
+export interface NormBandPoint {
+	x: number;
+	yMin: number;
+	yMax: number;
+	yTypical: number;
+}
+
+export interface SleepVsNormData {
+	/** SVG path for the actual sleep area (filled) */
+	actualPath: string;
+	/** SVG path for the norm band (filled, translucent) */
+	bandPath: string;
+	/** SVG path for the norm typical line */
+	typicalPath: string;
+	/** Dot positions for actual data points */
+	dots: { x: number; y: number; hours: number; date: string }[];
+	/** Y-axis ticks */
+	yTicks: { y: number; label: string }[];
+	/** X-axis date labels (sparse — first, middle, last) */
+	xLabels: { x: number; label: string }[];
+	/** Grid lines (y values) */
+	gridLines: number[];
+	maxHours: number;
+}
+
+/** Get Galland norm range for a given age in months, interpolated from discrete bands. */
+function gallandRange(ageMonths: number): { min: number; max: number; typical: number } {
+	const typical = regressionEquations.sleepDurationHours(Math.max(0.01, ageMonths / 12));
+	// Find matching band for upper/lower
+	const bands = sleepDuration.ageBands.filter((b) => !("note" in b));
+	for (const b of bands) {
+		if (ageMonths >= b.ageMonths[0] && ageMonths <= b.ageMonths[1]) {
+			return { min: b.lower, max: b.upper, typical };
+		}
+	}
+	// Fallback: use regression ± 3h
+	return { min: typical - 3, max: typical + 3, typical };
+}
+
+export function buildSleepVsNorm(
+	days: { date: string; totalHours: number }[],
+	birthdate: string,
+): SleepVsNormData {
+	if (days.length === 0) {
+		return { actualPath: "", bandPath: "", typicalPath: "", dots: [], yTicks: [], xLabels: [], gridLines: [], maxHours: 0 };
+	}
+
+	const birthMs = new Date(birthdate).getTime();
+	const n = days.length;
+
+	// Compute age at each day and norm values
+	const points = days.map((d, i) => {
+		const dayMs = new Date(d.date + "T12:00:00").getTime();
+		const ageMonths = Math.max(0, (dayMs - birthMs) / (30.44 * 24 * 60 * 60 * 1000));
+		const norm = gallandRange(ageMonths);
+		return { ...d, i, ageMonths, norm };
+	});
+
+	// Determine Y-axis range
+	const allValues = points.flatMap((p) => [p.totalHours, p.norm.max, p.norm.min]);
+	const maxHours = Math.ceil(Math.max(...allValues) + 0.5);
+	const minHours = Math.max(0, Math.floor(Math.min(...allValues) - 0.5));
+	const range = maxHours - minHours || 1;
+
+	// Y mapping relative to minHours
+	const yMap = (h: number) => TS_CHART.PAD_T + tsPlotH() - ((h - minHours) / range) * tsPlotH();
+
+	// Build actual sleep area path (area from baseline to data)
+	const baseY = yMap(minHours);
+	const actualPoints = points.map((p) => `${tsX(p.i, n)},${yMap(p.totalHours)}`);
+	const actualPath = `M${tsX(0, n)},${baseY} L${actualPoints.join(" L")} L${tsX(n - 1, n)},${baseY} Z`;
+
+	// Build norm band polygon (upper forward, lower backward)
+	const upperPoints = points.map((p) => `${tsX(p.i, n)},${yMap(p.norm.max)}`);
+	const lowerPoints = points.map((p) => `${tsX(p.i, n)},${yMap(p.norm.min)}`).toReversed();
+	const bandPath = `M${upperPoints.join(" L")} L${lowerPoints.join(" L")} Z`;
+
+	// Typical line
+	const typicalPoints = points.map((p) => `${tsX(p.i, n)},${yMap(p.norm.typical)}`);
+	const typicalPath = `M${typicalPoints.join(" L")}`;
+
+	// Dots
+	const dots = points.map((p) => ({
+		x: tsX(p.i, n),
+		y: yMap(p.totalHours),
+		hours: Math.round(p.totalHours * 10) / 10,
+		date: p.date,
+	}));
+
+	// Y-axis ticks (every 2 hours within range)
+	const yTicks: { y: number; label: string }[] = [];
+	const gridLines: number[] = [];
+	for (let h = Math.ceil(minHours); h <= maxHours; h += 2) {
+		const y = yMap(h);
+		yTicks.push({ y, label: `${h}t` });
+		gridLines.push(y);
+	}
+
+	// X-axis labels (sparse)
+	const xLabels: { x: number; label: string }[] = [];
+	const labelIndices = n <= 7
+		? points.map((_, i) => i)
+		: [0, Math.floor(n / 2), n - 1];
+	for (const i of labelIndices) {
+		xLabels.push({
+			x: tsX(i, n),
+			label: new Date(points[i].date + "T12:00:00").toLocaleDateString("nb-NO", { day: "numeric", month: "short" }),
+		});
+	}
+
+	return { actualPath, bandPath, typicalPath, dots, yTicks, xLabels, gridLines, maxHours };
+}
+
+// ── Chart A: 30-Day Stacked Area Trend ────────────────────────
+
+export interface StackedAreaData {
+	/** SVG path for night sleep (bottom area) */
+	nightPath: string;
+	/** SVG path for nap sleep (top area, stacked on night) */
+	napPath: string;
+	/** Y-axis ticks */
+	yTicks: { y: number; label: string }[];
+	/** X-axis labels */
+	xLabels: { x: number; label: string }[];
+	/** Grid lines */
+	gridLines: number[];
+	maxHours: number;
+}
+
+export function buildStackedArea(
+	days: { date: string; napMin: number; nightMin: number }[],
+): StackedAreaData {
+	if (days.length === 0) {
+		return { nightPath: "", napPath: "", yTicks: [], xLabels: [], gridLines: [], maxHours: 0 };
+	}
+
+	const n = days.length;
+	const maxMin = Math.max(60, ...days.map((d) => d.napMin + d.nightMin));
+	const maxHours = Math.ceil(maxMin / 60);
+	const plotH = tsPlotH();
+	const baseY = TS_CHART.PAD_T + plotH;
+
+	const yMap = (min: number) => baseY - (min / maxMin) * plotH;
+
+	// Night area: baseline → night values → baseline
+	const nightTopPoints = days.map((d, i) => `${tsX(i, n)},${yMap(d.nightMin)}`);
+	const nightPath = `M${tsX(0, n)},${baseY} L${nightTopPoints.join(" L")} L${tsX(n - 1, n)},${baseY} Z`;
+
+	// Nap area: night top → total top → night top (reversed)
+	const totalTopPoints = days.map((d, i) => `${tsX(i, n)},${yMap(d.nightMin + d.napMin)}`);
+	const napPath = `M${nightTopPoints.join(" L")} L${totalTopPoints.toReversed().join(" L")} Z`;
+
+	// Y-axis ticks
+	const yTicks: { y: number; label: string }[] = [];
+	const gridLines: number[] = [];
+	const step = maxHours <= 6 ? 1 : 2;
+	for (let h = step; h <= maxHours; h += step) {
+		const y = yMap(h * 60);
+		yTicks.push({ y, label: `${h}t` });
+		gridLines.push(y);
+	}
+
+	// X-axis labels
+	const xLabels: { x: number; label: string }[] = [];
+	const labelIndices = n <= 7
+		? days.map((_, i) => i)
+		: [0, Math.floor(n / 2), n - 1];
+	for (const i of labelIndices) {
+		xLabels.push({
+			x: tsX(i, n),
+			label: new Date(days[i].date + "T12:00:00").toLocaleDateString("nb-NO", { day: "numeric", month: "short" }),
+		});
+	}
+
+	return { nightPath, napPath, yTicks, xLabels, gridLines, maxHours };
+}
+
+// ── Chart C: Night Stretch Growth ─────────────────────────────
+
+export interface NightStretchChartData {
+	/** SVG polyline path for the line */
+	linePath: string;
+	/** SVG area path (filled under line) */
+	areaPath: string;
+	/** Dot positions */
+	dots: { x: number; y: number; hours: number; date: string }[];
+	/** Y-axis ticks */
+	yTicks: { y: number; label: string }[];
+	/** X-axis labels */
+	xLabels: { x: number; label: string }[];
+	/** Grid lines */
+	gridLines: number[];
+	maxHours: number;
+}
+
+export function buildNightStretchChart(
+	stretches: NightStretch[],
+): NightStretchChartData {
+	if (stretches.length === 0) {
+		return { linePath: "", areaPath: "", dots: [], yTicks: [], xLabels: [], gridLines: [], maxHours: 0 };
+	}
+
+	const n = stretches.length;
+	const maxMin = Math.max(60, ...stretches.map((s) => s.minutes));
+	const maxHours = Math.ceil(maxMin / 60);
+	const plotH = tsPlotH();
+	const baseY = TS_CHART.PAD_T + plotH;
+
+	const yMap = (min: number) => baseY - (min / maxMin) * plotH;
+
+	const linePoints = stretches.map((s, i) => `${tsX(i, n)},${yMap(s.minutes)}`);
+	const linePath = `M${linePoints.join(" L")}`;
+	const areaPath = `M${tsX(0, n)},${baseY} L${linePoints.join(" L")} L${tsX(n - 1, n)},${baseY} Z`;
+
+	const dots = stretches.map((s, i) => ({
+		x: tsX(i, n),
+		y: yMap(s.minutes),
+		hours: Math.round((s.minutes / 60) * 10) / 10,
+		date: s.date,
+	}));
+
+	const yTicks: { y: number; label: string }[] = [];
+	const gridLines: number[] = [];
+	const step = maxHours <= 4 ? 1 : 2;
+	for (let h = step; h <= maxHours; h += step) {
+		const y = yMap(h * 60);
+		yTicks.push({ y, label: `${h}t` });
+		gridLines.push(y);
+	}
+
+	const xLabels: { x: number; label: string }[] = [];
+	const labelIndices = n <= 7
+		? stretches.map((_, i) => i)
+		: [0, Math.floor(n / 2), n - 1];
+	for (const i of labelIndices) {
+		xLabels.push({
+			x: tsX(i, n),
+			label: new Date(stretches[i].date + "T12:00:00").toLocaleDateString("nb-NO", { day: "numeric", month: "short" }),
+		});
+	}
+
+	return { linePath, areaPath, dots, yTicks, xLabels, gridLines, maxHours };
+}
+
+// ── Chart D: Sleep Timeline (Gantt) ───────────────────────────
+
+export const GANTT = {
+	W: 360,
+	ROW_H: 20,
+	PAD_L: 56,
+	PAD_R: 8,
+	PAD_T: 24,
+	HOUR_START: 18, // 18:00 left edge (night-centered)
+} as const;
+
+export interface GanttBlock {
+	x: number;
+	w: number;
+	y: number;
+	type: "nap" | "night";
+}
+
+export interface GanttRow {
+	date: string;
+	dateLabel: string;
+	y: number;
+	blocks: GanttBlock[];
+}
+
+export interface GanttChartData {
+	rows: GanttRow[];
+	hourLabels: { x: number; label: string }[];
+	height: number;
+}
+
+export function buildGanttChart(
+	sleeps: SleepEntry[],
+	days: number,
+	tz?: string,
+): GanttChartData {
+	const completed = sleeps.filter((s) => s.end_time);
+	if (completed.length === 0) return { rows: [], hourLabels: [], height: 0 };
+
+	const plotW = GANTT.W - GANTT.PAD_L - GANTT.PAD_R;
+	const hoursSpan = 24;
+
+	// Map an hour (0-23) to x position on the 18:00–18:00 axis
+	const hourToX = (h: number): number => {
+		let offset = h - GANTT.HOUR_START;
+		if (offset < 0) offset += 24;
+		return GANTT.PAD_L + (offset / hoursSpan) * plotW;
+	};
+
+	// Group by "gantt date" — a day runs 18:00 to 18:00, so we key on the evening date
+	const byGanttDate = new Map<string, SleepEntry[]>();
+	for (const s of completed) {
+		const startDate = new Date(s.start_time);
+		const localHour = tz
+			? parseFloat(new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false }).format(startDate).replace(":", "."))
+			: startDate.getHours() + startDate.getMinutes() / 60;
+		const dateStr = tz ? isoToDateInTz(s.start_time, tz) : s.start_time.slice(0, 10);
+
+		// If before 18:00, belongs to previous evening's row
+		let ganttDate: string;
+		if (localHour < GANTT.HOUR_START) {
+			const prevDay = new Date(dateStr + "T12:00:00");
+			prevDay.setDate(prevDay.getDate() - 1);
+			ganttDate = prevDay.toISOString().slice(0, 10);
+		} else {
+			ganttDate = dateStr;
+		}
+
+		if (!byGanttDate.has(ganttDate)) byGanttDate.set(ganttDate, []);
+		byGanttDate.get(ganttDate)!.push(s);
+	}
+
+	// Sort dates and take last N days
+	const sortedDates = [...byGanttDate.keys()].toSorted().slice(-days);
+
+	const rows: GanttRow[] = sortedDates.map((date, i) => {
+		const y = GANTT.PAD_T + i * GANTT.ROW_H;
+		const entries = byGanttDate.get(date) ?? [];
+		const blocks: GanttBlock[] = [];
+
+		for (const s of entries) {
+			const startDate = new Date(s.start_time);
+			const endDate = new Date(s.end_time!);
+
+			const startH = tz
+				? getLocalHourFrac(startDate, tz)
+				: startDate.getHours() + startDate.getMinutes() / 60;
+			const durationH = (endDate.getTime() - startDate.getTime()) / 3600000;
+
+			const x = hourToX(startH);
+			const endX = hourToX((startH + durationH) % 24);
+			// Handle wrap-around (sleep crossing the 18:00 boundary is rare but possible)
+			const w = endX > x ? endX - x : Math.max(2, (plotW - (x - GANTT.PAD_L)) + (endX - GANTT.PAD_L));
+
+			blocks.push({ x, w: Math.max(2, w), y: y + 2, type: s.type });
+		}
+
+		return {
+			date,
+			dateLabel: new Date(date + "T12:00:00").toLocaleDateString("nb-NO", { weekday: "short", day: "numeric" }),
+			y,
+			blocks,
+		};
+	});
+
+	// Hour labels along top
+	const hourLabels: { x: number; label: string }[] = [];
+	for (let h = GANTT.HOUR_START; h < GANTT.HOUR_START + 24; h += 3) {
+		const displayH = h % 24;
+		hourLabels.push({ x: hourToX(displayH), label: `${String(displayH).padStart(2, "0")}` });
+	}
+
+	const height = GANTT.PAD_T + sortedDates.length * GANTT.ROW_H + 8;
+
+	return { rows, hourLabels, height };
+}
+
+function getLocalHourFrac(date: Date, tz: string): number {
+	const parts = new Intl.DateTimeFormat("en-GB", {
+		timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false,
+	}).formatToParts(date);
+	const h = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+	const m = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+	return (h % 24) + m / 60;
+}
+
+// ── Chart E: Heatmap geometry ─────────────────────────────────
+
+export const HEATMAP = {
+	W: 360,
+	CELL_W: 13,
+	CELL_H: 14,
+	PAD_L: 56,
+	PAD_T: 20,
+	PAD_R: 8,
+	GAP: 1,
+} as const;
+
+export interface HeatmapCellGeo {
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+	minutes: number;
+	opacity: number;
+}
+
+export interface HeatmapChartData {
+	cells: HeatmapCellGeo[];
+	dateLabels: { x: number; y: number; label: string }[];
+	hourLabels: { x: number; label: string }[];
+	height: number;
+	width: number;
+}
+
+export function buildHeatmapChart(heatmapRows: HeatmapRow[], days: number): HeatmapChartData {
+	const rows = heatmapRows.slice(-days);
+	if (rows.length === 0) return { cells: [], dateLabels: [], hourLabels: [], height: 0, width: 0 };
+
+	const cellW = HEATMAP.CELL_W;
+	const cellH = HEATMAP.CELL_H;
+	const gap = HEATMAP.GAP;
+
+	const cells: HeatmapCellGeo[] = [];
+	const dateLabels: { x: number; y: number; label: string }[] = [];
+
+	for (let r = 0; r < rows.length; r++) {
+		const row = rows[r];
+		const y = HEATMAP.PAD_T + r * (cellH + gap);
+
+		dateLabels.push({
+			x: HEATMAP.PAD_L - 4,
+			y: y + cellH / 2 + 3,
+			label: new Date(row.date + "T12:00:00").toLocaleDateString("nb-NO", { weekday: "short", day: "numeric" }),
+		});
+
+		for (let h = 0; h < 24; h++) {
+			const x = HEATMAP.PAD_L + h * (cellW + gap);
+			const minutes = row.hours[h];
+			const opacity = Math.min(1, minutes / 60);
+			cells.push({ x, y, w: cellW, h: cellH, minutes, opacity });
+		}
+	}
+
+	const hourLabels: { x: number; label: string }[] = [];
+	for (let h = 0; h < 24; h += 3) {
+		hourLabels.push({
+			x: HEATMAP.PAD_L + h * (cellW + gap) + cellW / 2,
+			label: `${String(h).padStart(2, "0")}`,
+		});
+	}
+
+	const width = HEATMAP.PAD_L + 24 * (cellW + gap) + HEATMAP.PAD_R;
+	const height = HEATMAP.PAD_T + rows.length * (cellH + gap) + 8;
+
+	return { cells, dateLabels, hourLabels, height, width };
+}
+
+// ── Chart F: Wake Window Scatter ──────────────────────────────
+
+export interface WakeScatterData {
+	dots: { x: number; y: number; minutes: number }[];
+	bandY: { top: number; bottom: number } | null;
+	yTicks: { y: number; label: string }[];
+	gridLines: number[];
+	maxMin: number;
+}
+
+export function buildWakeScatter(
+	gaps: WakeWindowGap[],
+	recommendedRange?: { min: number; max: number },
+): WakeScatterData {
+	if (gaps.length === 0) return { dots: [], bandY: null, yTicks: [], gridLines: [], maxMin: 0 };
+
+	const n = gaps.length;
+	const maxMin = Math.max(180, ...gaps.map((g) => g.minutes));
+	const plotH = tsPlotH();
+	const baseY = TS_CHART.PAD_T + plotH;
+
+	const yMap = (min: number) => baseY - (min / maxMin) * plotH;
+
+	const dots = gaps.map((g, i) => ({
+		x: tsX(i, n),
+		y: yMap(g.minutes),
+		minutes: g.minutes,
+	}));
+
+	let bandY: { top: number; bottom: number } | null = null;
+	if (recommendedRange) {
+		bandY = {
+			top: yMap(recommendedRange.max),
+			bottom: yMap(recommendedRange.min),
+		};
+	}
+
+	const yTicks: { y: number; label: string }[] = [];
+	const gridLines: number[] = [];
+	const stepMin = maxMin <= 180 ? 30 : 60;
+	for (let m = stepMin; m <= maxMin; m += stepMin) {
+		const y = yMap(m);
+		yTicks.push({ y, label: m >= 60 ? `${Math.round(m / 60)}t` : `${m}m` });
+		gridLines.push(y);
+	}
+
+	return { dots, bandY, yTicks, gridLines, maxMin };
 }
 
 // ── Data fetching ──────────────────────────────────────────────
@@ -261,12 +785,24 @@ export interface ComputedStats {
 	bestWorst: BestWorst | null;
 	diaperStats7: DiaperStats | null;
 	diaperStats30: DiaperStats | null;
+	// Tier 1 charts
+	stackedArea: StackedAreaData;
+	sleepVsNorm: SleepVsNormData | null;
+	nightStretchChart: NightStretchChartData;
+	// Tier 2 (advanced) charts
+	gantt: GanttChartData;
+	heatmapChart: HeatmapChartData;
+	wakeScatter: WakeScatterData;
+	nightStretches: NightStretch[];
+	wakeGaps: WakeWindowGap[];
+	heatmap: HeatmapRow[];
 }
 
 export function computeAllStats(
 	sleeps: SleepEntry[],
 	diapers: DiaperLogRow[],
 	tz?: string,
+	birthdate?: string,
 ): ComputedStats {
 	const mapped: SleepEntry[] = sleeps.map((s) => ({
 		start_time: s.start_time,
@@ -300,6 +836,35 @@ export function computeAllStats(
 	const diaperStats7 = diapers.length > 0 ? computeDiaperStats(week7Diapers, tz) : null;
 	const diaperStats30 = diapers.length > 0 ? computeDiaperStats(diapers, tz) : null;
 
+	// New charts: stacked area from allStats days
+	const stackedAreaDays = allStats.days.map((d) => ({
+		date: d.date,
+		napMin: d.stats.totalNapMinutes,
+		nightMin: d.stats.totalNightMinutes,
+	}));
+	const stackedArea = buildStackedArea(stackedAreaDays);
+
+	// Sleep vs age norms (requires birthdate)
+	let sleepVsNorm: SleepVsNormData | null = null;
+	if (birthdate) {
+		const normDays = allStats.days.map((d) => ({
+			date: d.date,
+			totalHours: (d.stats.totalNapMinutes + d.stats.totalNightMinutes) / 60,
+		}));
+		sleepVsNorm = buildSleepVsNorm(normDays, birthdate);
+	}
+
+	// Night stretch growth
+	const nightStretches = getLongestNightStretches(mapped, tz);
+	const nightStretchChart = buildNightStretchChart(nightStretches);
+
+	// Tier 2: advanced charts
+	const wakeGaps = getWakeWindowGaps(week7);
+	const heatmap = buildSleepHeatmap(mapped, tz);
+	const gantt = buildGanttChart(mapped, 14, tz);
+	const heatmapChart = buildHeatmapChart(heatmap, 14);
+	const wakeScatter = buildWakeScatter(wakeGaps);
+
 	return {
 		weekStats,
 		allStats,
@@ -313,5 +878,14 @@ export function computeAllStats(
 		bestWorst,
 		diaperStats7,
 		diaperStats30,
+		stackedArea,
+		sleepVsNorm,
+		nightStretchChart,
+		gantt,
+		heatmapChart,
+		wakeScatter,
+		nightStretches,
+		wakeGaps,
+		heatmap,
 	};
 }
