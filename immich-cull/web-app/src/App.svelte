@@ -5,7 +5,7 @@
   import InfoPanel from './components/InfoPanel.svelte';
   import {
     fetchGroups, fetchGroup, fetchBatches, fetchBatch, fetchStats,
-    decideGroup, undecideGroup, rankBatch, fmt,
+    decideGroup, undecideGroup, rankBatch, savePhotoDecisions, fetchPhotoDecisions, fmt,
     type GroupSummary, type GroupDetail, type BatchSummary, type BatchDetail,
     type LlmImage, type Stats,
   } from './lib/api';
@@ -51,6 +51,7 @@
     if (!selectedAsset) return;
     userStars[selectedAsset.id] = stars;
     userStars = userStars;
+    savePhotoDecisions([{ assetId: selectedAsset.id, state: states[selectedAsset.id] ?? null, userStars: stars }]);
   }
 
   function buildLlmMap(bd: BatchDetail | null): Record<string, LlmImage> {
@@ -91,21 +92,29 @@
     }
   });
 
+  async function loadPhotoStates(assets: { id: string }[]) {
+    const ids = assets.map(a => a.id);
+    const saved = await fetchPhotoDecisions(ids);
+    for (const [id, d] of Object.entries(saved)) {
+      if (d.state) states[id] = d.state as AssetState;
+      if (d.userStars != null) userStars[id] = d.userStars;
+    }
+    for (const a of assets) if (!(a.id in states)) states[a.id] = null;
+    states = states;
+    userStars = userStars;
+  }
+
   async function selectGroup(idx: number) {
     groupIdx = idx; selectedIdx = 0; showPreview = false;
     groupDetail = await fetchGroup(`group-${idx}`);
-    if (groupDetail?.decision && !groupDetail.decision.skipped) {
-      for (const id of groupDetail.decision.keep) states[id] = 'keep';
-      for (const id of groupDetail.decision.cull) states[id] = 'cull';
-    }
-    for (const a of groupDetail?.assets ?? []) if (!(a.id in states)) states[a.id] = null;
-    states = states;
+    await loadPhotoStates(groupDetail?.assets ?? []);
     history.replaceState(null, '', `#group/${idx}`);
   }
 
   async function selectBatch(idx: number) {
     batchIdx = idx; selectedIdx = 0; showPreview = false;
     batchDetail = await fetchBatch(batches[idx].id);
+    await loadPhotoStates(batchDetail?.assets ?? []);
     history.replaceState(null, '', `#batch/${batches[idx].id}`);
   }
 
@@ -122,20 +131,34 @@
   function mark(s: 'keep' | 'cull') {
     if (selectedIdx < 0) selectedIdx = 0;
     const a = currentAssets[selectedIdx]; if (!a) return;
-    states[a.id] = states[a.id] === s ? null : s;
+    const newState = states[a.id] === s ? null : s;
+    states[a.id] = newState;
     states = states;
+    savePhotoDecisions([{ assetId: a.id, state: newState, userStars: userStars[a.id] ?? null }]);
     if (selectedIdx < currentAssets.length - 1) selectedIdx++;
   }
 
   function keepBestCullRest() {
     if (selectedIdx < 0) selectedIdx = 0;
-    for (let i = 0; i < currentAssets.length; i++) states[currentAssets[i].id] = i === selectedIdx ? 'keep' : 'cull';
+    const decisions: Array<{ assetId: string; state: string | null; userStars: number | null }> = [];
+    for (let i = 0; i < currentAssets.length; i++) {
+      const s = i === selectedIdx ? 'keep' : 'cull';
+      states[currentAssets[i].id] = s;
+      decisions.push({ assetId: currentAssets[i].id, state: s, userStars: userStars[currentAssets[i].id] ?? null });
+    }
     states = states;
+    savePhotoDecisions(decisions);
   }
 
   function keepFirstN(n: number) {
-    for (let i = 0; i < currentAssets.length; i++) states[currentAssets[i].id] = i < n ? 'keep' : 'cull';
+    const decisions: Array<{ assetId: string; state: string | null; userStars: number | null }> = [];
+    for (let i = 0; i < currentAssets.length; i++) {
+      const s = i < n ? 'keep' : 'cull';
+      states[currentAssets[i].id] = s;
+      decisions.push({ assetId: currentAssets[i].id, state: s, userStars: userStars[currentAssets[i].id] ?? null });
+    }
     states = states;
+    savePhotoDecisions(decisions);
   }
 
   async function approve() {
@@ -205,9 +228,15 @@
       case 'Escape': showPreview = false; break;
       case ' ': e.preventDefault(); if (selectedIdx >= 0) showPreview = !showPreview; break;
       case 'k': case 'j': mark('keep'); break;
-      case 'K': case 'J': for (const a of currentAssets) states[a.id] = 'keep'; states = states; break;
+      case 'K': case 'J':
+        for (const a of currentAssets) states[a.id] = 'keep'; states = states;
+        savePhotoDecisions(currentAssets.map(a => ({ assetId: a.id, state: 'keep', userStars: userStars[a.id] ?? null })));
+        break;
       case 'x': case 'f': mark('cull'); break;
-      case 'X': case 'F': for (const a of currentAssets) states[a.id] = 'cull'; states = states; break;
+      case 'X': case 'F':
+        for (const a of currentAssets) states[a.id] = 'cull'; states = states;
+        savePhotoDecisions(currentAssets.map(a => ({ assetId: a.id, state: 'cull', userStars: userStars[a.id] ?? null })));
+        break;
       case 'b': case 'B': keepBestCullRest(); break;
       case 'a': case 'Enter': e.preventDefault(); approve(); break;
       case 's': if (!shift) skip(); break;

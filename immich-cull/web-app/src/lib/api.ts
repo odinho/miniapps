@@ -90,6 +90,20 @@ export async function fetchBatch(id: string): Promise<BatchDetail> {
   return (await fetch(`${BASE}/api/batches/${id}`)).json();
 }
 
+export async function savePhotoDecisions(decisions: Array<{ assetId: string; state: string | null; userStars: number | null }>) {
+  return (await fetch(`${BASE}/api/photos/decisions`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ decisions }),
+  })).json();
+}
+
+export async function fetchPhotoDecisions(assetIds: string[]): Promise<Record<string, { state: string | null; userStars: number | null }>> {
+  return (await fetch(`${BASE}/api/photos/decisions/get`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ assetIds }),
+  })).json();
+}
+
 export async function rankBatch(id: string) {
   return (await fetch(`${BASE}/api/batches/${id}/rank`, { method: 'POST' })).json();
 }

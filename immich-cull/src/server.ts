@@ -419,6 +419,21 @@ app.post<{ Params: { id: string } }>("/api/batches/:id/rank", async (req) => {
   return { cached: false, response, inputTokens, outputTokens };
 });
 
+// === Per-photo decisions (shared across all views) ===
+
+/** Save decisions for multiple photos */
+app.post<{ Body: { decisions: Array<{ assetId: string; state: string | null; userStars: number | null }> } }>(
+  "/api/photos/decisions", async (req) => {
+    stateDb.savePhotoDecisions(req.body.decisions);
+    return { ok: true, count: req.body.decisions.length };
+  }
+);
+
+/** Get decisions for a list of photos */
+app.post<{ Body: { assetIds: string[] } }>("/api/photos/decisions/get", async (req) => {
+  return stateDb.getPhotoDecisions(req.body.assetIds);
+});
+
 app.get("/", async (_, reply) => {
   reply.type("text/html");
   return readFileSync(resolve(__dirname, "../web/index.html"), "utf-8");

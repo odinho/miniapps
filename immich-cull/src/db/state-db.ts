@@ -17,7 +17,7 @@ export interface StoredDecision {
   decidedAt: string;
 }
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 export class StateDb {
   private db: Database.Database;
@@ -115,6 +115,17 @@ export class StateDb {
           rationale TEXT NOT NULL DEFAULT '',
           confidence REAL NOT NULL DEFAULT 0,
           created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+      `);
+    }
+
+    if (currentVersion < 3) {
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS photo_decisions (
+          asset_id TEXT PRIMARY KEY,
+          state TEXT,                     -- 'keep' | 'cull' | null
+          user_stars INTEGER,             -- 0-5, null = no override
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
       `);
     }
@@ -226,6 +237,61 @@ export class StateDb {
       "SELECT id, response_json FROM llm_batch_runs WHERE batch_id = ? AND batch_fingerprint = ? AND status = 'completed' ORDER BY id DESC LIMIT 1"
     ).get(batchId, fingerprint) as any;
     return row ? { id: row.id, responseJson: row.response_json } : null;
+  }
+
+  // === Per-photo decisions (shared across all views) ===
+
+  savePhotoDecision(assetId: string, state: string | null, userStars: number | null) {
+    this.db.prepare(`
+      INSERT INTO photo_decisions (asset_id, state, user_stars, updated_at)
+      VALUES (?, ?, ?, datetime('now'))
+      ON CONFLICT(asset_id) DO UPDATE SET
+        state = excluded.state,
+        user_stars = excluded.user_stars,
+        updated_at = datetime('now')
+    `).run(assetId, state, userStars);
+  }
+
+  savePhotoDecisions(decisions: Array<{ assetId: string; state: string | null; userStars: number | null }>) {
+    const stmt = this.db.prepare(`
+      INSERT INTO photo_decisions (asset_id, state, user_stars, updated_at)
+      VALUES (?, ?, ?, datetime('now'))
+      ON CONFLICT(asset_id) DO UPDATE SET
+        state = excluded.state,
+        user_stars = excluded.user_stars,
+        updated_at = datetime('now')
+    `);
+    const batch = this.db.transaction(() => {
+      for (const d of decisions) stmt.run(d.assetId, d.state, d.userStars);
+    });
+    batch();
+  }
+
+  getPhotoDecisions(assetIds: string[]): Record<string, { state: string | null; userStars: number | null }> {
+    const result: Record<string, { state: string | null; userStars: number | null }> = {};
+    // SQLite has a limit on placeholders, batch in chunks
+    for (let i = 0; i < assetIds.length; i += 500) {
+      const chunk = assetIds.slice(i, i + 500);
+      const placeholders = chunk.map(() => '?').join(',');
+      const rows = this.db.prepare(
+        `SELECT asset_id, state, user_stars FROM photo_decisions WHERE asset_id IN (${placeholders})`
+      ).all(...chunk) as any[];
+      for (const row of rows) {
+        result[row.asset_id] = { state: row.state, userStars: row.user_stars };
+      }
+    }
+    return result;
+  }
+
+  getAllPhotoDecisionStats(): { kept: number; culled: number; starred: number } {
+    const row = this.db.prepare(`
+      SELECT
+        SUM(CASE WHEN state = 'keep' THEN 1 ELSE 0 END) as kept,
+        SUM(CASE WHEN state = 'cull' THEN 1 ELSE 0 END) as culled,
+        SUM(CASE WHEN user_stars > 0 THEN 1 ELSE 0 END) as starred
+      FROM photo_decisions
+    `).get() as any;
+    return { kept: row?.kept ?? 0, culled: row?.culled ?? 0, starred: row?.starred ?? 0 };
   }
 
   // === Stats ===
