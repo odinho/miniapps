@@ -88,7 +88,7 @@ export class LlmClient {
         },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 16000,
+      max_tokens: 32000,
       temperature: 0.2,
     };
 
@@ -112,7 +112,12 @@ export class LlmClient {
     const inputTokens = result.usage?.prompt_tokens ?? 0;
     const outputTokens = result.usage?.completion_tokens ?? 0;
 
-    onProgress?.(`Parsing response (${inputTokens} in, ${outputTokens} out)...`);
+    const finishReason = result.choices?.[0]?.finish_reason;
+    onProgress?.(`Parsing response (${inputTokens} in, ${outputTokens} out, finish: ${finishReason})...`);
+
+    if (finishReason === "length") {
+      console.warn(`WARNING: Response truncated (hit output token limit). Try smaller batch.`);
+    }
 
     // Parse the JSON response
     let parsed: DayBatchResponse;
