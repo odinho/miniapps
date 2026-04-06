@@ -297,11 +297,12 @@ function renderPreview(){
       }).join('')}
     </div>
     <div class="pv-main">
-      <img src="/api/preview?id=${encodeURIComponent(a.id)}" id="pvImg"
+      <img id="pvImg" src="/api/preview?id=${encodeURIComponent(a.id)}"
            style="max-width:100%;max-height:100%;object-fit:contain">
-      <img src="/api/full?id=${encodeURIComponent(a.id)}" id="pvFull"
-           onload="document.getElementById('pvImg').style.display='none';this.style.opacity=1;this.style.transition='none'"
-           style="position:absolute;max-width:100%;max-height:100%;object-fit:contain;opacity:0;transition:opacity .15s">
+      <script>
+        {const img=document.getElementById('pvImg'),fullUrl='/api/full?id=${encodeURIComponent(a.id)}';
+         const pre=new Image();pre.onload=()=>{img.src=fullUrl};pre.src=fullUrl;}
+      </script>
       ${s?`<div class="ptag ${s}">${s.toUpperCase()}</div>`:''}
       <div class="pinfo"><strong>${a.filename}</strong> &middot; ${fmt(a.bytes||0)} &middot; ${new Date(a.date).toLocaleString('no')}${a.rating>0?' &middot; '+'★'.repeat(a.rating):''}${a.isFavorite?' &middot; ♥':''}</div>
     </div>
