@@ -36,6 +36,7 @@ const app = Fastify({ logger: false });
 let groups: PhotoGroup[] = [];
 let assetMap = new Map<string, Asset>();
 let fileSizeCache = new Map<string, number>(); // assetId -> bytes
+let dimensionCache = new Map<string, { w: number; h: number }>(); // assetId -> dimensions
 let decisions = new Map<string, { keep: string[]; cull: string[]; skipped: boolean }>();
 
 /** Resolve the file path, handling Facet's extension-stripped paths */
@@ -58,6 +59,21 @@ function getFileSize(asset: Asset): number {
     return size;
   } catch {
     return 0;
+  }
+}
+
+/** Get image dimensions (rotated), cached */
+async function getDimensions(asset: Asset): Promise<{ w: number; h: number }> {
+  if (dimensionCache.has(asset.id)) return dimensionCache.get(asset.id)!;
+  const fp = resolveFilePath(asset);
+  if (!fp) return { w: 4, h: 3 };
+  try {
+    const meta = await sharp(fp).rotate().metadata();
+    const dims = { w: meta.width ?? 4, h: meta.height ?? 3 };
+    dimensionCache.set(asset.id, dims);
+    return dims;
+  } catch {
+    return { w: 4, h: 3 };
   }
 }
 
@@ -131,9 +147,33 @@ app.get("/api/groups", async () => {
 app.get<{ Params: { id: string } }>("/api/groups/:id", async (req) => {
   const group = groups.find((g) => g.id === req.params.id);
   if (!group) return { error: "Not found" };
+
+  // Include dimensions for layout computation
+  const assetsWithDims = await Promise.all(
+    group.assets.map(async (a) => {
+      const dims = await getDimensions(a.asset);
+      return {
+        id: a.asset.id,
+        filename: a.asset.filename,
+        path: a.asset.path,
+        date: a.asset.fileCreatedAt.toISOString(),
+        rating: a.asset.rating,
+        isFavorite: a.asset.isFavorite,
+        bytes: getFileSize(a.asset),
+        w: dims.w,
+        h: dims.h,
+      };
+    })
+  );
+
   return {
-    ...groupToJson(group),
+    id: group.id,
+    count: group.assets.length,
+    timeSpanMinutes: group.timeSpanMinutes,
+    avgDistance: group.avgDistance,
+    totalBytes: group.assets.reduce((s, a) => s + getFileSize(a.asset), 0),
     decision: decisions.get(group.id) || null,
+    assets: assetsWithDims,
   };
 });
 
