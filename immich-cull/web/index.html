@@ -285,6 +285,7 @@ function renderPreview(){
   // Use up to 12% of overlay height for filmstrip, but no less than 50px
   const stripH = Math.min(ovH * 0.12, Math.max(50, fitH));
 
+  const fullUrl=`/api/full?id=${encodeURIComponent(a.id)}`;
   ov.innerHTML=`<div class="preview-ov">
     <div class="pv-strip" style="height:${stripH + 6}px">
       ${g.assets.map((x,i)=>{
@@ -299,14 +300,14 @@ function renderPreview(){
     <div class="pv-main">
       <img id="pvImg" src="/api/preview?id=${encodeURIComponent(a.id)}"
            style="max-width:100%;max-height:100%;object-fit:contain">
-      <script>
-        {const img=document.getElementById('pvImg'),fullUrl='/api/full?id=${encodeURIComponent(a.id)}';
-         const pre=new Image();pre.onload=()=>{img.src=fullUrl};pre.src=fullUrl;}
-      </script>
       ${s?`<div class="ptag ${s}">${s.toUpperCase()}</div>`:''}
       <div class="pinfo"><strong>${a.filename}</strong> &middot; ${fmt(a.bytes||0)} &middot; ${new Date(a.date).toLocaleString('no')}${a.rating>0?' &middot; '+'★'.repeat(a.rating):''}${a.isFavorite?' &middot; ♥':''}</div>
     </div>
   </div>`;
+  // Preload full-res, swap when ready
+  const pre=new Image();
+  pre.onload=()=>{const el=document.getElementById('pvImg');if(el)el.src=fullUrl;};
+  pre.src=fullUrl;
 }
 function ensureSel(){if(si<0){si=0;mode='detail';render();renderBar();}}
 function doKeep(){ensureSel();mark('keep');}
