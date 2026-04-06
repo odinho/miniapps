@@ -45,19 +45,22 @@ If people are visible, mention them first, not the background.
 Do not label a photo as "path" or "grass" when a person is a clear subject.
 
 SIMILARITY GROUPING:
-Create subgroups for genuinely similar photos (same moment/pose/framing).
-Prefer precise, small groups over broad ones.
-Shared outdoor setting alone (same trail, daylight, grass) is NOT enough to group.
-Create SEPARATE subgroups for:
+Group photos that are variations of the same moment — same subject, similar framing, taken within ~2 minutes. These are the prime cull targets.
+Separate subgroups for:
 - different people combinations
-- different actions, poses, or expressions
+- different actions or poses
+- different locations
 - clear time gaps (>2 min)
-- clearly different framing or location
-A subgroup = one moment, not a whole walk.
+Photos taken in rapid succession of the same subject = definitely a group.
+Snapchat screenshots of different content = NOT a group (each is unique content).
+Most batches should have at least a few groups — if you found zero, look harder.
 
 CULLING:
-Conservative — only cull when clearly redundant given what's kept.
-Keep extras if they capture different moments, angles, or expressions.
+In bursts/similar sequences, typically keep 30-50% and cull the rest.
+Keep the sharpest, best-composed, best-expression shot(s).
+Keep extras ONLY if they capture a genuinely different moment or angle.
+Slight variations of the same pose/moment = cull all but the best.
+For a group of 10 similar shots, keeping 2-3 is usually right.
 
 OUTPUT — compact JSON, indices 0..N-1 ONLY. Do NOT invent indices beyond the input.
 {
