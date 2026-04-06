@@ -53,8 +53,14 @@ function resolveFilePath(asset: { path: string }): string | null {
   return null;
 }
 
-console.log(`\nSending to LLM...`);
-const client = new LlmClient({ apiKey, model: getArg("--model", "google/gemini-2.5-flash-lite") });
+const useVertex = args.includes("--vertex");
+console.log(`\nSending to LLM via ${useVertex ? "Vertex AI" : "OpenRouter"}...`);
+const client = new LlmClient({
+  apiKey: useVertex ? "" : apiKey,
+  model: getArg("--model", "gemini-2.5-flash-lite"),
+  provider: useVertex ? "vertexai" : "openrouter",
+  vertexProject: "tagrdevin",
+});
 
 const t0 = Date.now();
 const { response, rawJson, inputTokens, outputTokens } = await client.rankBatch(

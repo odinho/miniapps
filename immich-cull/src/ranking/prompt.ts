@@ -6,14 +6,14 @@ import { Asset } from "../shared/types.js";
 export function buildPrompt(batch: SessionBatch): string {
   const dateRange = `${batch.dateRange.start.toISOString().slice(0, 16)} to ${batch.dateRange.end.toISOString().slice(0, 16)}`;
 
+  // Use short integer indices as image IDs to save output tokens
   const imagesMeta = batch.assets.map((a, i) => ({
-    index: i,
-    imageId: a.id,
-    filename: a.filename,
-    timestamp: a.fileCreatedAt.toISOString(),
-    existingStars: a.rating ?? 0,
-    isScreenshotHint: /screenshot/i.test(a.filename) || /Screenshot/i.test(a.path),
-    isSnapchatHint: /snapchat/i.test(a.filename) || /Snapchat/i.test(a.path),
+    i, // short index as ID — LLM uses this in output
+    f: a.filename,
+    t: a.fileCreatedAt.toISOString().slice(11, 19), // just HH:MM:SS
+    s: a.rating ?? 0, // existing stars
+    sc: /screenshot/i.test(a.filename) ? 1 : 0,
+    sn: /snapchat/i.test(a.filename) ? 1 : 0,
   }));
 
   return `Session metadata:
@@ -55,34 +55,12 @@ Important rules:
 - The user's philosophy: "Keeping a few extra isn't high cost. This is mostly about culling what we never will need anyway." Be conservative — only recommend culling when the image is clearly redundant given what's being kept.
 - Return valid JSON only, matching the provided schema exactly.
 
-JSON Schema for your response:
+COMPACT JSON — use integer index (i) from input as image ID. Be terse.
 {
-  "batchId": "string",
-  "batchSize": number,
-  "dateRange": "string",
-  "batchSummary": "string — brief description of the session",
-  "overallConfidence": number (0-1),
-  "images": [
-    {
-      "imageId": "string — must match the imageId from input",
-      "suggestedStars": 0 | 1 | 2 | 3,
-      "categories": ["string — from: portrait, group_portrait, selfie, landscape, travel, event, pet, action, document, receipt, whiteboard, screenshot, snapchat_save, technical_construction, vehicle, food, meme, other"],
-      "protectFromCull": boolean,
-      "protectionReason": "string — from: existing_star_protection, personal_memory, utility_reference, partner_shared_image, distinct_moment, no_special_protection",
-      "briefNote": "string — short, for UI hover, max 15 words",
-      "similaritySubgroupId": "string | null — null if singleton"
-    }
-  ],
-  "similaritySubgroups": [
-    {
-      "subgroupId": "string",
-      "imageIds": ["string — ordered best first"],
-      "subgroupType": "burst | near_duplicate | same_scene | same_subject",
-      "recommendedKeepCount": number,
-      "recommendedKeepIds": ["string"],
-      "cullIds": ["string"],
-      "rationale": "string — why these are grouped and which to keep",
-      "confidence": number (0-1)
-    }
-  ]
-}`;
+  "sum": "1-sentence summary",
+  "img": [[i, stars, "cat", "note max 5 words", "sgId"|null], ...],
+  "sg": [{"id":"g1", "type":"burst|dup|scene|subj", "all":[best,...worst], "keep":[kept], "why":"max 15 words"}, ...]
+}
+img is array-of-arrays: [index, 0-3 stars, "category", "brief note", subgroupId or null].
+Only include "p" key on img entry if protectFromCull: [[i, s, "cat", "note", "sg", true]].
+Category codes: por grp sel lan tra evt pet act doc rec wb ss snap tech veh food meme oth`;
