@@ -33,38 +33,44 @@ The review server currently holds decisions in-memory (lost on restart).
 
 ### Phase 2: Gemini LLM Ranking
 
-See [LLM_INTEGRATION_PLAN.md](LLM_INTEGRATION_PLAN.md) for full design.
+See [LLM_INTEGRATION_PLAN.md](LLM_INTEGRATION_PLAN.md) and [docs/batching-strategy-v2.md](docs/batching-strategy-v2.md).
 
-Core:
+**Batching**: day/trip-sized sessions, not similarity groups.
+- [ ] Session batcher: 4h time gaps for phone photos, DSLR folder boundaries for organized photos
+- [ ] Sub-split sessions >150 photos at largest internal gap
+- [ ] Target: 10-150 photos per batch, ~2500 batches for 100k photos
+
+**LLM integration** (one call per day-batch):
 - [ ] Connect to Gemini 2.5 Flash Lite via `@google/genai`
-- [ ] Send ALL images per group (no chunking — 20 images trivial for 1M context)
-- [ ] Structured JSON: ranking + keepSets + categories + star suggestions + protection flags + groupCoherence
-- [ ] Store raw LLM responses + normalized rows in SQLite (versioned, fingerprinted)
-- [ ] Separate `llm_policy_applied` table for derived stars/decisions (re-run policy without re-calling LLM)
+- [ ] Every photo gets: star rating (0-3), categories, brief note, protection flags
+- [ ] LLM identifies similarity subgroups within batch + ranks them + recommends keep/cull
+- [ ] Store raw responses + normalized rows + policy-applied output in SQLite
+- [ ] Cost: ~$8.66 for 100k photos (100% coverage)
 
-UI integration:
-- [ ] Pre-populate keep/cull from LLM's recommendedDefaultKeepIds
-- [ ] Default workflow: LLM recommends → user hits `A` to approve → next (minimal decisions)
-- [ ] +/- slider available but not the default path (adjusts keepTopN)
-- [ ] Show LLM comparativeReason per image on hover/detail
-- [ ] Flag groups where groupCoherence = "unrelated" (bad clustering)
+**UI integration**:
+- [ ] Pre-populate keep/cull from LLM's similarity subgroup recommendations
+- [ ] Default workflow: LLM recommends → user hits `A` → next (minimal decisions)
+- [ ] Show LLM briefNote per image on hover
+- [ ] Show batchSummary in header ("Christmas Eve 2020 — family dinner, gifts")
+- [ ] CLIP similarity groups for UI layout within day-batches
 
-Auto-approve (the killer feature):
-- [ ] High-confidence groups (>0.9, clear burst, coherent) auto-approved in background
-- [ ] Show summary of auto-approved decisions for spot-checking
-- [ ] User reviews only low-confidence and ambiguous groups
+**Auto-approve** (critical for ADD-friendly workflow):
+- [ ] High-confidence subgroups auto-approved (pairs: keep-one when clearly better)
+- [ ] Summary of auto-approved decisions for spot-checking
 - [ ] Cuts review workload by 60-80%
+- [ ] Never auto-cull-all groups of 3+ (user never does this)
 
-Star ratings:
+**Star ratings** (every photo, not just grouped ones):
 - [ ] LLM suggests 0-3★ per image (never 4-5★)
-- [ ] Policy layer applies folder context for existing 1★ ambiguity
+- [ ] Policy layer for existing 1★ ambiguity
 - [ ] 2★+ existing ratings are hard floor
 - [ ] See [STAR_RATING_PHILOSOPHY.md](STAR_RATING_PHILOSOPHY.md)
 
-Batch processing:
-- [ ] Queue all groups for LLM ranking
-- [ ] Progress tracking and failure handling (mark failed groups, skip gracefully)
-- [ ] Budget 3-5x base cost for prompt iteration (~$8-15 total during development)
+**Calibration data** (143 manual decisions):
+- 48% keep rate overall, LLM should not be aggressive
+- Pairs: default keep-1 (72%), keep-both when distinct (14%)
+- Groups 3+: never cull-all, keep-all 12% of time
+- Budget prompt iteration at ~$15 total (1.5 full runs)
 
 ### Phase 3: Full Library Processing
 
