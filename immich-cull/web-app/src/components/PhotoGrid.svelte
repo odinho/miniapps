@@ -15,14 +15,10 @@
 
   let container: HTMLDivElement;
   let rects: Rect[] = [];
-  let containerW = 0;
-  let containerH = 0;
 
   function computeLayout() {
     if (!container || !assets.length) return;
-    containerW = container.clientWidth;
-    containerH = container.clientHeight;
-    rects = justifiedLayout(assets, containerW, containerH, 4);
+    rects = justifiedLayout(assets, container.clientWidth, container.clientHeight, 4);
   }
 
   onMount(() => {
@@ -33,29 +29,26 @@
   });
 
   $: if (assets) computeLayout();
-
-  function cellClass(id: string, idx: number): string {
-    const parts = ['cell'];
-    const s = states[id];
-    if (s === 'keep' || keepSet.has(id)) parts.push('keep');
-    if (s === 'cull' || cullSet.has(id)) parts.push('cull');
-    if (idx === selectedIdx) parts.push('sel');
-    return parts.join(' ');
-  }
 </script>
 
 <div class="jgrid" bind:this={container}>
-  {#each assets as asset, i}
+  {#each assets as asset, i (asset.id)}
     {@const r = rects[i] || { x: 0, y: 0, w: 100, h: 100 }}
     {@const llm = llmMap[asset.id]}
     {@const sg = llm?.similaritySubgroupId}
+    {@const isKeep = states[asset.id] === 'keep' || keepSet.has(asset.id)}
+    {@const isCull = states[asset.id] === 'cull' || cullSet.has(asset.id)}
+    {@const isSel = i === selectedIdx}
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-      class={cellClass(asset.id, i)}
+      class="cell"
+      class:keep={isKeep}
+      class:cull={isCull}
+      class:sel={isSel}
       style="left:{r.x}px;top:{r.y}px;width:{r.w}px;height:{r.h}px;{sg ? 'outline:2px dashed rgba(240,160,64,.4);outline-offset:-2px' : ''}"
       on:click={() => onSelect(i)}
-      on:keydown={(e) => e.key === 'Enter' && onSelect(i)}
       role="button"
-      tabindex="0"
+      tabindex="-1"
     >
       <img src={previewUrl(asset.id)} loading="lazy" alt={asset.filename} />
 
@@ -68,9 +61,9 @@
         {/if}
       {/if}
 
-      {#if states[asset.id] === 'keep' || keepSet.has(asset.id)}
+      {#if isKeep}
         <div class="bdg kb">KEEP</div>
-      {:else if states[asset.id] === 'cull' || cullSet.has(asset.id)}
+      {:else if isCull}
         <div class="bdg cb">CULL</div>
       {/if}
 
@@ -80,7 +73,7 @@
 
       <div class="lbl">
         <span>{asset.filename}</span>
-        <span>{fmt(asset.bytes || 0)}</span>
+        <span>{fmt(asset.bytes || 0)}{sg ? ' · ' + sg : ''}</span>
       </div>
     </div>
   {/each}
