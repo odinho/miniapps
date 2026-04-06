@@ -7,6 +7,7 @@
  * - Sub-split batches >maxBatchSize at the largest internal gap
  */
 import { Asset } from "../shared/types.js";
+import { createHash } from "crypto";
 
 export interface SessionBatch {
   id: string;
@@ -120,8 +121,11 @@ export function batchBySession(
   // Sort batches by date (newest first for review)
   batches.sort((a, b) => b.dateRange.start.getTime() - a.dateRange.start.getTime());
 
-  // Re-index
-  return batches.map((b, i) => ({ ...b, id: `batch-${i}` }));
+  // Assign stable content-addressed IDs (hash of asset IDs, not positional)
+  return batches.map((b) => ({
+    ...b,
+    id: stableBatchId(b),
+  }));
 }
 
 /** Split a sorted array of assets at the largest internal time gap if it exceeds maxSize */
@@ -156,16 +160,26 @@ function splitIfTooLarge(assets: Asset[], maxSize: number): Asset[][] {
   return result;
 }
 
+/** Content-addressed batch ID: stable even if batch order changes */
+function stableBatchId(batch: SessionBatch): string {
+  const ids = batch.assets.map((a) => a.id).sort().join("\n");
+  const hash = createHash("sha256").update(ids).digest("hex").slice(0, 12);
+  const date = batch.dateRange.start.toISOString().slice(0, 10);
+  return `${date}-${hash}`;
+}
+
 /** Print batch statistics */
 export function batchStats(batches: SessionBatch[]): string {
+  if (batches.length === 0) return "0 batches from 0 photos";
   const totalPhotos = batches.reduce((s, b) => s + b.assets.length, 0);
   const sizes = batches.map((b) => b.assets.length);
+  const sorted = [...sizes].sort((a, b) => a - b);
   const folderBatches = batches.filter((b) => b.source === "folder").length;
   const timeBatches = batches.filter((b) => b.source === "time-gap").length;
 
   return [
     `${batches.length} batches from ${totalPhotos} photos`,
     `  Folder-based: ${folderBatches}, Time-gap: ${timeBatches}`,
-    `  Sizes: min=${Math.min(...sizes)}, max=${Math.max(...sizes)}, avg=${(totalPhotos / batches.length).toFixed(1)}, median=${sizes.sort((a, b) => a - b)[Math.floor(sizes.length / 2)]}`,
+    `  Sizes: min=${sorted[0]}, max=${sorted[sorted.length - 1]}, avg=${(totalPhotos / batches.length).toFixed(1)}, median=${sorted[Math.floor(sorted.length / 2)]}`,
   ].join("\n");
 }
