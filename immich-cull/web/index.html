@@ -11,22 +11,21 @@
   .header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 6px 16px; background: #222; border-bottom: 1px solid #333;
-    height: 36px; flex-shrink: 0;
+    height: 34px; flex-shrink: 0;
   }
-  .header h1 { font-size: 15px; font-weight: 600; color: #f0a040; }
+  .header h1 { font-size: 14px; font-weight: 600; color: #f0a040; }
   .stats { font-size: 12px; color: #999; display: flex; gap: 14px; }
   .stats .v { color: #e0e0e0; font-weight: 600; }
-  .stats .saved { color: #4caf50; }
 
-  .container { display: flex; height: calc(100vh - 36px); }
+  .container { display: flex; height: calc(100vh - 34px); }
 
   /* Sidebar */
   .sidebar {
-    width: 220px; min-width: 220px; overflow-y: auto; background: #1e1e1e;
+    width: 200px; min-width: 200px; overflow-y: auto; background: #1e1e1e;
     border-right: 1px solid #333; font-size: 12px;
   }
   .gi {
-    padding: 6px 10px; cursor: pointer; border-bottom: 1px solid #262626;
+    padding: 5px 8px; cursor: pointer; border-bottom: 1px solid #262626;
     border-left: 3px solid transparent;
   }
   .gi:hover { background: #282828; }
@@ -35,101 +34,98 @@
   .gi .t { font-weight: 500; }
   .gi .m { color: #777; font-size: 11px; }
 
-  /* Main area */
+  /* Main content area */
   .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
-  /* Image grid: fills available space */
-  .grid-area {
-    flex: 1; display: flex; gap: 4px; padding: 4px; overflow: hidden;
-    align-items: stretch;
+  /* Masonry grid - all images visible */
+  .masonry {
+    flex: 1; display: flex; flex-wrap: wrap; gap: 4px; padding: 4px;
+    overflow-y: auto; align-content: start;
   }
-
-  /* Selected image (large) */
-  .selected-preview {
-    flex: 2; display: flex; align-items: center; justify-content: center;
-    position: relative; min-width: 0; background: #111; border-radius: 4px;
-  }
-  .selected-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
-  .selected-preview .label {
-    position: absolute; bottom: 6px; left: 6px;
-    background: rgba(0,0,0,0.85); padding: 4px 10px; border-radius: 4px;
-    font-size: 12px; max-width: 50%;
-  }
-  .selected-preview .state-label {
-    position: absolute; top: 8px; left: 8px;
-    font-size: 14px; font-weight: 700; padding: 3px 10px; border-radius: 4px;
-  }
-  .state-label.keep { background: #4caf50; color: white; }
-  .state-label.cull { background: #f44336; color: white; }
-
-  /* Thumbnail strip (right side) */
-  .thumb-strip {
-    flex: 1; display: flex; flex-direction: column; gap: 4px;
-    overflow-y: auto; min-width: 0; max-width: 45%;
-  }
-  .thumb-strip.few { flex-direction: row; flex-wrap: wrap; align-content: start; }
-
-  .thumb {
-    position: relative; cursor: pointer; flex-shrink: 0;
-    border: 3px solid transparent; border-radius: 4px;
-    transition: border-color 0.1s, opacity 0.1s;
+  .masonry .img-wrap {
+    position: relative; cursor: pointer; flex-grow: 1;
+    border: 3px solid transparent; border-radius: 3px;
+    transition: border-color 0.1s, opacity 0.15s;
     overflow: hidden;
   }
-  .thumb.active { border-color: #f0a040; box-shadow: 0 0 8px rgba(240,160,64,0.5); }
-  .thumb.keep { border-color: #4caf50; }
-  .thumb.cull { border-color: #f44336; opacity: 0.45; }
-  .thumb.keep.active { border-color: #f0a040; opacity: 1; }
-  .thumb.cull.active { border-color: #f0a040; opacity: 0.7; }
-  .thumb img { width: 100%; height: auto; display: block; }
-  .thumb .badge {
+  .img-wrap.active { border-color: #f0a040; box-shadow: 0 0 6px rgba(240,160,64,0.5); }
+  .img-wrap.keep { border-color: #4caf50; }
+  .img-wrap.cull { border-color: #f44336; opacity: 0.4; }
+  .img-wrap.active.keep, .img-wrap.active.cull { border-color: #f0a040; opacity: 1; }
+  .img-wrap img { height: 100%; width: 100%; object-fit: cover; display: block; }
+  .img-wrap .badge {
     position: absolute; top: 2px; left: 2px; font-size: 10px; font-weight: 700;
     padding: 1px 5px; border-radius: 3px; color: white;
   }
   .badge.kb { background: #4caf50; }
   .badge.cb { background: #f44336; }
-  .thumb .fn {
+  .img-wrap .meta {
     position: absolute; bottom: 0; left: 0; right: 0; font-size: 9px;
-    color: #ddd; background: rgba(0,0,0,0.75); padding: 2px 4px;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: #ddd; background: linear-gradient(transparent, rgba(0,0,0,0.85));
+    padding: 12px 4px 3px; display: flex; justify-content: space-between;
   }
-  .thumb .sz {
-    position: absolute; top: 2px; right: 2px; font-size: 9px;
-    color: #ccc; background: rgba(0,0,0,0.7); padding: 1px 4px; border-radius: 2px;
+  .img-wrap .stars {
+    position: absolute; top: 2px; right: 2px; font-size: 10px; color: #ffd700;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
   }
-  .thumb .stars {
-    position: absolute; bottom: 16px; right: 2px; font-size: 10px; color: #ffd700;
+
+  /* Preview overlay (only when image selected + needed) */
+  .preview-overlay {
+    position: fixed; top: 34px; left: 200px; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.92); display: flex; align-items: center;
+    justify-content: center; z-index: 50;
   }
+  .preview-overlay img { max-width: 95%; max-height: 90%; object-fit: contain; }
+  .preview-overlay .info {
+    position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.85); padding: 6px 14px; border-radius: 6px;
+    font-size: 13px; text-align: center; max-width: 80%;
+  }
+  .preview-overlay .close-hint {
+    position: absolute; top: 12px; right: 16px; font-size: 12px; color: #888;
+  }
+  .preview-overlay .state-tag {
+    position: absolute; top: 12px; left: 16px;
+    font-size: 14px; font-weight: 700; padding: 3px 12px; border-radius: 4px;
+  }
+  .state-tag.keep { background: #4caf50; color: white; }
+  .state-tag.cull { background: #f44336; color: white; }
 
   /* Action bar */
   .actions {
-    display: flex; gap: 8px; padding: 6px 12px; background: #222;
-    border-top: 1px solid #333; align-items: center; justify-content: center;
-    flex-shrink: 0; flex-wrap: wrap;
+    display: flex; gap: 10px; padding: 7px 16px; background: #222;
+    border-top: 1px solid #333; align-items: center; flex-shrink: 0;
   }
   .actions button {
-    padding: 5px 14px; border: none; border-radius: 4px; cursor: pointer;
-    font-size: 12px; font-weight: 500;
+    padding: 6px 16px; border: none; border-radius: 5px; cursor: pointer;
+    font-size: 13px; font-weight: 500; transition: opacity 0.1s;
   }
   .actions button:hover { opacity: 0.85; }
   .bk { background: #4caf50; color: white; }
-  .bc { background: #f44336; color: white; }
-  .bs { background: #444; color: #bbb; }
-  .ba { background: #f0a040; color: #1a1a1a; font-weight: 700; }
+  .bc { background: #e53935; color: white; }
   .bb { background: #2196F3; color: white; }
-  .bka { background: #388e3c; color: white; }
-  .bca { background: #c62828; color: white; }
+  .ba { background: #f0a040; color: #1a1a1a; font-weight: 700; }
+  .bs { background: #444; color: #aaa; }
+  .bh { background: transparent; color: #666; border: 1px solid #444 !important; font-size: 12px; padding: 4px 10px; }
 
-  .group-info {
-    font-size: 11px; color: #888; margin-left: auto; text-align: right;
+  .spacer { flex: 1; }
+  .group-meta { font-size: 11px; color: #777; text-align: right; line-height: 1.4; }
+
+  /* Help modal */
+  .help-modal {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.85); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
   }
-
-  .shortcuts {
-    font-size: 11px; color: #555; text-align: center; padding: 3px;
-    background: #1a1a1a; flex-shrink: 0;
+  .help-modal .content {
+    background: #2a2a2a; border-radius: 8px; padding: 24px 32px;
+    max-width: 500px; font-size: 13px; line-height: 1.8;
   }
-  kbd { background: #333; padding: 0 4px; border-radius: 2px; font-family: monospace; color: #aaa; }
+  .help-modal h2 { font-size: 16px; margin-bottom: 12px; color: #f0a040; }
+  .help-modal kbd { background: #444; padding: 1px 6px; border-radius: 3px; font-family: monospace; color: #ddd; }
+  .help-modal .col2 { display: grid; grid-template-columns: auto 1fr; gap: 2px 16px; }
 
-  .empty { display: flex; align-items: center; justify-content: center; flex: 1; color: #666; font-size: 16px; }
+  .empty { display: flex; align-items: center; justify-content: center; flex: 1; color: #666; }
 </style>
 </head>
 <body>
@@ -141,18 +137,22 @@
   <div class="sidebar" id="sidebar"></div>
   <div class="main" id="main"><div class="empty">Loading...</div></div>
 </div>
+<div id="overlay"></div>
+<div id="helpModal"></div>
 
 <script>
 let groups = [];
-let ci = -1;  // current group index
-let si = 0;   // selected asset index
-let states = {}; // assetId -> 'keep' | 'cull' | null
+let ci = -1;      // current group index
+let si = -1;      // selected asset index (-1 = none selected)
+let states = {};   // assetId -> 'keep' | 'cull' | null
+let showPreview = false;
+let showHelp = false;
 
-function fmt(bytes) {
-  if (bytes > 1e9) return (bytes/1e9).toFixed(1) + ' GB';
-  if (bytes > 1e6) return (bytes/1e6).toFixed(1) + ' MB';
-  if (bytes > 1e3) return (bytes/1e3).toFixed(0) + ' KB';
-  return bytes + ' B';
+function fmt(b) {
+  if (b >= 1e9) return (b/1e9).toFixed(1)+' GB';
+  if (b >= 1e6) return (b/1e6).toFixed(1)+' MB';
+  if (b >= 1e3) return (b/1e3).toFixed(0)+' KB';
+  return b+' B';
 }
 
 async function load() {
@@ -163,10 +163,9 @@ async function load() {
 }
 
 function renderSidebar() {
-  const sb = document.getElementById('sidebar');
-  sb.innerHTML = groups.map((g, i) => {
+  document.getElementById('sidebar').innerHTML = groups.map((g, i) => {
     const d = new Date(g.earliestDate);
-    const ds = d.getFullYear() > 2000 ? d.toLocaleDateString('no', {day:'numeric',month:'short',year:'2-digit'}) : '?';
+    const ds = d.getFullYear() > 2000 ? d.toLocaleDateString('no',{day:'numeric',month:'short',year:'2-digit'}) : '?';
     return `<div class="gi ${i===ci?'active':''} ${g.decided?'decided':''}" onclick="selectGroup(${i})" id="gi-${i}">
       <div class="t">${g.count} photos &middot; ${ds}</div>
       <div class="m">${g.timeSpanMinutes}min &middot; ${fmt(g.totalBytes)}</div>
@@ -175,78 +174,105 @@ function renderSidebar() {
 }
 
 function selectGroup(idx) {
-  ci = idx; si = 0;
+  ci = idx; si = -1; showPreview = false;
   const g = groups[idx];
   for (const a of g.assets) { if (!(a.id in states)) states[a.id] = null; }
   renderGroup();
   renderSidebar();
-  // Scroll sidebar to active item
-  const el = document.getElementById('gi-' + idx);
-  if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  document.getElementById('gi-'+idx)?.scrollIntoView({block:'nearest',behavior:'smooth'});
 }
 
 function renderGroup() {
   const g = groups[ci];
   if (!g) return;
-  const sel = g.assets[si];
-  const st = states[sel.id];
-  const isMany = g.assets.length > 6;
 
-  // Calculate cull savings for this group
+  // Calculate image sizes for masonry: aim to fill the space
+  // For <=4 images: ~50% height each; for 5-9: ~33%; for 10+: ~25%
+  const count = g.assets.length;
+  let imgH;
+  if (count <= 3) imgH = 'calc(50vh - 50px)';
+  else if (count <= 6) imgH = 'calc(33vh - 30px)';
+  else if (count <= 12) imgH = 'calc(25vh - 25px)';
+  else imgH = 'calc(20vh - 20px)';
+
   let cullBytes = 0;
-  for (const a of g.assets) { if (states[a.id] === 'cull') cullBytes += (a.bytes || 0); }
+  for (const a of g.assets) { if (states[a.id] === 'cull') cullBytes += (a.bytes||0); }
 
   document.getElementById('main').innerHTML = `
-    <div class="grid-area">
-      <div class="selected-preview">
-        <img src="/api/preview?id=${encodeURIComponent(sel.id)}" alt="">
-        ${st ? `<div class="state-label ${st}">${st.toUpperCase()}</div>` : ''}
-        <div class="label">
-          <strong>${sel.filename}</strong> &middot; ${fmt(sel.bytes||0)}<br>
-          ${new Date(sel.date).toLocaleString('no')}
-          ${sel.rating > 0 ? ' &middot; ' + '★'.repeat(sel.rating) : ''}
-          ${sel.isFavorite ? ' &middot; ♥' : ''}
-        </div>
-      </div>
-      <div class="thumb-strip ${isMany ? '' : 'few'}">
-        ${g.assets.map((a, i) => {
-          const s = states[a.id];
-          return `<div class="thumb ${i===si?'active':''} ${s||''}" onclick="selectAsset(${i})">
-            <img src="/api/thumb?id=${encodeURIComponent(a.id)}" loading="lazy">
-            ${s==='keep'?'<div class="badge kb">KEEP</div>':''}
-            ${s==='cull'?'<div class="badge cb">CULL</div>':''}
-            ${a.rating>0?`<div class="stars">${'★'.repeat(a.rating)}</div>`:''}
-            <div class="sz">${fmt(a.bytes||0)}</div>
-            <div class="fn">${a.filename}</div>
-          </div>`;
-        }).join('')}
-      </div>
+    <div class="masonry">
+      ${g.assets.map((a, i) => {
+        const s = states[a.id];
+        return `<div class="img-wrap ${i===si?'active':''} ${s||''}"
+                     onclick="clickImage(${i})" ondblclick="openPreview(${i})"
+                     style="height:${imgH}">
+          <img src="/api/preview?id=${encodeURIComponent(a.id)}" loading="lazy">
+          ${s==='keep'?'<div class="badge kb">KEEP</div>':''}
+          ${s==='cull'?'<div class="badge cb">CULL</div>':''}
+          ${a.rating>0?`<div class="stars">${'★'.repeat(a.rating)}</div>`:''}
+          <div class="meta"><span>${a.filename}</span><span>${fmt(a.bytes||0)}</span></div>
+        </div>`;
+      }).join('')}
     </div>
     <div class="actions">
-      <button class="bk" onclick="markAsset('keep')">Keep <kbd>K</kbd>/<kbd>J</kbd></button>
-      <button class="bc" onclick="markAsset('cull')">Cull <kbd>X</kbd>/<kbd>F</kbd></button>
-      <button class="bb" onclick="keepBestCullRest()">Best+Cull <kbd>B</kbd></button>
-      <button class="bka" onclick="keepAll()">Keep All <kbd>⇧K</kbd></button>
-      <button class="bca" onclick="cullAll()">Cull All <kbd>⇧X</kbd></button>
-      <button class="ba" onclick="approveGroup()">Approve <kbd>A</kbd>/<kbd>Enter</kbd></button>
-      <button class="bs" onclick="skipGroup()">Skip <kbd>S</kbd></button>
-      <div class="group-info">
-        ${g.count} photos &middot; ${g.timeSpanMinutes}min span &middot; ${fmt(g.totalBytes)}
-        ${cullBytes > 0 ? `<br>Cull saves ${fmt(cullBytes)}` : ''}
+      <button class="bk" onclick="doKeep()">Keep</button>
+      <button class="bc" onclick="doCull()">Cull</button>
+      <button class="bb" onclick="keepBestCullRest()">Best + Cull Rest</button>
+      <button class="ba" onclick="approveGroup()">Approve & Next</button>
+      <button class="bs" onclick="skipGroup()">Skip</button>
+      <span class="spacer"></span>
+      <div class="group-meta">
+        ${g.count} photos &middot; ${g.timeSpanMinutes}min
+        ${cullBytes > 0 ? ` &middot; cull saves ${fmt(cullBytes)}` : ''}
       </div>
+      <button class="bh" onclick="toggleHelp()">?</button>
     </div>
-    <div class="shortcuts">
-      <kbd>←</kbd><kbd>→</kbd> or <kbd>D</kbd><kbd>G</kbd> photos &middot;
-      <kbd>↑</kbd><kbd>↓</kbd> groups &middot;
-      <kbd>1</kbd>-<kbd>5</kbd> numpad: keep first N &middot;
-      undecided on approve → kept
+  `;
+
+  renderOverlay();
+}
+
+function clickImage(i) {
+  if (si === i) { si = -1; showPreview = false; } // deselect
+  else { si = i; showPreview = false; }
+  renderGroup();
+}
+
+function openPreview(i) {
+  si = i; showPreview = true;
+  renderGroup();
+}
+
+function renderOverlay() {
+  const el = document.getElementById('overlay');
+  if (!showPreview || si < 0) { el.innerHTML = ''; return; }
+  const g = groups[ci];
+  const a = g.assets[si];
+  const s = states[a.id];
+  el.innerHTML = `
+    <div class="preview-overlay" onclick="closePreview()">
+      <img src="/api/preview?id=${encodeURIComponent(a.id)}" onclick="event.stopPropagation()">
+      ${s ? `<div class="state-tag ${s}">${s.toUpperCase()}</div>` : ''}
+      <div class="close-hint">Esc / click to close</div>
+      <div class="info">
+        <strong>${a.filename}</strong> &middot; ${fmt(a.bytes||0)} &middot;
+        ${new Date(a.date).toLocaleString('no')}
+        ${a.rating > 0 ? ' &middot; ' + '★'.repeat(a.rating) : ''}
+      </div>
     </div>
   `;
 }
 
-function selectAsset(i) { si = i; renderGroup(); }
+function closePreview() { showPreview = false; renderOverlay(); }
+
+function ensureSelected() {
+  if (si < 0) { si = 0; renderGroup(); }
+}
+
+function doKeep() { ensureSelected(); markAsset('keep'); }
+function doCull() { ensureSelected(); markAsset('cull'); }
 
 function markAsset(s) {
+  ensureSelected();
   const g = groups[ci];
   const a = g.assets[si];
   states[a.id] = states[a.id] === s ? null : s;
@@ -255,6 +281,7 @@ function markAsset(s) {
 }
 
 function keepBestCullRest() {
+  ensureSelected();
   const g = groups[ci];
   for (let i = 0; i < g.assets.length; i++) {
     states[g.assets[i].id] = i === si ? 'keep' : 'cull';
@@ -262,17 +289,6 @@ function keepBestCullRest() {
   renderGroup();
 }
 
-function keepAll() {
-  for (const a of groups[ci].assets) states[a.id] = 'keep';
-  renderGroup();
-}
-
-function cullAll() {
-  for (const a of groups[ci].assets) states[a.id] = 'cull';
-  renderGroup();
-}
-
-/** Keep first N assets (sorted by position), cull rest */
 function keepFirstN(n) {
   const g = groups[ci];
   for (let i = 0; i < g.assets.length; i++) {
@@ -283,45 +299,30 @@ function keepFirstN(n) {
 
 async function approveGroup() {
   const g = groups[ci];
-  // Undecided assets default to KEEP (safe default)
-  for (const a of g.assets) {
-    if (!states[a.id]) states[a.id] = 'keep';
-  }
-
-  const keep = g.assets.filter(a => states[a.id] === 'keep').map(a => a.id);
-  const cull = g.assets.filter(a => states[a.id] === 'cull').map(a => a.id);
-
+  for (const a of g.assets) { if (!states[a.id]) states[a.id] = 'keep'; }
+  const keep = g.assets.filter(a => states[a.id]==='keep').map(a => a.id);
+  const cull = g.assets.filter(a => states[a.id]==='cull').map(a => a.id);
   await fetch(`/api/groups/${g.id}/decide`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ keep, cull }),
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({keep,cull}),
   });
   g.decided = true;
-  updateStats();
-  renderSidebar();
-  nextUndecided();
+  updateStats(); renderSidebar(); nextUndecided();
 }
 
 async function skipGroup() {
   const g = groups[ci];
   await fetch(`/api/groups/${g.id}/decide`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ keep: [], cull: [], skipped: true }),
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({keep:[],cull:[],skipped:true}),
   });
   g.decided = true;
-  updateStats();
-  renderSidebar();
-  nextUndecided();
+  updateStats(); renderSidebar(); nextUndecided();
 }
 
 function nextUndecided() {
-  for (let i = ci + 1; i < groups.length; i++) {
-    if (!groups[i].decided) { selectGroup(i); return; }
-  }
-  for (let i = 0; i < ci; i++) {
-    if (!groups[i].decided) { selectGroup(i); return; }
-  }
+  for (let i = ci+1; i < groups.length; i++) if (!groups[i].decided) { selectGroup(i); return; }
+  for (let i = 0; i < ci; i++) if (!groups[i].decided) { selectGroup(i); return; }
 }
 
 async function updateStats() {
@@ -330,30 +331,58 @@ async function updateStats() {
     <span><span class="v">${s.decided}</span>/${s.totalGroups}</span>
     <span style="color:#4caf50"><span class="v">${s.photosToKeep}</span> keep</span>
     <span style="color:#f44336"><span class="v">${s.photosToCull}</span> cull</span>
-    <span class="saved">save ${fmt(s.cullBytes)}</span>
+    <span style="color:#4caf50">save ${fmt(s.cullBytes)}</span>
     <span><span class="v">${s.remaining}</span> left</span>
   `;
 }
 
-function fmt(b) {
-  if (b >= 1e9) return (b/1e9).toFixed(1)+' GB';
-  if (b >= 1e6) return (b/1e6).toFixed(1)+' MB';
-  if (b >= 1e3) return (b/1e3).toFixed(0)+' KB';
-  return b+' B';
+function toggleHelp() {
+  showHelp = !showHelp;
+  document.getElementById('helpModal').innerHTML = showHelp ? `
+    <div class="help-modal" onclick="toggleHelp()">
+      <div class="content" onclick="event.stopPropagation()">
+        <h2>Keyboard Shortcuts</h2>
+        <div class="col2">
+          <kbd>←</kbd> <kbd>→</kbd> <span>Select prev/next image</span>
+          <kbd>↑</kbd> <kbd>↓</kbd> <span>Prev/next group</span>
+          <kbd>K</kbd> or <kbd>J</kbd> <span>Keep selected image</span>
+          <kbd>X</kbd> or <kbd>F</kbd> <span>Cull selected image</span>
+          <kbd>B</kbd> <span>Keep selected, cull all others</span>
+          <kbd>Shift+K</kbd> <span>Keep all in group</span>
+          <kbd>Shift+X</kbd> <span>Cull all in group</span>
+          <kbd>1</kbd>-<kbd>5</kbd> <span>Keep first N, cull rest</span>
+          <kbd>A</kbd> or <kbd>Enter</kbd> <span>Approve group & next</span>
+          <kbd>S</kbd> <span>Skip group</span>
+          <kbd>Space</kbd> <span>Toggle preview of selected</span>
+          <kbd>Esc</kbd> <span>Close preview / deselect</span>
+          <kbd>?</kbd> <span>Toggle this help</span>
+        </div>
+        <p style="margin-top:12px;color:#999;font-size:12px">
+          Undecided images default to <strong>keep</strong> on approve.<br>
+          Groups sorted newest-first. Culled images go to Immich trash (30-day recovery).
+        </p>
+      </div>
+    </div>
+  ` : '';
 }
 
 document.addEventListener('keydown', (e) => {
+  if (showHelp && e.key === 'Escape') { toggleHelp(); return; }
+  if (showHelp) return;
+  if (showPreview && e.key === 'Escape') { closePreview(); return; }
   if (ci < 0) return;
   const g = groups[ci];
   const shift = e.shiftKey;
 
   switch(e.key) {
-    // Navigation
-    case 'ArrowRight': case 'd': case 'D':
-      if (!shift && si < g.assets.length - 1) { si++; renderGroup(); }
+    case 'ArrowRight': case 'd':
+      e.preventDefault();
+      if (si < g.assets.length - 1) { si++; renderGroup(); }
+      else if (si === -1) { si = 0; renderGroup(); }
       break;
-    case 'ArrowLeft': case 'g': case 'G':
-      if (!shift && si > 0) { si--; renderGroup(); }
+    case 'ArrowLeft': case 'g':
+      e.preventDefault();
+      if (si > 0) { si--; renderGroup(); }
       break;
     case 'ArrowDown':
       e.preventDefault();
@@ -363,21 +392,25 @@ document.addEventListener('keydown', (e) => {
       e.preventDefault();
       if (ci > 0) selectGroup(ci - 1);
       break;
-
-    // Actions
-    case 'k': markAsset('keep'); break;
-    case 'K': keepAll(); break;
-    case 'j': markAsset('keep'); break;  // alternative left-hand
-    case 'J': keepAll(); break;
-    case 'x': markAsset('cull'); break;
-    case 'X': cullAll(); break;
-    case 'f': markAsset('cull'); break;  // alternative left-hand
-    case 'F': cullAll(); break;
+    case 'k': case 'j': markAsset('keep'); break;
+    case 'K': case 'J':
+      for (const a of g.assets) states[a.id] = 'keep';
+      renderGroup(); break;
+    case 'x': case 'f': markAsset('cull'); break;
+    case 'X': case 'F':
+      for (const a of g.assets) states[a.id] = 'cull';
+      renderGroup(); break;
     case 'b': case 'B': keepBestCullRest(); break;
-    case 'a': case 'Enter': approveGroup(); break;
-    case 's': case 'S': if (!shift) skipGroup(); break;
-
-    // Numpad: keep first N
+    case 'a': case 'Enter': e.preventDefault(); approveGroup(); break;
+    case 's': if (!shift) skipGroup(); break;
+    case ' ':
+      e.preventDefault();
+      if (si >= 0) { showPreview = !showPreview; renderGroup(); }
+      break;
+    case 'Escape':
+      if (si >= 0) { si = -1; renderGroup(); }
+      break;
+    case '?': toggleHelp(); break;
     case '1': keepFirstN(1); break;
     case '2': keepFirstN(2); break;
     case '3': keepFirstN(3); break;
