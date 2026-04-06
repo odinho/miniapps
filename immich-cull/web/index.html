@@ -69,8 +69,8 @@
   .pvt img{height:100%;width:auto;display:block;object-fit:contain;}
   .pvt .pvb{position:absolute;top:1px;left:1px;font-size:8px;font-weight:700;padding:0 3px;border-radius:2px;color:white;}
   .pvb.kb{background:var(--good);} .pvb.cb{background:var(--bad);}
-  .pv-main{flex:1;min-height:0;display:grid;place-items:center;position:relative;}
-  .pv-main img{max-width:100%;max-height:100%;object-fit:contain;}
+  .pv-main{flex:1;min-height:0;position:relative;overflow:hidden;}
+  .pv-main img{width:100%;height:100%;object-fit:contain;display:block;}
   .pv-main .pinfo{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
     background:rgba(0,0,0,.8);padding:4px 14px;border-radius:5px;font-size:12px;white-space:nowrap;}
   .pv-main .ptag{position:absolute;top:10px;left:10px;font-size:14px;font-weight:700;padding:2px 10px;border-radius:4px;}
@@ -298,8 +298,7 @@ function renderPreview(){
       }).join('')}
     </div>
     <div class="pv-main">
-      <img id="pvImg" src="/api/preview?id=${encodeURIComponent(a.id)}"
-           style="max-width:100%;max-height:100%;object-fit:contain">
+      <img id="pvImg" src="/api/preview?id=${encodeURIComponent(a.id)}">
       ${s?`<div class="ptag ${s}">${s.toUpperCase()}</div>`:''}
       <div class="pinfo"><strong>${a.filename}</strong> &middot; ${fmt(a.bytes||0)} &middot; ${new Date(a.date).toLocaleString('no')}${a.rating>0?' &middot; '+'★'.repeat(a.rating):''}${a.isFavorite?' &middot; ♥':''}</div>
     </div>
