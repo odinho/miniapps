@@ -28,7 +28,7 @@ export interface SessionBatchConfig {
 
 export const DEFAULT_SESSION_CONFIG: SessionBatchConfig = {
   gapHours: 4,
-  maxBatchSize: 150,
+  maxBatchSize: 30,
   folderPattern: /\/(\d{8}-[^/]+)\//,
 };
 
