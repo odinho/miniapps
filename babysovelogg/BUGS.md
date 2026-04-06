@@ -2,6 +2,19 @@
 
 ## Must fix
 
+### B30: Napper import creates "open night" spanning months → UI picks wrong event to end
+**Symptom:** After Napper import on 2026-04-05, sleep_log `id=245` (domain_id `slp_import_613`) started 2026-03-22T17:38Z with no `end_time` → 347 hours(!). UI's "end sleep" dropdown picked this bogus event instead of the real current night, making it seem like a 320-hr nap should be ended.
+**Root cause:** Napper import creates `sleep.manual` entries with only `start_time` and no `end_time` for "open" sleeps, but doesn't validate that an open night shouldn't span weeks/months.
+**Fix (manual):** Marked `sleep_log` entry as `deleted = 1` in DB.
+**Permanent fix needed:** Napper import should either (a) not create open sleeps without explicit intent, or (b) cap open sleeps to a reasonable max (e.g. 24h) and flag anomalies.
+
+### B31: End sleep lacks date picker for cross-midnight sessions
+**Symptom:** When trying to end last night's sleep (started Apr 5, ended Apr 6), the UI only allows entering the time (HH:MM), not the date. This makes it impossible to correctly end a sleep that crosses midnight — the default date logic may use the wrong day.
+**Root cause:** The end-sleep form uses `TimeInput` component (always-local HH:MM) but no date override. It infers date from context, which can be wrong for multi-day sleeps.
+**Fix needed:** Add an optional date picker to the end-sleep form, or infer date from the previous wake time / sleep start more robustly.
+
+## Must fix
+
 ### ~~B20: Baby timezone is null in production~~ — fixed (1727dba)
 Auto-backfills from server locale on first state fetch. Production will set "Europe/Oslo" on next app load.
 
