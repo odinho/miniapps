@@ -27,9 +27,10 @@
   .jgrid{position:relative;width:100%;height:100%;overflow:hidden;}
   .jgrid .cell{position:absolute;overflow:hidden;cursor:pointer;border:3px solid transparent;transition:border-color .12s,opacity .12s;}
   .jgrid .cell:hover{border-color:#555;}
+  .jgrid .cell.sel{border-color:var(--accent);box-shadow:0 0 8px rgba(240,160,64,.4);}
   .jgrid .cell.keep{border-color:var(--good);}
   .jgrid .cell.cull{border-color:var(--bad);opacity:.4;}
-  .jgrid .cell img{width:100%;height:100%;object-fit:cover;display:block;}
+  .jgrid .cell img{width:100%;height:100%;object-fit:contain;display:block;background:#0b0d11;}
   .jgrid .cell .lbl{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.8));padding:10px 5px 3px;font-size:9px;color:#bbb;display:flex;justify-content:space-between;}
   .jgrid .cell .bdg{position:absolute;top:3px;left:3px;font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;color:white;}
   .bdg.kb{background:var(--good);} .bdg.cb{background:var(--bad);}
@@ -57,6 +58,16 @@
   .bs{background:#333;color:#aaa;} .bh{background:none;color:var(--muted);border:1px solid var(--line)!important;padding:3px 9px;font-size:12px;}
   .spacer{flex:1;} .bmeta{font-size:11px;color:var(--muted);}
 
+  /* Preview overlay */
+  .preview-ov{position:fixed;top:var(--header-h);left:var(--sidebar-w);right:0;bottom:var(--bar-h);
+    background:rgba(0,0,0,.93);z-index:50;display:grid;place-items:center;}
+  .preview-ov img{max-width:96%;max-height:92%;object-fit:contain;}
+  .preview-ov .pinfo{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+    background:rgba(0,0,0,.8);padding:4px 14px;border-radius:5px;font-size:12px;white-space:nowrap;}
+  .preview-ov .ptag{position:absolute;top:10px;left:10px;font-size:14px;font-weight:700;padding:2px 10px;border-radius:4px;}
+  .ptag.keep{background:var(--good);color:white;} .ptag.cull{background:var(--bad);color:white;}
+  .preview-ov .phint{position:absolute;top:10px;right:14px;color:#666;font-size:12px;}
+
   /* Help */
   .help-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center;}
   .help-box{background:#1a1d24;border:1px solid var(--line);border-radius:10px;padding:20px 24px;width:min(420px,90vw);}
@@ -75,6 +86,7 @@
   <div class="main" id="main"></div>
   <footer class="bar" id="bar"></footer>
 </div>
+<div id="previewOv"></div>
 <div id="helpRoot"></div>
 
 <script>
@@ -178,6 +190,7 @@ async function selectGroup(idx){
   // Fetch group detail with dimensions
   groupDetail = await(await fetch(`/api/groups/group-${idx}`)).json();
   for(const a of groupDetail.assets) if(!(a.id in states)) states[a.id]=null;
+  si = 0; // select first image by default
   render(); renderSidebar(); renderBar();
   document.getElementById('gi-'+idx)?.scrollIntoView({block:'nearest',behavior:'smooth'});
 }
@@ -198,7 +211,7 @@ function renderGrid(){
 
   main.innerHTML = `<div class="jgrid">${g.assets.map((a,i)=>{
     const r=rects[i]; const s=states[a.id];
-    return`<div class="cell ${s||''}" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px" onclick="enterDetail(${i})">
+    return`<div class="cell ${s||''} ${i===si?'sel':''}" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px" onclick="clickGrid(${i})">
       <img src="/api/preview?id=${encodeURIComponent(a.id)}" loading="lazy">
       ${s==='keep'?'<div class="bdg kb">KEEP</div>':''}${s==='cull'?'<div class="bdg cb">CULL</div>':''}
       ${a.rating>0?`<div class="st">${'★'.repeat(a.rating)}</div>`:''}
@@ -237,8 +250,26 @@ function renderBar(){
     <button class="bh" onclick="toggleHelp()">?</button>`;
 }
 
+let showPreview=false;
+
+function clickGrid(i){
+  if(si===i){showPreview=true;renderPreview();} // click selected = open preview
+  else{si=i;render();renderBar();}
+}
 function enterDetail(i){si=i;mode='detail';render();renderBar();}
-function backToGrid(){mode='grid';si=-1;render();renderBar();}
+function backToGrid(){mode='grid';showPreview=false;render();renderBar();}
+
+function renderPreview(){
+  const ov=document.getElementById('previewOv');
+  if(!showPreview||si<0||!groupDetail){ov.innerHTML='';return;}
+  const a=groupDetail.assets[si],s=states[a.id];
+  ov.innerHTML=`<div class="preview-ov" onclick="showPreview=false;renderPreview()">
+    <img src="/api/preview?id=${encodeURIComponent(a.id)}" onclick="event.stopPropagation()">
+    ${s?`<div class="ptag ${s}">${s.toUpperCase()}</div>`:''}
+    <div class="phint">Esc to close</div>
+    <div class="pinfo"><strong>${a.filename}</strong> &middot; ${fmt(a.bytes||0)} &middot; ${new Date(a.date).toLocaleString('no')}${a.rating>0?' &middot; '+'★'.repeat(a.rating):''}${a.isFavorite?' &middot; ♥':''}</div>
+  </div>`;
+}
 function ensureSel(){if(si<0){si=0;mode='detail';render();renderBar();}}
 function doKeep(){ensureSel();mark('keep');}
 function doCull(){ensureSel();mark('cull');}
@@ -327,20 +358,21 @@ document.addEventListener('keydown',e=>{
   if(ci<0||!groupDetail) return;
   const g=groupDetail;
   switch(e.key){
-    // ArrowRight enters detail on first image if in grid mode
     case'ArrowRight':case'd':
       e.preventDefault();
-      if(mode==='grid'){enterDetail(0);}
-      else if(si<g.assets.length-1){si++;render();renderBar();}
+      if(si<g.assets.length-1){si++;showPreview=false;render();renderBar();renderPreview();}
       break;
     case'ArrowLeft':case'g':
       e.preventDefault();
-      if(mode==='detail'&&si>0){si--;render();renderBar();}
-      else if(mode==='detail'&&si===0) backToGrid();
+      if(si>0){si--;showPreview=false;render();renderBar();renderPreview();}
       break;
     case'ArrowDown':e.preventDefault();if(ci<groups.length-1)selectGroup(ci+1);break;
     case'ArrowUp':e.preventDefault();if(ci>0)selectGroup(ci-1);break;
-    case'Escape':if(mode==='detail')backToGrid();break;
+    case'Escape':
+      if(showPreview){showPreview=false;renderPreview();}
+      else if(mode==='detail') backToGrid();
+      break;
+    case' ':e.preventDefault();if(si>=0){showPreview=!showPreview;renderPreview();}break;
     case'k':case'j':mark('keep');break;
     case'K':case'J':for(const a of g.assets)states[a.id]='keep';render();renderBar();break;
     case'x':case'f':mark('cull');break;

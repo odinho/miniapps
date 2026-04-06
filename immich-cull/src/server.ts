@@ -68,8 +68,14 @@ async function getDimensions(asset: Asset): Promise<{ w: number; h: number }> {
   const fp = resolveFilePath(asset);
   if (!fp) return { w: 4, h: 3 };
   try {
-    const meta = await sharp(fp).rotate().metadata();
-    const dims = { w: meta.width ?? 4, h: meta.height ?? 3 };
+    const meta = await sharp(fp).metadata();
+    let w = meta.width ?? 4;
+    let h = meta.height ?? 3;
+    // EXIF orientations 5-8 involve a 90° rotation, so swap w/h
+    if (meta.orientation && meta.orientation >= 5 && meta.orientation <= 8) {
+      [w, h] = [h, w];
+    }
+    const dims = { w, h };
     dimensionCache.set(asset.id, dims);
     return dims;
   } catch {
