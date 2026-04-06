@@ -29,7 +29,7 @@
   .jgrid .cell:hover{border-color:#555;}
   .jgrid .cell.keep{border-color:var(--good);}
   .jgrid .cell.cull{border-color:var(--bad);opacity:.4;}
-  .jgrid .cell.sel{border-color:var(--accent)!important;box-shadow:0 0 8px rgba(240,160,64,.5);opacity:1!important;}
+  .jgrid .cell.sel{border-color:var(--accent)!important;box-shadow:0 0 8px rgba(240,160,64,.5);}
   .jgrid .cell img{width:100%;height:100%;object-fit:contain;display:block;background:#0b0d11;}
   .jgrid .cell .lbl{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.8));padding:10px 5px 3px;font-size:9px;color:#bbb;display:flex;justify-content:space-between;}
   .jgrid .cell .bdg{position:absolute;top:3px;left:3px;font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;color:white;}
@@ -41,7 +41,7 @@
   .filmstrip{display:flex;gap:3px;padding:3px;overflow-x:auto;background:#111319;border-bottom:1px solid var(--line);flex-shrink:0;height:80px;align-items:stretch;}
   .ft{flex-shrink:0;cursor:pointer;border:2px solid transparent;border-radius:3px;height:100%;position:relative;}
   .ft.keep{border-color:var(--good);} .ft.cull{border-color:var(--bad);opacity:.4;}
-  .ft.active{border-color:var(--accent)!important;opacity:1!important;}
+  .ft.active{border-color:var(--accent)!important;}
   .ft img{height:100%;width:auto;display:block;object-fit:contain;}
   .bigp{flex:1;min-height:0;display:grid;place-items:center;background:#090b0f;position:relative;}
   .bigp img{max-width:100%;max-height:100%;object-fit:contain;}
@@ -64,7 +64,7 @@
   .pv-strip{display:flex;gap:3px;padding:3px;overflow-x:auto;background:#111319;
     border-bottom:1px solid var(--line);flex-shrink:0;align-items:stretch;}
   .pv-strip .pvt{flex-shrink:0;cursor:pointer;border:2px solid transparent;border-radius:3px;position:relative;overflow:hidden;}
-  .pvt.active{border-color:var(--accent)!important;opacity:1!important;}
+  .pvt.active{border-color:var(--accent)!important;}
   .pvt.keep{border-color:var(--good);} .pvt.cull{border-color:var(--bad);opacity:.4;}
   .pvt img{height:100%;width:auto;display:block;object-fit:contain;}
   .pvt .pvb{position:absolute;top:1px;left:1px;font-size:8px;font-weight:700;padding:0 3px;border-radius:2px;color:white;}
@@ -99,6 +99,8 @@
 
 <script>
 let groups=[], ci=-1, si=-1, states={}, mode='grid', groupDetail=null;
+// Undo stack: [{groupIdx, prevDecided, prevStates:{assetId->state}, prevSi}]
+let undoStack=[];
 
 function fmt(b){return b>=1e9?(b/1e9).toFixed(1)+' GB':b>=1e6?(b/1e6).toFixed(1)+' MB':b>=1e3?(b/1e3).toFixed(0)+' KB':b+' B';}
 
@@ -114,16 +116,14 @@ function justifiedLayout(items, containerW, containerH, gap) {
   const maxRows = Math.min(items.length, Math.ceil(Math.sqrt(items.length) + 1));
 
   for (let nRows = 1; nRows <= maxRows; nRows++) {
-    const layout = computeRows(aspects, containerW, containerH, gap, nRows);
+    const layout = computeRows(aspects, containerW, containerH, gap, nRows, items);
     if (layout && layout.fill > bestFill) { bestLayout = layout; bestFill = layout.fill; }
   }
   return bestLayout ? bestLayout.rects : items.map((_,i) => ({x:0,y:i*100,w:100,h:100}));
 }
 
-function computeRows(aspects, W, H, gap, nRows) {
+function computeRows(aspects, W, H, gap, nRows, items) {
   const n = aspects.length;
-  // Distribute images across rows: try to balance total aspect ratio per row
-  // Simple greedy: split into nRows groups where each group's total aspect is ~equal
   const totalAspect = aspects.reduce((s,a) => s+a, 0);
   const targetPerRow = totalAspect / nRows;
 
@@ -162,7 +162,13 @@ function computeRows(aspects, W, H, gap, nRows) {
   let y = 0;
   let usedArea = 0;
   for (let r = 0; r < rows.length; r++) {
-    const rowH = rawHeights[r] * scale;
+    let rowH = rawHeights[r] * scale;
+    // Cap row height so no image exceeds its native pixel height
+    if (items) {
+      for (const i of rows[r]) {
+        rowH = Math.min(rowH, items[i].h);
+      }
+    }
     let x = 0;
     for (const i of rows[r]) {
       const imgW = rowH * aspects[i];
@@ -193,13 +199,13 @@ function renderSidebar(){
   }).join('');
 }
 
-async function selectGroup(idx){
-  ci=idx; si=-1; mode='grid';
-  // Fetch group detail with dimensions
+async function selectGroup(idx, keepPreview=false){
+  ci=idx; si=0; if(!keepPreview){mode='grid';showPreview=false;}
   groupDetail = await(await fetch(`/api/groups/group-${idx}`)).json();
   for(const a of groupDetail.assets) if(!(a.id in states)) states[a.id]=null;
-  si = 0; // select first image by default
   render(); renderSidebar(); renderBar();
+  if(showPreview) renderPreview();
+  else document.getElementById('previewOv').innerHTML='';
   document.getElementById('gi-'+idx)?.scrollIntoView({block:'nearest',behavior:'smooth'});
 }
 
@@ -322,6 +328,11 @@ function keepFirstN(n){
 
 async function approveGroup(){
   const g=groupDetail;
+  // Save undo state
+  const prevStates={};
+  for(const a of g.assets) prevStates[a.id]=states[a.id];
+  undoStack.push({groupIdx:ci,prevDecided:false,prevStates,prevSi:si});
+
   for(const a of g.assets)if(!states[a.id])states[a.id]='keep';
   await fetch(`/api/groups/${g.id}/decide`,{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({keep:g.assets.filter(a=>states[a.id]==='keep').map(a=>a.id),cull:g.assets.filter(a=>states[a.id]==='cull').map(a=>a.id)})});
@@ -330,9 +341,30 @@ async function approveGroup(){
 
 async function skipGroup(){
   const g=groupDetail;
+  const prevStates={};
+  for(const a of g.assets) prevStates[a.id]=states[a.id];
+  undoStack.push({groupIdx:ci,prevDecided:false,prevStates,prevSi:si});
+
   await fetch(`/api/groups/${g.id}/decide`,{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({keep:[],cull:[],skipped:true})});
   groups[ci].decided=true;updateStats();renderSidebar();nextUndecided();
+}
+
+async function undo(){
+  if(!undoStack.length) return;
+  const u=undoStack.pop();
+  // Restore states
+  for(const [id,s] of Object.entries(u.prevStates)) states[id]=s;
+  // Un-decide the group
+  groups[u.groupIdx].decided=false;
+  // Tell server to un-decide (re-post with empty to clear, or just let it be overwritten on next approve)
+  await fetch(`/api/groups/group-${u.groupIdx}/decide`,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({keep:[],cull:[],skipped:true})});
+  // Navigate back
+  await selectGroup(u.groupIdx, showPreview);
+  si=u.prevSi;
+  render();renderBar();updateStats();renderSidebar();
+  if(showPreview)renderPreview();
 }
 
 function nextUndecided(){
@@ -372,6 +404,7 @@ function toggleHelp(){
       <tr><td><kbd>Shift</kbd>+<kbd>K</kbd></td><td>Keep all</td></tr>
       <tr><td><kbd>Shift</kbd>+<kbd>X</kbd></td><td>Cull all</td></tr>
       <tr><td><kbd>1</kbd>&ndash;<kbd>5</kbd></td><td>Keep first N, cull rest</td></tr>
+      <tr><td><kbd>Backspace</kbd></td><td>Undo last approve/skip</td></tr>
     </table>
     <div class="note">Undecided &rarr; <b>keep</b> on approve. Culled &rarr; Immich trash (30 days).</div>
   </div></div>`:'';
@@ -393,8 +426,8 @@ document.addEventListener('keydown',e=>{
       e.preventDefault();
       if(si>0){si--;render();renderBar();if(showPreview)renderPreview();}
       break;
-    case'ArrowDown':e.preventDefault();if(ci<groups.length-1)selectGroup(ci+1);break;
-    case'ArrowUp':e.preventDefault();if(ci>0)selectGroup(ci-1);break;
+    case'ArrowDown':e.preventDefault();if(ci<groups.length-1)selectGroup(ci+1,showPreview);break;
+    case'ArrowUp':e.preventDefault();if(ci>0)selectGroup(ci-1,showPreview);break;
     case'Escape':
       if(showPreview){showPreview=false;renderPreview();}
       else if(mode==='detail') backToGrid();
@@ -407,6 +440,7 @@ document.addEventListener('keydown',e=>{
     case'b':case'B':keepBestCullRest();break;
     case'a':case'Enter':e.preventDefault();approveGroup();break;
     case's':if(!e.shiftKey)skipGroup();break;
+    case'Backspace':e.preventDefault();undo();break;
     case'?':toggleHelp();break;
     case'1':keepFirstN(1);break;case'2':keepFirstN(2);break;case'3':keepFirstN(3);break;
     case'4':keepFirstN(4);break;case'5':keepFirstN(5);break;
