@@ -15,7 +15,10 @@ import { DEFAULT_CLUSTER_CONFIG, PhotoGroup, Asset } from "./shared/types.js";
 import { getImmichDbConfig } from "./shared/config.js";
 import sharp from "sharp";
 import { fileURLToPath } from "url";
-import { StateDb } from "./db/state-db.js";
+import { StateDb, batchFingerprint } from "./db/state-db.js";
+import { batchBySession, SessionBatch } from "./batching/session-batcher.js";
+import { LlmClient } from "./ranking/llm-client.js";
+import { DayBatchResponse } from "./ranking/types.js";
 import { config as loadEnv } from "dotenv";
 loadEnv();
 
@@ -302,12 +305,104 @@ app.get<{ Querystring: { id: string } }>("/api/full", async (req, reply) => {
   }
 });
 
+// === LLM Batch endpoints ===
+
+let sessionBatches: SessionBatch[] = [];
+let llmClient: LlmClient | null = null;
+
+/** List all session batches */
+app.get("/api/batches", async () => {
+  return sessionBatches.map((b) => {
+    const fp = batchFingerprint(b.assets.map(a => a.id));
+    const cached = stateDb.getLlmRun(b.id, fp);
+    return {
+      id: b.id,
+      source: b.source,
+      folderName: b.folderName,
+      count: b.assets.length,
+      dateRange: { start: b.dateRange.start.toISOString(), end: b.dateRange.end.toISOString() },
+      hasLlmResult: cached !== null,
+    };
+  });
+});
+
+/** Get a batch with its LLM results (if available) */
+app.get<{ Params: { id: string } }>("/api/batches/:id", async (req) => {
+  const batch = sessionBatches.find(b => b.id === req.params.id);
+  if (!batch) return { error: "Not found" };
+
+  const fp = batchFingerprint(batch.assets.map(a => a.id));
+  const cached = stateDb.getLlmRun(batch.id, fp);
+  let llmResult: DayBatchResponse | null = null;
+  if (cached) {
+    try { llmResult = JSON.parse(cached.responseJson); } catch {}
+  }
+
+  return {
+    id: batch.id,
+    source: batch.source,
+    folderName: batch.folderName,
+    count: batch.assets.length,
+    dateRange: { start: batch.dateRange.start.toISOString(), end: batch.dateRange.end.toISOString() },
+    assets: batch.assets.map((a) => ({
+      id: a.id,
+      filename: a.filename,
+      date: a.fileCreatedAt.toISOString(),
+      rating: a.rating,
+      bytes: getFileSize(a),
+    })),
+    llm: llmResult,
+  };
+});
+
+/** Run LLM on a batch */
+app.post<{ Params: { id: string } }>("/api/batches/:id/rank", async (req) => {
+  const batch = sessionBatches.find(b => b.id === req.params.id);
+  if (!batch) return { error: "Not found" };
+  if (!llmClient) return { error: "No LLM client configured (need --vertex or OPENROUTER key)" };
+
+  const fp = batchFingerprint(batch.assets.map(a => a.id));
+
+  // Check cache
+  const cached = stateDb.getLlmRun(batch.id, fp);
+  if (cached) {
+    return { cached: true, response: JSON.parse(cached.responseJson) };
+  }
+
+  const { response, rawJson, inputTokens, outputTokens } = await llmClient.rankBatch(
+    batch, resolveFilePath, (s) => console.log(`  [LLM] ${s}`)
+  );
+
+  // Store in DB
+  stateDb.saveLlmRun(batch.id, fp, "gemini-2.5-flash-lite", "v2", rawJson, inputTokens, outputTokens);
+
+  return { cached: false, response, inputTokens, outputTokens };
+});
+
 app.get("/", async (_, reply) => {
   reply.type("text/html");
   return readFileSync(resolve(__dirname, "../web/index.html"), "utf-8");
 });
 
 await loadData();
+
+// Build session batches from loaded assets
+const allAssets = [...assetMap.values()];
+sessionBatches = batchBySession(allAssets);
+console.log(`${sessionBatches.length} session batches`);
+
+// Initialize LLM client
+const orKeyPath = resolve("/home/odin/Kode/miniapps/babysovelogg/OPENROUTER.key");
+if (args.includes("--vertex")) {
+  llmClient = new LlmClient({ apiKey: "", provider: "vertexai", model: "gemini-2.5-flash-lite", vertexProject: "tagrdevin" });
+  console.log("LLM: Vertex AI (tagrdevin)");
+} else if (existsSync(orKeyPath)) {
+  llmClient = new LlmClient({ apiKey: readFileSync(orKeyPath, "utf-8").trim(), provider: "openrouter", model: "google/gemini-2.5-flash-lite" });
+  console.log("LLM: OpenRouter");
+} else {
+  console.log("LLM: not configured (use --vertex or provide OpenRouter key)");
+}
+
 await app.listen({ port, host: "0.0.0.0" });
 console.log(`\nReview UI: http://localhost:${port}`);
 console.log(`Network:   http://192.168.10.88:${port}`);

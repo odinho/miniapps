@@ -79,6 +79,16 @@
   .ptag.keep{background:var(--good);color:white;} .ptag.cull{background:var(--bad);color:white;}
 
   /* Help */
+  /* LLM mode: star badge on images */
+  .llm-star{position:absolute;top:3px;left:3px;font-size:11px;color:#ffd700;text-shadow:0 1px 2px #000;background:rgba(0,0,0,.6);padding:1px 4px;border-radius:3px;}
+  .llm-note{position:absolute;bottom:14px;left:0;right:0;text-align:center;font-size:9px;color:#ddd;text-shadow:0 1px 2px #000;padding:0 4px;}
+  .llm-sg-border{outline:2px dashed rgba(240,160,64,.4);outline-offset:-2px;}
+  .llm-cull-suggest{opacity:.35;} .llm-cull-suggest:hover{opacity:.7;}
+  .llm-keep-suggest{outline:2px solid rgba(76,175,80,.5);outline-offset:-2px;}
+  .sg-header{padding:6px 8px;font-size:11px;color:var(--accent);border-bottom:1px solid var(--line);background:rgba(240,160,64,.08);}
+  .run-btn{padding:4px 12px;border:none;border-radius:4px;background:#7c4dff;color:white;cursor:pointer;font-size:12px;}
+  .run-btn:hover{opacity:.85;}
+
   .help-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center;}
   .help-box{background:#1a1d24;border:1px solid var(--line);border-radius:10px;padding:20px 24px;width:min(420px,90vw);}
   .help-box h2{font-size:16px;margin-bottom:16px;color:var(--accent);}
@@ -91,7 +101,14 @@
 </head>
 <body>
 <div class="app">
-  <header class="header"><h1>immich-cull</h1><div class="stats" id="stats"></div></header>
+  <header class="header">
+    <h1>immich-cull</h1>
+    <div style="display:flex;gap:4px">
+      <button onclick="switchMode('groups')" id="modeGroups" style="padding:2px 10px;border:1px solid var(--line);border-radius:4px;background:var(--accent);color:#1a1a1a;font-size:12px;cursor:pointer;font-weight:600">Groups</button>
+      <button onclick="switchMode('llm')" id="modeLlm" style="padding:2px 10px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--muted);font-size:12px;cursor:pointer">LLM Batches</button>
+    </div>
+    <div class="stats" id="stats"></div>
+  </header>
   <aside class="sidebar" id="sidebar"></aside>
   <div class="main" id="main"></div>
   <footer class="bar" id="bar"></footer>
@@ -494,6 +511,136 @@ document.addEventListener('keydown',e=>{
     case'1':keepFirstN(1);break;case'2':keepFirstN(2);break;case'3':keepFirstN(3);break;
     case'4':keepFirstN(4);break;case'5':keepFirstN(5);break;
   }
+});
+
+// === LLM BATCH MODE ===
+let appMode = 'groups'; // 'groups' | 'llm'
+let batches = [];
+let currentBatch = null; // full batch data with llm results
+let currentBatchIdx = -1;
+
+function switchMode(m) {
+  appMode = m;
+  document.getElementById('modeGroups').style.background = m==='groups' ? 'var(--accent)' : 'transparent';
+  document.getElementById('modeGroups').style.color = m==='groups' ? '#1a1a1a' : 'var(--muted)';
+  document.getElementById('modeLlm').style.background = m==='llm' ? 'var(--accent)' : 'transparent';
+  document.getElementById('modeLlm').style.color = m==='llm' ? '#1a1a1a' : 'var(--muted)';
+  if (m==='groups') { renderSidebar(); render(); renderBar(); }
+  else { loadBatches(); }
+}
+
+async function loadBatches() {
+  batches = await(await fetch('/api/batches')).json();
+  renderBatchSidebar();
+  if (batches.length && currentBatchIdx < 0) selectBatch(0);
+}
+
+function renderBatchSidebar() {
+  document.getElementById('sidebar').innerHTML = batches.map((b, i) => {
+    const d = new Date(b.dateRange.start);
+    const ds = d.getFullYear()>2000 ? d.toLocaleDateString('no',{day:'numeric',month:'short',year:'2-digit'}) : '?';
+    return `<div class="gi ${i===currentBatchIdx?'active':''} ${b.hasLlmResult?'':''}}" onclick="selectBatch(${i})" id="bi-${i}">
+      <div class="t">${b.count} photos &middot; ${ds}</div>
+      <div class="m">${b.source} ${b.folderName||''} ${b.hasLlmResult?'✓ LLM':''}</div>
+    </div>`;
+  }).join('');
+}
+
+async function selectBatch(idx) {
+  currentBatchIdx = idx;
+  const b = batches[idx];
+  currentBatch = await(await fetch(`/api/batches/${b.id}`)).json();
+  renderBatchView();
+  renderBatchSidebar();
+  document.getElementById('bi-'+idx)?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+function renderBatchView() {
+  const b = currentBatch;
+  if (!b) return;
+  const main = document.getElementById('main');
+  const W = main.clientWidth;
+  const H = main.clientHeight;
+
+  // Build image data with LLM annotations
+  const llmMap = {};
+  if (b.llm?.images) for (const img of b.llm.images) llmMap[img.imageId] = img;
+
+  // Build subgroup keep/cull sets
+  const sgKeep = new Set();
+  const sgCull = new Set();
+  if (b.llm?.similaritySubgroups) {
+    for (const sg of b.llm.similaritySubgroups) {
+      for (const id of sg.recommendedKeepIds) sgKeep.add(id);
+      for (const id of sg.cullIds) sgCull.add(id);
+    }
+  }
+
+  // Use justified layout
+  const items = b.assets.map(a => {
+    // Approximate aspect ratio from filename (or default 4:3)
+    return { w: 4, h: 3 }; // we don't have dimensions in batch API yet
+  });
+  // For now use CSS columns since we don't have dimensions
+  const cols = b.assets.length <= 6 ? 2 : b.assets.length <= 12 ? 3 : 4;
+
+  main.innerHTML = `
+    <div style="overflow-y:auto;padding:4px;flex:1;column-count:${cols};column-gap:4px">
+      ${b.llm ? `<div style="column-span:all;padding:4px 8px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);margin-bottom:4px">
+        <strong>${b.llm.batchSummary||''}</strong>
+        &middot; ${b.llm.images?.length||0} assessed
+        &middot; ${b.llm.similaritySubgroups?.length||0} subgroups
+        &middot; conf ${b.llm.overallConfidence||'?'}
+      </div>` : ''}
+      ${b.assets.map((a, i) => {
+        const llm = llmMap[a.id];
+        const isKeep = sgKeep.has(a.id);
+        const isCull = sgCull.has(a.id);
+        const stars = llm ? '★'.repeat(llm.suggestedStars) + '☆'.repeat(3-llm.suggestedStars) : '';
+        const note = llm?.briefNote || '';
+        const cats = llm?.categories?.join(', ') || '';
+        const sg = llm?.similaritySubgroupId;
+        return `<div class="photo-card ${isCull?'llm-cull-suggest':''} ${isKeep?'llm-keep-suggest':''} ${sg?'llm-sg-border':''}"
+                     style="break-inside:avoid;margin-bottom:4px;position:relative;border-radius:4px;overflow:hidden;background:#0b0d11">
+          <img src="/api/preview?id=${encodeURIComponent(a.id)}" style="width:100%;height:auto;display:block" loading="lazy">
+          ${stars ? `<div class="llm-star">${stars}</div>` : ''}
+          ${note ? `<div class="llm-note">${note}</div>` : ''}
+          <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.8));padding:12px 5px 3px;font-size:9px;color:#bbb;display:flex;justify-content:space-between">
+            <span>${a.filename}</span>
+            <span>${isCull?'<span style="color:var(--bad)">CULL</span>':isKeep?'<span style="color:var(--good)">KEEP</span>':''}${sg?' &middot; '+sg:''}</span>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+
+  // Action bar
+  document.getElementById('bar').innerHTML = `
+    ${!b.llm ? `<button class="run-btn" onclick="runLlm()">Run LLM on this batch</button>` : ''}
+    <span class="spacer"></span>
+    <span class="bmeta">${b.count} photos &middot; ${b.source} ${b.folderName||''}</span>
+    <button class="bh" onclick="toggleHelp()">?</button>
+  `;
+}
+
+async function runLlm() {
+  const b = batches[currentBatchIdx];
+  if (!b) return;
+  document.getElementById('bar').innerHTML = '<span style="color:var(--accent)">Running LLM... (may take 15-60s)</span>';
+  try {
+    const resp = await fetch(`/api/batches/${b.id}/rank`, { method: 'POST' });
+    const data = await resp.json();
+    if (data.error) { alert('LLM error: ' + data.error); return; }
+    b.hasLlmResult = true;
+    await selectBatch(currentBatchIdx); // reload with results
+  } catch (e) {
+    alert('LLM error: ' + e.message);
+  }
+}
+
+window.addEventListener('resize', () => {
+  if (appMode === 'groups' && mode === 'grid' && groupDetail) renderGrid();
+  if (appMode === 'llm' && currentBatch) renderBatchView();
 });
 
 load();
