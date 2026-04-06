@@ -72,7 +72,9 @@
   .pv-main{flex:1;min-height:0;position:relative;overflow:hidden;}
   .pv-main img{width:100%;height:100%;object-fit:contain;display:block;}
   .pv-main .pinfo{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
-    background:rgba(0,0,0,.8);padding:4px 14px;border-radius:5px;font-size:12px;white-space:nowrap;}
+    background:rgba(0,0,0,.8);padding:4px 14px;border-radius:5px;font-size:12px;white-space:nowrap;transition:background .15s;}
+  .pv-main .pinfo-keep{background:rgba(76,175,80,.7);}
+  .pv-main .pinfo-cull{background:rgba(229,57,53,.7);}
   .pv-main .ptag{position:absolute;top:10px;left:10px;font-size:14px;font-weight:700;padding:2px 10px;border-radius:4px;}
   .ptag.keep{background:var(--good);color:white;} .ptag.cull{background:var(--bad);color:white;}
 
@@ -307,8 +309,11 @@ function renderPreview(){
     const tagEl=ov.querySelector('.ptag');
     if(tagEl){tagEl.className=s?`ptag ${s}`:'ptag';tagEl.textContent=s?s.toUpperCase():'';tagEl.style.display=s?'':'none';}
     // Update info
-    const infoEl=ov.querySelector('.pinfo');
-    if(infoEl) infoEl.innerHTML=`<strong>${a.filename}</strong> &middot; ${fmt(a.bytes||0)} &middot; ${new Date(a.date).toLocaleString('no')}${a.rating>0?' &middot; '+'★'.repeat(a.rating):''}${a.isFavorite?' &middot; ♥':''}`;
+    const infoEl=ov.querySelector('[class^="pinfo"]');
+    if(infoEl){
+      infoEl.className=`pinfo${s==='keep'?' pinfo-keep':''}${s==='cull'?' pinfo-cull':''}`;
+      infoEl.innerHTML=`<strong>${a.filename}</strong> &middot; ${fmt(a.bytes||0)} &middot; ${new Date(a.date).toLocaleString('no')}${a.rating>0?' &middot; '+'★'.repeat(a.rating):''}${a.isFavorite?' &middot; ♥':''}`;
+    }
     // Preload full-res
     const expectedId=a.id;
     const pre=new Image();
@@ -340,7 +345,7 @@ function renderPreview(){
     <div class="pv-main">
       <img id="pvImg" data-asset-id="${a.id}" src="${previewUrl}">
       <div class="ptag ${s||''}" style="${s?'':'display:none'}">${s?s.toUpperCase():''}</div>
-      <div class="pinfo"><strong>${a.filename}</strong> &middot; ${fmt(a.bytes||0)} &middot; ${new Date(a.date).toLocaleString('no')}${a.rating>0?' &middot; '+'★'.repeat(a.rating):''}${a.isFavorite?' &middot; ♥':''}</div>
+      <div class="pinfo${s==='keep'?' pinfo-keep':''}${s==='cull'?' pinfo-cull':''}"><strong>${a.filename}</strong> &middot; ${fmt(a.bytes||0)} &middot; ${new Date(a.date).toLocaleString('no')}${a.rating>0?' &middot; '+'★'.repeat(a.rating):''}${a.isFavorite?' &middot; ♥':''}</div>
     </div>
   </div>`;
   const expectedId=a.id;
