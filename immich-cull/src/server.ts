@@ -30,6 +30,8 @@ const useImmich = args.includes("--immich");
 const port = parseInt(getArg("--port", "3000"));
 const sampleSize = parseInt(getArg("--sample", "0"));
 
+const PREVIEW_MAX_PX = 1400;
+
 const app = Fastify({ logger: false });
 
 // State
@@ -75,10 +77,9 @@ async function getDimensions(asset: Asset): Promise<{ w: number; h: number }> {
     if (meta.orientation && meta.orientation >= 5 && meta.orientation <= 8) {
       [w, h] = [h, w];
     }
-    // Scale down to match the preview endpoint's max 1400px
-    const PREVIEW_MAX = 1400;
-    if (w > PREVIEW_MAX || h > PREVIEW_MAX) {
-      const scale = PREVIEW_MAX / Math.max(w, h);
+    // Scale down to match the preview endpoint's max dimension
+    if (w > PREVIEW_MAX_PX || h > PREVIEW_MAX_PX) {
+      const scale = PREVIEW_MAX_PX / Math.max(w, h);
       w = Math.round(w * scale);
       h = Math.round(h * scale);
     }
@@ -248,28 +249,7 @@ app.get("/api/stats", async () => {
   };
 });
 
-/** Thumbnail: auto-rotated via EXIF */
-app.get<{ Querystring: { id: string } }>("/api/thumb", async (req, reply) => {
-  const asset = assetMap.get(req.query.id);
-  if (!asset) { reply.code(404); return { error: "Not found" }; }
-  const fp = resolveFilePath(asset);
-  if (!fp) { reply.code(404); return { error: "File not found" }; }
-
-  try {
-    const thumb = await sharp(fp)
-      .rotate() // auto-rotate based on EXIF orientation
-      .resize(400, 400, { fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: 80 })
-      .toBuffer();
-    reply.type("image/jpeg").header("Cache-Control", "public, max-age=3600");
-    return thumb;
-  } catch (e: any) {
-    reply.code(500);
-    return { error: e.message };
-  }
-});
-
-/** Preview: auto-rotated, larger */
+/** Preview: auto-rotated, max PREVIEW_MAX_PX */
 app.get<{ Querystring: { id: string } }>("/api/preview", async (req, reply) => {
   const asset = assetMap.get(req.query.id);
   if (!asset) { reply.code(404); return { error: "Not found" }; }
@@ -279,11 +259,31 @@ app.get<{ Querystring: { id: string } }>("/api/preview", async (req, reply) => {
   try {
     const preview = await sharp(fp)
       .rotate() // auto-rotate based on EXIF orientation
-      .resize(1400, 1400, { fit: "inside", withoutEnlargement: true })
+      .resize(PREVIEW_MAX_PX, PREVIEW_MAX_PX, { fit: "inside", withoutEnlargement: true })
       .jpeg({ quality: 85 })
       .toBuffer();
     reply.type("image/jpeg").header("Cache-Control", "public, max-age=3600");
     return preview;
+  } catch (e: any) {
+    reply.code(500);
+    return { error: e.message };
+  }
+});
+
+/** Full-size: auto-rotated, original resolution (for preview overlay) */
+app.get<{ Querystring: { id: string } }>("/api/full", async (req, reply) => {
+  const asset = assetMap.get(req.query.id);
+  if (!asset) { reply.code(404); return { error: "Not found" }; }
+  const fp = resolveFilePath(asset);
+  if (!fp) { reply.code(404); return { error: "File not found" }; }
+
+  try {
+    const full = await sharp(fp)
+      .rotate()
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    reply.type("image/jpeg").header("Cache-Control", "public, max-age=3600");
+    return full;
   } catch (e: any) {
     reply.code(500);
     return { error: e.message };
