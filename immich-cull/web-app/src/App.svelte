@@ -258,6 +258,7 @@
 
 {#if showPreview && selectedIdx >= 0 && currentAssets.length}
   <Preview assets={currentAssets} {selectedIdx} {states} {llmMap} {keepSet} {cullSet}
+    subgroups={batchDetail?.llm?.similaritySubgroups ?? []}
     onSelect={(i) => selectedIdx = i} onClose={() => showPreview = false} />
 {/if}
 
@@ -329,7 +330,7 @@
   :global(.cell) { position: absolute; overflow: hidden; cursor: pointer; border: 3px solid transparent; transition: border-color .12s, opacity .12s; }
   :global(.cell:hover) { border-color: #555; }
   :global(.cell.keep) { border-color: #4caf50; }
-  :global(.cell.cull) { border-color: #e53935; }
+  :global(.cell.cull) { border-color: rgba(229,57,53,.5); }
   :global(.cell.cull > img) { opacity: .4; }
   :global(.cell.sel) { border-color: #f0a040 !important; box-shadow: 0 0 8px rgba(240,160,64,.5); }
   :global(.cell img) { width: 100%; height: 100%; object-fit: contain; display: block; background: #0b0d11; }

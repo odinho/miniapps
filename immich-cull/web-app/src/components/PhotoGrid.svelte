@@ -73,7 +73,7 @@
 
       <div class="lbl">
         <span>{asset.filename}</span>
-        <span>{fmt(asset.bytes || 0)}{sg ? ' · ' + sg : ''}</span>
+        <span>{fmt(asset.bytes || 0)}</span>
       </div>
     </div>
   {/each}
