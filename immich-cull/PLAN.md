@@ -6,34 +6,56 @@ Working prototype with:
 - Clustering engine (time-bucketed cosine similarity on CLIP embeddings)
 - Two data sources: Facet SQLite (local testing) and Immich PostgreSQL (production)
 - Review UI with justified grid layout, preview mode, keyboard-driven workflow
-- 340 groups from 3,173 local phone photos, 284 groups from 2,000 Immich photos
 - Confirmed working with full Immich DB (72k+ images with embeddings)
 
 ## Implementation Phases
+
+### Phase 0: Calibration & Onboarding (before LLM)
+
+Before running the LLM on thousands of groups, establish ground truth.
+
+- [ ] User manually reviews ~50 groups across different types (portraits, landscapes, docs, screenshots)
+- [ ] Record decisions as benchmark set for LLM evaluation
+- [ ] User tags ~10 representative folders as "old workflow" or "new workflow" for 1★ heuristic
+- [ ] Internalize the new 0-5★ scale before the tool starts suggesting
+- [ ] ~30 minutes of work, saves weeks of prompt iteration
 
 ### Phase 1: Persist State (next)
 
 The review server currently holds decisions in-memory (lost on restart).
 
-- [ ] Add SQLite database for tool state (decisions, session history)
-- [ ] Persist keep/cull decisions across server restarts
-- [ ] Store undo history in SQLite
-- [ ] Load/display previous decisions on group revisit (partially done: rehydration from server works, but server is in-memory)
+- [ ] Add SQLite database for tool state
+- [ ] Persist decisions (keep/cull per group) across server restarts
+- [ ] Store undo history
+- [ ] Session tracking: "you reviewed 120 groups today, approved 95, culled 340 photos"
+- [ ] Progress indicator: "2000 of 5000 groups reviewed"
+- [ ] "Pick up where you left off" — trivial resumption for returning after days/weeks
 
 ### Phase 2: Gemini LLM Ranking
 
 See [LLM_INTEGRATION_PLAN.md](LLM_INTEGRATION_PLAN.md) for full design.
 
-Core implementation:
+Core:
 - [ ] Connect to Gemini 2.5 Flash Lite via `@google/genai`
-- [ ] Send ALL images per group (no chunking — 20 images is trivial for 1M context)
-- [ ] Rich structured JSON output: ranking + keep sets + categories + star suggestions + protection flags
+- [ ] Send ALL images per group (no chunking — 20 images trivial for 1M context)
+- [ ] Structured JSON: ranking + keepSets + categories + star suggestions + protection flags + groupCoherence
 - [ ] Store raw LLM responses + normalized rows in SQLite (versioned, fingerprinted)
-- [ ] Pre-populate keep/cull suggestions in UI from LLM output
-- [ ] Show LLM reasoning per image
-- [ ] +/- slider: "keep top 1", "keep top 2", etc. using LLM's keepSets
+- [ ] Separate `llm_policy_applied` table for derived stars/decisions (re-run policy without re-calling LLM)
 
-Star rating integration:
+UI integration:
+- [ ] Pre-populate keep/cull from LLM's recommendedDefaultKeepIds
+- [ ] Default workflow: LLM recommends → user hits `A` to approve → next (minimal decisions)
+- [ ] +/- slider available but not the default path (adjusts keepTopN)
+- [ ] Show LLM comparativeReason per image on hover/detail
+- [ ] Flag groups where groupCoherence = "unrelated" (bad clustering)
+
+Auto-approve (the killer feature):
+- [ ] High-confidence groups (>0.9, clear burst, coherent) auto-approved in background
+- [ ] Show summary of auto-approved decisions for spot-checking
+- [ ] User reviews only low-confidence and ambiguous groups
+- [ ] Cuts review workload by 60-80%
+
+Star ratings:
 - [ ] LLM suggests 0-3★ per image (never 4-5★)
 - [ ] Policy layer applies folder context for existing 1★ ambiguity
 - [ ] 2★+ existing ratings are hard floor
@@ -41,52 +63,69 @@ Star rating integration:
 
 Batch processing:
 - [ ] Queue all groups for LLM ranking
-- [ ] Batch API support for overnight processing (~$2.56 for 5k groups on Gemini 2.5 Flash Lite)
-- [ ] Progress tracking and failure handling
+- [ ] Progress tracking and failure handling (mark failed groups, skip gracefully)
+- [ ] Budget 3-5x base cost for prompt iteration (~$8-15 total during development)
 
-### Phase 3: Write-back to Immich
+### Phase 3: Full Library Processing
 
-- [ ] Write star ratings via Immich API (`PUT /assets/{id}`)
-- [ ] Move culled photos to Immich trash (30-day recovery)
-- [ ] Write XMP sidecars via `exiftool-vendored`
-- [ ] Create "Review Session" album in Immich for audit trail
-- [ ] Dry-run mode (show what would change without applying)
-- [ ] Bulk operations with progress tracking
-
-### Phase 4: Full Library Processing
+Run before write-back — build against real data, not test set.
 
 - [ ] Run clustering on all 72k+ Immich images
 - [ ] Performance: binary search is O(B·logN), should handle 100k in minutes
-- [ ] Memory: ~150MB for 72k × 512-dim embeddings — fits in Node heap
+- [ ] Memory: ~150MB for 72k × 512-dim embeddings
 - [ ] SSH tunnel automation or deploy on Debian VM directly
-- [ ] Process in time-range batches if needed
+- [ ] Aggregate dashboard before any writes: star distribution histogram, cull count, category breakdown, lowest-confidence groups
 
-### Phase 5: Categories, Tags & Cleanup
+### Phase 4: Write-back to Immich
 
-- [ ] LLM categories written to Immich tags (portrait, document, receipt, screenshot, etc.)
+Built against full-library data (not test set).
+
+- [ ] Soft-delete first: mark culled in SQLite, don't move to Immich trash until user finalizes batch
+  (Immich trash expires in 30 days; review might take months)
+- [ ] Write star ratings via Immich API (`PUT /assets/{id}`)
+- [ ] Finalize batch: move soft-deleted to Immich trash
+- [ ] Write XMP sidecars via `exiftool-vendored`
+- [ ] Create "Review Session" album in Immich for audit trail
+- [ ] Dry-run mode (show what would change without applying)
+- [ ] Rollback capability using audit trail (undo bulk star changes)
+- [ ] Rate-limit Immich API calls for bulk operations
+
+### Phase 5a: Categories & Tags (safe metadata)
+
+- [ ] Write LLM categories to Immich tags
 - [ ] Auto-detect phone screenshots from path/filename
 - [ ] Snapchat-from-Helene: protect meaningful personal saves
+- [ ] Folder/roll context heuristic for 1★ ambiguity
+- [ ] Singleton strategy: batch ungrouped photos by date, run lighter LLM pass for star ratings
+
+### Phase 5b: File Operations (higher risk, separate phase)
+
 - [ ] NEF/JPG pair management: keep NEF for high-rated, keep only JPG for low-rated
 - [ ] Suggest lower resolution for technical/reference photos
-- [ ] Folder/roll context heuristic for 1★ ambiguity resolution
+- [ ] Always dry-run first, require explicit confirmation
 
 ### Phase 6: Iteration & Learning
 
 - [ ] Track user overrides as structured feedback (promoted_keep, demoted_keep, changed_star)
-- [ ] Evaluate prompt versions against benchmark groups
+- [ ] Evaluate prompt versions against Phase 0 benchmark groups
+- [ ] Re-add TechnicalFlags if model accuracy validates it
 - [ ] Cross-library 4★ curation: surface top 3★ candidates for yearly review
-- [ ] Face-aware ranking (prefer photos where everyone's eyes are open)
-- [ ] Learning from decisions: adjust thresholds based on approve/override patterns
+- [ ] Auto-approve threshold tuning based on override rates
+- [ ] Category-specific prompt refinements
+- [ ] "Batch actions by category" UX (e.g., "delete these 47 screenshots")
 
 ## Architecture
 
 - **TypeScript full-stack** (user preference, Immich alignment)
 - **Read-only PostgreSQL** for embeddings (internal schema, pinned to Immich v2.5.2)
+  - Startup health check validates expected schema exists
+  - Plan for Immich API reading if it becomes available
 - **All writes through Immich API** (safe, documented, forwards-compatible)
-- **Local SQLite for tool state** (decisions, LLM responses, rankings, feedback) — planned, currently in-memory
-- **Gemini 2.5 Flash Lite** for ranking (~$2.56 for 5k groups via standard API)
-- **Never hard-delete** — always Immich trash with 30-day recovery
-- **2★+ existing ratings are hard floor** — 1★ is context-dependent (see star philosophy)
+- **Local SQLite for tool state**: decisions, LLM responses (raw + policy-applied), feedback, sessions
+- **Gemini 2.5 Flash Lite** for ranking (~$2.56 base for 5k groups, budget $15 for iteration)
+- **Soft-delete before Immich trash** — no data loss during extended review periods
+- **2★+ existing ratings are hard floor** — 1★ is context-dependent
+- **Auto-approve high-confidence groups** — minimize decisions for ADD-friendly workflow
 
 ## Clustering Thresholds (all configurable in ClusterConfig)
 
@@ -104,6 +143,19 @@ Batch processing:
 
 ## Key Documents
 
-- [LLM_INTEGRATION_PLAN.md](LLM_INTEGRATION_PLAN.md) — Full Gemini integration design (prompt, schema, storage, slider)
-- [STAR_RATING_PHILOSOPHY.md](STAR_RATING_PHILOSOPHY.md) — Revised 0-5★ scale and migration from old system
+- [LLM_INTEGRATION_PLAN.md](LLM_INTEGRATION_PLAN.md) — Full Gemini integration design
+- [STAR_RATING_PHILOSOPHY.md](STAR_RATING_PHILOSOPHY.md) — Revised 0-5★ scale
 - [README.md](README.md) — Quick start and keyboard shortcuts
+
+## Key Risks & Mitigations
+
+| Risk | Mitigation |
+|---|---|
+| LLM systematic aesthetic bias | Random 5% spot-check after auto-approve batches |
+| Clustering groups unrelated photos | groupCoherence field lets LLM flag it |
+| 80% folder heuristic is wrong | Manual folder tagging during onboarding, validate before bulk apply |
+| Immich schema changes on upgrade | Startup health check, schema adapter isolation |
+| Immich trash expires before review done | Soft-delete in SQLite first, finalize batch explicitly |
+| Decision fatigue (5000 groups) | Auto-approve 60-80% of high-confidence groups |
+| Tool abandoned after 3 sessions | Trivial resumption UX, session summaries, progress bars |
+| Singletons never reviewed | Phase 5a: batch by date, lighter LLM pass |

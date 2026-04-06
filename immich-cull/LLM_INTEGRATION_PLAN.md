@@ -259,6 +259,7 @@ export interface LlmGroupResponse {
   groupSize: number;
   overallConfidence: number;
   rankingQuality: "high" | "medium" | "low";
+  groupCoherence: "coherent" | "mixed" | "unrelated"; // flags bad clustering
   groupSummary: string;
   primaryCategories: LlmCategory[];
   warnings: string[];
@@ -267,11 +268,12 @@ export interface LlmGroupResponse {
 }
 
 export interface KeepSets {
-  keepTop1: string[];
+  keepTop1: string[]; // may be empty if no keeper exists (cullAll case)
   keepTop2: string[];
   keepTop3: string[];
   keepTop4: string[];
-  recommendedDefaultKeepCount: number;
+  cullAll: boolean; // true if no image in the group is worth keeping
+  recommendedDefaultKeepCount: number; // 0 = cull all
   recommendedDefaultKeepIds: string[];
   rationale: string;
 }
@@ -279,31 +281,25 @@ export interface KeepSets {
 export interface RankedImage {
   imageId: string;
   rank: number;
-  score: number;
   confidence: number;
   keepTier: "primary" | "secondary" | "backup" | "cull";
-  shouldKeepIfTop1: boolean;
-  shouldKeepIfTop2: boolean;
-  shouldKeepIfTop3: boolean;
-  shouldKeepIfTop4: boolean;
   isNearDuplicate: boolean;
   protectFromCull: boolean;
   protectionReason: ProtectionReason;
   existingStars: number;
-  suggestedStars: 1 | 2 | 3 | 4 | 5;
+  suggestedStars: 0 | 1 | 2 | 3; // 0=unremarkable, 1=good, 2=share-worthy, 3=standout. Never 4/5.
   categories: LlmCategory[];
-  technicalFlags: TechnicalFlags;
-  comparativeReason: string;
+  comparativeReason: string; // captures sharpness, expression, framing etc. in natural language
 }
 
-export interface TechnicalFlags {
-  sharpness: "high" | "medium" | "low";
-  eyesOpen?: "yes" | "no" | "unclear";
-  motionBlur: "none" | "mild" | "strong";
-  framing: "strong" | "acceptable" | "weak";
-  exposure: "good" | "usable" | "poor";
-  legibility?: "high" | "medium" | "low";
-}
+// NOTE: TechnicalFlags dropped from v1 per adversarial review.
+// The LLM gets sharpness/eye detection wrong often enough that comparativeReason
+// is more reliable. Can be added back in Phase 6 after validating model accuracy.
+
+// NOTE: shouldKeepIfTopN booleans dropped — redundant with KeepSets arrays.
+// Derive in application code if needed.
+
+// NOTE: score field dropped — not calibrated across groups, rank is sufficient.
 ```
 
 ### Output semantics
