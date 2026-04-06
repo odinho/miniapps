@@ -20,6 +20,13 @@
   $: llm = asset ? llmMap[asset.id] : null;
 
   let imgEl: HTMLImageElement;
+  let stripEl: HTMLDivElement;
+
+  // Scroll active filmstrip thumb into view
+  $: if (stripEl && selectedIdx >= 0) {
+    const thumb = stripEl.children[selectedIdx] as HTMLElement;
+    if (thumb) thumb.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  }
 
   $: if (asset) {
     const url = fullUrl(asset.id);
@@ -34,7 +41,7 @@
 
 <div class="preview-ov">
   <!-- Filmstrip -->
-  <div class="pv-strip">
+  <div class="pv-strip" bind:this={stripEl}>
     {#each assets as a, i}
       {@const ms = states[a.id]}
       {@const ls = keepSet.has(a.id) ? 'keep' : cullSet.has(a.id) ? 'cull' : null}

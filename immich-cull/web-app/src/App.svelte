@@ -27,6 +27,7 @@
   let batchDetail: BatchDetail | null = null;
 
   let states: Record<string, AssetState> = {};
+  let userStars: Record<string, number> = {};
   let stats: Stats | null = null;
   let undoStack: Array<{ groupIdx: number; prevStates: Record<string, AssetState>; prevSi: number }> = [];
 
@@ -44,6 +45,13 @@
     : null;
   $: selectedManualState = selectedAsset ? (states[selectedAsset.id] ?? null) : null;
   $: selectedLlmState = selectedAsset ? (keepSet.has(selectedAsset.id) ? 'keep' : cullSet.has(selectedAsset.id) ? 'cull' : null) : null;
+  $: selectedUserStars = selectedAsset ? (userStars[selectedAsset.id] ?? selectedAsset.rating ?? 0) : 0;
+
+  function setStars(stars: number) {
+    if (!selectedAsset) return;
+    userStars[selectedAsset.id] = stars;
+    userStars = userStars;
+  }
 
   function buildLlmMap(bd: BatchDetail | null): Record<string, LlmImage> {
     const m: Record<string, LlmImage> = {};
@@ -248,6 +256,8 @@
       subgroup={selectedSubgroup}
       manualState={selectedManualState}
       llmState={selectedLlmState}
+      userStars={selectedUserStars}
+      onSetStars={setStars}
     />
   </aside>
 
