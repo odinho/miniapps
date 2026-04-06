@@ -15,6 +15,7 @@ import { DEFAULT_CLUSTER_CONFIG, PhotoGroup, Asset } from "./shared/types.js";
 import { getImmichDbConfig } from "./shared/config.js";
 import sharp from "sharp";
 import { fileURLToPath } from "url";
+import { StateDb } from "./db/state-db.js";
 import { config as loadEnv } from "dotenv";
 loadEnv();
 
@@ -37,9 +38,10 @@ const app = Fastify({ logger: false });
 // State
 let groups: PhotoGroup[] = [];
 let assetMap = new Map<string, Asset>();
-let fileSizeCache = new Map<string, number>(); // assetId -> bytes
-let dimensionCache = new Map<string, { w: number; h: number }>(); // assetId -> dimensions
-let decisions = new Map<string, { keep: string[]; cull: string[]; skipped: boolean }>();
+let fileSizeCache = new Map<string, number>();
+let dimensionCache = new Map<string, { w: number; h: number }>();
+const stateDbPath = getArg("--state-db", resolve(__dirname, "../data/state.db"));
+const stateDb = new StateDb(stateDbPath);
 
 /** Resolve the file path, handling Facet's extension-stripped paths */
 function resolveFilePath(asset: Asset): string | null {
@@ -144,7 +146,7 @@ app.get("/api/groups", async () => {
     count: g.assets.length,
     timeSpanMinutes: g.timeSpanMinutes,
     avgDistance: g.avgDistance,
-    decided: decisions.has(g.id),
+    decided: stateDb.getDecision(g.id) !== null,
     earliestDate: Math.min(...g.assets.map((a) => a.asset.fileCreatedAt.getTime())),
     totalBytes: g.assets.reduce((s, a) => s + getFileSize(a.asset), 0),
     assets: g.assets.map((a) => ({
@@ -186,7 +188,7 @@ app.get<{ Params: { id: string } }>("/api/groups/:id", async (req) => {
     timeSpanMinutes: group.timeSpanMinutes,
     avgDistance: group.avgDistance,
     totalBytes: group.assets.reduce((s, a) => s + getFileSize(a.asset), 0),
-    decision: decisions.get(group.id) || null,
+    decision: stateDb.getDecision(group.id),
     assets: assetsWithDims,
   };
 });
@@ -216,41 +218,45 @@ app.post<{
 }>("/api/groups/:id/decide", async (req) => {
   const group = groups.find((g) => g.id === req.params.id);
   if (!group) return { error: "Not found" };
-  decisions.set(group.id, {
-    keep: req.body.keep,
-    cull: req.body.cull,
-    skipped: req.body.skipped ?? false,
-  });
-  return { ok: true, decided: decisions.size, total: groups.length };
+  stateDb.saveDecision(
+    group.id,
+    req.body.keep,
+    req.body.cull,
+    req.body.skipped ?? false,
+    0 // selectedIndex — client can send this later if needed
+  );
+  const stats = stateDb.getStats();
+  return { ok: true, decided: stats.decided, total: groups.length };
 });
 
 /** Undo a decision (remove it entirely) */
 app.delete<{ Params: { id: string } }>("/api/groups/:id/decide", async (req) => {
-  decisions.delete(req.params.id);
-  return { ok: true, decided: decisions.size };
+  stateDb.deleteDecision(req.params.id);
+  const stats = stateDb.getStats();
+  return { ok: true, decided: stats.decided };
 });
 
 app.get("/api/stats", async () => {
-  let totalKeep = 0;
-  let totalCull = 0;
-  let totalSkipped = 0;
+  const s = stateDb.getStats();
+
+  // Compute cull bytes from all decisions
   let cullBytes = 0;
-  for (const [groupId, d] of decisions.entries()) {
-    if (d.skipped) { totalSkipped++; continue; }
-    totalKeep += d.keep.length;
-    totalCull += d.cull.length;
+  const allDecisions = stateDb.getAllDecisions();
+  for (const [, d] of allDecisions) {
+    if (d.skipped) continue;
     for (const id of d.cull) {
       const a = assetMap.get(id);
       if (a) cullBytes += getFileSize(a);
     }
   }
+
   return {
     totalGroups: groups.length,
-    decided: decisions.size,
-    skipped: totalSkipped,
-    photosToKeep: totalKeep,
-    photosToCull: totalCull,
-    remaining: groups.length - decisions.size,
+    decided: s.decided,
+    skipped: s.skipped,
+    photosToKeep: s.photosKept,
+    photosToCull: s.photosCulled,
+    remaining: groups.length - s.decided,
     cullBytes,
   };
 });
