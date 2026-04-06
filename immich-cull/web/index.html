@@ -6,114 +6,130 @@
 <title>immich-cull</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #1a1a1a; color: #e0e0e0; font-family: system-ui, -apple-system, sans-serif; }
+  body { background: #1a1a1a; color: #e0e0e0; font-family: system-ui, sans-serif; overflow: hidden; }
 
   .header {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 20px; background: #252525; border-bottom: 1px solid #333;
-    position: sticky; top: 0; z-index: 100;
+    padding: 6px 16px; background: #222; border-bottom: 1px solid #333;
+    height: 36px; flex-shrink: 0;
   }
-  .header h1 { font-size: 18px; font-weight: 600; }
-  .stats { font-size: 13px; color: #999; display: flex; gap: 16px; }
-  .stats .stat-val { color: #e0e0e0; font-weight: 600; }
+  .header h1 { font-size: 15px; font-weight: 600; color: #f0a040; }
+  .stats { font-size: 12px; color: #999; display: flex; gap: 14px; }
+  .stats .v { color: #e0e0e0; font-weight: 600; }
+  .stats .saved { color: #4caf50; }
 
-  .container { display: flex; height: calc(100vh - 49px); }
+  .container { display: flex; height: calc(100vh - 36px); }
 
-  /* Sidebar: group list */
+  /* Sidebar */
   .sidebar {
-    width: 280px; min-width: 280px; overflow-y: auto;
-    background: #202020; border-right: 1px solid #333;
+    width: 220px; min-width: 220px; overflow-y: auto; background: #1e1e1e;
+    border-right: 1px solid #333; font-size: 12px;
   }
-  .group-item {
-    padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #2a2a2a;
-    transition: background 0.1s;
+  .gi {
+    padding: 6px 10px; cursor: pointer; border-bottom: 1px solid #262626;
+    border-left: 3px solid transparent;
   }
-  .group-item:hover { background: #2a2a2a; }
-  .group-item.active { background: #333; border-left: 3px solid #f0a040; }
-  .group-item.decided { opacity: 0.5; }
-  .group-item .g-title { font-size: 14px; font-weight: 500; }
-  .group-item .g-meta { font-size: 12px; color: #888; margin-top: 2px; }
+  .gi:hover { background: #282828; }
+  .gi.active { background: #2a2a2a; border-left-color: #f0a040; }
+  .gi.decided { opacity: 0.4; }
+  .gi .t { font-weight: 500; }
+  .gi .m { color: #777; font-size: 11px; }
 
   /* Main area */
   .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
-  /* Filmstrip */
-  .filmstrip {
-    display: flex; gap: 6px; padding: 12px; overflow-x: auto;
-    background: #1e1e1e; border-bottom: 1px solid #333;
-    min-height: 140px; align-items: center;
+  /* Image grid: fills available space */
+  .grid-area {
+    flex: 1; display: flex; gap: 4px; padding: 4px; overflow: hidden;
+    align-items: stretch;
   }
-  .film-thumb {
+
+  /* Selected image (large) */
+  .selected-preview {
+    flex: 2; display: flex; align-items: center; justify-content: center;
+    position: relative; min-width: 0; background: #111; border-radius: 4px;
+  }
+  .selected-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .selected-preview .label {
+    position: absolute; bottom: 6px; left: 6px;
+    background: rgba(0,0,0,0.85); padding: 4px 10px; border-radius: 4px;
+    font-size: 12px; max-width: 50%;
+  }
+  .selected-preview .state-label {
+    position: absolute; top: 8px; left: 8px;
+    font-size: 14px; font-weight: 700; padding: 3px 10px; border-radius: 4px;
+  }
+  .state-label.keep { background: #4caf50; color: white; }
+  .state-label.cull { background: #f44336; color: white; }
+
+  /* Thumbnail strip (right side) */
+  .thumb-strip {
+    flex: 1; display: flex; flex-direction: column; gap: 4px;
+    overflow-y: auto; min-width: 0; max-width: 45%;
+  }
+  .thumb-strip.few { flex-direction: row; flex-wrap: wrap; align-content: start; }
+
+  .thumb {
     position: relative; cursor: pointer; flex-shrink: 0;
     border: 3px solid transparent; border-radius: 4px;
-    transition: border-color 0.15s, opacity 0.15s;
+    transition: border-color 0.1s, opacity 0.1s;
+    overflow: hidden;
   }
-  .film-thumb.selected { border-color: #f0a040; }
-  .film-thumb.keep { border-color: #4caf50; }
-  .film-thumb.cull { border-color: #f44336; opacity: 0.5; }
-  .film-thumb img {
-    height: 110px; width: auto; display: block; border-radius: 2px;
-  }
-  .film-thumb .badge {
+  .thumb.active { border-color: #f0a040; box-shadow: 0 0 8px rgba(240,160,64,0.5); }
+  .thumb.keep { border-color: #4caf50; }
+  .thumb.cull { border-color: #f44336; opacity: 0.45; }
+  .thumb.keep.active { border-color: #f0a040; opacity: 1; }
+  .thumb.cull.active { border-color: #f0a040; opacity: 0.7; }
+  .thumb img { width: 100%; height: auto; display: block; }
+  .thumb .badge {
     position: absolute; top: 2px; left: 2px; font-size: 10px; font-weight: 700;
     padding: 1px 5px; border-radius: 3px; color: white;
   }
-  .film-thumb .badge.keep-badge { background: #4caf50; }
-  .film-thumb .badge.cull-badge { background: #f44336; }
-  .film-thumb .rating-badge {
-    position: absolute; bottom: 2px; right: 2px; font-size: 11px;
-    color: #ffd700;
+  .badge.kb { background: #4caf50; }
+  .badge.cb { background: #f44336; }
+  .thumb .fn {
+    position: absolute; bottom: 0; left: 0; right: 0; font-size: 9px;
+    color: #ddd; background: rgba(0,0,0,0.75); padding: 2px 4px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .film-thumb .filename {
-    position: absolute; bottom: 2px; left: 2px; font-size: 9px;
+  .thumb .sz {
+    position: absolute; top: 2px; right: 2px; font-size: 9px;
     color: #ccc; background: rgba(0,0,0,0.7); padding: 1px 4px; border-radius: 2px;
-    max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-
-  /* Preview */
-  .preview {
-    flex: 1; display: flex; align-items: center; justify-content: center;
-    overflow: hidden; position: relative; background: #111;
-  }
-  .preview img {
-    max-width: 100%; max-height: 100%; object-fit: contain;
-  }
-  .preview .info {
-    position: absolute; bottom: 12px; left: 12px; right: 12px;
-    display: flex; justify-content: space-between; align-items: flex-end;
-  }
-  .preview .photo-info {
-    background: rgba(0,0,0,0.8); padding: 8px 12px; border-radius: 6px;
-    font-size: 13px;
+  .thumb .stars {
+    position: absolute; bottom: 16px; right: 2px; font-size: 10px; color: #ffd700;
   }
 
   /* Action bar */
   .actions {
-    display: flex; gap: 10px; padding: 12px 20px; background: #252525;
+    display: flex; gap: 8px; padding: 6px 12px; background: #222;
     border-top: 1px solid #333; align-items: center; justify-content: center;
+    flex-shrink: 0; flex-wrap: wrap;
   }
   .actions button {
-    padding: 8px 20px; border: none; border-radius: 6px; cursor: pointer;
-    font-size: 14px; font-weight: 500; transition: opacity 0.15s;
+    padding: 5px 14px; border: none; border-radius: 4px; cursor: pointer;
+    font-size: 12px; font-weight: 500;
   }
   .actions button:hover { opacity: 0.85; }
-  .btn-keep { background: #4caf50; color: white; }
-  .btn-cull { background: #f44336; color: white; }
-  .btn-skip { background: #555; color: #ccc; }
-  .btn-approve { background: #f0a040; color: #1a1a1a; font-weight: 700; }
-  .btn-keepall { background: #2196F3; color: white; }
-  .actions .hint { font-size: 12px; color: #666; margin-left: 8px; }
+  .bk { background: #4caf50; color: white; }
+  .bc { background: #f44336; color: white; }
+  .bs { background: #444; color: #bbb; }
+  .ba { background: #f0a040; color: #1a1a1a; font-weight: 700; }
+  .bb { background: #2196F3; color: white; }
+  .bka { background: #388e3c; color: white; }
+  .bca { background: #c62828; color: white; }
+
+  .group-info {
+    font-size: 11px; color: #888; margin-left: auto; text-align: right;
+  }
 
   .shortcuts {
-    font-size: 12px; color: #666; text-align: center; padding: 6px;
-    background: #1e1e1e; border-top: 1px solid #2a2a2a;
+    font-size: 11px; color: #555; text-align: center; padding: 3px;
+    background: #1a1a1a; flex-shrink: 0;
   }
-  kbd {
-    background: #333; padding: 1px 6px; border-radius: 3px;
-    font-family: monospace; color: #ccc; border: 1px solid #444;
-  }
+  kbd { background: #333; padding: 0 4px; border-radius: 2px; font-family: monospace; color: #aaa; }
 
-  .empty { display: flex; align-items: center; justify-content: center; flex: 1; color: #666; font-size: 18px; }
+  .empty { display: flex; align-items: center; justify-content: center; flex: 1; color: #666; font-size: 16px; }
 </style>
 </head>
 <body>
@@ -123,20 +139,24 @@
 </div>
 <div class="container">
   <div class="sidebar" id="sidebar"></div>
-  <div class="main" id="main">
-    <div class="empty">Loading groups...</div>
-  </div>
+  <div class="main" id="main"><div class="empty">Loading...</div></div>
 </div>
 
 <script>
 let groups = [];
-let currentGroupIdx = -1;
-let selectedAssetIdx = 0;
-let assetStates = {}; // assetId -> 'keep' | 'cull' | null
+let ci = -1;  // current group index
+let si = 0;   // selected asset index
+let states = {}; // assetId -> 'keep' | 'cull' | null
+
+function fmt(bytes) {
+  if (bytes > 1e9) return (bytes/1e9).toFixed(1) + ' GB';
+  if (bytes > 1e6) return (bytes/1e6).toFixed(1) + ' MB';
+  if (bytes > 1e3) return (bytes/1e3).toFixed(0) + ' KB';
+  return bytes + ' B';
+}
 
 async function load() {
-  const resp = await fetch('/api/groups');
-  groups = await resp.json();
+  groups = await (await fetch('/api/groups')).json();
   renderSidebar();
   updateStats();
   if (groups.length > 0) selectGroup(0);
@@ -144,130 +164,138 @@ async function load() {
 
 function renderSidebar() {
   const sb = document.getElementById('sidebar');
-  sb.innerHTML = groups.map((g, i) => `
-    <div class="group-item ${i === currentGroupIdx ? 'active' : ''} ${g.decided ? 'decided' : ''}"
-         onclick="selectGroup(${i})" id="gi-${i}">
-      <div class="g-title">${g.count} photos</div>
-      <div class="g-meta">
-        ${g.timeSpanMinutes}min span &middot; dist ${g.avgDistance}
-        ${g.decided ? ' &middot; done' : ''}
-      </div>
-      <div class="g-meta">${new Date(g.assets[0]?.date).toLocaleDateString()}</div>
-    </div>
-  `).join('');
+  sb.innerHTML = groups.map((g, i) => {
+    const d = new Date(g.earliestDate);
+    const ds = d.getFullYear() > 2000 ? d.toLocaleDateString('no', {day:'numeric',month:'short',year:'2-digit'}) : '?';
+    return `<div class="gi ${i===ci?'active':''} ${g.decided?'decided':''}" onclick="selectGroup(${i})" id="gi-${i}">
+      <div class="t">${g.count} photos &middot; ${ds}</div>
+      <div class="m">${g.timeSpanMinutes}min &middot; ${fmt(g.totalBytes)}</div>
+    </div>`;
+  }).join('');
 }
 
 function selectGroup(idx) {
-  currentGroupIdx = idx;
-  selectedAssetIdx = 0;
-
-  // Initialize asset states for this group
+  ci = idx; si = 0;
   const g = groups[idx];
-  for (const a of g.assets) {
-    if (!(a.id in assetStates)) {
-      assetStates[a.id] = null;
-    }
-  }
-
-  // Auto-mark: best = keep (first one by default)
+  for (const a of g.assets) { if (!(a.id in states)) states[a.id] = null; }
   renderGroup();
   renderSidebar();
+  // Scroll sidebar to active item
+  const el = document.getElementById('gi-' + idx);
+  if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
 function renderGroup() {
-  const g = groups[currentGroupIdx];
+  const g = groups[ci];
   if (!g) return;
+  const sel = g.assets[si];
+  const st = states[sel.id];
+  const isMany = g.assets.length > 6;
 
-  const main = document.getElementById('main');
-  const selected = g.assets[selectedAssetIdx];
+  // Calculate cull savings for this group
+  let cullBytes = 0;
+  for (const a of g.assets) { if (states[a.id] === 'cull') cullBytes += (a.bytes || 0); }
 
-  main.innerHTML = `
-    <div class="filmstrip" id="filmstrip">
-      ${g.assets.map((a, i) => {
-        const state = assetStates[a.id];
-        return `
-          <div class="film-thumb ${i === selectedAssetIdx ? 'selected' : ''} ${state || ''}"
-               onclick="selectAsset(${i})">
-            <img src="/api/thumb?id=${encodeURIComponent(a.id)}" loading="lazy" alt="${a.filename}">
-            ${state === 'keep' ? '<div class="badge keep-badge">KEEP</div>' : ''}
-            ${state === 'cull' ? '<div class="badge cull-badge">CULL</div>' : ''}
-            ${a.rating > 0 ? `<div class="rating-badge">${'★'.repeat(a.rating)}</div>` : ''}
-            <div class="filename">${a.filename}</div>
-          </div>
-        `;
-      }).join('')}
-    </div>
-    <div class="preview">
-      <img src="/api/preview?id=${encodeURIComponent(selected.id)}" alt="${selected.filename}">
-      <div class="info">
-        <div class="photo-info">
-          <strong>${selected.filename}</strong><br>
-          ${new Date(selected.date).toLocaleString()}
-          ${selected.rating > 0 ? ` &middot; ${selected.rating}★` : ''}
-          ${selected.isFavorite ? ' &middot; ♥' : ''}
+  document.getElementById('main').innerHTML = `
+    <div class="grid-area">
+      <div class="selected-preview">
+        <img src="/api/preview?id=${encodeURIComponent(sel.id)}" alt="">
+        ${st ? `<div class="state-label ${st}">${st.toUpperCase()}</div>` : ''}
+        <div class="label">
+          <strong>${sel.filename}</strong> &middot; ${fmt(sel.bytes||0)}<br>
+          ${new Date(sel.date).toLocaleString('no')}
+          ${sel.rating > 0 ? ' &middot; ' + '★'.repeat(sel.rating) : ''}
+          ${sel.isFavorite ? ' &middot; ♥' : ''}
         </div>
+      </div>
+      <div class="thumb-strip ${isMany ? '' : 'few'}">
+        ${g.assets.map((a, i) => {
+          const s = states[a.id];
+          return `<div class="thumb ${i===si?'active':''} ${s||''}" onclick="selectAsset(${i})">
+            <img src="/api/thumb?id=${encodeURIComponent(a.id)}" loading="lazy">
+            ${s==='keep'?'<div class="badge kb">KEEP</div>':''}
+            ${s==='cull'?'<div class="badge cb">CULL</div>':''}
+            ${a.rating>0?`<div class="stars">${'★'.repeat(a.rating)}</div>`:''}
+            <div class="sz">${fmt(a.bytes||0)}</div>
+            <div class="fn">${a.filename}</div>
+          </div>`;
+        }).join('')}
       </div>
     </div>
     <div class="actions">
-      <button class="btn-keep" onclick="markAsset('keep')">Keep (K)</button>
-      <button class="btn-cull" onclick="markAsset('cull')">Cull (X)</button>
-      <button class="btn-keepall" onclick="keepBestCullRest()">Keep Best, Cull Rest (B)</button>
-      <button class="btn-approve" onclick="approveGroup()">Approve & Next (A)</button>
-      <button class="btn-skip" onclick="skipGroup()">Skip (S)</button>
+      <button class="bk" onclick="markAsset('keep')">Keep <kbd>K</kbd>/<kbd>J</kbd></button>
+      <button class="bc" onclick="markAsset('cull')">Cull <kbd>X</kbd>/<kbd>F</kbd></button>
+      <button class="bb" onclick="keepBestCullRest()">Best+Cull <kbd>B</kbd></button>
+      <button class="bka" onclick="keepAll()">Keep All <kbd>⇧K</kbd></button>
+      <button class="bca" onclick="cullAll()">Cull All <kbd>⇧X</kbd></button>
+      <button class="ba" onclick="approveGroup()">Approve <kbd>A</kbd>/<kbd>Enter</kbd></button>
+      <button class="bs" onclick="skipGroup()">Skip <kbd>S</kbd></button>
+      <div class="group-info">
+        ${g.count} photos &middot; ${g.timeSpanMinutes}min span &middot; ${fmt(g.totalBytes)}
+        ${cullBytes > 0 ? `<br>Cull saves ${fmt(cullBytes)}` : ''}
+      </div>
     </div>
     <div class="shortcuts">
-      <kbd>←</kbd><kbd>→</kbd> navigate photos &middot;
-      <kbd>K</kbd> keep &middot; <kbd>X</kbd> cull &middot;
-      <kbd>B</kbd> keep best, cull rest &middot;
-      <kbd>A</kbd> approve &middot; <kbd>S</kbd> skip &middot;
-      <kbd>↑</kbd><kbd>↓</kbd> prev/next group
+      <kbd>←</kbd><kbd>→</kbd> or <kbd>D</kbd><kbd>G</kbd> photos &middot;
+      <kbd>↑</kbd><kbd>↓</kbd> groups &middot;
+      <kbd>1</kbd>-<kbd>5</kbd> numpad: keep first N &middot;
+      undecided on approve → kept
     </div>
   `;
 }
 
-function selectAsset(idx) {
-  selectedAssetIdx = idx;
-  renderGroup();
-}
+function selectAsset(i) { si = i; renderGroup(); }
 
-function markAsset(state) {
-  const g = groups[currentGroupIdx];
-  const a = g.assets[selectedAssetIdx];
-  assetStates[a.id] = assetStates[a.id] === state ? null : state;
-  // Auto-advance to next unmarked
-  if (selectedAssetIdx < g.assets.length - 1) selectedAssetIdx++;
+function markAsset(s) {
+  const g = groups[ci];
+  const a = g.assets[si];
+  states[a.id] = states[a.id] === s ? null : s;
+  if (si < g.assets.length - 1) si++;
   renderGroup();
 }
 
 function keepBestCullRest() {
-  const g = groups[currentGroupIdx];
-  // Keep the currently selected, cull the rest
+  const g = groups[ci];
   for (let i = 0; i < g.assets.length; i++) {
-    assetStates[g.assets[i].id] = i === selectedAssetIdx ? 'keep' : 'cull';
+    states[g.assets[i].id] = i === si ? 'keep' : 'cull';
+  }
+  renderGroup();
+}
+
+function keepAll() {
+  for (const a of groups[ci].assets) states[a.id] = 'keep';
+  renderGroup();
+}
+
+function cullAll() {
+  for (const a of groups[ci].assets) states[a.id] = 'cull';
+  renderGroup();
+}
+
+/** Keep first N assets (sorted by position), cull rest */
+function keepFirstN(n) {
+  const g = groups[ci];
+  for (let i = 0; i < g.assets.length; i++) {
+    states[g.assets[i].id] = i < n ? 'keep' : 'cull';
   }
   renderGroup();
 }
 
 async function approveGroup() {
-  const g = groups[currentGroupIdx];
-  const keep = g.assets.filter(a => assetStates[a.id] === 'keep').map(a => a.id);
-  const cull = g.assets.filter(a => assetStates[a.id] === 'cull').map(a => a.id);
-
-  // If no explicit decisions, keep first and cull rest
-  if (keep.length === 0 && cull.length === 0) {
-    assetStates[g.assets[0].id] = 'keep';
-    for (let i = 1; i < g.assets.length; i++) {
-      assetStates[g.assets[i].id] = 'cull';
-    }
-    return approveGroup();
+  const g = groups[ci];
+  // Undecided assets default to KEEP (safe default)
+  for (const a of g.assets) {
+    if (!states[a.id]) states[a.id] = 'keep';
   }
+
+  const keep = g.assets.filter(a => states[a.id] === 'keep').map(a => a.id);
+  const cull = g.assets.filter(a => states[a.id] === 'cull').map(a => a.id);
 
   await fetch(`/api/groups/${g.id}/decide`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ keep, cull }),
   });
-
   g.decided = true;
   updateStats();
   renderSidebar();
@@ -275,7 +303,7 @@ async function approveGroup() {
 }
 
 async function skipGroup() {
-  const g = groups[currentGroupIdx];
+  const g = groups[ci];
   await fetch(`/api/groups/${g.id}/decide`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -288,51 +316,73 @@ async function skipGroup() {
 }
 
 function nextUndecided() {
-  for (let i = currentGroupIdx + 1; i < groups.length; i++) {
+  for (let i = ci + 1; i < groups.length; i++) {
     if (!groups[i].decided) { selectGroup(i); return; }
   }
-  // Wrap around
-  for (let i = 0; i < currentGroupIdx; i++) {
+  for (let i = 0; i < ci; i++) {
     if (!groups[i].decided) { selectGroup(i); return; }
   }
 }
 
 async function updateStats() {
-  const resp = await fetch('/api/stats');
-  const s = await resp.json();
+  const s = await (await fetch('/api/stats')).json();
   document.getElementById('stats').innerHTML = `
-    <span><span class="stat-val">${s.decided}</span>/${s.totalGroups} reviewed</span>
-    <span><span class="stat-val" style="color:#4caf50">${s.photosToKeep}</span> keep</span>
-    <span><span class="stat-val" style="color:#f44336">${s.photosToCull}</span> cull</span>
-    <span><span class="stat-val">${s.remaining}</span> remaining</span>
+    <span><span class="v">${s.decided}</span>/${s.totalGroups}</span>
+    <span style="color:#4caf50"><span class="v">${s.photosToKeep}</span> keep</span>
+    <span style="color:#f44336"><span class="v">${s.photosToCull}</span> cull</span>
+    <span class="saved">save ${fmt(s.cullBytes)}</span>
+    <span><span class="v">${s.remaining}</span> left</span>
   `;
 }
 
-// Keyboard shortcuts
+function fmt(b) {
+  if (b >= 1e9) return (b/1e9).toFixed(1)+' GB';
+  if (b >= 1e6) return (b/1e6).toFixed(1)+' MB';
+  if (b >= 1e3) return (b/1e3).toFixed(0)+' KB';
+  return b+' B';
+}
+
 document.addEventListener('keydown', (e) => {
-  if (currentGroupIdx < 0) return;
-  const g = groups[currentGroupIdx];
+  if (ci < 0) return;
+  const g = groups[ci];
+  const shift = e.shiftKey;
 
   switch(e.key) {
-    case 'ArrowRight':
-      if (selectedAssetIdx < g.assets.length - 1) { selectedAssetIdx++; renderGroup(); }
+    // Navigation
+    case 'ArrowRight': case 'd': case 'D':
+      if (!shift && si < g.assets.length - 1) { si++; renderGroup(); }
       break;
-    case 'ArrowLeft':
-      if (selectedAssetIdx > 0) { selectedAssetIdx--; renderGroup(); }
+    case 'ArrowLeft': case 'g': case 'G':
+      if (!shift && si > 0) { si--; renderGroup(); }
       break;
     case 'ArrowDown':
       e.preventDefault();
-      if (currentGroupIdx < groups.length - 1) selectGroup(currentGroupIdx + 1);
+      if (ci < groups.length - 1) selectGroup(ci + 1);
       break;
     case 'ArrowUp':
       e.preventDefault();
-      if (currentGroupIdx > 0) selectGroup(currentGroupIdx - 1);
+      if (ci > 0) selectGroup(ci - 1);
       break;
-    case 'k': case 'K': markAsset('keep'); break;
-    case 'x': case 'X': markAsset('cull'); break;
+
+    // Actions
+    case 'k': markAsset('keep'); break;
+    case 'K': keepAll(); break;
+    case 'j': markAsset('keep'); break;  // alternative left-hand
+    case 'J': keepAll(); break;
+    case 'x': markAsset('cull'); break;
+    case 'X': cullAll(); break;
+    case 'f': markAsset('cull'); break;  // alternative left-hand
+    case 'F': cullAll(); break;
     case 'b': case 'B': keepBestCullRest(); break;
-    case 'a': case 'A': approveGroup(); break;
-    case 's': case 'S': skipGroup(); break;
+    case 'a': case 'Enter': approveGroup(); break;
+    case 's': case 'S': if (!shift) skipGroup(); break;
+
+    // Numpad: keep first N
+    case '1': keepFirstN(1); break;
+    case '2': keepFirstN(2); break;
+    case '3': keepFirstN(3); break;
+    case '4': keepFirstN(4); break;
+    case '5': keepFirstN(5); break;
   }
 });
 

@@ -4,12 +4,10 @@
  * Modes:
  *   --local   Use Facet SQLite (default, for development)
  *   --immich  Use Immich PostgreSQL via SSH tunnel
- *
- * Usage: npx tsx src/server.ts [--local|--immich] [--port 3000]
  */
 import Fastify from "fastify";
-import { resolve, join, dirname } from "path";
-import { readFileSync, existsSync } from "fs";
+import { resolve, dirname } from "path";
+import { readFileSync, existsSync, statSync } from "fs";
 import { FacetAdapter } from "./db/facet-adapter.js";
 import { ImmichAdapter } from "./db/immich-adapter.js";
 import { clusterAssets } from "./clustering/engine.js";
@@ -37,7 +35,31 @@ const app = Fastify({ logger: false });
 // State
 let groups: PhotoGroup[] = [];
 let assetMap = new Map<string, Asset>();
+let fileSizeCache = new Map<string, number>(); // assetId -> bytes
 let decisions = new Map<string, { keep: string[]; cull: string[]; skipped: boolean }>();
+
+/** Resolve the file path, handling Facet's extension-stripped paths */
+function resolveFilePath(asset: Asset): string | null {
+  if (existsSync(asset.path)) return asset.path;
+  for (const ext of [".jpg", ".jpeg", ".JPG", ".JPEG", ".png", ".PNG", ".heic", ".HEIC"]) {
+    if (existsSync(asset.path + ext)) return asset.path + ext;
+  }
+  return null;
+}
+
+/** Get file size in bytes, cached */
+function getFileSize(asset: Asset): number {
+  if (fileSizeCache.has(asset.id)) return fileSizeCache.get(asset.id)!;
+  const fp = resolveFilePath(asset);
+  if (!fp) return 0;
+  try {
+    const size = statSync(fp).size;
+    fileSizeCache.set(asset.id, size);
+    return size;
+  } catch {
+    return 0;
+  }
+}
 
 async function loadData() {
   let assets: Asset[];
@@ -45,7 +67,6 @@ async function loadData() {
   if (useImmich) {
     console.log("Connecting to Immich PostgreSQL...");
     const adapter = new ImmichAdapter(getImmichDbConfig());
-
     const count = await adapter.getAssetCount();
     console.log(`Immich has ${count} images with embeddings`);
 
@@ -70,19 +91,22 @@ async function loadData() {
 
   console.log(`Loaded ${assets.length} assets, clustering...`);
   const result = clusterAssets(assets, DEFAULT_CLUSTER_CONFIG);
-  groups = result.groups;
 
-  // Build asset map
-  for (const a of assets) {
-    assetMap.set(a.id, a);
-  }
+  // Sort groups by earliest date (temporally close groups adjacent)
+  groups = result.groups.sort((a, b) => {
+    const aTime = Math.min(...a.assets.map((x) => x.asset.fileCreatedAt.getTime()));
+    const bTime = Math.min(...b.assets.map((x) => x.asset.fileCreatedAt.getTime()));
+    return bTime - aTime; // newest first
+  });
+  // Re-index after sort
+  groups = groups.map((g, i) => ({ ...g, id: `group-${i}` }));
 
+  for (const a of assets) assetMap.set(a.id, a);
   console.log(`${groups.length} groups found (${result.stats.singletons} singletons)`);
 }
 
 // === API Routes ===
 
-/** List all groups with summary info */
 app.get("/api/groups", async () => {
   return groups.map((g, i) => ({
     id: g.id,
@@ -91,29 +115,35 @@ app.get("/api/groups", async () => {
     timeSpanMinutes: g.timeSpanMinutes,
     avgDistance: g.avgDistance,
     decided: decisions.has(g.id),
+    earliestDate: Math.min(...g.assets.map((a) => a.asset.fileCreatedAt.getTime())),
+    totalBytes: g.assets.reduce((s, a) => s + getFileSize(a.asset), 0),
     assets: g.assets.map((a) => ({
       id: a.asset.id,
       filename: a.asset.filename,
       date: a.asset.fileCreatedAt.toISOString(),
       rating: a.asset.rating,
       isFavorite: a.asset.isFavorite,
+      bytes: getFileSize(a.asset),
     })),
   }));
 });
 
-/** Get a single group */
 app.get<{ Params: { id: string } }>("/api/groups/:id", async (req) => {
   const group = groups.find((g) => g.id === req.params.id);
   if (!group) return { error: "Not found" };
+  return {
+    ...groupToJson(group),
+    decision: decisions.get(group.id) || null,
+  };
+});
 
-  const decision = decisions.get(group.id);
-
+function groupToJson(group: PhotoGroup) {
   return {
     id: group.id,
     count: group.assets.length,
     timeSpanMinutes: group.timeSpanMinutes,
     avgDistance: group.avgDistance,
-    decision: decision || null,
+    totalBytes: group.assets.reduce((s, a) => s + getFileSize(a.asset), 0),
     assets: group.assets.map((a) => ({
       id: a.asset.id,
       filename: a.asset.filename,
@@ -121,41 +151,39 @@ app.get<{ Params: { id: string } }>("/api/groups/:id", async (req) => {
       date: a.asset.fileCreatedAt.toISOString(),
       rating: a.asset.rating,
       isFavorite: a.asset.isFavorite,
+      bytes: getFileSize(a.asset),
     })),
   };
-});
+}
 
-/** Save a decision for a group */
 app.post<{
   Params: { id: string };
   Body: { keep: string[]; cull: string[]; skipped?: boolean };
 }>("/api/groups/:id/decide", async (req) => {
   const group = groups.find((g) => g.id === req.params.id);
   if (!group) return { error: "Not found" };
-
   decisions.set(group.id, {
     keep: req.body.keep,
     cull: req.body.cull,
     skipped: req.body.skipped ?? false,
   });
-
   return { ok: true, decided: decisions.size, total: groups.length };
 });
 
-/** Get review stats */
 app.get("/api/stats", async () => {
   let totalKeep = 0;
   let totalCull = 0;
   let totalSkipped = 0;
-  for (const d of decisions.values()) {
-    if (d.skipped) {
-      totalSkipped++;
-    } else {
-      totalKeep += d.keep.length;
-      totalCull += d.cull.length;
+  let cullBytes = 0;
+  for (const [groupId, d] of decisions.entries()) {
+    if (d.skipped) { totalSkipped++; continue; }
+    totalKeep += d.keep.length;
+    totalCull += d.cull.length;
+    for (const id of d.cull) {
+      const a = assetMap.get(id);
+      if (a) cullBytes += getFileSize(a);
     }
   }
-
   return {
     totalGroups: groups.length,
     decided: decisions.size,
@@ -163,41 +191,24 @@ app.get("/api/stats", async () => {
     photosToKeep: totalKeep,
     photosToCull: totalCull,
     remaining: groups.length - decisions.size,
+    cullBytes,
   };
 });
 
-/** Serve a thumbnail for an asset (resized to 400px for the UI) */
+/** Thumbnail: auto-rotated via EXIF */
 app.get<{ Querystring: { id: string } }>("/api/thumb", async (req, reply) => {
   const asset = assetMap.get(req.query.id);
-  if (!asset) {
-    reply.code(404);
-    return { error: "Not found" };
-  }
-
-  // Reconstruct the file path (add extension back for Facet paths)
-  let filePath = asset.path;
-  if (!existsSync(filePath)) {
-    // Facet strips extensions; try common ones
-    for (const ext of [".jpg", ".jpeg", ".JPG", ".JPEG", ".png", ".PNG"]) {
-      if (existsSync(filePath + ext)) {
-        filePath = filePath + ext;
-        break;
-      }
-    }
-  }
-
-  if (!existsSync(filePath)) {
-    reply.code(404);
-    return { error: `File not found: ${asset.filename}` };
-  }
+  if (!asset) { reply.code(404); return { error: "Not found" }; }
+  const fp = resolveFilePath(asset);
+  if (!fp) { reply.code(404); return { error: "File not found" }; }
 
   try {
-    const thumb = await sharp(filePath)
+    const thumb = await sharp(fp)
+      .rotate() // auto-rotate based on EXIF orientation
       .resize(400, 400, { fit: "inside", withoutEnlargement: true })
       .jpeg({ quality: 80 })
       .toBuffer();
-
-    reply.type("image/jpeg");
+    reply.type("image/jpeg").header("Cache-Control", "public, max-age=3600");
     return thumb;
   } catch (e: any) {
     reply.code(500);
@@ -205,36 +216,20 @@ app.get<{ Querystring: { id: string } }>("/api/thumb", async (req, reply) => {
   }
 });
 
-/** Serve a full preview for an asset */
+/** Preview: auto-rotated, larger */
 app.get<{ Querystring: { id: string } }>("/api/preview", async (req, reply) => {
   const asset = assetMap.get(req.query.id);
-  if (!asset) {
-    reply.code(404);
-    return { error: "Not found" };
-  }
-
-  let filePath = asset.path;
-  if (!existsSync(filePath)) {
-    for (const ext of [".jpg", ".jpeg", ".JPG", ".JPEG", ".png", ".PNG"]) {
-      if (existsSync(filePath + ext)) {
-        filePath = filePath + ext;
-        break;
-      }
-    }
-  }
-
-  if (!existsSync(filePath)) {
-    reply.code(404);
-    return { error: `File not found: ${asset.filename}` };
-  }
+  if (!asset) { reply.code(404); return { error: "Not found" }; }
+  const fp = resolveFilePath(asset);
+  if (!fp) { reply.code(404); return { error: "File not found" }; }
 
   try {
-    const preview = await sharp(filePath)
-      .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
+    const preview = await sharp(fp)
+      .rotate() // auto-rotate based on EXIF orientation
+      .resize(1400, 1400, { fit: "inside", withoutEnlargement: true })
       .jpeg({ quality: 85 })
       .toBuffer();
-
-    reply.type("image/jpeg");
+    reply.type("image/jpeg").header("Cache-Control", "public, max-age=3600");
     return preview;
   } catch (e: any) {
     reply.code(500);
@@ -242,13 +237,11 @@ app.get<{ Querystring: { id: string } }>("/api/preview", async (req, reply) => {
   }
 });
 
-// === Static file serving for the SPA ===
 app.get("/", async (_, reply) => {
   reply.type("text/html");
   return readFileSync(resolve(__dirname, "../web/index.html"), "utf-8");
 });
 
-// === Start ===
 await loadData();
 await app.listen({ port, host: "0.0.0.0" });
 console.log(`\nReview UI: http://localhost:${port}`);
