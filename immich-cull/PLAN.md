@@ -82,7 +82,7 @@ Working prototype with:
 - **TypeScript full-stack** (user preference, Immich alignment)
 - **Read-only PostgreSQL** for embeddings (internal schema, pinned to Immich v2.5.2)
 - **All writes through Immich API** (safe, documented, forwards-compatible)
-- **Local SQLite for tool state** (decisions, rankings, undo history)
+- **Local SQLite for tool state** (decisions, rankings, undo history) — planned, currently in-memory Map
 - **Gemini Flash Lite for ranking** (~$2-5 for full library via Batch API)
 - **Never hard-delete** — always Immich trash with 30-day recovery
 - **Existing ratings are sacred** — never auto-downgrade

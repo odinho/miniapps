@@ -45,6 +45,8 @@ export interface ClusterConfig {
   minGroupSize: number;
   /** Top K neighbors to consider per asset */
   topK: number;
+  /** Temporal gap in minutes to split groups */
+  temporalGapMinutes: number;
 }
 
 export const DEFAULT_CLUSTER_CONFIG: ClusterConfig = {
@@ -56,4 +58,5 @@ export const DEFAULT_CLUSTER_CONFIG: ClusterConfig = {
   maxGroupSize: 20,
   minGroupSize: 2,
   topK: 12,
+  temporalGapMinutes: 12,
 };

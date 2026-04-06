@@ -1,6 +1,6 @@
 # immich-cull
 
-AI-assisted photo culling tool for [Immich](https://immich.app/). Groups similar photos (bursts, same scene over minutes) using CLIP embeddings, ranks them with Gemini LLM, and presents a keyboard-driven review UI for fast keep/cull decisions.
+Photo culling tool for [Immich](https://immich.app/). Groups similar photos (bursts, same scene over minutes) using CLIP embeddings and presents a keyboard-driven review UI for fast keep/cull decisions. Gemini LLM ranking is planned but not yet implemented.
 
 ## Quick Start
 

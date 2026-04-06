@@ -112,7 +112,7 @@ async function loadData() {
     }
     await adapter.close();
   } else {
-    const dbPath = resolve(__dirname, "../../../facet/photo_scores_pro.db");
+    const dbPath = getArg("--db", resolve(__dirname, "../../../facet/photo_scores_pro.db"));
     console.log(`Loading from Facet DB: ${dbPath}`);
     const adapter = new FacetAdapter(dbPath);
     assets = adapter.getAllAssets();
@@ -222,6 +222,12 @@ app.post<{
     skipped: req.body.skipped ?? false,
   });
   return { ok: true, decided: decisions.size, total: groups.length };
+});
+
+/** Undo a decision (remove it entirely) */
+app.delete<{ Params: { id: string } }>("/api/groups/:id/decide", async (req) => {
+  decisions.delete(req.params.id);
+  return { ok: true, decided: decisions.size };
 });
 
 app.get("/api/stats", async () => {

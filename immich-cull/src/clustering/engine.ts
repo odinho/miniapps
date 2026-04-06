@@ -224,7 +224,7 @@ function splitByTemporalGaps(assets: Asset[], config: ClusterConfig): Asset[][] 
     (a, b) => a.fileCreatedAt.getTime() - b.fileCreatedAt.getTime()
   );
 
-  const GAP_THRESHOLD_MS = 12 * 60_000;
+  const GAP_THRESHOLD_MS = config.temporalGapMinutes * 60_000;
   const subGroups: Asset[][] = [];
   let current: Asset[] = [sorted[0]];
 

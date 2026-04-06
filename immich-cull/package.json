@@ -6,7 +6,6 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/server.ts",
-    "cluster": "tsx src/cli/cluster.ts",
     "cluster:local": "tsx src/cli/cluster-local.ts",
     "cluster:immich": "tsx src/cli/cluster-immich.ts",
     "review": "tsx src/server.ts",

@@ -199,6 +199,11 @@ function renderSidebar(){
 async function selectGroup(idx, keepPreview=false){
   ci=idx; si=0; if(!keepPreview){mode='grid';showPreview=false;}
   groupDetail = await(await fetch(`/api/groups/group-${idx}`)).json();
+  // Rehydrate decisions from server if present
+  if(groupDetail.decision && !groupDetail.decision.skipped){
+    for(const id of groupDetail.decision.keep) states[id]='keep';
+    for(const id of groupDetail.decision.cull) states[id]='cull';
+  }
   for(const a of groupDetail.assets) if(!(a.id in states)) states[a.id]=null;
   render(); renderSidebar(); renderBar();
   if(showPreview) renderPreview();
@@ -397,9 +402,8 @@ async function undo(){
   for(const [id,s] of Object.entries(u.prevStates)) states[id]=s;
   // Un-decide the group
   groups[u.groupIdx].decided=false;
-  // Tell server to un-decide (re-post with empty to clear, or just let it be overwritten on next approve)
-  await fetch(`/api/groups/group-${u.groupIdx}/decide`,{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({keep:[],cull:[],skipped:true})});
+  // Tell server to delete the decision
+  await fetch(`/api/groups/group-${u.groupIdx}/decide`,{method:'DELETE'});
   // Navigate back
   await selectGroup(u.groupIdx, showPreview);
   si=u.prevSi;
