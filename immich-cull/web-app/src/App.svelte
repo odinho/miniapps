@@ -328,7 +328,9 @@
   :global(.jgrid) { position: relative; width: 100%; height: 100%; overflow: hidden; }
   :global(.cell) { position: absolute; overflow: hidden; cursor: pointer; border: 3px solid transparent; transition: border-color .12s, opacity .12s; }
   :global(.cell:hover) { border-color: #555; }
-  :global(.cell.keep) { border-color: #4caf50; } :global(.cell.cull) { border-color: #e53935; opacity: .4; }
+  :global(.cell.keep) { border-color: #4caf50; }
+  :global(.cell.cull) { border-color: #e53935; }
+  :global(.cell.cull > img) { opacity: .4; }
   :global(.cell.sel) { border-color: #f0a040 !important; box-shadow: 0 0 8px rgba(240,160,64,.5); }
   :global(.cell img) { width: 100%; height: 100%; object-fit: contain; display: block; background: #0b0d11; }
   :global(.lbl) { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,.8)); padding: 10px 5px 3px; font-size: 9px; color: #bbb; display: flex; justify-content: space-between; }
