@@ -57,7 +57,7 @@
 {/if}
 
 <style>
-  .info-panel { padding: 8px; font-size: 11px; border-top: 1px solid #2a2e36; }
+  .info-panel { padding: 10px; font-size: 11px; border-top: 3px solid #f0a040; background: #0e1014; }
   .ip-filename { font-weight: 600; font-size: 12px; margin-bottom: 2px; word-break: break-all; }
   .ip-meta { color: #7a8294; margin-bottom: 6px; }
   .ip-rating { color: #ffd700; margin-bottom: 4px; }
