@@ -96,6 +96,17 @@ Built against full-library data (not test set).
 - [ ] Rollback capability using audit trail (undo bulk star changes)
 - [ ] Rate-limit Immich API calls for bulk operations
 
+### Phase 4b: UI Refactor
+
+The single-file HTML+inline-JS approach is reaching its limits (~700 lines, mixed concerns). Refactor to a proper frontend:
+
+- [ ] Move to React/Preact + Vite (or similar lightweight framework)
+- [ ] Component structure: Sidebar, Grid, Preview, BatchView, ActionBar, Help
+- [ ] Hash or client-side routing for groups/batches/settings
+- [ ] Shared image rendering between Groups and LLM Batches modes
+- [ ] State management (currently scattered across globals)
+- [ ] CSS in separate file(s)
+
 ### Phase 5a: Categories & Tags (safe metadata)
 
 - [ ] Write LLM categories to Immich tags

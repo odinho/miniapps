@@ -637,7 +637,51 @@ window.addEventListener('resize', () => {
   if (appMode === 'llm' && currentBatch) renderBatchView();
 });
 
-load();
+// === Hash routing ===
+function updateHash() {
+  if (appMode === 'groups' && ci >= 0) {
+    history.replaceState(null, '', `#group/${ci}`);
+  } else if (appMode === 'llm' && currentBatchIdx >= 0 && batches[currentBatchIdx]) {
+    history.replaceState(null, '', `#batch/${batches[currentBatchIdx].id}`);
+  }
+}
+
+// Update hash on navigation
+const origSelectGroup = selectGroup;
+selectGroup = async function(idx, keepPreview) {
+  await origSelectGroup(idx, keepPreview);
+  updateHash();
+};
+const origSelectBatch = selectBatch;
+selectBatch = async function(idx) {
+  await origSelectBatch(idx);
+  updateHash();
+};
+const origSwitchMode = switchMode;
+switchMode = function(m) {
+  origSwitchMode(m);
+  updateHash();
+};
+
+async function initFromHash() {
+  const hash = location.hash.slice(1);
+  if (hash.startsWith('batch/')) {
+    const batchId = hash.slice(6);
+    await load(); // load groups first
+    switchMode('llm');
+    await loadBatches();
+    const idx = batches.findIndex(b => b.id === batchId);
+    if (idx >= 0) selectBatch(idx);
+  } else if (hash.startsWith('group/')) {
+    const groupIdx = parseInt(hash.slice(6));
+    await load();
+    if (!isNaN(groupIdx) && groupIdx < groups.length) selectGroup(groupIdx);
+  } else {
+    await load();
+  }
+}
+
+initFromHash();
 </script>
 </body>
 </html>
