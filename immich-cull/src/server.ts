@@ -75,6 +75,13 @@ async function getDimensions(asset: Asset): Promise<{ w: number; h: number }> {
     if (meta.orientation && meta.orientation >= 5 && meta.orientation <= 8) {
       [w, h] = [h, w];
     }
+    // Scale down to match the preview endpoint's max 1400px
+    const PREVIEW_MAX = 1400;
+    if (w > PREVIEW_MAX || h > PREVIEW_MAX) {
+      const scale = PREVIEW_MAX / Math.max(w, h);
+      w = Math.round(w * scale);
+      h = Math.round(h * scale);
+    }
     const dims = { w, h };
     dimensionCache.set(asset.id, dims);
     return dims;
