@@ -222,6 +222,7 @@
 
   <aside class="sidebar">
     {#each sidebarItems as item}
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div class="gi" class:active={item.active} class:decided={item.decided}
            on:click={() => mode === 'groups' ? selectGroup(item.idx) : selectBatch(item.idx)} role="button" tabindex="-1">
         <div class="t">{item.label} · {item.date.toLocaleDateString('no', { day: 'numeric', month: 'short', year: '2-digit' })}</div>
@@ -261,25 +262,33 @@
 {/if}
 
 {#if helpOpen}
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_interactive_supports_focus -->
   <div class="help-bg" on:click={() => helpOpen = false} role="dialog">
+    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
     <div class="help-box" on:click|stopPropagation role="document">
       <h2>Keyboard Shortcuts</h2>
       <h3>Navigation</h3>
-      <table><tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Previous / next image</td></tr>
+      <table><tbody>
+        <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Previous / next image</td></tr>
         <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>Previous / next group/batch</td></tr>
         <tr><td><kbd>Space</kbd></td><td>Toggle preview</td></tr>
-        <tr><td><kbd>Esc</kbd></td><td>Close preview</td></tr></table>
+        <tr><td><kbd>Esc</kbd></td><td>Close preview</td></tr>
+      </tbody></table>
       <h3>Actions</h3>
-      <table><tr><td><kbd>K</kbd></td><td>Keep image</td></tr>
+      <table><tbody>
+        <tr><td><kbd>K</kbd></td><td>Keep image</td></tr>
         <tr><td><kbd>X</kbd></td><td>Cull image</td></tr>
         <tr><td><kbd>B</kbd></td><td>Keep selected, cull rest</td></tr>
         <tr><td><kbd>A</kbd> / <kbd>Enter</kbd></td><td>Approve & next</td></tr>
-        <tr><td><kbd>S</kbd></td><td>Skip</td></tr></table>
+        <tr><td><kbd>S</kbd></td><td>Skip</td></tr>
+      </tbody></table>
       <h3>Bulk</h3>
-      <table><tr><td><kbd>Shift+K</kbd></td><td>Keep all</td></tr>
+      <table><tbody>
+        <tr><td><kbd>Shift+K</kbd></td><td>Keep all</td></tr>
         <tr><td><kbd>Shift+X</kbd></td><td>Cull all</td></tr>
         <tr><td><kbd>1</kbd>–<kbd>5</kbd></td><td>Keep first N</td></tr>
-        <tr><td><kbd>Backspace</kbd></td><td>Undo</td></tr></table>
+        <tr><td><kbd>Backspace</kbd></td><td>Undo</td></tr>
+      </tbody></table>
       <p class="note">Undecided → <strong>keep</strong> on approve.</p>
     </div>
   </div>
