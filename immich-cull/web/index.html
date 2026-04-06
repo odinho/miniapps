@@ -270,22 +270,57 @@ function clickGrid(i){
 function enterDetail(i){si=i;mode='detail';render();renderBar();}
 function backToGrid(){mode='grid';showPreview=false;render();renderBar();}
 
+let _pvGroupId=null; // track which group the preview DOM was built for
+
 function renderPreview(){
   const ov=document.getElementById('previewOv');
-  if(!showPreview||si<0||!groupDetail){ov.innerHTML='';return;}
+  if(!showPreview||si<0||!groupDetail){ov.innerHTML='';_pvGroupId=null;return;}
   const g=groupDetail, a=g.assets[si], s=states[a.id];
+  const previewUrl=`/api/preview?id=${encodeURIComponent(a.id)}`;
+  const fullUrl=`/api/full?id=${encodeURIComponent(a.id)}`;
 
-  // Compute filmstrip height: fill available width with all images
-  const ovW = window.innerWidth - 200; // minus sidebar
-  const ovH = window.innerHeight - 34 - 40; // minus header and bar
+  // If the preview overlay already exists for this group, just update in place
+  const existingImg=document.getElementById('pvImg');
+  if(_pvGroupId===g.id && existingImg){
+    // Swap main image src (preview loads instantly from cache)
+    existingImg.dataset.assetId=a.id;
+    existingImg.src=previewUrl;
+    // Update filmstrip active states
+    ov.querySelectorAll('.pvt').forEach((el,i)=>{
+      el.classList.toggle('active',i===si);
+      const xs=states[g.assets[i].id];
+      el.classList.toggle('keep',xs==='keep');
+      el.classList.toggle('cull',xs==='cull');
+      const badge=el.querySelector('.pvb');
+      if(badge){
+        badge.className=xs==='keep'?'pvb kb':xs==='cull'?'pvb cb':'pvb';
+        badge.textContent=xs==='keep'?'K':xs==='cull'?'X':'';
+        badge.style.display=xs?'':'none';
+      }
+    });
+    // Update status tag
+    const tagEl=ov.querySelector('.ptag');
+    if(tagEl){tagEl.className=s?`ptag ${s}`:'ptag';tagEl.textContent=s?s.toUpperCase():'';tagEl.style.display=s?'':'none';}
+    // Update info
+    const infoEl=ov.querySelector('.pinfo');
+    if(infoEl) infoEl.innerHTML=`<strong>${a.filename}</strong> &middot; ${fmt(a.bytes||0)} &middot; ${new Date(a.date).toLocaleString('no')}${a.rating>0?' &middot; '+'★'.repeat(a.rating):''}${a.isFavorite?' &middot; ♥':''}`;
+    // Preload full-res
+    const expectedId=a.id;
+    const pre=new Image();
+    pre.onload=()=>{const el=document.getElementById('pvImg');if(el&&el.dataset.assetId===expectedId)el.src=fullUrl;};
+    pre.src=fullUrl;
+    return;
+  }
+
+  // Full rebuild (first open or group changed)
+  _pvGroupId=g.id;
+  const ovW = window.innerWidth - 200;
+  const ovH = window.innerHeight - 34 - 40;
   const totalAspect = g.assets.reduce((sum,x) => sum + (x.w/x.h), 0);
   const gaps = (g.assets.length - 1) * 3 + 6;
-  // Height where all thumbs fit side-by-side in available width
   const fitH = (ovW - gaps) / totalAspect;
-  // Use up to 12% of overlay height for filmstrip, but no less than 50px
   const stripH = Math.min(ovH * 0.12, Math.max(50, fitH));
 
-  const fullUrl=`/api/full?id=${encodeURIComponent(a.id)}`;
   ov.innerHTML=`<div class="preview-ov">
     <div class="pv-strip" style="height:${stripH + 6}px">
       ${g.assets.map((x,i)=>{
@@ -293,17 +328,16 @@ function renderPreview(){
         return`<div class="pvt ${i===si?'active':''} ${xs||''}" style="height:${stripH}px"
                     onclick="si=${i};render();renderBar();renderPreview()">
           <img src="/api/preview?id=${encodeURIComponent(x.id)}">
-          ${xs==='keep'?'<div class="pvb kb">K</div>':''}${xs==='cull'?'<div class="pvb cb">X</div>':''}
+          <div class="pvb ${xs==='keep'?'kb':xs==='cull'?'cb':''}" style="${xs?'':'display:none'}">${xs==='keep'?'K':xs==='cull'?'X':''}</div>
         </div>`;
       }).join('')}
     </div>
     <div class="pv-main">
-      <img id="pvImg" data-asset-id="${a.id}" src="/api/preview?id=${encodeURIComponent(a.id)}">
-      ${s?`<div class="ptag ${s}">${s.toUpperCase()}</div>`:''}
+      <img id="pvImg" data-asset-id="${a.id}" src="${previewUrl}">
+      <div class="ptag ${s||''}" style="${s?'':'display:none'}">${s?s.toUpperCase():''}</div>
       <div class="pinfo"><strong>${a.filename}</strong> &middot; ${fmt(a.bytes||0)} &middot; ${new Date(a.date).toLocaleString('no')}${a.rating>0?' &middot; '+'★'.repeat(a.rating):''}${a.isFavorite?' &middot; ♥':''}</div>
     </div>
   </div>`;
-  // Preload full-res, swap only if still showing the same image
   const expectedId=a.id;
   const pre=new Image();
   pre.onload=()=>{const el=document.getElementById('pvImg');if(el&&el.dataset.assetId===expectedId)el.src=fullUrl;};
