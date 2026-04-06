@@ -562,11 +562,9 @@ function renderBatchView() {
   const W = main.clientWidth;
   const H = main.clientHeight;
 
-  // Build image data with LLM annotations
+  // Build LLM annotation lookups
   const llmMap = {};
   if (b.llm?.images) for (const img of b.llm.images) llmMap[img.imageId] = img;
-
-  // Build subgroup keep/cull sets
   const sgKeep = new Set();
   const sgCull = new Set();
   if (b.llm?.similaritySubgroups) {
@@ -576,41 +574,37 @@ function renderBatchView() {
     }
   }
 
-  // Use justified layout
-  const items = b.assets.map(a => {
-    // Approximate aspect ratio from filename (or default 4:3)
-    return { w: 4, h: 3 }; // we don't have dimensions in batch API yet
-  });
-  // For now use CSS columns since we don't have dimensions
-  const cols = b.assets.length <= 6 ? 2 : b.assets.length <= 12 ? 3 : 4;
+  // Use justified layout (same as groups mode)
+  const rects = justifiedLayout(b.assets, W, H, 4);
+
+  // Compute total grid height for scrolling
+  let maxY = 0;
+  for (const r of rects) maxY = Math.max(maxY, r.y + r.h);
 
   main.innerHTML = `
-    <div style="overflow-y:auto;padding:4px;flex:1;column-count:${cols};column-gap:4px">
-      ${b.llm ? `<div style="column-span:all;padding:4px 8px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);margin-bottom:4px">
-        <strong>${b.llm.batchSummary||''}</strong>
-        &middot; ${b.llm.images?.length||0} assessed
-        &middot; ${b.llm.similaritySubgroups?.length||0} subgroups
-        &middot; conf ${b.llm.overallConfidence||'?'}
-      </div>` : ''}
-      ${b.assets.map((a, i) => {
-        const llm = llmMap[a.id];
-        const isKeep = sgKeep.has(a.id);
-        const isCull = sgCull.has(a.id);
-        const stars = llm ? '★'.repeat(llm.suggestedStars) + '☆'.repeat(3-llm.suggestedStars) : '';
-        const note = llm?.briefNote || '';
-        const cats = llm?.categories?.join(', ') || '';
-        const sg = llm?.similaritySubgroupId;
-        return `<div class="photo-card ${isCull?'llm-cull-suggest':''} ${isKeep?'llm-keep-suggest':''} ${sg?'llm-sg-border':''}"
-                     style="break-inside:avoid;margin-bottom:4px;position:relative;border-radius:4px;overflow:hidden;background:#0b0d11">
-          <img src="/api/preview?id=${encodeURIComponent(a.id)}" style="width:100%;height:auto;display:block" loading="lazy">
-          ${stars ? `<div class="llm-star">${stars}</div>` : ''}
-          ${note ? `<div class="llm-note">${note}</div>` : ''}
-          <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.8));padding:12px 5px 3px;font-size:9px;color:#bbb;display:flex;justify-content:space-between">
-            <span>${a.filename}</span>
-            <span>${isCull?'<span style="color:var(--bad)">CULL</span>':isKeep?'<span style="color:var(--good)">KEEP</span>':''}${sg?' &middot; '+sg:''}</span>
-          </div>
-        </div>`;
-      }).join('')}
+    ${b.llm ? `<div style="padding:4px 8px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);flex-shrink:0">
+      <strong>${b.llm.batchSummary||''}</strong>
+      &middot; ${b.llm.images?.length||0} assessed
+      &middot; ${b.llm.similaritySubgroups?.length||0} subgroups
+    </div>` : ''}
+    <div style="flex:1;overflow-y:auto;position:relative">
+      <div style="position:relative;width:100%;height:${maxY}px">
+        ${b.assets.map((a, i) => {
+          const r = rects[i];
+          const llm = llmMap[a.id];
+          const isKeep = sgKeep.has(a.id);
+          const isCull = sgCull.has(a.id);
+          const stars = llm ? '★'.repeat(llm.suggestedStars) + '☆'.repeat(3-llm.suggestedStars) : '';
+          const note = llm?.briefNote || '';
+          const sg = llm?.similaritySubgroupId;
+          return `<div class="cell ${isCull?'cull':''} ${isKeep?'keep':''}" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;${sg?'outline:2px dashed rgba(240,160,64,.4);outline-offset:-2px':''}">
+            <img src="/api/preview?id=${encodeURIComponent(a.id)}" loading="lazy">
+            ${stars ? `<div class="llm-star">${stars}</div>` : ''}
+            ${note ? `<div class="llm-note">${note}</div>` : ''}
+            <div class="lbl"><span>${a.filename}</span><span>${isCull?'CULL':isKeep?'KEEP':''} ${sg||''}</span></div>
+          </div>`;
+        }).join('')}
+      </div>
     </div>
   `;
 

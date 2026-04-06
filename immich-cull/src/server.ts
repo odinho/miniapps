@@ -344,12 +344,17 @@ app.get<{ Params: { id: string } }>("/api/batches/:id", async (req) => {
     folderName: batch.folderName,
     count: batch.assets.length,
     dateRange: { start: batch.dateRange.start.toISOString(), end: batch.dateRange.end.toISOString() },
-    assets: batch.assets.map((a) => ({
-      id: a.id,
-      filename: a.filename,
-      date: a.fileCreatedAt.toISOString(),
-      rating: a.rating,
-      bytes: getFileSize(a),
+    assets: await Promise.all(batch.assets.map(async (a) => {
+      const dims = await getDimensions(a);
+      return {
+        id: a.id,
+        filename: a.filename,
+        date: a.fileCreatedAt.toISOString(),
+        rating: a.rating,
+        bytes: getFileSize(a),
+        w: dims.w,
+        h: dims.h,
+      };
     })),
     llm: llmResult,
   };
