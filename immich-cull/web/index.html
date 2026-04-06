@@ -574,48 +574,33 @@ function renderBatchView() {
     }
   }
 
-  // For batches with many photos, use a tall target height so images get reasonable sizes
-  // and the container scrolls vertically. Target ~300px row height.
-  const targetRowH = 300;
-  const estimatedRows = Math.ceil(b.assets.length / 3);
-  const targetH = Math.max(H, estimatedRows * (targetRowH + 4));
-  const rects = justifiedLayout(b.assets, W, targetH, 4);
+  // Same justified layout as groups mode — fit into viewport
+  const rects = justifiedLayout(b.assets, W, H, 4);
 
-  let maxY = 0;
-  for (const r of rects) maxY = Math.max(maxY, r.y + r.h);
+  main.innerHTML = `<div class="jgrid">
+    ${b.assets.map((a, i) => {
+      const r = rects[i];
+      const llm = llmMap[a.id];
+      const isKeep = sgKeep.has(a.id);
+      const isCull = sgCull.has(a.id);
+      const stars = llm ? '★'.repeat(llm.suggestedStars) + '☆'.repeat(3-llm.suggestedStars) : '';
+      const note = llm?.briefNote || '';
+      const sg = llm?.similaritySubgroupId;
+      return `<div class="cell ${isCull?'cull':''} ${isKeep?'keep':''}" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;${sg?'outline:2px dashed rgba(240,160,64,.4);outline-offset:-2px':''}">
+        <img src="/api/preview?id=${encodeURIComponent(a.id)}" loading="lazy">
+        ${stars ? `<div class="llm-star">${stars}</div>` : ''}
+        ${note ? `<div class="llm-note">${note}</div>` : ''}
+        <div class="lbl"><span>${a.filename}</span><span>${isCull?'CULL':isKeep?'KEEP':''} ${sg||''}</span></div>
+      </div>`;
+    }).join('')}
+  </div>`;
 
-  main.innerHTML = `
-    ${b.llm ? `<div style="padding:4px 8px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);flex-shrink:0">
-      <strong>${b.llm.batchSummary||''}</strong>
-      &middot; ${b.llm.images?.length||0} assessed
-      &middot; ${b.llm.similaritySubgroups?.length||0} subgroups
-    </div>` : ''}
-    <div style="flex:1;overflow-y:auto;position:relative">
-      <div style="position:relative;width:100%;height:${maxY}px">
-        ${b.assets.map((a, i) => {
-          const r = rects[i];
-          const llm = llmMap[a.id];
-          const isKeep = sgKeep.has(a.id);
-          const isCull = sgCull.has(a.id);
-          const stars = llm ? '★'.repeat(llm.suggestedStars) + '☆'.repeat(3-llm.suggestedStars) : '';
-          const note = llm?.briefNote || '';
-          const sg = llm?.similaritySubgroupId;
-          return `<div class="cell ${isCull?'cull':''} ${isKeep?'keep':''}" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;${sg?'outline:2px dashed rgba(240,160,64,.4);outline-offset:-2px':''}">
-            <img src="/api/preview?id=${encodeURIComponent(a.id)}" loading="lazy">
-            ${stars ? `<div class="llm-star">${stars}</div>` : ''}
-            ${note ? `<div class="llm-note">${note}</div>` : ''}
-            <div class="lbl"><span>${a.filename}</span><span>${isCull?'CULL':isKeep?'KEEP':''} ${sg||''}</span></div>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>
-  `;
-
-  // Action bar
+  // Action bar with LLM summary
+  const llmInfo = b.llm ? `${b.llm.batchSummary||''} &middot; ${b.llm.images?.length||0} rated &middot; ${b.llm.similaritySubgroups?.length||0} subgroups` : '';
   document.getElementById('bar').innerHTML = `
-    ${!b.llm ? `<button class="run-btn" onclick="runLlm()">Run LLM on this batch</button>` : ''}
-    <span class="spacer"></span>
-    <span class="bmeta">${b.count} photos &middot; ${b.source} ${b.folderName||''}</span>
+    ${!b.llm ? `<button class="run-btn" onclick="runLlm()">Run LLM</button>` : ''}
+    ${llmInfo ? `<span class="bmeta" style="flex:1">${llmInfo}</span>` : '<span class="spacer"></span>'}
+    <span class="bmeta">${b.count} photos</span>
     <button class="bh" onclick="toggleHelp()">?</button>
   `;
 }
