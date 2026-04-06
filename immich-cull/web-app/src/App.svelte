@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import PhotoGrid from './components/PhotoGrid.svelte';
   import Preview from './components/Preview.svelte';
+  import InfoPanel from './components/InfoPanel.svelte';
   import {
     fetchGroups, fetchGroup, fetchBatches, fetchBatch, fetchStats,
     decideGroup, undecideGroup, rankBatch, fmt,
@@ -33,6 +34,16 @@
   $: llmMap = buildLlmMap(batchDetail);
   $: keepSet = new Set(batchDetail?.llm?.similaritySubgroups?.flatMap(sg => sg.recommendedKeepIds) ?? []);
   $: cullSet = new Set(batchDetail?.llm?.similaritySubgroups?.flatMap(sg => sg.cullIds) ?? []);
+  $: allSubgroups = batchDetail?.llm?.similaritySubgroups ?? [];
+
+  // Selected asset info for InfoPanel
+  $: selectedAsset = currentAssets[selectedIdx] ?? null;
+  $: selectedLlm = selectedAsset ? llmMap[selectedAsset.id] ?? null : null;
+  $: selectedSubgroup = selectedLlm?.similaritySubgroupId
+    ? allSubgroups.find(sg => sg.subgroupId === selectedLlm!.similaritySubgroupId) ?? null
+    : null;
+  $: selectedManualState = selectedAsset ? (states[selectedAsset.id] ?? null) : null;
+  $: selectedLlmState = selectedAsset ? (keepSet.has(selectedAsset.id) ? 'keep' : cullSet.has(selectedAsset.id) ? 'cull' : null) : null;
 
   function buildLlmMap(bd: BatchDetail | null): Record<string, LlmImage> {
     const m: Record<string, LlmImage> = {};
@@ -221,14 +232,23 @@
   </header>
 
   <aside class="sidebar">
-    {#each sidebarItems as item}
-      <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <div class="gi" class:active={item.active} class:decided={item.decided}
-           on:click={() => mode === 'groups' ? selectGroup(item.idx) : selectBatch(item.idx)} role="button" tabindex="-1">
-        <div class="t">{item.label} · {item.date.toLocaleDateString('no', { day: 'numeric', month: 'short', year: '2-digit' })}</div>
-        <div class="m">{item.sub}</div>
-      </div>
-    {/each}
+    <div class="sidebar-list">
+      {#each sidebarItems as item}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="gi" class:active={item.active} class:decided={item.decided}
+             on:click={() => mode === 'groups' ? selectGroup(item.idx) : selectBatch(item.idx)} role="button" tabindex="-1">
+          <div class="t">{item.label} · {item.date.toLocaleDateString('no', { day: 'numeric', month: 'short', year: '2-digit' })}</div>
+          <div class="m">{item.sub}</div>
+        </div>
+      {/each}
+    </div>
+    <InfoPanel
+      asset={selectedAsset}
+      llm={selectedLlm}
+      subgroup={selectedSubgroup}
+      manualState={selectedManualState}
+      llmState={selectedLlmState}
+    />
   </aside>
 
   <div class="main">
@@ -258,7 +278,7 @@
 
 {#if showPreview && selectedIdx >= 0 && currentAssets.length}
   <Preview assets={currentAssets} {selectedIdx} {states} {llmMap} {keepSet} {cullSet}
-    subgroups={batchDetail?.llm?.similaritySubgroups ?? []}
+    subgroups={allSubgroups}
     onSelect={(i) => selectedIdx = i} onClose={() => showPreview = false} />
 {/if}
 
@@ -309,7 +329,8 @@
   .stats { margin-left: auto; font-size: 12px; color: #7a8294; display: flex; gap: 12px; }
   .stats strong { color: #e0e4ea; } .stats .good { color: #4caf50; } .stats .bad { color: #e53935; }
 
-  .sidebar { grid-row: 2 / 4; min-height: 0; overflow-y: auto; border-right: 1px solid #2a2e36; background: #12141a; font-size: 12px; }
+  .sidebar { grid-row: 2 / 4; min-height: 0; display: flex; flex-direction: column; border-right: 1px solid #2a2e36; background: #12141a; font-size: 12px; }
+  .sidebar-list { flex: 1; overflow-y: auto; min-height: 0; }
   .gi { padding: 5px 8px; cursor: pointer; border-bottom: 1px solid #1e2028; border-left: 3px solid transparent; }
   .gi:hover { background: #1c1f27; } .gi.active { background: #1f2330; border-left-color: #f0a040; } .gi.decided { opacity: .35; }
   .gi .t { font-weight: 500; } .gi .m { color: #666; font-size: 11px; }
@@ -330,7 +351,7 @@
   :global(.cell) { position: absolute; overflow: hidden; cursor: pointer; border: 3px solid transparent; transition: border-color .12s, opacity .12s; }
   :global(.cell:hover) { border-color: #555; }
   :global(.cell.keep) { border-color: #4caf50; }
-  :global(.cell.cull) { border-color: rgba(229,57,53,.5); }
+  :global(.cell.cull) { border-color: rgba(229,57,53,.4); outline: none !important; }
   :global(.cell.cull > img) { opacity: .4; }
   :global(.cell.sel) { border-color: #f0a040 !important; box-shadow: 0 0 8px rgba(240,160,64,.5); }
   :global(.cell img) { width: 100%; height: 100%; object-fit: contain; display: block; background: #0b0d11; }
@@ -342,11 +363,13 @@
   :global(.llm-note) { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 9px; color: #ddd; text-shadow: 0 1px 2px #000; }
 
   :global(.preview-ov) { position: fixed; top: 34px; left: 200px; right: 0; bottom: 40px; background: #090b0f; z-index: 50; display: flex; flex-direction: column; }
-  :global(.pv-strip) { display: flex; gap: 3px; padding: 3px; overflow-x: auto; background: #111319; border-bottom: 1px solid #2a2e36; flex-shrink: 0; align-items: stretch; height: 76px; }
-  :global(.pvt) { flex-shrink: 0; cursor: pointer; border: 2px solid transparent; border-radius: 3px; position: relative; overflow: hidden; }
+  :global(.pv-strip) { display: flex; gap: 3px; padding: 3px; overflow-x: auto; background: #111319; border-bottom: 1px solid #2a2e36; flex-shrink: 0; align-items: center; height: 76px; }
+  :global(.pvt) { flex-shrink: 0; cursor: pointer; border: 2px solid transparent; border-radius: 3px; overflow: hidden; height: 66px; }
   :global(.pvt.active) { border-color: #f0a040 !important; }
-  :global(.pvt.keep) { border-color: #4caf50; } :global(.pvt.cull) { border-color: #e53935; opacity: .4; }
-  :global(.pvt img) { height: 100%; width: auto; display: block; object-fit: contain; }
+  :global(.pvt.keep) { border-color: #4caf50; }
+  :global(.pvt.cull) { border-color: rgba(229,57,53,.4); }
+  :global(.pvt.cull img) { opacity: .4; }
+  :global(.pvt img) { height: 100%; width: auto; display: block; }
   :global(.pv-main) { flex: 1; min-height: 0; position: relative; overflow: hidden; }
   :global(.pv-main img) { width: 100%; height: 100%; object-fit: contain; display: block; }
   :global(.pv-main .pinfo) { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.8); padding: 4px 14px; border-radius: 5px; font-size: 12px; white-space: nowrap; }
