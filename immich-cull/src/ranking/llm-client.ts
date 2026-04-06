@@ -257,8 +257,14 @@ export class LlmClient {
       }
     }
 
-    // Map compact format back to full types
+    // Map compact format back to full types, filter invalid indices
     const expanded = expandCompactResponse(parsed, batch);
+    expanded.images = expanded.images.filter(img => !img.imageId.startsWith("unknown-"));
+    expanded.batchSize = expanded.images.length;
+
+    if (expanded.images.length !== batch.assets.length) {
+      console.warn(`LLM returned ${expanded.images.length} valid images, expected ${batch.assets.length}`);
+    }
 
     return { response: expanded, rawJson, inputTokens, outputTokens };
   }
