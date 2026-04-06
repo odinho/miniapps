@@ -158,17 +158,14 @@ function computeRows(aspects, W, H, gap, nRows, items) {
   const totalRawH = rawHeights.reduce((s,h) => s+h, 0);
   const scale = Math.min(1, availH / totalRawH); // don't upscale beyond natural
 
+  // Don't restrict row height by individual image native sizes —
+  // allow bigger cells, images will be centered via object-fit:contain.
+  // This avoids one small image shrinking the whole row.
   const rects = [];
   let y = 0;
   let usedArea = 0;
   for (let r = 0; r < rows.length; r++) {
-    let rowH = rawHeights[r] * scale;
-    // Cap row height so no image exceeds its native pixel height
-    if (items) {
-      for (const i of rows[r]) {
-        rowH = Math.min(rowH, items[i].h);
-      }
-    }
+    const rowH = rawHeights[r] * scale;
     let x = 0;
     for (const i of rows[r]) {
       const imgW = rowH * aspects[i];
@@ -278,12 +275,15 @@ function renderPreview(){
   if(!showPreview||si<0||!groupDetail){ov.innerHTML='';return;}
   const g=groupDetail, a=g.assets[si], s=states[a.id];
 
-  // Compute filmstrip thumb height: use available width to show all images
-  // Each thumb aspect ≈ w/h, so total width at height H = sum(H * aspect_i) + gaps
+  // Compute filmstrip height: fill available width with all images
   const ovW = window.innerWidth - 200; // minus sidebar
+  const ovH = window.innerHeight - 34 - 40; // minus header and bar
   const totalAspect = g.assets.reduce((sum,x) => sum + (x.w/x.h), 0);
-  const gaps = (g.assets.length - 1) * 3 + 6; // gaps + padding
-  const stripH = Math.min(140, Math.max(50, (ovW - gaps) / totalAspect));
+  const gaps = (g.assets.length - 1) * 3 + 6;
+  // Height where all thumbs fit side-by-side in available width
+  const fitH = (ovW - gaps) / totalAspect;
+  // Use up to 30% of overlay height for filmstrip, but no less than 50px
+  const stripH = Math.min(ovH * 0.3, Math.max(50, fitH));
 
   ov.innerHTML=`<div class="preview-ov">
     <div class="pv-strip" style="height:${stripH + 6}px">
@@ -291,7 +291,7 @@ function renderPreview(){
         const xs=states[x.id];
         return`<div class="pvt ${i===si?'active':''} ${xs||''}" style="height:${stripH}px"
                     onclick="si=${i};render();renderBar();renderPreview()">
-          <img src="/api/thumb?id=${encodeURIComponent(x.id)}">
+          <img src="/api/preview?id=${encodeURIComponent(x.id)}">
           ${xs==='keep'?'<div class="pvb kb">K</div>':''}${xs==='cull'?'<div class="pvb cb">X</div>':''}
         </div>`;
       }).join('')}
