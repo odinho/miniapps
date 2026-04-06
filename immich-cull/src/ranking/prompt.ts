@@ -1,66 +1,73 @@
 /** Build the LLM prompt for a day-batch review */
 
 import { SessionBatch } from "../batching/session-batcher.js";
-import { Asset } from "../shared/types.js";
 
 export function buildPrompt(batch: SessionBatch): string {
   const dateRange = `${batch.dateRange.start.toISOString().slice(0, 16)} to ${batch.dateRange.end.toISOString().slice(0, 16)}`;
+  const n = batch.assets.length;
 
-  // Use short integer indices as image IDs to save output tokens
   const imagesMeta = batch.assets.map((a, i) => ({
-    i, // short index as ID — LLM uses this in output
+    i,
     f: a.filename,
-    t: a.fileCreatedAt.toISOString().slice(11, 19), // just HH:MM:SS
-    s: a.rating ?? 0, // existing stars
+    t: a.fileCreatedAt.toISOString().slice(11, 19),
+    s: a.rating ?? 0,
     sc: /screenshot/i.test(a.filename) ? 1 : 0,
     sn: /snapchat/i.test(a.filename) ? 1 : 0,
   }));
 
-  return `Session metadata:
-{
-  "batchId": "${batch.id}",
-  "batchSize": ${batch.assets.length},
-  "dateRange": "${dateRange}",
-  "folderName": ${batch.folderName ? `"${batch.folderName}"` : "null"}
+  // Pre-compute hints for the model
+  const scIndices = imagesMeta.filter(m => m.sc).map(m => m.i);
+  const snIndices = imagesMeta.filter(m => m.sn).map(m => m.i);
+  const hints: string[] = [];
+  if (scIndices.length >= 2) hints.push(`Screenshots: indices [${scIndices.join(",")}] — consider grouping.`);
+  if (snIndices.length >= 2) hints.push(`Snapchat saves: indices [${snIndices.join(",")}] — consider grouping.`);
+
+  return `Session: ${batch.folderName ?? dateRange}
+${n} images, indices 0-${n - 1}. Return EXACTLY ${n} entries in img.
+${hints.length ? "\nHints:\n" + hints.join("\n") + "\n" : ""}
+Images:
+${JSON.stringify(imagesMeta)}
+
+Review the attached ${n} images and return JSON.`;
 }
 
-Images in chronological order:
-${JSON.stringify(imagesMeta, null, 2)}
+export const SYSTEM_PROMPT = `You review photos from a single session for culling and rating.
 
-Now review the attached images and return JSON matching the schema.`;
-}
+TASKS:
+1. Assess EVERY photo — star rating + category + brief note.
+2. Find similarity groups (3+ similar photos) and rank within each.
+3. For each group, recommend keep vs cull.
 
-export const SYSTEM_PROMPT = `You are reviewing a batch of photos from a single photography session (one day, trip, or outing).
+STARS (0-3, never 4-5):
+0 = unremarkable, generic. 1 = good, stands out. 2 = share-worthy. 3 = session highlight.
+Give a distribution: not all the same score. Existing 2+ stars are protected (never lower).
 
-Your job is to:
-1. Assess EVERY photo individually — suggest a star rating and category.
-2. Identify groups of similar or near-duplicate photos within the batch.
-3. For each similarity group, rank the photos and recommend which to keep vs cull.
+SIMILARITY GROUPING — critical:
+After assessing all images, scan for clusters:
+- Near-identical compositions (same subject, similar framing) → "dup"
+- Burst sequences (<5s apart, similar shots) → "burst"
+- Same scene from different angles/times → "scene"
+- Same subject across the session → "subj"
+If multiple images have sn=1 (snapchat), consider grouping them.
+If multiple images have sc=1 (screenshot), consider grouping them.
+Groups of 10+ similar photos are MORE important to identify than groups of 3.
+Err on the side of grouping. Every cluster of similar photos must be a subgroup.
 
-Star rating scale (0-3, you never assign 4 or 5):
-- 0: Processed, unremarkable. Generic, redundant, or purely functional.
-- 1: Good photo. Would pick this one out when scrolling. Nice moment, light, composition, or useful reference.
-- 2: Share-worthy. Genuinely good, would show to someone.
-- 3: Session highlight. Best photo(s) of this batch. Would feature in a trip recap.
+CULLING:
+Conservative — only cull when clearly redundant given what's kept.
+"Keeping a few extra isn't high cost. Cull what we'll never need."
+Within groups, keep extras if they capture different moments/angles/expressions.
 
-Important rules:
-- Assess EVERY image. Do not skip any.
-- For star ratings, judge relative to this session/batch. Every batch should have a distribution — not all 0, not all 2.
-- Existing star ratings of 2+ are protected: never suggest lower than the existing rating.
-- Technical/documentation images, receipts, screenshots: judge by usefulness, not beauty.
-- Snapchat saves or partner-shared personal content: protect if meaningful, even if quality is low.
-- When identifying similarity subgroups, be inclusive: if 3+ photos look like the same scene/moment/subject, group them.
-- Within similarity subgroups, rank by: sharpness, expression, composition, timing, uniqueness of moment.
-- Recommend keeping extras when photos capture genuinely different moments or angles.
-- The user's philosophy: "Keeping a few extra isn't high cost. This is mostly about culling what we never will need anyway." Be conservative — only recommend culling when the image is clearly redundant given what's being kept.
-- Return valid JSON only, matching the provided schema exactly.
+DESCRIPTIONS:
+Look at each photo individually. Every photo MUST get a UNIQUE description.
+Do NOT repeat the same note for multiple photos. Describe what you actually see.
 
-COMPACT JSON — use integer index (i) from input as image ID. Be terse.
+OUTPUT — compact JSON, indices 0..N-1 only. Do NOT invent extra indices.
 {
   "sum": "1-sentence summary",
-  "img": [[i, stars, "cat", "note max 5 words", "sgId"|null], ...],
+  "img": [[i, stars, "cat", "note 3-5 words", "sgId"|null], ...],
   "sg": [{"id":"g1", "type":"burst|dup|scene|subj", "all":[best,...worst], "keep":[kept], "why":"max 15 words"}, ...]
 }
-img is array-of-arrays: [index, 0-3 stars, "category", "brief note", subgroupId or null].
-Only include "p" key on img entry if protectFromCull: [[i, s, "cat", "note", "sg", true]].
-Category codes: por grp sel lan tra evt pet act doc rec wb ss snap tech veh food meme oth`;
+Only add 6th element true to img tuple if protectFromCull.
+Category codes: por grp sel lan tra evt pet act doc rec wb ss snap tech veh food meme oth
+"all" array: ordered best-first (best photo at index 0, worst last).`;

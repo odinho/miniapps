@@ -24,19 +24,32 @@ const CATEGORY_MAP: Record<string, string> = {
 };
 
 function expandCategory(code: string): string {
-  return CATEGORY_MAP[code] ?? code;
+  return CATEGORY_MAP[code.toLowerCase()] ?? "other";
 }
 
 function expandCompactResponse(raw: any, batch: SessionBatch): DayBatchResponse {
   const assets = batch.assets;
 
+  // Deduplicate and validate indices
+  const seen = new Set<number>();
   const images: ImageAssessment[] = (raw.img ?? raw.images ?? []).map((img: any) => {
-    // Support both tuple format [i, stars, "cat", "note", "sg", protect?] and object format
+    const idx = Array.isArray(img) ? img[0] : (img.i ?? img.index);
+
+    // Validate index range
+    if (typeof idx !== "number" || idx < 0 || idx >= assets.length) {
+      console.warn(`LLM: out-of-range index ${idx} (batch size ${assets.length}), skipping`);
+      return null;
+    }
+    // Deduplicate
+    if (seen.has(idx)) return null;
+    seen.add(idx);
+
+    const asset = assets[idx];
+
     if (Array.isArray(img)) {
-      const [idx, stars, cat, note, sg, protect] = img;
-      const asset = assets[idx];
+      const [, stars, cat, note, sg, protect] = img;
       return {
-        imageId: asset?.id ?? `unknown-${idx}`,
+        imageId: asset.id,
         suggestedStars: stars ?? 0,
         categories: (typeof cat === "string" ? [cat] : (cat ?? [])).map(expandCategory),
         protectFromCull: protect ?? false,
@@ -45,11 +58,8 @@ function expandCompactResponse(raw: any, batch: SessionBatch): DayBatchResponse 
         similaritySubgroupId: sg ?? null,
       };
     }
-    // Object format fallback
-    const idx = img.i ?? img.index;
-    const asset = assets[idx];
     return {
-      imageId: asset?.id ?? `unknown-${idx}`,
+      imageId: asset.id,
       suggestedStars: img.s ?? img.suggestedStars ?? 0,
       categories: (img.c ?? img.categories ?? []).map(expandCategory),
       protectFromCull: img.p ?? img.protectFromCull ?? false,
@@ -57,7 +67,7 @@ function expandCompactResponse(raw: any, batch: SessionBatch): DayBatchResponse 
       briefNote: img.n ?? img.briefNote ?? "",
       similaritySubgroupId: img.g ?? img.similaritySubgroupId ?? null,
     };
-  });
+  }).filter((x): x is ImageAssessment => x !== null);
 
   const similaritySubgroups: SimilaritySubgroup[] = (raw.sg ?? raw.similaritySubgroups ?? []).map((sg: any) => {
     const mapIdx = (idx: number) => assets[idx]?.id ?? `unknown-${idx}`;
@@ -101,7 +111,7 @@ export const DEFAULT_LLM_CONFIG: LlmClientConfig = {
   apiKey: "",
   model: "google/gemini-2.5-flash-lite",
   baseUrl: "https://openrouter.ai/api/v1",
-  previewMaxPx: 800,
+  previewMaxPx: 1200, // larger previews for better LLM detail recognition
   provider: "openrouter",
 };
 
@@ -257,11 +267,7 @@ export class LlmClient {
       }
     }
 
-    // Map compact format back to full types, filter invalid indices
     const expanded = expandCompactResponse(parsed, batch);
-    expanded.images = expanded.images.filter(img => !img.imageId.startsWith("unknown-"));
-    expanded.batchSize = expanded.images.length;
-
     if (expanded.images.length !== batch.assets.length) {
       console.warn(`LLM returned ${expanded.images.length} valid images, expected ${batch.assets.length}`);
     }
