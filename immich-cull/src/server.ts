@@ -333,9 +333,44 @@ app.get<{ Params: { id: string } }>("/api/batches/:id", async (req) => {
 
   const fp = batchFingerprint(batch.assets.map(a => a.id));
   const cached = stateDb.getLlmRun(batch.id, fp);
-  let llmResult: DayBatchResponse | null = null;
+  let llmResult: any = null;
   if (cached) {
-    try { llmResult = JSON.parse(cached.responseJson); } catch {}
+    try {
+      const raw = JSON.parse(cached.responseJson);
+      // Expand compact format to full format for the UI
+      llmResult = {
+        batchSummary: raw.sum ?? raw.batchSummary ?? "",
+        overallConfidence: raw.conf ?? raw.overallConfidence ?? 0,
+        images: (raw.img ?? raw.images ?? []).map((img: any) => {
+          if (Array.isArray(img)) {
+            const [idx, stars, cat, note, sg] = img;
+            const asset = batch.assets[idx];
+            return {
+              imageId: asset?.id ?? `unknown-${idx}`,
+              suggestedStars: stars ?? 0,
+              categories: typeof cat === "string" ? [cat] : (cat ?? []),
+              briefNote: note ?? "",
+              similaritySubgroupId: sg ?? null,
+            };
+          }
+          return img;
+        }).filter((img: any) => img && !String(img.imageId).startsWith("unknown-")),
+        similaritySubgroups: (raw.sg ?? raw.similaritySubgroups ?? []).map((sg: any) => {
+          const mapIdx = (idx: number) => batch.assets[idx]?.id ?? `unknown-${idx}`;
+          const allIds = (sg.all ?? sg.imageIds ?? []).map((v: any) => typeof v === "number" ? mapIdx(v) : v);
+          const keepIds = (sg.keep ?? sg.recommendedKeepIds ?? []).map((v: any) => typeof v === "number" ? mapIdx(v) : v);
+          return {
+            subgroupId: sg.id ?? sg.subgroupId ?? "",
+            imageIds: allIds,
+            subgroupType: sg.type ?? sg.subgroupType ?? "scene",
+            recommendedKeepCount: keepIds.length,
+            recommendedKeepIds: keepIds,
+            cullIds: allIds.filter((id: string) => !keepIds.includes(id)),
+            rationale: sg.why ?? sg.rationale ?? "",
+          };
+        }),
+      };
+    } catch {}
   }
 
   return {

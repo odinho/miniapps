@@ -574,10 +574,13 @@ function renderBatchView() {
     }
   }
 
-  // Use justified layout (same as groups mode)
-  const rects = justifiedLayout(b.assets, W, H, 4);
+  // For batches with many photos, use a tall target height so images get reasonable sizes
+  // and the container scrolls vertically. Target ~300px row height.
+  const targetRowH = 300;
+  const estimatedRows = Math.ceil(b.assets.length / 3);
+  const targetH = Math.max(H, estimatedRows * (targetRowH + 4));
+  const rects = justifiedLayout(b.assets, W, targetH, 4);
 
-  // Compute total grid height for scrolling
   let maxY = 0;
   for (const r of rects) maxY = Math.max(maxY, r.y + r.h);
 
