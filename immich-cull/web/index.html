@@ -298,14 +298,15 @@ function renderPreview(){
       }).join('')}
     </div>
     <div class="pv-main">
-      <img id="pvImg" src="/api/preview?id=${encodeURIComponent(a.id)}">
+      <img id="pvImg" data-asset-id="${a.id}" src="/api/preview?id=${encodeURIComponent(a.id)}">
       ${s?`<div class="ptag ${s}">${s.toUpperCase()}</div>`:''}
       <div class="pinfo"><strong>${a.filename}</strong> &middot; ${fmt(a.bytes||0)} &middot; ${new Date(a.date).toLocaleString('no')}${a.rating>0?' &middot; '+'★'.repeat(a.rating):''}${a.isFavorite?' &middot; ♥':''}</div>
     </div>
   </div>`;
-  // Preload full-res, swap when ready
+  // Preload full-res, swap only if still showing the same image
+  const expectedId=a.id;
   const pre=new Image();
-  pre.onload=()=>{const el=document.getElementById('pvImg');if(el)el.src=fullUrl;};
+  pre.onload=()=>{const el=document.getElementById('pvImg');if(el&&el.dataset.assetId===expectedId)el.src=fullUrl;};
   pre.src=fullUrl;
 }
 function ensureSel(){if(si<0){si=0;mode='detail';render();renderBar();}}
