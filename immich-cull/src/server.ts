@@ -14,8 +14,11 @@ import { FacetAdapter } from "./db/facet-adapter.js";
 import { ImmichAdapter } from "./db/immich-adapter.js";
 import { clusterAssets } from "./clustering/engine.js";
 import { DEFAULT_CLUSTER_CONFIG, PhotoGroup, Asset } from "./shared/types.js";
+import { getImmichDbConfig } from "./shared/config.js";
 import sharp from "sharp";
 import { fileURLToPath } from "url";
+import { config as loadEnv } from "dotenv";
+loadEnv();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -41,13 +44,7 @@ async function loadData() {
 
   if (useImmich) {
     console.log("Connecting to Immich PostgreSQL...");
-    const adapter = new ImmichAdapter({
-      host: "localhost",
-      port: 15432,
-      user: "postgres",
-      password: "ga3wSqj6do7zt78TaHC8Oj9oUxz8YLrK",
-      database: "immich",
-    });
+    const adapter = new ImmichAdapter(getImmichDbConfig());
 
     const count = await adapter.getAssetCount();
     console.log(`Immich has ${count} images with embeddings`);

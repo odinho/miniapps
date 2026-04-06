@@ -8,7 +8,10 @@
 import { ImmichAdapter } from "../db/immich-adapter.js";
 import { clusterAssets } from "../clustering/engine.js";
 import { ClusterConfig, DEFAULT_CLUSTER_CONFIG } from "../shared/types.js";
+import { getImmichDbConfig } from "../shared/config.js";
 import { writeFileSync } from "fs";
+import { config as loadEnv } from "dotenv";
+loadEnv();
 
 const args = process.argv.slice(2);
 
@@ -35,13 +38,7 @@ console.log(`Config: strong=${config.strongEdgeDistance}, burst=${config.burstEd
 if (sampleSize > 0) console.log(`Sample: ${sampleSize} most recent photos`);
 console.log();
 
-const adapter = new ImmichAdapter({
-  host: "localhost",
-  port: 15432,
-  user: "postgres",
-  password: "ga3wSqj6do7zt78TaHC8Oj9oUxz8YLrK",
-  database: "immich",
-});
+const adapter = new ImmichAdapter(getImmichDbConfig());
 
 try {
   const totalCount = await adapter.getAssetCount();

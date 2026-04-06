@@ -5,6 +5,7 @@
  */
 import Database from "better-sqlite3";
 import { Asset } from "../shared/types.js";
+import { tryParseFilenameDate } from "../shared/filename-dates.js";
 
 export class FacetAdapter {
   private db: Database.Database;
@@ -31,20 +32,25 @@ export class FacetAdapter {
       burst_group_id: string | null;
     }>;
 
-    return rows.map((row) => ({
-      id: row.path,
-      path: row.path,
-      filename: row.filename,
-      fileCreatedAt: parseFacetDate(row.date_taken),
-      embedding: new Float32Array(
-        row.clip_embedding.buffer,
-        row.clip_embedding.byteOffset,
-        row.clip_embedding.byteLength / 4
-      ),
-      rating: row.star_rating,
-      isFavorite: row.is_favorite === 1,
-      duplicateId: row.burst_group_id,
-    }));
+    return rows.map((row) => {
+      let date = parseFacetDate(row.date_taken);
+      // Fallback: try parsing timestamp from filename (e.g. Snapchat-{unix}.jpg)
+      if (date.getTime() === 0) {
+        date = tryParseFilenameDate(row.filename) ?? date;
+      }
+
+      return {
+        id: row.path,
+        path: row.path,
+        filename: row.filename,
+        fileCreatedAt: date,
+        // Safe copy into aligned ArrayBuffer (Buffer offset may not be 4-byte aligned)
+        embedding: copyToFloat32Array(row.clip_embedding),
+        rating: row.star_rating,
+        isFavorite: row.is_favorite === 1,
+        duplicateId: row.burst_group_id,
+      };
+    });
   }
 
   getAssetCount(): number {
@@ -57,6 +63,13 @@ export class FacetAdapter {
   close() {
     this.db.close();
   }
+}
+
+/** Copy Buffer bytes into a properly aligned Float32Array. */
+function copyToFloat32Array(buf: Buffer): Float32Array {
+  const aligned = new ArrayBuffer(buf.byteLength);
+  new Uint8Array(aligned).set(new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength));
+  return new Float32Array(aligned);
 }
 
 function parseFacetDate(dateStr: string | null): Date {

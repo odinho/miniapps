@@ -6,9 +6,9 @@
  * 2. Within each bucket, find top-K neighbors per asset using cosine distance
  * 3. Add edges: strong (distance ≤ threshold) or near-burst (distance ≤ burst threshold + time proximity)
  * 4. Find connected components via Union-Find
- * 5. Split mega-groups by temporal gaps
+ * 5. Split groups by temporal gaps (all groups, not just oversized ones)
  */
-import { Asset, ClusterConfig, DEFAULT_CLUSTER_CONFIG, PhotoGroup, GroupAsset } from "../shared/types.js";
+import { Asset, ClusterConfig, DEFAULT_CLUSTER_CONFIG, PhotoGroup } from "../shared/types.js";
 import { cosineDistance, topKNeighbors } from "./cosine.js";
 import { UnionFind } from "./union-find.js";
 
@@ -22,11 +22,23 @@ export interface ClusterStats {
   edgesCreated: number;
 }
 
+/** Binary search: find first index where sorted[i].time >= target */
+function lowerBound(times: number[], target: number): number {
+  let lo = 0;
+  let hi = times.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (times[mid] < target) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
 export function clusterAssets(
   assets: Asset[],
-  config: ClusterConfig = DEFAULT_CLUSTER_CONFIG
+  config: ClusterConfig = DEFAULT_CLUSTER_CONFIG,
+  log: (msg: string) => void = console.log
 ): { groups: PhotoGroup[]; stats: ClusterStats } {
-  // Sort by time
   const sorted = [...assets].sort(
     (a, b) => a.fileCreatedAt.getTime() - b.fileCreatedAt.getTime()
   );
@@ -35,7 +47,6 @@ export function clusterAssets(
   const uf = new UnionFind(n);
   let edgesCreated = 0;
 
-  // Create time buckets with stride
   const bucketMs = config.bucketMinutes * 60_000;
   const strideMs = config.bucketStride * 60_000;
 
@@ -43,111 +54,107 @@ export function clusterAssets(
     return { groups: [], stats: emptyStats() };
   }
 
-  const startTime = sorted[0].fileCreatedAt.getTime();
-  const endTime = sorted[n - 1].fileCreatedAt.getTime();
+  // Separate dated from undated
+  const EPOCH_THRESHOLD = 86_400_000;
+  const times = sorted.map((a) => a.fileCreatedAt.getTime());
 
-  // Separate assets with valid dates from those without
-  const EPOCH_THRESHOLD = 86_400_000; // 1 day after epoch = "no date"
-  const dated = sorted.filter((a) => a.fileCreatedAt.getTime() > EPOCH_THRESHOLD);
-  const undated = sorted.filter((a) => a.fileCreatedAt.getTime() <= EPOCH_THRESHOLD);
+  // Find the boundary between undated and dated using binary search
+  const datedStartIdx = lowerBound(times, EPOCH_THRESHOLD + 1);
+  const undatedCount = datedStartIdx;
+  const datedCount = n - datedStartIdx;
 
-  console.log(`Clustering ${dated.length} dated + ${undated.length} undated assets`);
-  if (dated.length > 0) {
-    console.log(`Date range: ${dated[0].fileCreatedAt.toISOString()} to ${dated[dated.length - 1].fileCreatedAt.toISOString()}`);
+  log(`Clustering ${datedCount} dated + ${undatedCount} undated assets`);
+  if (datedCount > 0) {
+    log(`Date range: ${sorted[datedStartIdx].fileCreatedAt.toISOString()} to ${sorted[n - 1].fileCreatedAt.toISOString()}`);
   }
 
-  // Build index map: asset -> position in sorted array
-  const assetIndex = new Map<string, number>();
-  sorted.forEach((a, i) => assetIndex.set(a.id, i));
+  // Process dated assets with time buckets (using binary search for bucket membership)
+  if (datedCount >= 2) {
+    const datedStart = times[datedStartIdx];
+    const datedEnd = times[n - 1];
 
-  // Process dated assets with time buckets
-  const datedStart = dated.length > 0 ? dated[0].fileCreatedAt.getTime() : 0;
-  const datedEnd = dated.length > 0 ? dated[dated.length - 1].fileCreatedAt.getTime() : 0;
+    let bucketCount = 0;
+    for (let bucketStart = datedStart; bucketStart <= datedEnd; bucketStart += strideMs) {
+      const bucketEnd = bucketStart + bucketMs;
 
-  let bucketCount = 0;
-  for (let bucketStart = datedStart; bucketStart <= datedEnd; bucketStart += strideMs) {
-    const bucketEnd = bucketStart + bucketMs;
+      // Binary search for bucket boundaries
+      const lo = lowerBound(times, bucketStart);
+      const hi = lowerBound(times, bucketEnd);
 
-    // Find assets in this bucket (binary search would be faster but this is fine for 100k)
-    const bucketIndices: number[] = [];
-    for (let i = 0; i < n; i++) {
-      const t = sorted[i].fileCreatedAt.getTime();
-      if (t >= bucketStart && t < bucketEnd) {
-        bucketIndices.push(i);
+      if (hi - lo < 2) continue;
+      bucketCount++;
+
+      const bucketIndices: number[] = [];
+      for (let i = lo; i < hi; i++) bucketIndices.push(i);
+
+      const bucketEmbeddings = bucketIndices.map((i) => sorted[i].embedding);
+
+      for (let localIdx = 0; localIdx < bucketIndices.length; localIdx++) {
+        const globalIdx = bucketIndices[localIdx];
+        const asset = sorted[globalIdx];
+
+        const neighbors = topKNeighbors(
+          asset.embedding,
+          bucketEmbeddings,
+          config.topK,
+          localIdx
+        );
+
+        for (const neighbor of neighbors) {
+          const neighborGlobalIdx = bucketIndices[neighbor.index];
+          const neighborAsset = sorted[neighborGlobalIdx];
+          const timeDeltaMin =
+            Math.abs(asset.fileCreatedAt.getTime() - neighborAsset.fileCreatedAt.getTime()) / 60_000;
+
+          let shouldLink = false;
+
+          if (neighbor.distance <= config.strongEdgeDistance) {
+            shouldLink = true;
+          } else if (
+            neighbor.distance <= config.burstEdgeDistance &&
+            timeDeltaMin <= config.burstTimeMinutes
+          ) {
+            shouldLink = true;
+          }
+
+          if (shouldLink) {
+            uf.union(globalIdx, neighborGlobalIdx);
+            edgesCreated++;
+          }
+        }
       }
     }
 
-    if (bucketIndices.length < 2) continue;
-    bucketCount++;
-
-    // Gather embeddings for this bucket
-    const bucketEmbeddings = bucketIndices.map((i) => sorted[i].embedding);
-
-    // For each asset in the bucket, find top-K neighbors
-    for (let localIdx = 0; localIdx < bucketIndices.length; localIdx++) {
-      const globalIdx = bucketIndices[localIdx];
-      const asset = sorted[globalIdx];
-
-      const neighbors = topKNeighbors(
-        asset.embedding,
-        bucketEmbeddings,
-        config.topK,
-        localIdx
-      );
-
-      for (const neighbor of neighbors) {
-        const neighborGlobalIdx = bucketIndices[neighbor.index];
-        const neighborAsset = sorted[neighborGlobalIdx];
-        const timeDeltaMin =
-          Math.abs(asset.fileCreatedAt.getTime() - neighborAsset.fileCreatedAt.getTime()) / 60_000;
-
-        let shouldLink = false;
-
-        // Strong edge: similar enough regardless of time (within the bucket)
-        if (neighbor.distance <= config.strongEdgeDistance) {
-          shouldLink = true;
-        }
-        // Near-burst edge: somewhat similar + very close in time
-        else if (
-          neighbor.distance <= config.burstEdgeDistance &&
-          timeDeltaMin <= config.burstTimeMinutes
-        ) {
-          shouldLink = true;
-        }
-
-        if (shouldLink) {
-          uf.union(globalIdx, neighborGlobalIdx);
-          edgesCreated++;
-        }
-      }
-    }
+    log(`Processed ${bucketCount} time buckets`);
   }
 
-  // Process undated assets: only use strong similarity edges (no time signal)
-  if (undated.length >= 2) {
-    const undatedIndices = undated.map((a) => assetIndex.get(a.id)!);
-    const undatedEmbeddings = undated.map((a) => a.embedding);
-
-    // Use a tighter threshold for undated since we have no time signal
+  // Process undated assets: tighter threshold, no time signal
+  if (undatedCount >= 2) {
+    if (undatedCount > 5000) {
+      log(`WARNING: ${undatedCount} undated assets — O(n²) may be slow. Consider fixing dates.`);
+    }
     const UNDATED_THRESHOLD = config.strongEdgeDistance * 0.75;
 
-    for (let localIdx = 0; localIdx < undated.length; localIdx++) {
-      const globalIdx = undatedIndices[localIdx];
-      const neighbors = topKNeighbors(undated[localIdx].embedding, undatedEmbeddings, config.topK, localIdx);
+    const undatedEmbeddings: Float32Array[] = [];
+    for (let i = 0; i < undatedCount; i++) {
+      undatedEmbeddings.push(sorted[i].embedding);
+    }
 
+    for (let localIdx = 0; localIdx < undatedCount; localIdx++) {
+      const neighbors = topKNeighbors(undatedEmbeddings[localIdx], undatedEmbeddings, config.topK, localIdx);
       for (const neighbor of neighbors) {
         if (neighbor.distance <= UNDATED_THRESHOLD) {
-          uf.union(globalIdx, undatedIndices[neighbor.index]);
+          uf.union(localIdx, neighbor.index);
           edgesCreated++;
         }
       }
     }
-    console.log(`Processed ${undated.length} undated assets with tighter threshold (${UNDATED_THRESHOLD.toFixed(3)})`);
+    log(`Processed ${undatedCount} undated assets (threshold ${UNDATED_THRESHOLD.toFixed(3)})`);
   }
 
-  console.log(`Processed ${bucketCount} time buckets, created ${edgesCreated} edges`);
+  log(`Created ${edgesCreated} edges`);
 
-  // Extract connected components
+  // Extract connected components and split by temporal gaps
   const components = uf.getComponents();
   let groups: PhotoGroup[] = [];
   let singletons = 0;
@@ -160,8 +167,8 @@ export function clusterAssets(
 
     const groupAssets = memberIndices.map((i) => sorted[i]);
 
-    // Split mega-groups by temporal gaps
-    const subGroups = splitMegaGroup(groupAssets, config);
+    // Always split by temporal gaps (not just mega-groups)
+    const subGroups = splitByTemporalGaps(groupAssets, config);
 
     for (const subGroup of subGroups) {
       if (subGroup.length < config.minGroupSize) {
@@ -169,10 +176,8 @@ export function clusterAssets(
         continue;
       }
 
-      const times = subGroup.map((a) => a.fileCreatedAt.getTime());
-      const timeSpanMin = (Math.max(...times) - Math.min(...times)) / 60_000;
-
-      // Compute average pairwise distance (sample if large)
+      const subTimes = subGroup.map((a) => a.fileCreatedAt.getTime());
+      const timeSpanMin = (Math.max(...subTimes) - Math.min(...subTimes)) / 60_000;
       const avgDist = sampleAvgDistance(subGroup);
 
       groups.push({
@@ -192,10 +197,7 @@ export function clusterAssets(
     }
   }
 
-  // Sort groups by size descending for review priority
   groups.sort((a, b) => b.assets.length - a.assets.length);
-
-  // Re-index
   groups = groups.map((g, i) => ({ ...g, id: `group-${i}` }));
 
   const stats: ClusterStats = {
@@ -214,15 +216,15 @@ export function clusterAssets(
   return { groups, stats };
 }
 
-/** Split a group if there are temporal gaps > 12 minutes */
-function splitMegaGroup(assets: Asset[], config: ClusterConfig): Asset[][] {
-  if (assets.length <= config.maxGroupSize) return [assets];
+/** Split any group by temporal gaps > 12 minutes, then cap oversized subgroups. */
+function splitByTemporalGaps(assets: Asset[], config: ClusterConfig): Asset[][] {
+  if (assets.length < 2) return [assets];
 
   const sorted = [...assets].sort(
     (a, b) => a.fileCreatedAt.getTime() - b.fileCreatedAt.getTime()
   );
 
-  const GAP_THRESHOLD_MS = 12 * 60_000; // 12 minutes
+  const GAP_THRESHOLD_MS = 12 * 60_000;
   const subGroups: Asset[][] = [];
   let current: Asset[] = [sorted[0]];
 
@@ -236,13 +238,12 @@ function splitMegaGroup(assets: Asset[], config: ClusterConfig): Asset[][] {
   }
   subGroups.push(current);
 
-  // If still too large, split further by re-clustering with tighter threshold
+  // Cap oversized subgroups by splitting in half
   const result: Asset[][] = [];
   for (const sg of subGroups) {
     if (sg.length <= config.maxGroupSize) {
       result.push(sg);
     } else {
-      // Just split in half by time as a fallback
       const mid = Math.floor(sg.length / 2);
       result.push(sg.slice(0, mid));
       result.push(sg.slice(mid));
@@ -252,7 +253,6 @@ function splitMegaGroup(assets: Asset[], config: ClusterConfig): Asset[][] {
   return result;
 }
 
-/** Sample average pairwise cosine distance (cap at 50 pairs for large groups) */
 function sampleAvgDistance(assets: Asset[]): number {
   if (assets.length < 2) return 0;
   const maxPairs = 50;
@@ -260,7 +260,6 @@ function sampleAvgDistance(assets: Asset[]): number {
   let count = 0;
 
   if (assets.length <= 10) {
-    // All pairs
     for (let i = 0; i < assets.length; i++) {
       for (let j = i + 1; j < assets.length; j++) {
         totalDist += cosineDistance(assets[i].embedding, assets[j].embedding);
@@ -268,7 +267,6 @@ function sampleAvgDistance(assets: Asset[]): number {
       }
     }
   } else {
-    // Random sampling
     for (let k = 0; k < maxPairs; k++) {
       const i = Math.floor(Math.random() * assets.length);
       let j = Math.floor(Math.random() * assets.length);
@@ -282,13 +280,5 @@ function sampleAvgDistance(assets: Asset[]): number {
 }
 
 function emptyStats(): ClusterStats {
-  return {
-    totalAssets: 0,
-    assetsWithEmbeddings: 0,
-    totalGroups: 0,
-    singletons: 0,
-    largestGroup: 0,
-    avgGroupSize: 0,
-    edgesCreated: 0,
-  };
+  return { totalAssets: 0, assetsWithEmbeddings: 0, totalGroups: 0, singletons: 0, largestGroup: 0, avgGroupSize: 0, edgesCreated: 0 };
 }

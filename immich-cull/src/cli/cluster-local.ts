@@ -16,7 +16,7 @@ function getArg(flag: string, defaultVal: string): string {
   return idx >= 0 && idx + 1 < args.length ? args[idx + 1] : defaultVal;
 }
 
-const dbPath = getArg("--db", resolve(import.meta.dirname!, "../../..", "facet/photo_scores_pro.db"));
+const dbPath = getArg("--db", resolve(import.meta.dirname ?? ".", "../../..", "facet/photo_scores_pro.db"));
 const strongDist = parseFloat(getArg("--strong", String(DEFAULT_CLUSTER_CONFIG.strongEdgeDistance)));
 const burstDist = parseFloat(getArg("--burst", String(DEFAULT_CLUSTER_CONFIG.burstEdgeDistance)));
 const bucketMin = parseInt(getArg("--bucket", String(DEFAULT_CLUSTER_CONFIG.bucketMinutes)));
