@@ -2,11 +2,16 @@
 
 ## Must fix
 
-### B30: Napper import creates "open night" spanning months → UI picks wrong event to end
-**Symptom:** After Napper import on 2026-04-05, sleep_log `id=245` (domain_id `slp_import_613`) started 2026-03-22T17:38Z with no `end_time` → 347 hours(!). UI's "end sleep" dropdown picked this bogus event instead of the real current night, making it seem like a 320-hr nap should be ended.
-**Root cause:** Napper import creates `sleep.manual` entries with only `start_time` and no `end_time` for "open" sleeps, but doesn't validate that an open night shouldn't span weeks/months.
+### B30: Napper import creates overlapping/open sleeps — doesn't respect existing data
+**Symptom:** After Napper import on 2026-04-05, sleep_log `id=245` (domain_id `slp_import_613`) started 2026-03-22T17:38Z with no `end_time` → 347 hours(!). UI's "end sleep" dropdown picked this bogus event instead of the real current night.
+**Root cause (deeper):** The Napper import doesn't check for existing babysovelogg data in the same time range. The open night from 2026-03-22 likely already had data logged directly in babysovelogg — the import should have detected the overlap and skipped/deferred to the existing native data. Native data should ALWAYS be preferred over imported data.
 **Fix (manual):** Marked `sleep_log` entry as `deleted = 1` in DB.
-**Permanent fix needed:** Napper import should either (a) not create open sleeps without explicit intent, or (b) cap open sleeps to a reasonable max (e.g. 24h) and flag anomalies.
+**Permanent fix needed (red-green TDD approach):**
+1. Create a comprehensive import test suite with a table-driven or helper-based approach
+2. Test many corner cases: overlapping data, open nights, cross-midnight sleeps, partial overlaps, merge conflicts
+3. Import must detect existing native data and prefer it over imported entries
+4. Cap open sleeps to reasonable max (e.g. 24h) and flag anomalies
+5. Test the full interaction between import and app state (not just import in isolation)
 
 ### B31: End sleep lacks date picker for cross-midnight sessions
 **Symptom:** When trying to end last night's sleep (started Apr 5, ended Apr 6), the UI only allows entering the time (HH:MM), not the date. This makes it impossible to correctly end a sleep that crosses midnight — the default date logic may use the wrong day.
