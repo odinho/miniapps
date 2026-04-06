@@ -270,15 +270,14 @@
   </div>
 
   <footer class="bar">
+    <button class="bk" on:click={() => mark('keep')}>Keep</button>
+    <button class="bc" on:click={() => mark('cull')}>Cull</button>
+    <button class="bb" on:click={keepBestCullRest}>Best + Cull Rest</button>
     {#if mode === 'groups'}
-      <button class="bk" on:click={() => mark('keep')}>Keep</button>
-      <button class="bc" on:click={() => mark('cull')}>Cull</button>
-      <button class="bb" on:click={keepBestCullRest}>Best + Cull Rest</button>
       <button class="ba" on:click={approve}>Approve & Next</button>
       <button class="bs" on:click={skip}>Skip</button>
     {:else}
       {#if batchDetail && !batchDetail.llm}<button class="run-btn" on:click={runLlm}>Run LLM</button>{/if}
-      {#if batchDetail?.llm}<span class="bmeta" style="flex:1">{batchDetail.llm.batchSummary}</span>{/if}
     {/if}
     <span class="spacer"></span>
     <span class="bmeta">{currentAssets.length} photos</span>
