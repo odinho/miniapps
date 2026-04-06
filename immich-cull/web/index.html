@@ -282,8 +282,8 @@ function renderPreview(){
   const gaps = (g.assets.length - 1) * 3 + 6;
   // Height where all thumbs fit side-by-side in available width
   const fitH = (ovW - gaps) / totalAspect;
-  // Use up to 30% of overlay height for filmstrip, but no less than 50px
-  const stripH = Math.min(ovH * 0.3, Math.max(50, fitH));
+  // Use up to 12% of overlay height for filmstrip, but no less than 50px
+  const stripH = Math.min(ovH * 0.12, Math.max(50, fitH));
 
   ov.innerHTML=`<div class="preview-ov">
     <div class="pv-strip" style="height:${stripH + 6}px">
@@ -297,7 +297,12 @@ function renderPreview(){
       }).join('')}
     </div>
     <div class="pv-main">
-      <img src="/api/full?id=${encodeURIComponent(a.id)}">
+      <img src="/api/preview?id=${encodeURIComponent(a.id)}" id="pvImg"
+           onload="this._loaded=true"
+           style="position:absolute;max-width:100%;max-height:100%;object-fit:contain">
+      <img src="/api/full?id=${encodeURIComponent(a.id)}"
+           onload="document.getElementById('pvImg').style.display='none';this.style.opacity=1"
+           style="max-width:100%;max-height:100%;object-fit:contain;opacity:0;transition:opacity .15s">
       ${s?`<div class="ptag ${s}">${s.toUpperCase()}</div>`:''}
       <div class="pinfo"><strong>${a.filename}</strong> &middot; ${fmt(a.bytes||0)} &middot; ${new Date(a.date).toLocaleString('no')}${a.rating>0?' &middot; '+'★'.repeat(a.rating):''}${a.isFavorite?' &middot; ♥':''}</div>
     </div>
