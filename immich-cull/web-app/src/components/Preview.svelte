@@ -67,18 +67,26 @@
     }
   }
 
+  let animatingOut = false;
+
   function onTouchEnd(e: TouchEvent) {
     if (dragging && Math.abs(dragX) > 80) {
       swiping = true;
-      swipeResult = dragX > 0 ? 'keep' : 'cull';
-      // Animate out then apply
-      dragX = dragX > 0 ? 400 : -400;
+      const result: 'keep' | 'cull' = dragX > 0 ? 'keep' : 'cull';
+      // Fly off screen
+      animatingOut = true;
+      dragX = dragX > 0 ? window.innerWidth : -window.innerWidth;
       setTimeout(() => {
-        if (swipeResult) onMark(swipeResult);
+        // Apply the action
+        onMark(result);
+        // Reset instantly (no transition) so next image appears clean
+        animatingOut = false;
         dragX = 0;
         dragging = false;
         swipeResult = null;
-      }, 200);
+        // Force a tick so the reset happens without transition
+        requestAnimationFrame(() => { dragX = 0; });
+      }, 250);
     } else {
       dragX = 0;
       dragging = false;
@@ -126,7 +134,7 @@
     on:touchend={onTouchEnd}
   >
     {#if asset}
-      <div class="pv-drag-wrapper" style="transform:translateX({dragX}px) rotate({dragX * 0.03}deg);{dragging ? '' : 'transition:transform .2s ease'}">
+      <div class="pv-drag-wrapper" style="transform:translateX({dragX}px) rotate({dragX * 0.03}deg);{animatingOut ? 'transition:transform .25s ease-in' : dragging ? '' : dragX === 0 ? '' : 'transition:transform .15s ease-out'}">
         <img
           bind:this={imgEl}
           data-asset-id={asset.id}
