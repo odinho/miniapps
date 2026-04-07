@@ -517,6 +517,8 @@
     :global(.pv-strip) { height: 60px; }
     :global(.pvt) { height: 50px; }
     :global(.lbl) { display: none; }
-    :global(.bdg) { font-size: 8px; padding: 0 4px; }
+    :global(.bdg) { display: none; }
+    :global(.llm-note) { display: none; }
+    :global(.llm-star) { display: none; }
   }
 </style>
