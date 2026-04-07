@@ -110,8 +110,7 @@
   <div class="pv-strip" bind:this={stripEl}>
     {#each assets as a, i}
       {@const ms = states[a.id]}
-      {@const ls = keepSet.has(a.id) ? 'keep' : cullSet.has(a.id) ? 'cull' : null}
-      {@const ds = ms ?? ls}
+      {@const ds = ms || (keepSet.has(a.id) ? 'keep' : cullSet.has(a.id) ? 'cull' : null)}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div
         class="pvt"

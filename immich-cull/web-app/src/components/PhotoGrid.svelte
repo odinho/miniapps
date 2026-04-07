@@ -36,8 +36,9 @@
     {@const r = rects[i] || { x: 0, y: 0, w: 100, h: 100 }}
     {@const llm = llmMap[asset.id]}
     {@const sg = llm?.similaritySubgroupId}
-    {@const isKeep = states[asset.id] === 'keep' || keepSet.has(asset.id)}
-    {@const isCull = states[asset.id] === 'cull' || cullSet.has(asset.id)}
+    {@const manualState = states[asset.id]}
+    {@const isKeep = manualState === 'keep' || (!manualState && keepSet.has(asset.id))}
+    {@const isCull = manualState === 'cull' || (!manualState && cullSet.has(asset.id))}
     {@const isSel = i === selectedIdx}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
