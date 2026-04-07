@@ -22,6 +22,8 @@ export interface SessionBatchConfig {
   gapHours: number;
   /** Max photos per batch before sub-splitting */
   maxBatchSize: number;
+  /** Min photos per batch — smaller ones get merged into neighbors */
+  minBatchSize: number;
   /** Regex to detect DSLR folder patterns in paths */
   folderPattern: RegExp;
 }
@@ -29,6 +31,7 @@ export interface SessionBatchConfig {
 export const DEFAULT_SESSION_CONFIG: SessionBatchConfig = {
   gapHours: 4,
   maxBatchSize: 30,
+  minBatchSize: 3,
   folderPattern: /\/(\d{8}-[^/]+)\//,
 };
 
@@ -114,6 +117,51 @@ export function batchBySession(
             end: sub[sub.length - 1].fileCreatedAt,
           },
         });
+      }
+    }
+  }
+
+  // Merge small batches into their nearest neighbor
+  if (config.minBatchSize > 1) {
+    // Sort by date first so neighbors are temporally adjacent
+    batches.sort((a, b) => a.dateRange.start.getTime() - b.dateRange.start.getTime());
+
+    let merged = true;
+    while (merged) {
+      merged = false;
+      for (let i = 0; i < batches.length; i++) {
+        if (batches[i].assets.length >= config.minBatchSize) continue;
+        // Don't merge DSLR folder batches (they have intentional boundaries)
+        if (batches[i].source === "folder") continue;
+
+        // Find the closest neighbor that won't exceed maxBatchSize
+        let bestIdx = -1;
+        let bestGap = Infinity;
+        for (const j of [i - 1, i + 1]) {
+          if (j < 0 || j >= batches.length) continue;
+          if (batches[j].source === "folder") continue; // don't merge into folders
+          if (batches[i].assets.length + batches[j].assets.length > config.maxBatchSize) continue;
+          const gap = Math.abs(
+            batches[i].dateRange.start.getTime() - batches[j].dateRange.end.getTime()
+          );
+          if (gap < bestGap) { bestGap = gap; bestIdx = j; }
+        }
+
+        if (bestIdx >= 0) {
+          // Merge i into bestIdx
+          const target = batches[bestIdx];
+          const source = batches[i];
+          target.assets = [...target.assets, ...source.assets].sort(
+            (a, b) => a.fileCreatedAt.getTime() - b.fileCreatedAt.getTime()
+          );
+          target.dateRange = {
+            start: target.assets[0].fileCreatedAt,
+            end: target.assets[target.assets.length - 1].fileCreatedAt,
+          };
+          batches.splice(i, 1);
+          merged = true;
+          break; // restart scan
+        }
       }
     }
   }
