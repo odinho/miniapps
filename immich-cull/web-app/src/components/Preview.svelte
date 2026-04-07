@@ -18,7 +18,9 @@
   $: asset = assets[selectedIdx];
   $: manualState = asset ? states[asset.id] : null;
   $: llmState = asset ? (keepSet.has(asset.id) ? 'keep' : cullSet.has(asset.id) ? 'cull' : null) : null;
-  $: displayState = manualState ?? llmState;
+  // Show manual state if set, otherwise show LLM state.
+  // manualState is the authoritative source (already pre-populated from LLM on batch select).
+  $: displayState = manualState;
   $: llm = asset ? llmMap[asset.id] : null;
 
   let imgEl: HTMLImageElement;

@@ -530,9 +530,13 @@
     onCycleState={() => {
       if (!selectedAsset) return;
       const cur = states[selectedAsset.id];
-      if (!cur || cur === null) mark('keep');
-      else if (cur === 'keep') mark('cull');
-      else { states[selectedAsset.id] = null; states = states; savePhotoDecisions([{ assetId: selectedAsset.id, state: null, userStars: userStars[selectedAsset.id] ?? null }]); }
+      let next: AssetState;
+      if (!cur) next = 'keep';
+      else if (cur === 'keep') next = 'cull';
+      else next = null;
+      states[selectedAsset.id] = next;
+      states = states;
+      savePhotoDecisions([{ assetId: selectedAsset.id, state: next, userStars: userStars[selectedAsset.id] ?? null }]);
     }} />
 {/if}
 
