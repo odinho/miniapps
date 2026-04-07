@@ -501,9 +501,14 @@
           <button class="kl-btn" on:click={() => applyKeepLevel(keepLevel - 1)}>−</button>
           <span class="kl-label" title="Keep {sgStats.totalKept}, cull {sgStats.totalCulled}">
             {sgStats.totalKept}✓ {sgStats.totalCulled}✗
-            {#if keepLevel === 0}<span class="kl-default">default</span>
-            {:else if sgStats.isAggressive}<span class="kl-aggressive">+singles</span>
-            {/if}
+            <span class="kl-mode" class:kl-aggressive={sgStats.isAggressive}>
+              {#if keepLevel > 1}keep more
+              {:else if keepLevel === 1}generous
+              {:else if keepLevel === 0}default
+              {:else if !sgStats.isAggressive}trim
+              {:else}cull more
+              {/if}
+            </span>
           </span>
           <button class="kl-btn" on:click={() => applyKeepLevel(keepLevel + 1)}>+</button>
         </div>
@@ -602,8 +607,8 @@
   .kl-btn { background: #333; border: none; color: #ddd; width: 26px; height: 26px; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
   .kl-btn:hover { background: #444; }
   .kl-label { font-size: 12px; color: #ddd; padding: 0 6px; min-width: 50px; text-align: center; white-space: nowrap; font-weight: 600; }
-  .kl-default { font-size: 9px; color: #7a8294; font-weight: 400; display: block; margin-top: -2px; text-decoration: underline; }
-  .kl-aggressive { font-size: 9px; color: #e53935; font-weight: 400; display: block; margin-top: -2px; }
+  .kl-mode { font-size: 9px; color: #7a8294; font-weight: 400; display: block; margin-top: -2px; }
+  .kl-mode.kl-aggressive { color: #e53935; }
 
   :global(.jgrid) { position: relative; width: 100%; height: 100%; overflow: hidden; }
   :global(.cell) { position: absolute; overflow: hidden; cursor: pointer; border: 3px solid transparent; transition: border-color .12s, opacity .12s; }
