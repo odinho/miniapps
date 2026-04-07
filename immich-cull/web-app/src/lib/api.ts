@@ -26,6 +26,7 @@ export interface AssetDetail extends AssetSummary {
 export interface BatchSummary {
   id: string; source: string; folderName: string | null; count: number;
   dateRange: { start: string; end: string }; hasLlmResult: boolean;
+  viewStatus: string | null;
 }
 
 export interface BatchDetail {

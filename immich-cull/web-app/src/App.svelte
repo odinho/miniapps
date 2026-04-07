@@ -30,7 +30,7 @@
   let states: Record<string, AssetState> = {};
   let userStars: Record<string, number> = {};
   let stats: Stats | null = null;
-  let undoStack: Array<{ groupIdx: number; prevStates: Record<string, AssetState>; prevSi: number }> = [];
+  let undoStack: Array<{ mode: AppMode; idx: number; prevStates: Record<string, AssetState>; prevSi: number }> = [];
 
   $: currentAssets = mode === 'groups' ? (groupDetail?.assets ?? []) : (batchDetail?.assets ?? []);
   $: llmMap = buildLlmMap(batchDetail);
@@ -69,7 +69,7 @@
         date: new Date(g.earliestDate),
       }))
     : batches.map((b, i) => ({
-        idx: i, active: i === batchIdx, decided: (b as any).viewStatus === 'reviewed' || (b as any).viewStatus === 'skipped',
+        idx: i, active: i === batchIdx, decided: b.viewStatus === 'reviewed' || b.viewStatus === 'skipped',
         label: `${b.count} photos${b.hasLlmResult ? ' ✓' : ''}`,
         sub: `${b.source} ${b.folderName || ''}`,
         date: new Date(b.dateRange.start),
@@ -187,9 +187,8 @@
     const prevStates: Record<string, AssetState> = {};
     for (const a of assets) prevStates[a.id] = states[a.id];
 
-    if (mode === 'groups') {
-      undoStack = [...undoStack, { groupIdx, prevStates, prevSi: selectedIdx }];
-    }
+    const undoIdx = mode === 'groups' ? groupIdx : batchIdx;
+    undoStack = [...undoStack, { mode, idx: undoIdx, prevStates, prevSi: selectedIdx }];
 
     // Default unmarked photos to 'keep'
     for (const a of assets) if (!states[a.id]) states[a.id] = 'keep';
@@ -209,12 +208,11 @@
       stats = await fetchStats();
       nextUndecided();
     } else if (mode === 'batches' && batches[batchIdx]) {
-      // Mark batch as reviewed via view_status
       await fetch(`/api/view-status/${batches[batchIdx].id}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ viewType: 'batch', status: 'reviewed' }),
       });
-      batches[batchIdx] = { ...batches[batchIdx], hasLlmResult: true };
+      (batches[batchIdx] as any).viewStatus = 'reviewed';
       batches = batches;
       nextUndecidedBatch();
     }
@@ -224,7 +222,7 @@
     if (mode === 'groups' && groupDetail) {
       const prevStates: Record<string, AssetState> = {};
       for (const a of groupDetail.assets) prevStates[a.id] = states[a.id];
-      undoStack = [...undoStack, { groupIdx, prevStates, prevSi: selectedIdx }];
+      undoStack = [...undoStack, { mode: 'groups', idx: groupIdx, prevStates, prevSi: selectedIdx }];
       await decideGroup(groupDetail.id, [], [], true);
       groups[groupIdx].decided = true; groups = groups;
       stats = await fetchStats();
@@ -245,14 +243,28 @@
     // Restore local states
     for (const [id, s] of Object.entries(u.prevStates)) states[id] = s;
     states = states;
-    // Restore on server: save previous photo decisions + clear view status
+    // Restore on server
     const decisions = Object.entries(u.prevStates).map(([id, s]) => ({
       assetId: id, state: s, userStars: userStars[id] ?? null
     }));
     await savePhotoDecisions(decisions);
-    await undecideGroup(`group-${u.groupIdx}`);
-    groups[u.groupIdx].decided = false; groups = groups;
-    await selectGroup(u.groupIdx);
+
+    if (u.mode === 'groups') {
+      await undecideGroup(`group-${u.idx}`);
+      groups[u.idx].decided = false; groups = groups;
+      if (mode !== 'groups') switchMode('groups');
+      await selectGroup(u.idx);
+    } else {
+      // Clear batch view status
+      await fetch(`/api/view-status/${batches[u.idx]?.id}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ viewType: 'batch', status: null }),
+      });
+      if (batches[u.idx]) (batches[u.idx] as any).viewStatus = null;
+      batches = batches;
+      if (mode !== 'batches') switchMode('batches');
+      await selectBatch(u.idx);
+    }
     selectedIdx = u.prevSi;
     stats = await fetchStats();
   }

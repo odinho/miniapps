@@ -52,9 +52,9 @@
     >
       <img src={previewUrl(asset.id)} loading="lazy" alt={asset.filename} />
 
-      {#if llm}
+      {#if llm && llm.suggestedStars > 0}
         <div class="llm-star">
-          {'★'.repeat(llm.suggestedStars)}{'☆'.repeat(3 - llm.suggestedStars)}
+          {'★'.repeat(llm.suggestedStars)}
         </div>
         {#if llm.briefNote}
           <div class="llm-note">{llm.briefNote}</div>
