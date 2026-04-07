@@ -108,6 +108,9 @@
     groupIdx = idx; selectedIdx = 0; showPreview = false;
     groupDetail = await fetchGroup(`group-${idx}`);
     await loadPhotoStates(groupDetail?.assets ?? []);
+    // Check if this group has been reviewed (from viewStatus)
+    groups[idx].decided = (groupDetail as any)?.viewStatus != null;
+    groups = groups;
     history.replaceState(null, '', `#group/${idx}`);
   }
 

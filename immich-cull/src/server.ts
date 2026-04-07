@@ -149,7 +149,7 @@ app.get("/api/groups", async () => {
     count: g.assets.length,
     timeSpanMinutes: g.timeSpanMinutes,
     avgDistance: g.avgDistance,
-    decided: stateDb.getDecision(g.id) !== null,
+    decided: stateDb.getViewStatus(g.id) !== null,
     earliestDate: Math.min(...g.assets.map((a) => a.asset.fileCreatedAt.getTime())),
     totalBytes: g.assets.reduce((s, a) => s + getFileSize(a.asset), 0),
     assets: g.assets.map((a) => ({
@@ -191,7 +191,7 @@ app.get<{ Params: { id: string } }>("/api/groups/:id", async (req) => {
     timeSpanMinutes: group.timeSpanMinutes,
     avgDistance: group.avgDistance,
     totalBytes: group.assets.reduce((s, a) => s + getFileSize(a.asset), 0),
-    decision: stateDb.getDecision(group.id),
+    viewStatus: stateDb.getViewStatus(group.id),
     assets: assetsWithDims,
   };
 });
@@ -215,51 +215,58 @@ function groupToJson(group: PhotoGroup) {
   };
 }
 
+/** Mark a group as reviewed/skipped */
 app.post<{
   Params: { id: string };
   Body: { keep: string[]; cull: string[]; skipped?: boolean };
 }>("/api/groups/:id/decide", async (req) => {
   const group = groups.find((g) => g.id === req.params.id);
   if (!group) return { error: "Not found" };
-  stateDb.saveDecision(
-    group.id,
-    req.body.keep,
-    req.body.cull,
-    req.body.skipped ?? false,
-    0 // selectedIndex — client can send this later if needed
-  );
-  const stats = stateDb.getStats();
-  return { ok: true, decided: stats.decided, total: groups.length };
+
+  if (req.body.skipped) {
+    stateDb.setViewStatus(group.id, 'group', 'skipped');
+  } else {
+    // Save per-photo decisions
+    const decisions: Array<{ assetId: string; state: string | null; userStars: number | null }> = [];
+    for (const id of req.body.keep) decisions.push({ assetId: id, state: 'keep', userStars: null });
+    for (const id of req.body.cull) decisions.push({ assetId: id, state: 'cull', userStars: null });
+    stateDb.savePhotoDecisions(decisions);
+    stateDb.setViewStatus(group.id, 'group', 'reviewed');
+  }
+
+  return { ok: true };
 });
 
-/** Undo a decision (remove it entirely) */
+/** Undo a group review */
 app.delete<{ Params: { id: string } }>("/api/groups/:id/decide", async (req) => {
-  stateDb.deleteDecision(req.params.id);
-  const stats = stateDb.getStats();
-  return { ok: true, decided: stats.decided };
+  stateDb.clearViewStatus(req.params.id);
+  return { ok: true };
 });
 
 app.get("/api/stats", async () => {
   const s = stateDb.getStats();
 
-  // Compute cull bytes from all decisions
+  // Compute cull bytes from photo_decisions
   let cullBytes = 0;
-  const allDecisions = stateDb.getAllDecisions();
-  for (const [, d] of allDecisions) {
-    if (d.skipped) continue;
-    for (const id of d.cull) {
-      const a = assetMap.get(id);
-      if (a) cullBytes += getFileSize(a);
-    }
+  const cullPhotos = stateDb.getPhotoDecisions(
+    [...assetMap.keys()].filter(id => {
+      const d = stateDb.getPhotoDecisions([id]);
+      return d[id]?.state === 'cull';
+    })
+  );
+  // This is slow for large libraries — optimize later if needed
+  for (const [id] of Object.entries(cullPhotos)) {
+    const a = assetMap.get(id);
+    if (a) cullBytes += getFileSize(a);
   }
 
   return {
     totalGroups: groups.length,
-    decided: s.decided,
-    skipped: s.skipped,
+    decided: s.groupsReviewed + s.groupsSkipped,
+    skipped: s.groupsSkipped,
     photosToKeep: s.photosKept,
     photosToCull: s.photosCulled,
-    remaining: groups.length - s.decided,
+    remaining: groups.length - s.groupsReviewed - s.groupsSkipped,
     cullBytes,
   };
 });
