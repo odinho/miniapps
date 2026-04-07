@@ -316,7 +316,14 @@ app.get("/api/batches", async () => {
       count: b.assets.length,
       dateRange: { start: b.dateRange.start.toISOString(), end: b.dateRange.end.toISOString() },
       hasLlmResult: cached !== null,
+      viewStatus: stateDb.getViewStatus(b.id),
     };
+  })
+  // Sort: LLM-processed first, then by date
+  .sort((a: any, b: any) => {
+    if (a.hasLlmResult && !b.hasLlmResult) return -1;
+    if (!a.hasLlmResult && b.hasLlmResult) return 1;
+    return 0; // preserve date order within each group
   });
 });
 
@@ -412,6 +419,15 @@ app.post<{ Params: { id: string } }>("/api/batches/:id/rank", async (req) => {
 
   return { cached: false, response, inputTokens, outputTokens };
 });
+
+// === View status ===
+
+app.post<{ Params: { id: string }; Body: { viewType: string; status: string } }>(
+  "/api/view-status/:id", async (req) => {
+    stateDb.setViewStatus(req.params.id, req.body.viewType, req.body.status);
+    return { ok: true };
+  }
+);
 
 // === Per-photo decisions (shared across all views) ===
 

@@ -69,7 +69,7 @@
         date: new Date(g.earliestDate),
       }))
     : batches.map((b, i) => ({
-        idx: i, active: i === batchIdx, decided: false,
+        idx: i, active: i === batchIdx, decided: (b as any).viewStatus === 'reviewed' || (b as any).viewStatus === 'skipped',
         label: `${b.count} photos${b.hasLlmResult ? ' ✓' : ''}`,
         sub: `${b.source} ${b.folderName || ''}`,
         date: new Date(b.dateRange.start),
@@ -119,6 +119,20 @@
     batchIdx = idx; selectedIdx = 0; showPreview = false;
     batchDetail = await fetchBatch(batches[idx].id);
     await loadPhotoStates(batchDetail?.assets ?? []);
+
+    // Pre-populate from LLM suggestions if no manual decision exists
+    if (batchDetail?.llm?.similaritySubgroups) {
+      for (const sg of batchDetail.llm.similaritySubgroups) {
+        for (const id of sg.recommendedKeepIds) {
+          if (!states[id]) states[id] = 'keep';
+        }
+        for (const id of sg.cullIds) {
+          if (!states[id]) states[id] = 'cull';
+        }
+      }
+      states = states;
+    }
+
     history.replaceState(null, '', `#batch/${batches[idx].id}`);
   }
 
@@ -166,26 +180,62 @@
   }
 
   async function approve() {
-    if (mode !== 'groups' || !groupDetail) return;
+    const assets = currentAssets;
+    if (!assets.length) return;
+
+    // Snapshot for undo
     const prevStates: Record<string, AssetState> = {};
-    for (const a of groupDetail.assets) prevStates[a.id] = states[a.id];
-    undoStack = [...undoStack, { groupIdx, prevStates, prevSi: selectedIdx }];
-    for (const a of groupDetail.assets) if (!states[a.id]) states[a.id] = 'keep';
+    for (const a of assets) prevStates[a.id] = states[a.id];
+
+    if (mode === 'groups') {
+      undoStack = [...undoStack, { groupIdx, prevStates, prevSi: selectedIdx }];
+    }
+
+    // Default unmarked photos to 'keep'
+    for (const a of assets) if (!states[a.id]) states[a.id] = 'keep';
     states = states;
-    await decideGroup(groupDetail.id, groupDetail.assets.filter(a => states[a.id] === 'keep').map(a => a.id), groupDetail.assets.filter(a => states[a.id] === 'cull').map(a => a.id));
-    groups[groupIdx].decided = true; groups = groups;
-    stats = await fetchStats();
-    nextUndecided();
+
+    // Save all photo decisions
+    const decisions = assets.map(a => ({
+      assetId: a.id, state: states[a.id], userStars: userStars[a.id] ?? null
+    }));
+    await savePhotoDecisions(decisions);
+
+    if (mode === 'groups' && groupDetail) {
+      await decideGroup(groupDetail.id,
+        assets.filter(a => states[a.id] === 'keep').map(a => a.id),
+        assets.filter(a => states[a.id] === 'cull').map(a => a.id));
+      groups[groupIdx].decided = true; groups = groups;
+      stats = await fetchStats();
+      nextUndecided();
+    } else if (mode === 'batches' && batches[batchIdx]) {
+      // Mark batch as reviewed via view_status
+      await fetch(`/api/view-status/${batches[batchIdx].id}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ viewType: 'batch', status: 'reviewed' }),
+      });
+      batches[batchIdx] = { ...batches[batchIdx], hasLlmResult: true };
+      batches = batches;
+      nextUndecidedBatch();
+    }
   }
 
   async function skip() {
-    if (mode !== 'groups' || !groupDetail) return;
-    const prevStates: Record<string, AssetState> = {};
-    for (const a of groupDetail.assets) prevStates[a.id] = states[a.id];
-    undoStack = [...undoStack, { groupIdx, prevStates, prevSi: selectedIdx }];
-    await decideGroup(groupDetail.id, [], [], true);
-    groups[groupIdx].decided = true; groups = groups;
-    stats = await fetchStats(); nextUndecided();
+    if (mode === 'groups' && groupDetail) {
+      const prevStates: Record<string, AssetState> = {};
+      for (const a of groupDetail.assets) prevStates[a.id] = states[a.id];
+      undoStack = [...undoStack, { groupIdx, prevStates, prevSi: selectedIdx }];
+      await decideGroup(groupDetail.id, [], [], true);
+      groups[groupIdx].decided = true; groups = groups;
+      stats = await fetchStats();
+      nextUndecided();
+    } else if (mode === 'batches' && batches[batchIdx]) {
+      await fetch(`/api/view-status/${batches[batchIdx].id}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ viewType: 'batch', status: 'skipped' }),
+      });
+      nextUndecidedBatch();
+    }
   }
 
   async function undo() {
@@ -210,6 +260,11 @@
   function nextUndecided() {
     for (let i = groupIdx + 1; i < groups.length; i++) if (!groups[i].decided) { selectGroup(i); return; }
     for (let i = 0; i < groupIdx; i++) if (!groups[i].decided) { selectGroup(i); return; }
+  }
+
+  function nextUndecidedBatch() {
+    // Move to next batch (for now just go forward)
+    if (batchIdx < batches.length - 1) selectBatch(batchIdx + 1);
   }
 
   async function runLlm() {
@@ -317,11 +372,10 @@
     <button class="bk" on:click={() => mark('keep')}>Keep</button>
     <button class="bc" on:click={() => mark('cull')}>Cull</button>
     <button class="bb" on:click={keepBestCullRest}>Best + Cull Rest</button>
-    {#if mode === 'groups'}
-      <button class="ba" on:click={approve}>Approve & Next</button>
-      <button class="bs" on:click={skip}>Skip</button>
-    {:else}
-      {#if batchDetail && !batchDetail.llm}<button class="run-btn" on:click={runLlm}>Run LLM</button>{/if}
+    <button class="ba" on:click={approve}>Approve & Next</button>
+    <button class="bs" on:click={skip}>Skip</button>
+    {#if mode === 'batches' && batchDetail && !batchDetail.llm}
+      <button class="run-btn" on:click={runLlm}>Run LLM</button>
     {/if}
     <span class="spacer"></span>
     <span class="bmeta">{currentAssets.length} photos</span>
@@ -462,5 +516,7 @@
     :global(.preview-ov) { left: 0 !important; }
     :global(.pv-strip) { height: 60px; }
     :global(.pvt) { height: 50px; }
+    :global(.lbl) { display: none; }
+    :global(.bdg) { font-size: 8px; padding: 0 4px; }
   }
 </style>
