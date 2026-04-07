@@ -17,7 +17,9 @@
   let showPreview = false;
   let selectedIdx = 0;
   let helpOpen = false;
-  let sidebarOpen = false; // mobile sidebar drawer
+  let sidebarOpen = false;
+  let loading = false;
+  let llmRunning = false;
 
   let groups: GroupSummary[] = [];
   let groupIdx = -1;
@@ -107,7 +109,9 @@
 
   async function selectGroup(idx: number) {
     groupIdx = idx; selectedIdx = 0; showPreview = false;
+    loading = true;
     groupDetail = await fetchGroup(`group-${idx}`);
+    loading = false;
     await loadPhotoStates(groupDetail?.assets ?? []);
     // Check if this group has been reviewed (from viewStatus)
     groups[idx].decided = (groupDetail as any)?.viewStatus != null;
@@ -117,7 +121,9 @@
 
   async function selectBatch(idx: number) {
     batchIdx = idx; selectedIdx = 0; showPreview = false;
+    loading = true;
     batchDetail = await fetchBatch(batches[idx].id);
+    loading = false;
     await loadPhotoStates(batchDetail?.assets ?? []);
 
     // Pre-populate from LLM suggestions if no manual decision exists
@@ -280,18 +286,30 @@
   }
 
   async function runLlm() {
-    if (!batches[batchIdx]) return;
-    const result = await rankBatch(batches[batchIdx].id);
-    if (result.error) { alert('LLM error: ' + result.error); return; }
-    batches[batchIdx].hasLlmResult = true; batches = batches;
-    await selectBatch(batchIdx);
+    if (!batches[batchIdx] || llmRunning) return;
+    llmRunning = true;
+    try {
+      const result = await rankBatch(batches[batchIdx].id);
+      if (result.error) { alert('LLM error: ' + result.error); return; }
+      batches[batchIdx].hasLlmResult = true; batches = batches;
+      await selectBatch(batchIdx);
+    } finally {
+      llmRunning = false;
+    }
   }
 
   async function rerunLlm() {
-    if (!batches[batchIdx]) return;
-    // Delete cached result, then run fresh
-    await fetch(`/api/batches/${batches[batchIdx].id}/rank`, { method: 'DELETE' });
-    await runLlm();
+    if (!batches[batchIdx] || llmRunning) return;
+    llmRunning = true;
+    try {
+      await fetch(`/api/batches/${batches[batchIdx].id}/rank`, { method: 'DELETE' });
+      const result = await rankBatch(batches[batchIdx].id);
+      if (result.error) { alert('LLM error: ' + result.error); return; }
+      batches[batchIdx].hasLlmResult = true; batches = batches;
+      await selectBatch(batchIdx);
+    } finally {
+      llmRunning = false;
+    }
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -380,7 +398,9 @@
   </aside>
 
   <div class="main">
-    {#if currentAssets.length}
+    {#if loading}
+      <div class="empty"><span class="spinner"></span> Loading...</div>
+    {:else if currentAssets.length}
       <PhotoGrid assets={currentAssets} {states} {selectedIdx} {llmMap} {keepSet} {cullSet} onSelect={onGridSelect} />
     {:else}
       <div class="empty">Select a group or batch</div>
@@ -394,7 +414,9 @@
     <button class="ba" on:click={approve}>Approve & Next</button>
     <button class="bs" on:click={skip}>Skip</button>
     {#if mode === 'batches' && batchDetail}
-      {#if !batchDetail.llm}
+      {#if llmRunning}
+        <button class="run-btn" disabled><span class="spinner"></span> Running...</button>
+      {:else if !batchDetail.llm}
         <button class="run-btn" on:click={runLlm}>Run LLM</button>
       {:else}
         <button class="run-btn" on:click={rerunLlm} style="background:#555">Re-run LLM</button>
@@ -476,6 +498,9 @@
   .bs { background: #333; color: #aaa; } .bh { background: none; color: #7a8294; border: 1px solid #2a2e36 !important; padding: 3px 9px; font-size: 12px; }
   .run-btn { background: #7c4dff; color: white; }
   .spacer { flex: 1; } .bmeta { font-size: 11px; color: #7a8294; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: white; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .run-btn:disabled { opacity: .6; cursor: wait; }
 
   :global(.jgrid) { position: relative; width: 100%; height: 100%; overflow: hidden; }
   :global(.cell) { position: absolute; overflow: hidden; cursor: pointer; border: 3px solid transparent; transition: border-color .12s, opacity .12s; }
