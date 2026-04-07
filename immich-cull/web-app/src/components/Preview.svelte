@@ -61,17 +61,21 @@
     {/each}
   </div>
 
-  <!-- Main image only — info is in the sidebar -->
+  <!-- Main image — tap left/right to navigate, center to close -->
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
-  <div class="pv-main" on:click={onClose}>
+  <div class="pv-main" on:click={(e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    if (x < 0.3 && selectedIdx > 0) onSelect(selectedIdx - 1);
+    else if (x > 0.7 && selectedIdx < assets.length - 1) onSelect(selectedIdx + 1);
+    else onClose();
+  }}>
     {#if asset}
-      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
       <img
         bind:this={imgEl}
         data-asset-id={asset.id}
         src={previewUrl(asset.id)}
         alt={asset.filename}
-        on:click|stopPropagation
       />
 
       {#if displayState}
