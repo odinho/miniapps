@@ -85,6 +85,7 @@
         animatingOut = false;
         dragX = 0;
         dragging = false;
+        swiping = false;
         swipeResult = null;
         // Force a tick so the reset happens without transition
         requestAnimationFrame(() => { dragX = 0; });

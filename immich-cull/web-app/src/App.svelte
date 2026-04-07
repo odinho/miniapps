@@ -33,7 +33,7 @@
   let states: Record<string, AssetState> = {};
   let userStars: Record<string, number> = {};
   let stats: Stats | null = null;
-  let undoStack: Array<{ mode: AppMode; idx: number; prevStates: Record<string, AssetState>; prevSi: number; prevKeepLevel: number }> = [];
+  let undoStack: Array<{ mode: AppMode; idx: number; viewId: string; prevStates: Record<string, AssetState>; prevUserStars: Record<string, number>; prevSi: number; prevKeepLevel: number }> = [];
 
   $: currentAssets = mode === 'groups' ? (groupDetail?.assets ?? []) : (batchDetail?.assets ?? []);
   $: llmMap = buildLlmMap(batchDetail);
@@ -71,8 +71,9 @@
         ).length
       : 0;
 
-    const totalKept = Object.values(states).filter(s => s === 'keep').length;
-    const totalCulled = Object.values(states).filter(s => s === 'cull').length;
+    const batchAssetIds = new Set((batchDetail?.assets ?? []).map(a => a.id));
+    const totalKept = Object.entries(states).filter(([id, s]) => batchAssetIds.has(id) && s === 'keep').length;
+    const totalCulled = Object.entries(states).filter(([id, s]) => batchAssetIds.has(id) && s === 'cull').length;
 
     return { sgTotal, sgAdjusted, singletonsCulled, singletonCount: singletons.length, totalKept, totalCulled, isAggressive: aggLevel < 0 };
   })();
@@ -137,7 +138,7 @@
   async function selectGroup(idx: number) {
     groupIdx = idx; selectedIdx = 0; showPreview = false;
     loading = true;
-    groupDetail = await fetchGroup(`group-${idx}`);
+    groupDetail = await fetchGroup(groups[idx].id);
     loading = false;
     await loadPhotoStates(groupDetail?.assets ?? []);
     // Check if this group has been reviewed (from viewStatus)
@@ -227,7 +228,10 @@
     for (const a of assets) prevStates[a.id] = states[a.id];
 
     const undoIdx = mode === 'groups' ? groupIdx : batchIdx;
-    undoStack = [...undoStack, { mode, idx: undoIdx, prevStates, prevSi: selectedIdx, prevKeepLevel: keepLevel }];
+    const viewId = mode === 'groups' ? groups[groupIdx]?.id : batches[batchIdx]?.id;
+    const prevUserStars: Record<string, number> = {};
+    for (const a of assets) if (userStars[a.id] != null) prevUserStars[a.id] = userStars[a.id];
+    undoStack = [...undoStack, { mode, idx: undoIdx, viewId: viewId ?? '', prevStates, prevUserStars, prevSi: selectedIdx, prevKeepLevel: keepLevel }];
 
     // Default unmarked photos to 'keep'
     for (const a of assets) if (!states[a.id]) states[a.id] = 'keep';
@@ -253,6 +257,7 @@
       });
       (batches[batchIdx] as any).viewStatus = 'reviewed';
       batches = batches;
+      stats = await fetchStats();
       nextUndecidedBatch();
     }
   }
@@ -261,7 +266,9 @@
     if (mode === 'groups' && groupDetail) {
       const prevStates: Record<string, AssetState> = {};
       for (const a of groupDetail.assets) prevStates[a.id] = states[a.id];
-      undoStack = [...undoStack, { mode: 'groups', idx: groupIdx, prevStates, prevSi: selectedIdx, prevKeepLevel: keepLevel }];
+      const prevUserStars: Record<string, number> = {};
+      for (const a of groupDetail.assets) if (userStars[a.id] != null) prevUserStars[a.id] = userStars[a.id];
+      undoStack = [...undoStack, { mode: 'groups', idx: groupIdx, viewId: groupDetail.id, prevStates, prevUserStars, prevSi: selectedIdx, prevKeepLevel: keepLevel }];
       await decideGroup(groupDetail.id, [], [], true);
       groups[groupIdx].decided = true; groups = groups;
       stats = await fetchStats();
@@ -279,17 +286,19 @@
     if (!undoStack.length) return;
     const u = undoStack[undoStack.length - 1];
     undoStack = undoStack.slice(0, -1);
-    // Restore local states
+    // Restore local states and stars
     for (const [id, s] of Object.entries(u.prevStates)) states[id] = s;
+    for (const [id, s] of Object.entries(u.prevUserStars)) userStars[id] = s;
     states = states;
+    userStars = userStars;
     // Restore on server
     const decisions = Object.entries(u.prevStates).map(([id, s]) => ({
-      assetId: id, state: s, userStars: userStars[id] ?? null
+      assetId: id, state: s, userStars: u.prevUserStars[id] ?? null
     }));
     await savePhotoDecisions(decisions);
 
     if (u.mode === 'groups') {
-      await undecideGroup(`group-${u.idx}`);
+      await undecideGroup(u.viewId);
       groups[u.idx].decided = false; groups = groups;
       if (mode !== 'groups') switchMode('groups');
       await selectGroup(u.idx);

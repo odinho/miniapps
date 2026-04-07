@@ -9,7 +9,7 @@ export function justifiedLayout(
   gap: number = 4
 ): Rect[] {
   if (!items.length) return [];
-  const aspects = items.map(it => it.w / it.h);
+  const aspects = items.map(it => it.w / (it.h || 1));
 
   let bestLayout: { rects: Rect[]; fill: number } | null = null;
   let bestFill = 0;
