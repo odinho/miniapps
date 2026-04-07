@@ -12,6 +12,8 @@
   export let subgroups: LlmSubgroup[] = [];
   export let onSelect: (idx: number) => void = () => {};
   export let onClose: () => void = () => {};
+  export let onMark: (state: 'keep' | 'cull') => void = () => {};
+  export let onCycleState: () => void = () => {};
 
   $: asset = assets[selectedIdx];
   $: manualState = asset ? states[asset.id] : null;
@@ -22,7 +24,6 @@
   let imgEl: HTMLImageElement;
   let stripEl: HTMLDivElement;
 
-  // Scroll active filmstrip thumb into view
   $: if (stripEl && selectedIdx >= 0) {
     const thumb = stripEl.children[selectedIdx] as HTMLElement;
     if (thumb) thumb.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
@@ -36,6 +37,45 @@
       if (imgEl && imgEl.dataset.assetId === expectedId) imgEl.src = url;
     };
     pre.src = url;
+  }
+
+  // Swipe detection
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let swiping = false;
+
+  function onTouchStart(e: TouchEvent) {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    swiping = false;
+  }
+
+  function onTouchEnd(e: TouchEvent) {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+
+    // Only count horizontal swipes (not vertical scroll)
+    if (absDx > 60 && absDx > absDy * 1.5) {
+      swiping = true;
+      if (dx > 0) {
+        // Swipe right = KEEP
+        onMark('keep');
+      } else {
+        // Swipe left = CULL
+        onMark('cull');
+      }
+    }
+  }
+
+  function handleMainClick(e: MouseEvent) {
+    if (swiping) { swiping = false; return; }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    if (x < 0.3 && selectedIdx > 0) onSelect(selectedIdx - 1);
+    else if (x > 0.7 && selectedIdx < assets.length - 1) onSelect(selectedIdx + 1);
+    else onClose();
   }
 </script>
 
@@ -61,15 +101,13 @@
     {/each}
   </div>
 
-  <!-- Main image — tap left/right to navigate, center to close -->
+  <!-- Main image -->
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
-  <div class="pv-main" on:click={(e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    if (x < 0.3 && selectedIdx > 0) onSelect(selectedIdx - 1);
-    else if (x > 0.7 && selectedIdx < assets.length - 1) onSelect(selectedIdx + 1);
-    else onClose();
-  }}>
+  <div class="pv-main"
+    on:click={handleMainClick}
+    on:touchstart={onTouchStart}
+    on:touchend={onTouchEnd}
+  >
     {#if asset}
       <img
         bind:this={imgEl}
@@ -79,7 +117,15 @@
       />
 
       {#if displayState}
-        <div class="ptag {displayState}">{displayState.toUpperCase()}</div>
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
+        <div class="ptag {displayState}" on:click|stopPropagation={onCycleState}>
+          {displayState.toUpperCase()}
+        </div>
+      {:else}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
+        <div class="ptag none" on:click|stopPropagation={onCycleState}>
+          TAP TO MARK
+        </div>
       {/if}
 
       <div class="pinfo" class:pinfo-keep={displayState === 'keep'} class:pinfo-cull={displayState === 'cull'}>
@@ -87,6 +133,28 @@
         {new Date(asset.date).toLocaleString('no')}
         {#if llm} · {llm.briefNote}{/if}
       </div>
+
+      <!-- Swipe hints (mobile only) -->
+      <div class="swipe-hint left">← cull</div>
+      <div class="swipe-hint right">keep →</div>
     {/if}
   </div>
 </div>
+
+<style>
+  .swipe-hint {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    font-size: 11px; color: rgba(255,255,255,.15); pointer-events: none;
+    display: none;
+  }
+  .swipe-hint.left { left: 8px; }
+  .swipe-hint.right { right: 8px; }
+
+  @media (max-width: 768px) {
+    .swipe-hint { display: block; }
+  }
+
+  :global(.ptag.none) {
+    background: rgba(255,255,255,.15); color: #aaa; cursor: pointer;
+  }
+</style>

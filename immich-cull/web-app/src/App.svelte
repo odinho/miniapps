@@ -489,7 +489,16 @@
 {#if showPreview && selectedIdx >= 0 && currentAssets.length}
   <Preview assets={currentAssets} {selectedIdx} {states} {llmMap} {keepSet} {cullSet}
     subgroups={allSubgroups}
-    onSelect={(i) => selectedIdx = i} onClose={() => showPreview = false} />
+    onSelect={(i) => selectedIdx = i}
+    onClose={() => showPreview = false}
+    onMark={(s) => mark(s)}
+    onCycleState={() => {
+      if (!selectedAsset) return;
+      const cur = states[selectedAsset.id];
+      if (!cur || cur === null) mark('keep');
+      else if (cur === 'keep') mark('cull');
+      else { states[selectedAsset.id] = null; states = states; savePhotoDecisions([{ assetId: selectedAsset.id, state: null, userStars: userStars[selectedAsset.id] ?? null }]); }
+    }} />
 {/if}
 
 {#if helpOpen}
