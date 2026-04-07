@@ -45,6 +45,7 @@ export interface LlmResult {
 export interface LlmImage {
   imageId: string; suggestedStars: number;
   categories: string[]; briefNote: string;
+  llmKeepCull: 'keep' | 'cull' | null;
   similaritySubgroupId: string | null;
   protectFromCull?: boolean;
 }

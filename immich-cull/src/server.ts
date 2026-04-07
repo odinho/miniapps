@@ -344,7 +344,7 @@ app.get<{ Params: { id: string } }>("/api/batches/:id", async (req) => {
         overallConfidence: raw.conf ?? raw.overallConfidence ?? 0,
         images: (raw.img ?? raw.images ?? []).map((img: any) => {
           if (Array.isArray(img)) {
-            const [idx, stars, cat, note, sg] = img;
+            const [idx, stars, cat, note, sg, kc] = img;
             const asset = batch.assets[idx];
             return {
               imageId: asset?.id ?? `unknown-${idx}`,
@@ -352,6 +352,7 @@ app.get<{ Params: { id: string } }>("/api/batches/:id", async (req) => {
               categories: typeof cat === "string" ? [cat] : (cat ?? []),
               briefNote: note ?? "",
               similaritySubgroupId: sg ?? null,
+              llmKeepCull: kc === 'k' ? 'keep' : kc === 'c' ? 'cull' : null,
             };
           }
           return img;

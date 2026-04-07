@@ -6,7 +6,6 @@ export function buildPrompt(batch: SessionBatch): string {
   const dateRange = `${batch.dateRange.start.toISOString().slice(0, 16)} to ${batch.dateRange.end.toISOString().slice(0, 16)}`;
   const n = batch.assets.length;
 
-  // Lean metadata: just index, filename, time. No stars, no flags — model judges independently.
   const imagesMeta = batch.assets.map((a, i) => ({
     i,
     f: a.filename,
@@ -30,43 +29,34 @@ Background scenery (grass, trail, trees, sky) is secondary unless no people are 
 If people are visible, note them first. Do not reduce a family photo to "path with grass."
 
 TASKS:
-1. Assess EVERY photo — star rating + category + unique brief note.
-2. Find similarity subgroups and rank within each.
-3. For each subgroup, recommend keep vs cull.
+1. Assess EVERY photo — star rating + category + brief note + keep/cull recommendation.
+2. Find similarity subgroups (variations of same moment) and rank within each.
 
 STARS (0-3, never 4-5):
 0 = unremarkable/generic. 1 = good, stands out. 2 = share-worthy. 3 = session highlight.
 Photos with people usually outrank empty scenery from the same day.
-Give a real distribution across the batch — not all the same score.
+
+KEEP vs CULL — decide for EVERY photo, not just grouped ones:
+- keep: worth having in the library. Distinct moment, good quality, or useful reference.
+- cull: redundant, blurry, accidental, or adds nothing the kept photos don't already cover.
+Within subgroups: keep 30-50%, cull the rest. Keep sharpest/best expression.
+Singletons: cull if genuinely low-value (blurry, accidental, empty). Keep if it captures a moment.
+Lean toward keep when in doubt — but DO recommend culling weak photos.
 
 DESCRIPTIONS:
-Look at each photo individually. Every photo MUST get a UNIQUE note.
-If people are visible, mention them first, not the background.
-Do not label a photo as "path" or "grass" when a person is a clear subject.
+Every photo MUST get a UNIQUE note. If people visible, mention them first.
 
 SIMILARITY GROUPING:
-Group photos that are variations of the same moment — same subject, similar framing, taken within ~2 minutes. These are the prime cull targets.
-Separate subgroups for:
-- different people combinations
-- different actions or poses
-- different locations
-- clear time gaps (>2 min)
-Photos taken in rapid succession of the same subject = definitely a group.
-Snapchat screenshots of different content = NOT a group (each is unique content).
-Most batches should have at least a few groups — if you found zero, look harder.
+Group photos that are variations of the same moment — same subject, similar framing, <2 min apart.
+Separate subgroups for different people/actions/locations/time gaps.
+Photos not in any subgroup are singletons — they still need a keep/cull recommendation.
 
-CULLING:
-In bursts/similar sequences, typically keep 30-50% and cull the rest.
-Keep the sharpest, best-composed, best-expression shot(s).
-Keep extras ONLY if they capture a genuinely different moment or angle.
-Slight variations of the same pose/moment = cull all but the best.
-For a group of 10 similar shots, keeping 2-3 is usually right.
-
-OUTPUT — compact JSON, indices 0..N-1 ONLY. Do NOT invent indices beyond the input.
+OUTPUT — compact JSON, indices 0..N-1 ONLY. Do NOT invent extra indices.
 {
   "sum": "1-sentence summary",
-  "img": [[i, stars, "cat", "3-5 word note", "sgId"|null], ...],
+  "img": [[i, stars, "cat", "3-5 word note", "sgId"|null, "k"|"c"], ...],
   "sg": [{"id":"g1", "type":"burst|dup|scene|subj", "all":[best,...worst], "keep":[kept], "why":"max 15 words"}, ...]
 }
+img tuple: [index, stars, "category", "note", subgroupId or null, "k" for keep or "c" for cull].
 Category codes: por grp sel lan tra evt pet act doc rec wb ss snap tech veh food meme oth
-"all" array: ordered best-first (best at position 0, worst last).`;
+"all" array: ordered best-first.`;

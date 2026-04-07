@@ -47,15 +47,17 @@ function expandCompactResponse(raw: any, batch: SessionBatch): DayBatchResponse 
     const asset = assets[idx];
 
     if (Array.isArray(img)) {
-      const [, stars, cat, note, sg, protect] = img;
+      const [, stars, cat, note, sg, kc] = img;
+      const keepCull = kc === 'k' ? 'keep' : kc === 'c' ? 'cull' : null;
       return {
         imageId: asset.id,
         suggestedStars: stars ?? 0,
         categories: (typeof cat === "string" ? [cat] : (cat ?? [])).map(expandCategory),
-        protectFromCull: protect ?? false,
-        protectionReason: protect ? "personal_memory" : "no_special_protection",
+        protectFromCull: false,
+        protectionReason: "no_special_protection" as const,
         briefNote: note ?? "",
         similaritySubgroupId: sg ?? null,
+        llmKeepCull: keepCull,
       };
     }
     return {

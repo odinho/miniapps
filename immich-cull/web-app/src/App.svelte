@@ -127,16 +127,21 @@
     loading = false;
     await loadPhotoStates(batchDetail?.assets ?? []);
 
-    // Pre-populate from LLM: subgroup keep/cull + singletons default to keep
-    if (batchDetail?.llm) {
-      const inSubgroup = new Set<string>();
-      for (const sg of batchDetail.llm.similaritySubgroups ?? []) {
-        for (const id of sg.recommendedKeepIds) { if (!states[id]) states[id] = 'keep'; inSubgroup.add(id); }
-        for (const id of sg.cullIds) { if (!states[id]) states[id] = 'cull'; inSubgroup.add(id); }
+    // Pre-populate from LLM per-image keep/cull recommendations
+    if (batchDetail?.llm?.images) {
+      for (const img of batchDetail.llm.images) {
+        if (!states[img.imageId] && img.llmKeepCull) {
+          states[img.imageId] = img.llmKeepCull;
+        }
       }
-      // Singletons: keep by default (they're unique, not redundant)
+      // Fallback: use subgroup data for old LLM results without per-image k/c
+      for (const sg of batchDetail.llm.similaritySubgroups ?? []) {
+        for (const id of sg.recommendedKeepIds) { if (!states[id]) states[id] = 'keep'; }
+        for (const id of sg.cullIds) { if (!states[id]) states[id] = 'cull'; }
+      }
+      // Any remaining unset photos default to keep
       for (const a of batchDetail.assets) {
-        if (!states[a.id] && !inSubgroup.has(a.id)) states[a.id] = 'keep';
+        if (!states[a.id]) states[a.id] = 'keep';
       }
       states = states;
     }
