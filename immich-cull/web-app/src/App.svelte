@@ -446,10 +446,14 @@
       {:else if !batchDetail.llm}
         <button class="run-btn" on:click={runLlm}>Run LLM</button>
       {:else}
+        {@const totalInSg = (batchDetail?.llm?.similaritySubgroups ?? []).reduce((s, sg) => s + sg.imageIds.length, 0)}
+        {@const baseKeep = (batchDetail?.llm?.similaritySubgroups ?? []).reduce((s, sg) => s + sg.recommendedKeepCount, 0)}
+        {@const adjustedKeep = (batchDetail?.llm?.similaritySubgroups ?? []).reduce((s, sg) => s + Math.max(1, Math.min(sg.imageIds.length, sg.recommendedKeepCount + keepLevel)), 0)}
         <div class="keep-level">
           <button class="kl-btn" on:click={() => applyKeepLevel(keepLevel - 1)}>−</button>
-          <span class="kl-label" title="Adjust how many photos to keep per subgroup">
-            {keepLevel === 0 ? 'LLM default' : keepLevel > 0 ? `+${keepLevel} keep` : `${keepLevel} keep`}
+          <span class="kl-label" title="Keep {adjustedKeep} of {totalInSg} in subgroups">
+            {adjustedKeep}/{totalInSg}
+            {#if keepLevel === 0}<span class="kl-default">default</span>{/if}
           </span>
           <button class="kl-btn" on:click={() => applyKeepLevel(keepLevel + 1)}>+</button>
         </div>
@@ -538,7 +542,8 @@
   .keep-level { display: flex; align-items: center; gap: 2px; background: #1e2028; border-radius: 5px; padding: 2px; }
   .kl-btn { background: #333; border: none; color: #ddd; width: 26px; height: 26px; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
   .kl-btn:hover { background: #444; }
-  .kl-label { font-size: 11px; color: #aaa; padding: 0 6px; min-width: 70px; text-align: center; white-space: nowrap; }
+  .kl-label { font-size: 12px; color: #ddd; padding: 0 6px; min-width: 50px; text-align: center; white-space: nowrap; font-weight: 600; }
+  .kl-default { font-size: 9px; color: #7a8294; font-weight: 400; display: block; margin-top: -2px; text-decoration: underline; }
 
   :global(.jgrid) { position: relative; width: 100%; height: 100%; overflow: hidden; }
   :global(.cell) { position: absolute; overflow: hidden; cursor: pointer; border: 3px solid transparent; transition: border-color .12s, opacity .12s; }
@@ -607,7 +612,9 @@
     :global(.pvt) { height: 50px; }
     :global(.lbl) { display: none; }
     :global(.bdg) { display: none; }
+    :global(.cell.sel .bdg) { display: block; font-size: 9px; } /* show on selected */
     :global(.llm-note) { display: none; }
     :global(.llm-star) { display: none; }
+    :global(.cell.sel .llm-star) { display: block; } /* show stars on selected */
   }
 </style>
