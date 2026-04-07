@@ -20,6 +20,7 @@
   let sidebarOpen = false;
   let loading = false;
   let llmRunning = false;
+  let keepLevel = 0; // 0 = LLM default, +N = keep N more per subgroup, -N = keep N fewer
 
   let groups: GroupSummary[] = [];
   let groupIdx = -1;
@@ -120,21 +121,22 @@
   }
 
   async function selectBatch(idx: number) {
-    batchIdx = idx; selectedIdx = 0; showPreview = false;
+    batchIdx = idx; selectedIdx = 0; showPreview = false; keepLevel = 0;
     loading = true;
     batchDetail = await fetchBatch(batches[idx].id);
     loading = false;
     await loadPhotoStates(batchDetail?.assets ?? []);
 
-    // Pre-populate from LLM suggestions if no manual decision exists
-    if (batchDetail?.llm?.similaritySubgroups) {
-      for (const sg of batchDetail.llm.similaritySubgroups) {
-        for (const id of sg.recommendedKeepIds) {
-          if (!states[id]) states[id] = 'keep';
-        }
-        for (const id of sg.cullIds) {
-          if (!states[id]) states[id] = 'cull';
-        }
+    // Pre-populate from LLM: subgroup keep/cull + singletons default to keep
+    if (batchDetail?.llm) {
+      const inSubgroup = new Set<string>();
+      for (const sg of batchDetail.llm.similaritySubgroups ?? []) {
+        for (const id of sg.recommendedKeepIds) { if (!states[id]) states[id] = 'keep'; inSubgroup.add(id); }
+        for (const id of sg.cullIds) { if (!states[id]) states[id] = 'cull'; inSubgroup.add(id); }
+      }
+      // Singletons: keep by default (they're unique, not redundant)
+      for (const a of batchDetail.assets) {
+        if (!states[a.id] && !inSubgroup.has(a.id)) states[a.id] = 'keep';
       }
       states = states;
     }
@@ -285,6 +287,26 @@
     if (batchIdx < batches.length - 1) selectBatch(batchIdx + 1);
   }
 
+  function applyKeepLevel(level: number) {
+    if (!batchDetail?.llm?.similaritySubgroups) return;
+    keepLevel = level;
+    for (const sg of batchDetail.llm.similaritySubgroups) {
+      // sg.imageIds is ordered best-first
+      const ids = sg.imageIds;
+      const baseKeep = sg.recommendedKeepCount;
+      const adjustedKeep = Math.max(1, Math.min(ids.length, baseKeep + level));
+      for (let i = 0; i < ids.length; i++) {
+        states[ids[i]] = i < adjustedKeep ? 'keep' : 'cull';
+      }
+    }
+    states = states;
+    // Save all changes
+    const decisions = batchDetail.assets.map(a => ({
+      assetId: a.id, state: states[a.id] ?? 'keep', userStars: userStars[a.id] ?? null
+    }));
+    savePhotoDecisions(decisions);
+  }
+
   async function runLlm() {
     if (!batches[batchIdx] || llmRunning) return;
     llmRunning = true;
@@ -419,7 +441,14 @@
       {:else if !batchDetail.llm}
         <button class="run-btn" on:click={runLlm}>Run LLM</button>
       {:else}
-        <button class="run-btn" on:click={rerunLlm} style="background:#555">Re-run LLM</button>
+        <div class="keep-level">
+          <button class="kl-btn" on:click={() => applyKeepLevel(keepLevel - 1)}>−</button>
+          <span class="kl-label" title="Adjust how many photos to keep per subgroup">
+            {keepLevel === 0 ? 'LLM default' : keepLevel > 0 ? `+${keepLevel} keep` : `${keepLevel} keep`}
+          </span>
+          <button class="kl-btn" on:click={() => applyKeepLevel(keepLevel + 1)}>+</button>
+        </div>
+        <button class="run-btn" on:click={rerunLlm} style="background:#555;font-size:11px">Re-run</button>
       {/if}
     {/if}
     <span class="spacer"></span>
@@ -501,6 +530,10 @@
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: white; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .run-btn:disabled { opacity: .6; cursor: wait; }
+  .keep-level { display: flex; align-items: center; gap: 2px; background: #1e2028; border-radius: 5px; padding: 2px; }
+  .kl-btn { background: #333; border: none; color: #ddd; width: 26px; height: 26px; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .kl-btn:hover { background: #444; }
+  .kl-label { font-size: 11px; color: #aaa; padding: 0 6px; min-width: 70px; text-align: center; white-space: nowrap; }
 
   :global(.jgrid) { position: relative; width: 100%; height: 100%; overflow: hidden; }
   :global(.cell) { position: absolute; overflow: hidden; cursor: pointer; border: 3px solid transparent; transition: border-color .12s, opacity .12s; }
