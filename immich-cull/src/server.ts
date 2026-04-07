@@ -226,10 +226,12 @@ app.post<{
   if (req.body.skipped) {
     stateDb.setViewStatus(group.id, 'group', 'skipped');
   } else {
-    // Save per-photo decisions
+    // Save per-photo decisions (preserve existing user_stars)
+    const assetIds = [...req.body.keep, ...req.body.cull];
+    const existing = stateDb.getPhotoDecisions(assetIds);
     const decisions: Array<{ assetId: string; state: string | null; userStars: number | null }> = [];
-    for (const id of req.body.keep) decisions.push({ assetId: id, state: 'keep', userStars: null });
-    for (const id of req.body.cull) decisions.push({ assetId: id, state: 'cull', userStars: null });
+    for (const id of req.body.keep) decisions.push({ assetId: id, state: 'keep', userStars: existing[id]?.userStars ?? null });
+    for (const id of req.body.cull) decisions.push({ assetId: id, state: 'cull', userStars: existing[id]?.userStars ?? null });
     stateDb.savePhotoDecisions(decisions);
     stateDb.setViewStatus(group.id, 'group', 'reviewed');
   }
@@ -245,21 +247,6 @@ app.delete<{ Params: { id: string } }>("/api/groups/:id/decide", async (req) => 
 
 app.get("/api/stats", async () => {
   const s = stateDb.getStats();
-
-  // Compute cull bytes from photo_decisions
-  let cullBytes = 0;
-  const cullPhotos = stateDb.getPhotoDecisions(
-    [...assetMap.keys()].filter(id => {
-      const d = stateDb.getPhotoDecisions([id]);
-      return d[id]?.state === 'cull';
-    })
-  );
-  // This is slow for large libraries — optimize later if needed
-  for (const [id] of Object.entries(cullPhotos)) {
-    const a = assetMap.get(id);
-    if (a) cullBytes += getFileSize(a);
-  }
-
   return {
     totalGroups: groups.length,
     decided: s.groupsReviewed + s.groupsSkipped,
@@ -267,7 +254,7 @@ app.get("/api/stats", async () => {
     photosToKeep: s.photosKept,
     photosToCull: s.photosCulled,
     remaining: groups.length - s.groupsReviewed - s.groupsSkipped,
-    cullBytes,
+    cullBytes: 0, // TODO: compute efficiently with a join query
   };
 });
 

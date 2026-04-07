@@ -191,10 +191,16 @@
     if (!undoStack.length) return;
     const u = undoStack[undoStack.length - 1];
     undoStack = undoStack.slice(0, -1);
+    // Restore local states
     for (const [id, s] of Object.entries(u.prevStates)) states[id] = s;
     states = states;
-    groups[u.groupIdx].decided = false; groups = groups;
+    // Restore on server: save previous photo decisions + clear view status
+    const decisions = Object.entries(u.prevStates).map(([id, s]) => ({
+      assetId: id, state: s, userStars: userStars[id] ?? null
+    }));
+    await savePhotoDecisions(decisions);
     await undecideGroup(`group-${u.groupIdx}`);
+    groups[u.groupIdx].decided = false; groups = groups;
     await selectGroup(u.groupIdx);
     selectedIdx = u.prevSi;
     stats = await fetchStats();
