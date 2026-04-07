@@ -169,6 +169,12 @@ export class StateDb {
     return Number(result.lastInsertRowid);
   }
 
+  deleteLlmRun(batchId: string, fingerprint: string) {
+    this.db.prepare(
+      "DELETE FROM llm_batch_runs WHERE batch_id = ? AND batch_fingerprint = ?"
+    ).run(batchId, fingerprint);
+  }
+
   getLlmRun(batchId: string, fingerprint: string): { id: number; responseJson: string } | null {
     const row = this.db.prepare(
       "SELECT id, response_json FROM llm_batch_runs WHERE batch_id = ? AND batch_fingerprint = ? AND status = 'completed' ORDER BY id DESC LIMIT 1"

@@ -420,6 +420,15 @@ app.post<{ Params: { id: string } }>("/api/batches/:id/rank", async (req) => {
   return { cached: false, response, inputTokens, outputTokens };
 });
 
+/** Delete cached LLM result for a batch (to allow re-run) */
+app.delete<{ Params: { id: string } }>("/api/batches/:id/rank", async (req) => {
+  const batch = sessionBatches.find(b => b.id === req.params.id);
+  if (!batch) return { error: "Not found" };
+  const fp = batchFingerprint(batch.assets.map(a => a.id));
+  stateDb.deleteLlmRun(batch.id, fp);
+  return { ok: true };
+});
+
 // === View status ===
 
 app.post<{ Params: { id: string }; Body: { viewType: string; status: string } }>(

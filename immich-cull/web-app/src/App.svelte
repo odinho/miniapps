@@ -287,6 +287,13 @@
     await selectBatch(batchIdx);
   }
 
+  async function rerunLlm() {
+    if (!batches[batchIdx]) return;
+    // Delete cached result, then run fresh
+    await fetch(`/api/batches/${batches[batchIdx].id}/rank`, { method: 'DELETE' });
+    await runLlm();
+  }
+
   function handleKeydown(e: KeyboardEvent) {
     if (helpOpen) { if (e.key === 'Escape' || e.key === '?') helpOpen = false; return; }
     if (!currentAssets.length) return;
@@ -386,8 +393,12 @@
     <button class="bb" on:click={keepBestCullRest}>Best + Cull Rest</button>
     <button class="ba" on:click={approve}>Approve & Next</button>
     <button class="bs" on:click={skip}>Skip</button>
-    {#if mode === 'batches' && batchDetail && !batchDetail.llm}
-      <button class="run-btn" on:click={runLlm}>Run LLM</button>
+    {#if mode === 'batches' && batchDetail}
+      {#if !batchDetail.llm}
+        <button class="run-btn" on:click={runLlm}>Run LLM</button>
+      {:else}
+        <button class="run-btn" on:click={rerunLlm} style="background:#555">Re-run LLM</button>
+      {/if}
     {/if}
     <span class="spacer"></span>
     <span class="bmeta">{currentAssets.length} photos</span>
