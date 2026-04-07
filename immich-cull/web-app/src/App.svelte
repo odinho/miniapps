@@ -33,7 +33,7 @@
   let states: Record<string, AssetState> = {};
   let userStars: Record<string, number> = {};
   let stats: Stats | null = null;
-  let undoStack: Array<{ mode: AppMode; idx: number; prevStates: Record<string, AssetState>; prevSi: number }> = [];
+  let undoStack: Array<{ mode: AppMode; idx: number; prevStates: Record<string, AssetState>; prevSi: number; prevKeepLevel: number }> = [];
 
   $: currentAssets = mode === 'groups' ? (groupDetail?.assets ?? []) : (batchDetail?.assets ?? []);
   $: llmMap = buildLlmMap(batchDetail);
@@ -210,7 +210,7 @@
     for (const a of assets) prevStates[a.id] = states[a.id];
 
     const undoIdx = mode === 'groups' ? groupIdx : batchIdx;
-    undoStack = [...undoStack, { mode, idx: undoIdx, prevStates, prevSi: selectedIdx }];
+    undoStack = [...undoStack, { mode, idx: undoIdx, prevStates, prevSi: selectedIdx, prevKeepLevel: keepLevel }];
 
     // Default unmarked photos to 'keep'
     for (const a of assets) if (!states[a.id]) states[a.id] = 'keep';
@@ -244,7 +244,7 @@
     if (mode === 'groups' && groupDetail) {
       const prevStates: Record<string, AssetState> = {};
       for (const a of groupDetail.assets) prevStates[a.id] = states[a.id];
-      undoStack = [...undoStack, { mode: 'groups', idx: groupIdx, prevStates, prevSi: selectedIdx }];
+      undoStack = [...undoStack, { mode: 'groups', idx: groupIdx, prevStates, prevSi: selectedIdx, prevKeepLevel: keepLevel }];
       await decideGroup(groupDetail.id, [], [], true);
       groups[groupIdx].decided = true; groups = groups;
       stats = await fetchStats();
@@ -288,6 +288,7 @@
       await selectBatch(u.idx);
     }
     selectedIdx = u.prevSi;
+    keepLevel = u.prevKeepLevel;
     stats = await fetchStats();
   }
 
@@ -302,19 +303,28 @@
   }
 
   function applyKeepLevel(level: number) {
-    if (!batchDetail?.llm?.similaritySubgroups) return;
+    if (!batchDetail?.llm) return;
     keepLevel = level;
-    for (const sg of batchDetail.llm.similaritySubgroups) {
-      // sg.imageIds is ordered best-first
+
+    // Apply to subgroup assets
+    const inSubgroup = new Set<string>();
+    for (const sg of batchDetail.llm.similaritySubgroups ?? []) {
       const ids = sg.imageIds;
-      const baseKeep = sg.recommendedKeepCount;
-      const adjustedKeep = Math.max(1, Math.min(ids.length, baseKeep + level));
+      const adjustedKeep = Math.max(1, Math.min(ids.length, sg.recommendedKeepCount + level));
       for (let i = 0; i < ids.length; i++) {
         states[ids[i]] = i < adjustedKeep ? 'keep' : 'cull';
+        inSubgroup.add(ids[i]);
       }
     }
+
+    // Non-subgroup assets: use per-image LLM keep/cull recommendation
+    for (const img of batchDetail.llm.images ?? []) {
+      if (!inSubgroup.has(img.imageId)) {
+        states[img.imageId] = img.llmKeepCull ?? 'keep';
+      }
+    }
+
     states = states;
-    // Save all changes
     const decisions = batchDetail.assets.map(a => ({
       assetId: a.id, state: states[a.id] ?? 'keep', userStars: userStars[a.id] ?? null
     }));
@@ -457,9 +467,13 @@
       {:else}
         <div class="keep-level">
           <button class="kl-btn" on:click={() => applyKeepLevel(keepLevel - 1)}>−</button>
-          <span class="kl-label" title="Keep {sgStats.adjusted} of {sgStats.total} in subgroups">
-            {sgStats.adjusted}/{sgStats.total}
-            {#if keepLevel === 0}<span class="kl-default">default</span>{/if}
+          <span class="kl-label" title="Keep {sgStats.adjusted} of {sgStats.total} grouped photos">
+            {#if sgStats.total > 0}
+              {sgStats.adjusted}/{sgStats.total}
+              {#if keepLevel === 0}<span class="kl-default">default</span>{/if}
+            {:else}
+              no groups
+            {/if}
           </span>
           <button class="kl-btn" on:click={() => applyKeepLevel(keepLevel + 1)}>+</button>
         </div>
