@@ -47,7 +47,6 @@ export interface LlmImage {
   categories: string[]; briefNote: string;
   llmKeepCull: 'keep' | 'cull' | null;
   similaritySubgroupId: string | null;
-  protectFromCull?: boolean;
 }
 
 export interface LlmSubgroup {

@@ -7,10 +7,6 @@ export type LlmCategory =
   | "screenshot" | "snapchat_save"
   | "technical_construction" | "vehicle" | "food" | "meme" | "other";
 
-export type ProtectionReason =
-  | "existing_star_protection" | "personal_memory" | "utility_reference"
-  | "partner_shared_image" | "distinct_moment" | "no_special_protection";
-
 export interface DayBatchResponse {
   batchId: string;
   batchSize: number;
@@ -25,10 +21,9 @@ export interface ImageAssessment {
   imageId: string;
   suggestedStars: 0 | 1 | 2 | 3;
   categories: LlmCategory[];
-  protectFromCull: boolean;
-  protectionReason: ProtectionReason;
   briefNote: string;
   similaritySubgroupId: string | null;
+  llmKeepCull: 'keep' | 'cull' | null;
 }
 
 export interface SimilaritySubgroup {

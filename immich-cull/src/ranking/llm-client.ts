@@ -53,8 +53,6 @@ function expandCompactResponse(raw: any, batch: SessionBatch): DayBatchResponse 
         imageId: asset.id,
         suggestedStars: stars ?? 0,
         categories: (typeof cat === "string" ? [cat] : (cat ?? [])).map(expandCategory),
-        protectFromCull: false,
-        protectionReason: "no_special_protection" as const,
         briefNote: note ?? "",
         similaritySubgroupId: sg ?? null,
         llmKeepCull: keepCull,
@@ -64,10 +62,9 @@ function expandCompactResponse(raw: any, batch: SessionBatch): DayBatchResponse 
       imageId: asset.id,
       suggestedStars: img.s ?? img.suggestedStars ?? 0,
       categories: (img.c ?? img.categories ?? []).map(expandCategory),
-      protectFromCull: img.p ?? img.protectFromCull ?? false,
-      protectionReason: img.pr ?? img.protectionReason ?? "no_special_protection",
       briefNote: img.n ?? img.briefNote ?? "",
       similaritySubgroupId: img.g ?? img.similaritySubgroupId ?? null,
+      llmKeepCull: img.kc === 'k' ? 'keep' : img.kc === 'c' ? 'cull' : (img.llmKeepCull ?? null),
     };
   }).filter((x): x is ImageAssessment => x !== null);
 

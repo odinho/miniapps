@@ -586,7 +586,7 @@
 
   /* Mobile: sidebar as drawer overlay */
   @media (max-width: 768px) {
-    .app { grid-template-columns: minmax(0, 1fr); }
+    .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: 34px minmax(0, 1fr) auto; }
     .hamburger { display: block; }
     .sidebar {
       position: fixed; top: 34px; left: -280px; bottom: 0; width: 280px;
@@ -594,8 +594,11 @@
     }
     .sidebar.open { left: 0; }
     .sidebar-backdrop { display: block; position: fixed; inset: 0; top: 34px; background: rgba(0,0,0,.5); z-index: 99; }
-    .bar { grid-column: 1; gap: 6px; padding: 0 8px; }
-    .bar button { padding: 5px 10px; font-size: 12px; }
+    .bar { grid-column: 1; gap: 4px; padding: 4px 6px; flex-wrap: wrap; height: auto; min-height: 40px; }
+    .bar button { padding: 4px 8px; font-size: 11px; }
+    .keep-level { order: 10; } /* push ± to second row via wrap */
+    .run-btn { order: 11; }
+    .kl-btn { width: 32px; height: 32px; } /* bigger touch targets */
     .header { padding: 0 8px; gap: 6px; }
     .header h1 { font-size: 12px; }
     .stats { gap: 6px; font-size: 10px; }
