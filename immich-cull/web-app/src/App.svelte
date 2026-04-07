@@ -54,10 +54,27 @@
   // Keep level stats (reactive)
   $: sgStats = (() => {
     const sgs = batchDetail?.llm?.similaritySubgroups ?? [];
-    const total = sgs.reduce((s, sg) => s + sg.imageIds.length, 0);
-    const base = sgs.reduce((s, sg) => s + sg.recommendedKeepCount, 0);
-    const adjusted = sgs.reduce((s, sg) => s + Math.max(1, Math.min(sg.imageIds.length, sg.recommendedKeepCount + keepLevel)), 0);
-    return { total, base, adjusted };
+    const imgs = batchDetail?.llm?.images ?? [];
+    const inSg = new Set(sgs.flatMap(sg => sg.imageIds));
+    const singletons = imgs.filter(img => !inSg.has(img.imageId));
+
+    const sgTotal = sgs.reduce((s, sg) => s + sg.imageIds.length, 0);
+    const sgAdjusted = sgs.reduce((s, sg) => s + Math.max(1, Math.min(sg.imageIds.length, sg.recommendedKeepCount + keepLevel)), 0);
+
+    // Count how many singletons would be culled at current level
+    const minSgLevel = -(Math.max(...sgs.map(sg => sg.recommendedKeepCount - 1), 0));
+    const aggLevel = keepLevel - minSgLevel;
+    const singletonsCulled = aggLevel < 0
+      ? singletons.filter(img =>
+          (aggLevel <= -2 && img.suggestedStars <= 1) ||
+          (aggLevel <= -1 && img.suggestedStars === 0)
+        ).length
+      : 0;
+
+    const totalKept = Object.values(states).filter(s => s === 'keep').length;
+    const totalCulled = Object.values(states).filter(s => s === 'cull').length;
+
+    return { sgTotal, sgAdjusted, singletonsCulled, singletonCount: singletons.length, totalKept, totalCulled, isAggressive: aggLevel < 0 };
   })();
 
   function setStars(stars: number) {
@@ -306,8 +323,9 @@
     if (!batchDetail?.llm) return;
     keepLevel = level;
 
-    // Apply to subgroup assets
     const inSubgroup = new Set<string>();
+
+    // Apply to subgroup assets: adjust keep count per subgroup
     for (const sg of batchDetail.llm.similaritySubgroups ?? []) {
       const ids = sg.imageIds;
       const adjustedKeep = Math.max(1, Math.min(ids.length, sg.recommendedKeepCount + level));
@@ -317,9 +335,23 @@
       }
     }
 
-    // Non-subgroup assets: use per-image LLM keep/cull recommendation
+    // Non-subgroup (singleton) assets: LLM keep/cull at level 0,
+    // but at aggressive levels (below min subgroup), also cull low-star singletons
+    const minSubgroupLevel = -(Math.max(...(batchDetail.llm.similaritySubgroups ?? []).map(sg => sg.recommendedKeepCount - 1), 0));
+    const aggressiveLevel = level - minSubgroupLevel; // how far below the subgroup floor
+
     for (const img of batchDetail.llm.images ?? []) {
-      if (!inSubgroup.has(img.imageId)) {
+      if (inSubgroup.has(img.imageId)) continue;
+      if (aggressiveLevel < 0) {
+        // Below subgroup floor: cull singletons by star rating
+        if (aggressiveLevel <= -2 && img.suggestedStars <= 1) {
+          states[img.imageId] = 'cull';
+        } else if (aggressiveLevel <= -1 && img.suggestedStars === 0) {
+          states[img.imageId] = 'cull';
+        } else {
+          states[img.imageId] = img.llmKeepCull ?? 'keep';
+        }
+      } else {
         states[img.imageId] = img.llmKeepCull ?? 'keep';
       }
     }
@@ -467,12 +499,10 @@
       {:else}
         <div class="keep-level">
           <button class="kl-btn" on:click={() => applyKeepLevel(keepLevel - 1)}>−</button>
-          <span class="kl-label" title="Keep {sgStats.adjusted} of {sgStats.total} grouped photos">
-            {#if sgStats.total > 0}
-              {sgStats.adjusted}/{sgStats.total}
-              {#if keepLevel === 0}<span class="kl-default">default</span>{/if}
-            {:else}
-              no groups
+          <span class="kl-label" title="Keep {sgStats.totalKept}, cull {sgStats.totalCulled}">
+            {sgStats.totalKept}✓ {sgStats.totalCulled}✗
+            {#if keepLevel === 0}<span class="kl-default">default</span>
+            {:else if sgStats.isAggressive}<span class="kl-aggressive">+singles</span>
             {/if}
           </span>
           <button class="kl-btn" on:click={() => applyKeepLevel(keepLevel + 1)}>+</button>
@@ -573,6 +603,7 @@
   .kl-btn:hover { background: #444; }
   .kl-label { font-size: 12px; color: #ddd; padding: 0 6px; min-width: 50px; text-align: center; white-space: nowrap; font-weight: 600; }
   .kl-default { font-size: 9px; color: #7a8294; font-weight: 400; display: block; margin-top: -2px; text-decoration: underline; }
+  .kl-aggressive { font-size: 9px; color: #e53935; font-weight: 400; display: block; margin-top: -2px; }
 
   :global(.jgrid) { position: relative; width: 100%; height: 100%; overflow: hidden; }
   :global(.cell) { position: absolute; overflow: hidden; cursor: pointer; border: 3px solid transparent; transition: border-color .12s, opacity .12s; }
