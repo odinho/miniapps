@@ -17,6 +17,7 @@
   let showPreview = false;
   let selectedIdx = 0;
   let helpOpen = false;
+  let sidebarOpen = false; // mobile sidebar drawer
 
   let groups: GroupSummary[] = [];
   let groupIdx = -1;
@@ -261,6 +262,7 @@
 
 <div class="app">
   <header class="header">
+    <button class="hamburger" on:click={() => sidebarOpen = !sidebarOpen}>☰</button>
     <h1>immich-cull</h1>
     <div class="mode-toggle">
       <button class:active={mode === 'groups'} on:click={() => switchMode('groups')}>Groups</button>
@@ -277,12 +279,16 @@
     </div>
   </header>
 
-  <aside class="sidebar">
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
+  {#if sidebarOpen}
+    <div class="sidebar-backdrop" on:click={() => sidebarOpen = false}></div>
+  {/if}
+  <aside class="sidebar" class:open={sidebarOpen}>
     <div class="sidebar-list">
       {#each sidebarItems as item}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div class="gi" class:active={item.active} class:decided={item.decided}
-             on:click={() => mode === 'groups' ? selectGroup(item.idx) : selectBatch(item.idx)} role="button" tabindex="-1">
+             on:click={() => { sidebarOpen = false; mode === 'groups' ? selectGroup(item.idx) : selectBatch(item.idx); }} role="button" tabindex="-1">
           <div class="t">{item.label} · {item.date.toLocaleDateString('no', { day: 'numeric', month: 'short', year: '2-digit' })}</div>
           <div class="m">{item.sub}</div>
         </div>
@@ -433,4 +439,28 @@
   .help-box td { padding: 3px 0; font-size: 13px; } .help-box td:first-child { width: 110px; white-space: nowrap; }
   :global(kbd) { display: inline-block; min-width: 20px; text-align: center; padding: 1px 6px; border: 1px solid #444; border-radius: 4px; background: #252830; color: #ddd; font: 11px/1.5 monospace; }
   .note { margin-top: 16px; font-size: 11px; color: #666; line-height: 1.6; }
+
+  /* Hamburger — hidden on desktop */
+  .hamburger { display: none; background: none; border: none; color: #7a8294; font-size: 20px; cursor: pointer; padding: 0 4px; }
+  .sidebar-backdrop { display: none; }
+
+  /* Mobile: sidebar as drawer overlay */
+  @media (max-width: 768px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    .hamburger { display: block; }
+    .sidebar {
+      position: fixed; top: 34px; left: -280px; bottom: 0; width: 280px;
+      z-index: 100; transition: left .2s ease;
+    }
+    .sidebar.open { left: 0; }
+    .sidebar-backdrop { display: block; position: fixed; inset: 0; top: 34px; background: rgba(0,0,0,.5); z-index: 99; }
+    .bar { grid-column: 1; gap: 6px; padding: 0 8px; }
+    .bar button { padding: 5px 10px; font-size: 12px; }
+    .header { padding: 0 8px; gap: 6px; }
+    .header h1 { font-size: 12px; }
+    .stats { gap: 6px; font-size: 10px; }
+    :global(.preview-ov) { left: 0 !important; }
+    :global(.pv-strip) { height: 60px; }
+    :global(.pvt) { height: 50px; }
+  }
 </style>
