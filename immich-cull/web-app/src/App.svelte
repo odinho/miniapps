@@ -51,6 +51,15 @@
   $: selectedLlmState = selectedAsset ? (keepSet.has(selectedAsset.id) ? 'keep' : cullSet.has(selectedAsset.id) ? 'cull' : null) : null;
   $: selectedUserStars = selectedAsset ? (userStars[selectedAsset.id] ?? selectedAsset.rating ?? 0) : 0;
 
+  // Keep level stats (reactive)
+  $: sgStats = (() => {
+    const sgs = batchDetail?.llm?.similaritySubgroups ?? [];
+    const total = sgs.reduce((s, sg) => s + sg.imageIds.length, 0);
+    const base = sgs.reduce((s, sg) => s + sg.recommendedKeepCount, 0);
+    const adjusted = sgs.reduce((s, sg) => s + Math.max(1, Math.min(sg.imageIds.length, sg.recommendedKeepCount + keepLevel)), 0);
+    return { total, base, adjusted };
+  })();
+
   function setStars(stars: number) {
     if (!selectedAsset) return;
     userStars[selectedAsset.id] = stars;
@@ -446,13 +455,10 @@
       {:else if !batchDetail.llm}
         <button class="run-btn" on:click={runLlm}>Run LLM</button>
       {:else}
-        {@const totalInSg = (batchDetail?.llm?.similaritySubgroups ?? []).reduce((s, sg) => s + sg.imageIds.length, 0)}
-        {@const baseKeep = (batchDetail?.llm?.similaritySubgroups ?? []).reduce((s, sg) => s + sg.recommendedKeepCount, 0)}
-        {@const adjustedKeep = (batchDetail?.llm?.similaritySubgroups ?? []).reduce((s, sg) => s + Math.max(1, Math.min(sg.imageIds.length, sg.recommendedKeepCount + keepLevel)), 0)}
         <div class="keep-level">
           <button class="kl-btn" on:click={() => applyKeepLevel(keepLevel - 1)}>−</button>
-          <span class="kl-label" title="Keep {adjustedKeep} of {totalInSg} in subgroups">
-            {adjustedKeep}/{totalInSg}
+          <span class="kl-label" title="Keep {sgStats.adjusted} of {sgStats.total} in subgroups">
+            {sgStats.adjusted}/{sgStats.total}
             {#if keepLevel === 0}<span class="kl-default">default</span>{/if}
           </span>
           <button class="kl-btn" on:click={() => applyKeepLevel(keepLevel + 1)}>+</button>
