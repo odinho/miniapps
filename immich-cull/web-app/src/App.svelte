@@ -23,7 +23,6 @@
   let helpOpen = false;
   let sidebarOpen = false;
   let loading = false;
-  let llmRunning = false;
   let keepLevel = 0; // 0 = LLM default, +N = keep N more per subgroup, -N = keep N fewer
   const models = [
     { id: 'gemini-2.5-flash-lite', label: '2.5-lite' },
@@ -197,22 +196,23 @@
   }
 
   /** Switch to a model's cached result, or run it if not cached */
+  let runningModel = '';
   async function switchOrRunModel(modelId: string) {
-    if (!batches[batchIdx] || llmRunning) return;
+    if (!batches[batchIdx] || runningModel) return;
     const cachedModels = batchDetail?.llmModels ?? [];
     if (cachedModels.includes(modelId)) {
-      // Just switch to cached result
-      await selectBatch(batchIdx, { model: modelId });
+      // Switch to cached result (freshLlm to avoid stale DB overrides)
+      await selectBatch(batchIdx, { freshLlm: true, model: modelId });
     } else {
       // Need to run it
-      llmRunning = true;
+      runningModel = modelId;
       try {
         const result = await rankBatch(batches[batchIdx].id, modelId);
         if (result.error) { alert('LLM error: ' + result.error); return; }
         batches[batchIdx].hasLlmResult = true; batches = batches;
         await selectBatch(batchIdx, { freshLlm: true, model: modelId });
       } finally {
-        llmRunning = false;
+        runningModel = '';
       }
     }
   }
@@ -413,15 +413,15 @@
   }
 
   async function runLlm() {
-    if (!batches[batchIdx] || llmRunning) return;
-    llmRunning = true;
+    if (!batches[batchIdx] || runningModel) return;
+    runningModel = models[0].id;
     try {
       const result = await rankBatch(batches[batchIdx].id);
       if (result.error) { alert('LLM error: ' + result.error); return; }
       batches[batchIdx].hasLlmResult = true; batches = batches;
       await selectBatch(batchIdx, { freshLlm: true });
     } finally {
-      llmRunning = false;
+      runningModel = '';
     }
   }
 
@@ -459,7 +459,7 @@
       case 's': if (!shift) skip(); break;
       case 'Backspace': e.preventDefault(); undo(); break;
       case '?': helpOpen = !helpOpen; break;
-      case 'r': if (mode === 'batches' && !llmRunning) runLlm(); break;
+      case 'r': if (mode === 'batches' && !runningModel) runLlm(); break;
       case 'R': if (mode === 'batches') cycleModel(); break;
       case '-': case '_': if (mode === 'batches' && levelLimits.canDecrease) applyKeepLevel(levelLimits.nextDown); break;
       case '=': case '+': if (mode === 'batches' && levelLimits.canIncrease) applyKeepLevel(levelLimits.nextUp); break;
@@ -542,33 +542,35 @@
     <button class="ba" on:click={approve}>Approve & Next</button>
     <button class="bs" on:click={skip}>Skip</button>
     {#if mode === 'batches' && batchDetail}
-      {#if llmRunning}
-        <button class="run-btn" disabled><span class="spinner"></span> Running...</button>
-      {:else if !batchDetail.llm}
+      {#if !batchDetail.llm && !runningModel}
         <button class="run-btn" on:click={() => runLlm()}>LLM: {models[0].label}</button>
       {:else}
-        <div class="keep-level">
-          <button class="kl-btn" disabled={!levelLimits.canDecrease} on:click={() => applyKeepLevel(levelLimits.nextDown)}>−</button>
-          <span class="kl-label" title="Keep {sgStats.totalKept}, cull {sgStats.totalCulled}">
-            {sgStats.totalKept}✓ {sgStats.totalCulled}✗
-            <span class="kl-mode" class:kl-aggressive={sgStats.isAggressive}>
-              {#if keepLevel > 1}keep more
-              {:else if keepLevel === 1}generous
-              {:else if keepLevel === 0}default
-              {:else if !sgStats.isAggressive}trim
-              {:else}cull more
-              {/if}
+        {#if batchDetail.llm}
+          <div class="keep-level">
+            <button class="kl-btn" disabled={!levelLimits.canDecrease} on:click={() => applyKeepLevel(levelLimits.nextDown)}>−</button>
+            <span class="kl-label" title="Keep {sgStats.totalKept}, cull {sgStats.totalCulled}">
+              {sgStats.totalKept}✓ {sgStats.totalCulled}✗
+              <span class="kl-mode" class:kl-aggressive={sgStats.isAggressive}>
+                {#if keepLevel > 1}keep more
+                {:else if keepLevel === 1}generous
+                {:else if keepLevel === 0}default
+                {:else if !sgStats.isAggressive}trim
+                {:else}cull more
+                {/if}
+              </span>
             </span>
-          </span>
-          <button class="kl-btn" disabled={!levelLimits.canIncrease} on:click={() => applyKeepLevel(levelLimits.nextUp)}>+</button>
-        </div>
+            <button class="kl-btn" disabled={!levelLimits.canIncrease} on:click={() => applyKeepLevel(levelLimits.nextUp)}>+</button>
+          </div>
+        {/if}
         <div class="model-run">
           {#each models as m}
-            {@const isCurrent = batchDetail.llm.model === m.id}
+            {@const isCurrent = batchDetail.llm?.model === m.id}
             {@const hasCached = (batchDetail.llmModels ?? []).includes(m.id)}
+            {@const isRunning = runningModel === m.id}
             <button class="model-btn" class:current={isCurrent} class:cached={hasCached && !isCurrent}
+              disabled={!!runningModel}
               on:click={() => switchOrRunModel(m.id)} title="{m.id}{hasCached ? ' (cached)' : ''}">
-              {m.label}
+              {#if isRunning}<span class="spinner"></span>{:else}{m.label}{/if}
             </button>
           {/each}
         </div>
