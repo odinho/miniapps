@@ -82,7 +82,7 @@
       {#if sgRank}
         <div class="ip-sg-rank">
           <span class="ip-rank-pos">#{sgRank.rank}</span> of {sgRank.total}
-          {#if sgRank.rank <= sgRank.cutoff}
+          {#if currentState === 'keep'}
             <span class="ip-rank-kept">· kept</span>
           {:else}
             <span class="ip-rank-culled">· culled</span>
