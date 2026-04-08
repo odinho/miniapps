@@ -8,7 +8,7 @@ import { dirname } from "path";
 import { mkdirSync } from "fs";
 import { createHash } from "crypto";
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 export class StateDb {
   private db: Database.Database;
@@ -97,6 +97,32 @@ export class StateDb {
       } catch {
         /* old table doesn't exist, fine */
       }
+    }
+
+    if (currentVersion < 5) {
+      // Add 'superseded' to status CHECK constraint — SQLite requires table recreate
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS llm_batch_runs_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          batch_id TEXT NOT NULL,
+          batch_fingerprint TEXT NOT NULL,
+          model TEXT NOT NULL,
+          prompt_version TEXT NOT NULL,
+          status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'completed', 'failed', 'superseded')),
+          request_meta TEXT,
+          response_json TEXT,
+          error_message TEXT,
+          input_tokens INTEGER,
+          output_tokens INTEGER,
+          cost_estimate_usd REAL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          completed_at TEXT
+        );
+        INSERT INTO llm_batch_runs_new SELECT * FROM llm_batch_runs;
+        DROP TABLE llm_batch_runs;
+        ALTER TABLE llm_batch_runs_new RENAME TO llm_batch_runs;
+        CREATE INDEX IF NOT EXISTS idx_llm_batch ON llm_batch_runs(batch_id, batch_fingerprint, status);
+      `);
     }
 
     this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
@@ -225,13 +251,23 @@ export class StateDb {
       .run(batchId, fingerprint);
   }
 
-  getLlmRun(batchId: string, fingerprint: string): { id: number; responseJson: string } | null {
-    const row = this.db
-      .prepare(
-        "SELECT id, response_json FROM llm_batch_runs WHERE batch_id = ? AND batch_fingerprint = ? AND status = 'completed' ORDER BY id DESC LIMIT 1",
-      )
-      .get(batchId, fingerprint) as any;
-    return row ? { id: row.id, responseJson: row.response_json } : null;
+  getLlmRun(
+    batchId: string,
+    fingerprint: string,
+    model?: string,
+  ): { id: number; responseJson: string; model: string } | null {
+    const row = model
+      ? (this.db
+          .prepare(
+            "SELECT id, response_json as responseJson, model FROM llm_batch_runs WHERE batch_id = ? AND batch_fingerprint = ? AND model = ? AND status = 'completed' ORDER BY id DESC LIMIT 1",
+          )
+          .get(batchId, fingerprint, model) as any)
+      : (this.db
+          .prepare(
+            "SELECT id, response_json as responseJson, model FROM llm_batch_runs WHERE batch_id = ? AND batch_fingerprint = ? AND status = 'completed' ORDER BY id DESC LIMIT 1",
+          )
+          .get(batchId, fingerprint) as any);
+    return row ? { id: row.id, responseJson: row.responseJson, model: row.model } : null;
   }
 
   // === Stats (from photo_decisions, single source) ===

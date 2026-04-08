@@ -423,19 +423,17 @@ app.post<{ Params: { id: string }; Querystring: { model?: string } }>(
     const overrideModel = req.query.model;
     const fp = batchFingerprint(batch.assets.map((a) => a.id));
 
-    // Check cache (skip if model override — always run fresh)
-    if (!overrideModel) {
-      const cached = stateDb.getLlmRun(batch.id, fp);
-      if (cached) {
-        return { cached: true, response: JSON.parse(cached.responseJson) };
-      }
+    // Check cache — filter by model so different models don't share cache
+    const usedModel = overrideModel ?? modelArg;
+    const cached = stateDb.getLlmRun(batch.id, fp, usedModel);
+    if (cached) {
+      return { cached: true, model: usedModel, response: JSON.parse(cached.responseJson) };
     }
 
     // Use override model or default
     const client = overrideModel
       ? new LlmClient({ ...llmClient.config, model: overrideModel })
       : llmClient;
-    const usedModel = overrideModel ?? modelArg;
 
     try {
       const { response, rawJson, inputTokens, outputTokens } = await client.rankBatch(
