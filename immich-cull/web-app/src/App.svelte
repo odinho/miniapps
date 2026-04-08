@@ -172,16 +172,16 @@
     history.replaceState(null, '', `#group/${idx}`);
   }
 
-  async function selectBatch(idx: number, freshLlm = false) {
+  async function selectBatch(idx: number, opts: { freshLlm?: boolean; model?: string } = {}) {
     batchIdx = idx; selectedIdx = 0; showPreview = false; keepLevel = 0;
     loading = true;
-    batchDetail = await fetchBatch(batches[idx].id);
+    batchDetail = await fetchBatch(batches[idx].id, opts.model);
     loading = false;
 
     // Clear manual overrides for the new batch
     manualOverrides = {};
 
-    if (!freshLlm) {
+    if (!opts.freshLlm) {
       // Load saved manual overrides from DB
       const saved = await loadSavedStars(batchDetail?.assets ?? []);
       for (const [id, d] of Object.entries(saved)) {
@@ -194,6 +194,35 @@
     }
 
     history.replaceState(null, '', `#batch/${batches[idx].id}`);
+  }
+
+  /** Switch to a model's cached result, or run it if not cached */
+  async function switchOrRunModel(modelId: string) {
+    if (!batches[batchIdx] || llmRunning) return;
+    const cachedModels = batchDetail?.llmModels ?? [];
+    if (cachedModels.includes(modelId)) {
+      // Just switch to cached result
+      await selectBatch(batchIdx, { model: modelId });
+    } else {
+      // Need to run it
+      llmRunning = true;
+      try {
+        const result = await rankBatch(batches[batchIdx].id, modelId);
+        if (result.error) { alert('LLM error: ' + result.error); return; }
+        batches[batchIdx].hasLlmResult = true; batches = batches;
+        await selectBatch(batchIdx, { freshLlm: true, model: modelId });
+      } finally {
+        llmRunning = false;
+      }
+    }
+  }
+
+  /** Cycle to the next model (Shift+R) */
+  function cycleModel() {
+    const currentModel = batchDetail?.llm?.model ?? models[0].id;
+    const currentIdx = models.findIndex(m => m.id === currentModel);
+    const nextIdx = (currentIdx + 1) % models.length;
+    switchOrRunModel(models[nextIdx].id);
   }
 
   function switchMode(m: AppMode) {
@@ -383,28 +412,14 @@
     await savePhotoDecisions(decisions);
   }
 
-  async function runLlm(model?: string) {
+  async function runLlm() {
     if (!batches[batchIdx] || llmRunning) return;
     llmRunning = true;
     try {
-      const result = await rankBatch(batches[batchIdx].id, model);
+      const result = await rankBatch(batches[batchIdx].id);
       if (result.error) { alert('LLM error: ' + result.error); return; }
       batches[batchIdx].hasLlmResult = true; batches = batches;
-      await selectBatch(batchIdx, true);
-    } finally {
-      llmRunning = false;
-    }
-  }
-
-  async function rerunLlm(model?: string) {
-    if (!batches[batchIdx] || llmRunning) return;
-    llmRunning = true;
-    try {
-      await fetch(`/api/batches/${batches[batchIdx].id}/rank`, { method: 'DELETE' });
-      const result = await rankBatch(batches[batchIdx].id, model);
-      if (result.error) { alert('LLM error: ' + result.error); return; }
-      batches[batchIdx].hasLlmResult = true; batches = batches;
-      await selectBatch(batchIdx, true);
+      await selectBatch(batchIdx, { freshLlm: true });
     } finally {
       llmRunning = false;
     }
@@ -444,8 +459,8 @@
       case 's': if (!shift) skip(); break;
       case 'Backspace': e.preventDefault(); undo(); break;
       case '?': helpOpen = !helpOpen; break;
-      case 'r': if (mode === 'batches' && !llmRunning) { if (batchDetail?.llm) rerunLlm(); else runLlm(); } break;
-      case 'R': if (mode === 'batches' && !llmRunning) rerunLlm(models[1].id); break;
+      case 'r': if (mode === 'batches' && !llmRunning) runLlm(); break;
+      case 'R': if (mode === 'batches') cycleModel(); break;
       case '-': case '_': if (mode === 'batches' && levelLimits.canDecrease) applyKeepLevel(levelLimits.nextDown); break;
       case '=': case '+': if (mode === 'batches' && levelLimits.canIncrease) applyKeepLevel(levelLimits.nextUp); break;
       case '1': setStars(1); break; case '2': setStars(2); break; case '3': setStars(3); break;
@@ -530,7 +545,7 @@
       {#if llmRunning}
         <button class="run-btn" disabled><span class="spinner"></span> Running...</button>
       {:else if !batchDetail.llm}
-        <button class="run-btn" on:click={() => runLlm()}>Run LLM</button>
+        <button class="run-btn" on:click={() => runLlm()}>LLM: {models[0].label}</button>
       {:else}
         <div class="keep-level">
           <button class="kl-btn" disabled={!levelLimits.canDecrease} on:click={() => applyKeepLevel(levelLimits.nextDown)}>−</button>
@@ -549,8 +564,10 @@
         </div>
         <div class="model-run">
           {#each models as m}
-            <button class="model-btn" class:current={batchDetail.llm.model === m.id}
-              on:click={() => rerunLlm(m.id)} title="Run with {m.id}">
+            {@const isCurrent = batchDetail.llm.model === m.id}
+            {@const hasCached = (batchDetail.llmModels ?? []).includes(m.id)}
+            <button class="model-btn" class:current={isCurrent} class:cached={hasCached && !isCurrent}
+              on:click={() => switchOrRunModel(m.id)} title="{m.id}{hasCached ? ' (cached)' : ''}">
               {m.label}
             </button>
           {/each}
@@ -654,6 +671,7 @@
   .model-run { display: flex; gap: 2px; }
   .model-btn { background: #2a2e36; border: none; color: #888; font-size: 10px; padding: 3px 8px; border-radius: 3px; cursor: pointer; white-space: nowrap; }
   .model-btn:hover { background: #3a3e46; color: #ccc; }
+  .model-btn.cached { background: #3a3520; color: #c9b458; }
   .model-btn.current { background: #2a4a2a; color: #8c8; }
   .keep-level { display: flex; align-items: center; gap: 2px; background: #1e2028; border-radius: 5px; padding: 2px; }
   .kl-btn { background: #333; border: none; color: #ddd; width: 26px; height: 26px; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; }

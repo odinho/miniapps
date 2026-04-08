@@ -322,13 +322,16 @@ app.get("/api/batches", async () => {
   );
 });
 
-/** Get a batch with its LLM results (if available) */
-app.get<{ Params: { id: string } }>("/api/batches/:id", async (req) => {
+/** Get a batch with its LLM results (if available). ?model=xxx to get a specific model's result. */
+app.get<{ Params: { id: string }; Querystring: { model?: string } }>("/api/batches/:id", async (req) => {
   const batch = sessionBatches.find((b) => b.id === req.params.id);
   if (!batch) return { error: "Not found" };
 
   const fp = batchFingerprint(batch.assets.map((a) => a.id));
-  const cached = stateDb.getLlmRun(batch.id, fp);
+  const cached = req.query.model
+    ? stateDb.getLlmRun(batch.id, fp, req.query.model)
+    : stateDb.getLlmRun(batch.id, fp);
+  const llmModels = stateDb.getLlmModels(batch.id, fp);
   let llmResult: any = null;
   if (cached) {
     try {
@@ -410,6 +413,7 @@ app.get<{ Params: { id: string } }>("/api/batches/:id", async (req) => {
       }),
     ),
     llm: llmResult,
+    llmModels,
   };
 });
 

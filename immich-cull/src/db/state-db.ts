@@ -270,6 +270,16 @@ export class StateDb {
     return row ? { id: row.id, responseJson: row.responseJson, model: row.model } : null;
   }
 
+  /** Get list of models with completed results for a batch */
+  getLlmModels(batchId: string, fingerprint: string): string[] {
+    const rows = this.db
+      .prepare(
+        "SELECT DISTINCT model FROM llm_batch_runs WHERE batch_id = ? AND batch_fingerprint = ? AND status = 'completed' ORDER BY model",
+      )
+      .all(batchId, fingerprint) as Array<{ model: string }>;
+    return rows.map((r) => r.model);
+  }
+
   // === Stats (from photo_decisions, single source) ===
 
   getStats(): {

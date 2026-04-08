@@ -57,6 +57,7 @@ export interface BatchDetail {
   dateRange: { start: string; end: string };
   assets: AssetDetail[];
   llm: LlmResult | null;
+  llmModels?: string[];
 }
 
 export interface LlmResult {
@@ -126,8 +127,9 @@ export async function fetchBatches(): Promise<BatchSummary[]> {
   return (await fetch(`${BASE}/api/batches`)).json();
 }
 
-export async function fetchBatch(id: string): Promise<BatchDetail> {
-  return (await fetch(`${BASE}/api/batches/${id}`)).json();
+export async function fetchBatch(id: string, model?: string): Promise<BatchDetail> {
+  const qs = model ? `?model=${encodeURIComponent(model)}` : "";
+  return (await fetch(`${BASE}/api/batches/${id}${qs}`)).json();
 }
 
 export async function savePhotoDecisions(
