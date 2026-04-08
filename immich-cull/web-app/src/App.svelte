@@ -25,8 +25,11 @@
   let loading = false;
   let llmRunning = false;
   let keepLevel = 0; // 0 = LLM default, +N = keep N more per subgroup, -N = keep N fewer
-  let altModel = 'gemini-3.1-flash-lite-preview';
-  let modelPickerOpen = false;
+  const models = [
+    { id: 'gemini-2.5-flash-lite', label: '2.5-lite' },
+    { id: 'gemini-3.1-flash-lite-preview', label: '3.1-lite' },
+    { id: 'gemini-3-flash-preview', label: '3-flash' },
+  ];
 
   let groups: GroupSummary[] = [];
   let groupIdx = -1;
@@ -442,7 +445,7 @@
       case 'Backspace': e.preventDefault(); undo(); break;
       case '?': helpOpen = !helpOpen; break;
       case 'r': if (mode === 'batches' && !llmRunning) { if (batchDetail?.llm) rerunLlm(); else runLlm(); } break;
-      case 'R': if (mode === 'batches' && !llmRunning) rerunLlm(altModel); break;
+      case 'R': if (mode === 'batches' && !llmRunning) rerunLlm(models[1].id); break;
       case '-': case '_': if (mode === 'batches' && levelLimits.canDecrease) applyKeepLevel(levelLimits.nextDown); break;
       case '=': case '+': if (mode === 'batches' && levelLimits.canIncrease) applyKeepLevel(levelLimits.nextUp); break;
       case '1': setStars(1); break; case '2': setStars(2); break; case '3': setStars(3); break;
@@ -544,25 +547,14 @@
           </span>
           <button class="kl-btn" disabled={!levelLimits.canIncrease} on:click={() => applyKeepLevel(levelLimits.nextUp)}>+</button>
         </div>
-        <div class="model-info">
-          <button class="run-btn" on:click={() => rerunLlm()} style="background:#555;font-size:11px">Re-run</button>
-          <button class="run-btn" on:click={() => rerunLlm(altModel)} style="background:#664;font-size:11px" title="Run with {altModel}">Alt</button>
-          <button class="run-btn" on:click={() => modelPickerOpen = !modelPickerOpen} style="background:#444;font-size:11px;padding:2px 4px">▾</button>
-          {#if batchDetail.llm.model}
-            <span class="model-tag">{batchDetail.llm.model.replace('gemini-', '').replace('-preview', '')}</span>
-          {/if}
+        <div class="model-run">
+          {#each models as m}
+            <button class="model-btn" class:current={batchDetail.llm.model === m.id}
+              on:click={() => rerunLlm(m.id)} title="Run with {m.id}">
+              {m.label}
+            </button>
+          {/each}
         </div>
-        {#if modelPickerOpen}
-          <div class="model-picker">
-            {#each ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3.1-flash-lite-preview'] as m}
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <div class="model-opt" class:active={altModel === m} role="button" tabindex="-1"
-                on:click={() => { altModel = m; modelPickerOpen = false; }}>
-                {m.replace('gemini-', '').replace('-preview', '')}
-              </div>
-            {/each}
-          </div>
-        {/if}
       {/if}
     {/if}
     <span class="spacer"></span>
@@ -659,12 +651,10 @@
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: white; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .run-btn:disabled { opacity: .6; cursor: wait; }
-  .model-info { display: flex; align-items: center; gap: 3px; }
-  .model-tag { font-size: 9px; color: #7a8294; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .model-picker { display: flex; gap: 2px; flex-wrap: wrap; order: 20; }
-  .model-opt { font-size: 10px; padding: 3px 8px; background: #2a2e36; border-radius: 3px; cursor: pointer; color: #aaa; }
-  .model-opt:hover { background: #3a3e46; }
-  .model-opt.active { background: #664; color: #ffd; }
+  .model-run { display: flex; gap: 2px; }
+  .model-btn { background: #2a2e36; border: none; color: #888; font-size: 10px; padding: 3px 8px; border-radius: 3px; cursor: pointer; white-space: nowrap; }
+  .model-btn:hover { background: #3a3e46; color: #ccc; }
+  .model-btn.current { background: #2a4a2a; color: #8c8; }
   .keep-level { display: flex; align-items: center; gap: 2px; background: #1e2028; border-radius: 5px; padding: 2px; }
   .kl-btn { background: #333; border: none; color: #ddd; width: 26px; height: 26px; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
   .kl-btn:hover { background: #444; }
