@@ -335,6 +335,7 @@ app.get<{ Params: { id: string } }>("/api/batches/:id", async (req) => {
       const raw = JSON.parse(cached.responseJson);
       // Expand compact format to full format for the UI
       llmResult = {
+        model: cached.model,
         batchSummary: raw.sum ?? raw.batchSummary ?? "",
         overallConfidence: raw.conf ?? raw.overallConfidence ?? 0,
         images: (raw.img ?? raw.images ?? [])

@@ -60,6 +60,7 @@ export interface BatchDetail {
 }
 
 export interface LlmResult {
+  model?: string;
   batchSummary: string;
   overallConfidence: number;
   images: LlmImage[];
