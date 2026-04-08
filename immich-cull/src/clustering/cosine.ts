@@ -21,7 +21,7 @@ export function topKNeighbors(
   queryEmbedding: Float32Array,
   candidates: Float32Array[],
   k: number,
-  excludeIndex: number
+  excludeIndex: number,
 ): Array<{ index: number; distance: number }> {
   const scored: Array<{ index: number; distance: number }> = [];
 

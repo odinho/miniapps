@@ -5,7 +5,7 @@ export class UnionFind {
 
   constructor(size: number) {
     this.parent = Array.from({ length: size }, (_, i) => i);
-    this.rank = new Array(size).fill(0);
+    this.rank = Array.from({ length: size }, () => 0);
   }
 
   find(x: number): number {

@@ -56,6 +56,7 @@ export class ImmichAdapter {
 
     let offset = 0;
     while (offset < total) {
+      // eslint-disable-next-line no-await-in-loop -- intentional sequential batch loading
       const result = await this.pool.query(
         `
         SELECT a.id, a."originalFileName", a."originalPath",
@@ -69,7 +70,7 @@ export class ImmichAdapter {
         ORDER BY a."fileCreatedAt" ASC
         LIMIT $1 OFFSET $2
         `,
-        [batchSize, offset]
+        [batchSize, offset],
       );
 
       for (const row of result.rows) {
@@ -110,7 +111,7 @@ export class ImmichAdapter {
       ORDER BY a."fileCreatedAt" DESC
       LIMIT $1
       `,
-      [limit]
+      [limit],
     );
 
     return result.rows

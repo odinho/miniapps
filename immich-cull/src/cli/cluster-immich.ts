@@ -22,7 +22,9 @@ function getArg(flag: string, defaultVal: string): string {
 
 const sampleSize = parseInt(getArg("--sample", "0")); // 0 = all
 const jsonOutput = getArg("--json", "");
-const strongDist = parseFloat(getArg("--strong", String(DEFAULT_CLUSTER_CONFIG.strongEdgeDistance)));
+const strongDist = parseFloat(
+  getArg("--strong", String(DEFAULT_CLUSTER_CONFIG.strongEdgeDistance)),
+);
 const burstDist = parseFloat(getArg("--burst", String(DEFAULT_CLUSTER_CONFIG.burstEdgeDistance)));
 const bucketMin = parseInt(getArg("--bucket", String(DEFAULT_CLUSTER_CONFIG.bucketMinutes)));
 
@@ -34,7 +36,9 @@ const config: ClusterConfig = {
 };
 
 console.log("=== immich-cull: Immich Clustering ===");
-console.log(`Config: strong=${config.strongEdgeDistance}, burst=${config.burstEdgeDistance}, bucket=${config.bucketMinutes}min`);
+console.log(
+  `Config: strong=${config.strongEdgeDistance}, burst=${config.burstEdgeDistance}, bucket=${config.bucketMinutes}min`,
+);
 if (sampleSize > 0) console.log(`Sample: ${sampleSize} most recent photos`);
 console.log();
 
@@ -47,7 +51,9 @@ try {
   // Show rating distribution
   const ratings = await adapter.getRatingDistribution();
   console.log("Rating distribution:");
-  for (const [rating, count] of [...ratings.entries()].sort((a, b) => (a[0] ?? 99) - (b[0] ?? 99))) {
+  for (const [rating, count] of [...ratings.entries()].toSorted(
+    (a, b) => (a[0] ?? 99) - (b[0] ?? 99),
+  )) {
     console.log(`  ${rating === null ? "unrated" : rating + "★"}: ${count}`);
   }
   console.log();
@@ -90,12 +96,14 @@ try {
     const rated = g.assets.filter((a) => a.asset.rating != null && a.asset.rating > 0);
 
     console.log(
-      `\n[${g.id}] ${g.assets.length} photos | span: ${g.timeSpanMinutes}min | dist: ${g.avgDistance} | ${earliest.toISOString().slice(0, 16)}`
+      `\n[${g.id}] ${g.assets.length} photos | span: ${g.timeSpanMinutes}min | dist: ${g.avgDistance} | ${earliest.toISOString().slice(0, 16)}`,
     );
     const names = g.assets.map((a) => a.asset.filename).join(", ");
     console.log(`  ${names.length > 120 ? names.slice(0, 120) + "..." : names}`);
     if (rated.length > 0) {
-      console.log(`  Rated: ${rated.map((a) => `${a.asset.filename}=${a.asset.rating}★`).join(", ")}`);
+      console.log(
+        `  Rated: ${rated.map((a) => `${a.asset.filename}=${a.asset.rating}★`).join(", ")}`,
+      );
     }
   }
 
@@ -103,12 +111,14 @@ try {
   console.log("\n=== Group Size Distribution ===");
   const sizeDist = new Map<number, number>();
   for (const g of groups) sizeDist.set(g.assets.length, (sizeDist.get(g.assets.length) || 0) + 1);
-  for (const [size, count] of [...sizeDist.entries()].sort((a, b) => a[0] - b[0])) {
+  for (const [size, count] of [...sizeDist.entries()].toSorted((a, b) => a[0] - b[0])) {
     console.log(`  ${size} photos: ${count} groups (${count * size} total)`);
   }
 
   const inGroups = groups.reduce((s, g) => s + g.assets.length, 0);
-  console.log(`\nPhotos in groups: ${inGroups} / ${stats.totalAssets} (${Math.round((inGroups / stats.totalAssets) * 100)}%)`);
+  console.log(
+    `\nPhotos in groups: ${inGroups} / ${stats.totalAssets} (${Math.round((inGroups / stats.totalAssets) * 100)}%)`,
+  );
   console.log(`Potential culls: ~${inGroups - groups.length}`);
 
   if (jsonOutput) {

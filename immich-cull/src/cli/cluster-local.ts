@@ -16,12 +16,17 @@ function getArg(flag: string, defaultVal: string): string {
   return idx >= 0 && idx + 1 < args.length ? args[idx + 1] : defaultVal;
 }
 
-const dbPath = getArg("--db", resolve(import.meta.dirname ?? ".", "../../..", "facet/photo_scores_pro.db"));
-const strongDist = parseFloat(getArg("--strong", String(DEFAULT_CLUSTER_CONFIG.strongEdgeDistance)));
+const dbPath = getArg(
+  "--db",
+  resolve(import.meta.dirname ?? ".", "../../..", "facet/photo_scores_pro.db"),
+);
+const strongDist = parseFloat(
+  getArg("--strong", String(DEFAULT_CLUSTER_CONFIG.strongEdgeDistance)),
+);
 const burstDist = parseFloat(getArg("--burst", String(DEFAULT_CLUSTER_CONFIG.burstEdgeDistance)));
 const bucketMin = parseInt(getArg("--bucket", String(DEFAULT_CLUSTER_CONFIG.bucketMinutes)));
 const jsonOutput = getArg("--json", "");
-const dryRun = args.includes("--dry-run");
+const _dryRun = args.includes("--dry-run");
 
 const config: ClusterConfig = {
   ...DEFAULT_CLUSTER_CONFIG,
@@ -32,7 +37,9 @@ const config: ClusterConfig = {
 
 console.log("=== immich-cull: Local Clustering Test ===");
 console.log(`DB: ${dbPath}`);
-console.log(`Config: strong=${config.strongEdgeDistance}, burst=${config.burstEdgeDistance}, bucket=${config.bucketMinutes}min`);
+console.log(
+  `Config: strong=${config.strongEdgeDistance}, burst=${config.burstEdgeDistance}, bucket=${config.bucketMinutes}min`,
+);
 console.log();
 
 const adapter = new FacetAdapter(dbPath);
@@ -67,7 +74,7 @@ for (let i = 0; i < showCount; i++) {
   const filenames = g.assets.map((a) => a.asset.filename).join(", ");
 
   console.log(
-    `\n[${g.id}] ${g.assets.length} photos | span: ${g.timeSpanMinutes}min | avg dist: ${g.avgDistance} | ${earliest.toISOString().slice(0, 16)}`
+    `\n[${g.id}] ${g.assets.length} photos | span: ${g.timeSpanMinutes}min | avg dist: ${g.avgDistance} | ${earliest.toISOString().slice(0, 16)}`,
   );
 
   // Show filenames (truncated)
@@ -80,7 +87,9 @@ for (let i = 0; i < showCount; i++) {
   // Show existing ratings
   const rated = g.assets.filter((a) => a.asset.rating != null && a.asset.rating > 0);
   if (rated.length > 0) {
-    console.log(`  Rated: ${rated.map((a) => `${a.asset.filename}=${a.asset.rating}★`).join(", ")}`);
+    console.log(
+      `  Rated: ${rated.map((a) => `${a.asset.filename}=${a.asset.rating}★`).join(", ")}`,
+    );
   }
 }
 
@@ -91,12 +100,14 @@ for (const g of groups) {
   const size = g.assets.length;
   sizeDist.set(size, (sizeDist.get(size) || 0) + 1);
 }
-for (const [size, count] of [...sizeDist.entries()].sort((a, b) => a[0] - b[0])) {
+for (const [size, count] of [...sizeDist.entries()].toSorted((a, b) => a[0] - b[0])) {
   console.log(`  ${size} photos: ${count} groups (${count * size} photos total)`);
 }
 
 const photosInGroups = groups.reduce((s, g) => s + g.assets.length, 0);
-console.log(`\nPhotos in groups: ${photosInGroups} / ${stats.totalAssets} (${Math.round((photosInGroups / stats.totalAssets) * 100)}%)`);
+console.log(
+  `\nPhotos in groups: ${photosInGroups} / ${stats.totalAssets} (${Math.round((photosInGroups / stats.totalAssets) * 100)}%)`,
+);
 console.log(`Potential culls: ~${photosInGroups - groups.length} (keeping 1 per group)`);
 
 // Write JSON output

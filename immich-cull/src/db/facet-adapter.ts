@@ -20,7 +20,7 @@ export class FacetAdapter {
         `SELECT path, filename, date_taken, clip_embedding, star_rating, is_favorite, burst_group_id
          FROM photos
          WHERE clip_embedding IS NOT NULL
-         ORDER BY date_taken ASC`
+         ORDER BY date_taken ASC`,
       )
       .all() as Array<{
       path: string;

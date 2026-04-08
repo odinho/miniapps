@@ -10,7 +10,12 @@
     "cluster:immich": "tsx src/cli/cluster-immich.ts",
     "review": "tsx src/server.ts",
     "review:immich": "tsx src/server.ts --immich",
-    "test": "tsx src/cli/cluster-local.ts --dry-run"
+    "test": "tsx src/cli/cluster-local.ts --dry-run",
+    "lint": "oxlint --deny-warnings src/",
+    "fmt": "oxfmt --write src/",
+    "fmt:check": "oxfmt --check src/",
+    "typecheck": "tsgo --noEmit",
+    "check": "npm run lint && npm run fmt:check && npm run typecheck && npm --prefix web-app run lint && npm --prefix web-app run fmt:check && npm --prefix web-app run check && npm --prefix web-app run test"
   },
   "dependencies": {
     "@google/genai": "^1.0.0",
@@ -25,6 +30,9 @@
     "@types/better-sqlite3": "^7.6.0",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.11.0",
+    "@typescript/native-preview": "^7.0.0-dev.20260407.1",
+    "oxfmt": "^0.44.0",
+    "oxlint": "^1.59.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }

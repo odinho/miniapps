@@ -64,31 +64,39 @@ export class StateDb {
 
       // Migrate old decisions table if it exists
       try {
-        const oldDecisions = this.db.prepare(
-          "SELECT group_id, keep_ids, cull_ids, skipped FROM decisions"
-        ).all() as any[];
+        const oldDecisions = this.db
+          .prepare("SELECT group_id, keep_ids, cull_ids, skipped FROM decisions")
+          .all() as any[];
         for (const row of oldDecisions) {
           const groupId = row.group_id;
           const skipped = row.skipped === 1;
           // Migrate to view_status
-          this.db.prepare(
-            "INSERT OR IGNORE INTO view_status (view_id, view_type, status, reviewed_at) VALUES (?, 'group', ?, datetime('now'))"
-          ).run(groupId, skipped ? 'skipped' : 'reviewed');
+          this.db
+            .prepare(
+              "INSERT OR IGNORE INTO view_status (view_id, view_type, status, reviewed_at) VALUES (?, 'group', ?, datetime('now'))",
+            )
+            .run(groupId, skipped ? "skipped" : "reviewed");
           // Migrate keep/cull to photo_decisions
           if (!skipped) {
             for (const id of JSON.parse(row.keep_ids)) {
-              this.db.prepare(
-                "INSERT OR IGNORE INTO photo_decisions (asset_id, state, source) VALUES (?, 'keep', 'manual')"
-              ).run(id);
+              this.db
+                .prepare(
+                  "INSERT OR IGNORE INTO photo_decisions (asset_id, state, source) VALUES (?, 'keep', 'manual')",
+                )
+                .run(id);
             }
             for (const id of JSON.parse(row.cull_ids)) {
-              this.db.prepare(
-                "INSERT OR IGNORE INTO photo_decisions (asset_id, state, source) VALUES (?, 'cull', 'manual')"
-              ).run(id);
+              this.db
+                .prepare(
+                  "INSERT OR IGNORE INTO photo_decisions (asset_id, state, source) VALUES (?, 'cull', 'manual')",
+                )
+                .run(id);
             }
           }
         }
-      } catch { /* old table doesn't exist, fine */ }
+      } catch {
+        /* old table doesn't exist, fine */
+      }
     }
 
     this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
@@ -97,15 +105,19 @@ export class StateDb {
   // === Per-photo decisions (single source of truth) ===
 
   savePhotoDecision(assetId: string, state: string | null, userStars: number | null) {
-    this.db.prepare(`
+    this.db
+      .prepare(`
       INSERT INTO photo_decisions (asset_id, state, user_stars, updated_at)
       VALUES (?, ?, ?, datetime('now'))
       ON CONFLICT(asset_id) DO UPDATE SET
         state = excluded.state, user_stars = excluded.user_stars, updated_at = datetime('now')
-    `).run(assetId, state, userStars);
+    `)
+      .run(assetId, state, userStars);
   }
 
-  savePhotoDecisions(decisions: Array<{ assetId: string; state: string | null; userStars: number | null }>) {
+  savePhotoDecisions(
+    decisions: Array<{ assetId: string; state: string | null; userStars: number | null }>,
+  ) {
     const stmt = this.db.prepare(`
       INSERT INTO photo_decisions (asset_id, state, user_stars, updated_at)
       VALUES (?, ?, ?, datetime('now'))
@@ -117,14 +129,18 @@ export class StateDb {
     })();
   }
 
-  getPhotoDecisions(assetIds: string[]): Record<string, { state: string | null; userStars: number | null }> {
+  getPhotoDecisions(
+    assetIds: string[],
+  ): Record<string, { state: string | null; userStars: number | null }> {
     const result: Record<string, { state: string | null; userStars: number | null }> = {};
     for (let i = 0; i < assetIds.length; i += 500) {
       const chunk = assetIds.slice(i, i + 500);
-      const placeholders = chunk.map(() => '?').join(',');
-      const rows = this.db.prepare(
-        `SELECT asset_id, state, user_stars FROM photo_decisions WHERE asset_id IN (${placeholders})`
-      ).all(...chunk) as any[];
+      const placeholders = chunk.map(() => "?").join(",");
+      const rows = this.db
+        .prepare(
+          `SELECT asset_id, state, user_stars FROM photo_decisions WHERE asset_id IN (${placeholders})`,
+        )
+        .all(...chunk) as any[];
       for (const row of rows) {
         result[row.asset_id] = { state: row.state, userStars: row.user_stars };
       }
@@ -135,11 +151,13 @@ export class StateDb {
   // === View status (group/batch completion tracking) ===
 
   setViewStatus(viewId: string, viewType: string, status: string) {
-    this.db.prepare(`
+    this.db
+      .prepare(`
       INSERT INTO view_status (view_id, view_type, status, reviewed_at)
       VALUES (?, ?, ?, datetime('now'))
       ON CONFLICT(view_id) DO UPDATE SET status = excluded.status, reviewed_at = datetime('now')
-    `).run(viewId, viewType, status);
+    `)
+      .run(viewId, viewType, status);
   }
 
   clearViewStatus(viewId: string) {
@@ -147,12 +165,16 @@ export class StateDb {
   }
 
   getViewStatus(viewId: string): string | null {
-    const row = this.db.prepare("SELECT status FROM view_status WHERE view_id = ?").get(viewId) as any;
+    const row = this.db
+      .prepare("SELECT status FROM view_status WHERE view_id = ?")
+      .get(viewId) as any;
     return row?.status ?? null;
   }
 
   getViewStatuses(viewType: string): Record<string, string> {
-    const rows = this.db.prepare("SELECT view_id, status FROM view_status WHERE view_type = ?").all(viewType) as any[];
+    const rows = this.db
+      .prepare("SELECT view_id, status FROM view_status WHERE view_type = ?")
+      .all(viewType) as any[];
     const result: Record<string, string> = {};
     for (const row of rows) result[row.view_id] = row.status;
     return result;
@@ -160,45 +182,76 @@ export class StateDb {
 
   // === LLM Results ===
 
-  saveLlmRun(batchId: string, fingerprint: string, model: string, promptVersion: string, responseJson: string, inputTokens: number, outputTokens: number): number {
-    const cost = (inputTokens / 1e6) * 0.10 + (outputTokens / 1e6) * 0.40;
-    const result = this.db.prepare(`
+  saveLlmRun(
+    batchId: string,
+    fingerprint: string,
+    model: string,
+    promptVersion: string,
+    responseJson: string,
+    inputTokens: number,
+    outputTokens: number,
+  ): number {
+    const cost = (inputTokens / 1e6) * 0.1 + (outputTokens / 1e6) * 0.4;
+    const result = this.db
+      .prepare(`
       INSERT INTO llm_batch_runs (batch_id, batch_fingerprint, model, prompt_version, status, response_json, input_tokens, output_tokens, cost_estimate_usd, completed_at)
       VALUES (?, ?, ?, ?, 'completed', ?, ?, ?, ?, datetime('now'))
-    `).run(batchId, fingerprint, model, promptVersion, responseJson, inputTokens, outputTokens, cost);
+    `)
+      .run(
+        batchId,
+        fingerprint,
+        model,
+        promptVersion,
+        responseJson,
+        inputTokens,
+        outputTokens,
+        cost,
+      );
     return Number(result.lastInsertRowid);
   }
 
   deleteLlmRun(batchId: string, fingerprint: string) {
-    this.db.prepare(
-      "DELETE FROM llm_batch_runs WHERE batch_id = ? AND batch_fingerprint = ?"
-    ).run(batchId, fingerprint);
+    this.db
+      .prepare("DELETE FROM llm_batch_runs WHERE batch_id = ? AND batch_fingerprint = ?")
+      .run(batchId, fingerprint);
   }
 
   getLlmRun(batchId: string, fingerprint: string): { id: number; responseJson: string } | null {
-    const row = this.db.prepare(
-      "SELECT id, response_json FROM llm_batch_runs WHERE batch_id = ? AND batch_fingerprint = ? AND status = 'completed' ORDER BY id DESC LIMIT 1"
-    ).get(batchId, fingerprint) as any;
+    const row = this.db
+      .prepare(
+        "SELECT id, response_json FROM llm_batch_runs WHERE batch_id = ? AND batch_fingerprint = ? AND status = 'completed' ORDER BY id DESC LIMIT 1",
+      )
+      .get(batchId, fingerprint) as any;
     return row ? { id: row.id, responseJson: row.response_json } : null;
   }
 
   // === Stats (from photo_decisions, single source) ===
 
-  getStats(): { photosKept: number; photosCulled: number; photosStarred: number; groupsReviewed: number; groupsSkipped: number } {
-    const photos = this.db.prepare(`
+  getStats(): {
+    photosKept: number;
+    photosCulled: number;
+    photosStarred: number;
+    groupsReviewed: number;
+    groupsSkipped: number;
+  } {
+    const photos = this.db
+      .prepare(`
       SELECT
         SUM(CASE WHEN state = 'keep' THEN 1 ELSE 0 END) as kept,
         SUM(CASE WHEN state = 'cull' THEN 1 ELSE 0 END) as culled,
         SUM(CASE WHEN user_stars > 0 THEN 1 ELSE 0 END) as starred
       FROM photo_decisions
-    `).get() as any;
+    `)
+      .get() as any;
 
-    const views = this.db.prepare(`
+    const views = this.db
+      .prepare(`
       SELECT
         SUM(CASE WHEN status = 'reviewed' THEN 1 ELSE 0 END) as reviewed,
         SUM(CASE WHEN status = 'skipped' THEN 1 ELSE 0 END) as skipped
       FROM view_status WHERE view_type = 'group'
-    `).get() as any;
+    `)
+      .get() as any;
 
     return {
       photosKept: photos?.kept ?? 0,
@@ -215,6 +268,6 @@ export class StateDb {
 }
 
 export function batchFingerprint(assetIds: string[]): string {
-  const sorted = [...assetIds].sort();
+  const sorted = [...assetIds].toSorted();
   return createHash("sha256").update(sorted.join("\n")).digest("hex").slice(0, 16);
 }

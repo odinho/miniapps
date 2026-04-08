@@ -1,15 +1,20 @@
 /** Justified layout: pack images into rows filling a container */
 
-export interface Rect { x: number; y: number; w: number; h: number; }
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 
 export function justifiedLayout(
   items: Array<{ w: number; h: number }>,
   containerW: number,
   containerH: number,
-  gap: number = 4
+  gap: number = 4,
 ): Rect[] {
   if (!items.length) return [];
-  const aspects = items.map(it => it.w / (it.h || 1));
+  const aspects = items.map((it) => it.w / (it.h || 1));
 
   let bestLayout: { rects: Rect[]; fill: number } | null = null;
   let bestFill = 0;
@@ -17,13 +22,22 @@ export function justifiedLayout(
 
   for (let nRows = 1; nRows <= maxRows; nRows++) {
     const layout = computeRows(aspects, containerW, containerH, gap, nRows);
-    if (layout && layout.fill > bestFill) { bestLayout = layout; bestFill = layout.fill; }
+    if (layout && layout.fill > bestFill) {
+      bestLayout = layout;
+      bestFill = layout.fill;
+    }
   }
-  return bestLayout ? bestLayout.rects : items.map((_, i) => ({ x: 0, y: i * 100, w: 100, h: 100 }));
+  return bestLayout
+    ? bestLayout.rects
+    : items.map((_, i) => ({ x: 0, y: i * 100, w: 100, h: 100 }));
 }
 
 function computeRows(
-  aspects: number[], W: number, H: number, gap: number, nRows: number
+  aspects: number[],
+  W: number,
+  H: number,
+  gap: number,
+  nRows: number,
 ): { rects: Rect[]; fill: number } | null {
   const n = aspects.length;
   const totalAspect = aspects.reduce((s, a) => s + a, 0);
@@ -37,7 +51,8 @@ function computeRows(
     curAspect += aspects[i];
     if (rows.length < nRows - 1 && curAspect >= targetPerRow * 0.8 && cur.length > 0) {
       rows.push(cur);
-      cur = []; curAspect = 0;
+      cur = [];
+      curAspect = 0;
     }
   }
   if (cur.length) rows.push(cur);
@@ -46,13 +61,13 @@ function computeRows(
   const availH = H - totalGapH;
   if (availH <= 0) return null;
 
-  const rowData = rows.map(indices => ({
+  const rowData = rows.map((indices) => ({
     indices,
     rowAspect: indices.reduce((s, i) => s + aspects[i], 0),
     rowGapW: gap * (indices.length - 1),
   }));
 
-  const rawHeights = rowData.map(r => (W - r.rowGapW) / r.rowAspect);
+  const rawHeights = rowData.map((r) => (W - r.rowGapW) / r.rowAspect);
   const totalRawH = rawHeights.reduce((s, h) => s + h, 0);
   const scale = Math.min(1, availH / totalRawH);
 

@@ -37,10 +37,10 @@ function lowerBound(times: number[], target: number): number {
 export function clusterAssets(
   assets: Asset[],
   config: ClusterConfig = DEFAULT_CLUSTER_CONFIG,
-  log: (msg: string) => void = console.log
+  log: (msg: string) => void = console.log,
 ): { groups: PhotoGroup[]; stats: ClusterStats } {
-  const sorted = [...assets].sort(
-    (a, b) => a.fileCreatedAt.getTime() - b.fileCreatedAt.getTime()
+  const sorted = [...assets].toSorted(
+    (a, b) => a.fileCreatedAt.getTime() - b.fileCreatedAt.getTime(),
   );
 
   const n = sorted.length;
@@ -65,7 +65,9 @@ export function clusterAssets(
 
   log(`Clustering ${datedCount} dated + ${undatedCount} undated assets`);
   if (datedCount > 0) {
-    log(`Date range: ${sorted[datedStartIdx].fileCreatedAt.toISOString()} to ${sorted[n - 1].fileCreatedAt.toISOString()}`);
+    log(
+      `Date range: ${sorted[datedStartIdx].fileCreatedAt.toISOString()} to ${sorted[n - 1].fileCreatedAt.toISOString()}`,
+    );
   }
 
   // Process dated assets with time buckets (using binary search for bucket membership)
@@ -93,18 +95,14 @@ export function clusterAssets(
         const globalIdx = bucketIndices[localIdx];
         const asset = sorted[globalIdx];
 
-        const neighbors = topKNeighbors(
-          asset.embedding,
-          bucketEmbeddings,
-          config.topK,
-          localIdx
-        );
+        const neighbors = topKNeighbors(asset.embedding, bucketEmbeddings, config.topK, localIdx);
 
         for (const neighbor of neighbors) {
           const neighborGlobalIdx = bucketIndices[neighbor.index];
           const neighborAsset = sorted[neighborGlobalIdx];
           const timeDeltaMin =
-            Math.abs(asset.fileCreatedAt.getTime() - neighborAsset.fileCreatedAt.getTime()) / 60_000;
+            Math.abs(asset.fileCreatedAt.getTime() - neighborAsset.fileCreatedAt.getTime()) /
+            60_000;
 
           let shouldLink = false;
 
@@ -141,7 +139,12 @@ export function clusterAssets(
     }
 
     for (let localIdx = 0; localIdx < undatedCount; localIdx++) {
-      const neighbors = topKNeighbors(undatedEmbeddings[localIdx], undatedEmbeddings, config.topK, localIdx);
+      const neighbors = topKNeighbors(
+        undatedEmbeddings[localIdx],
+        undatedEmbeddings,
+        config.topK,
+        localIdx,
+      );
       for (const neighbor of neighbors) {
         if (neighbor.distance <= UNDATED_THRESHOLD) {
           uf.union(localIdx, neighbor.index);
@@ -197,7 +200,7 @@ export function clusterAssets(
     }
   }
 
-  groups.sort((a, b) => b.assets.length - a.assets.length);
+  groups = groups.toSorted((a, b) => b.assets.length - a.assets.length);
   groups = groups.map((g, i) => ({ ...g, id: `group-${i}` }));
 
   const stats: ClusterStats = {
@@ -220,8 +223,8 @@ export function clusterAssets(
 function splitByTemporalGaps(assets: Asset[], config: ClusterConfig): Asset[][] {
   if (assets.length < 2) return [assets];
 
-  const sorted = [...assets].sort(
-    (a, b) => a.fileCreatedAt.getTime() - b.fileCreatedAt.getTime()
+  const sorted = [...assets].toSorted(
+    (a, b) => a.fileCreatedAt.getTime() - b.fileCreatedAt.getTime(),
   );
 
   const GAP_THRESHOLD_MS = config.temporalGapMinutes * 60_000;
@@ -280,5 +283,13 @@ function sampleAvgDistance(assets: Asset[]): number {
 }
 
 function emptyStats(): ClusterStats {
-  return { totalAssets: 0, assetsWithEmbeddings: 0, totalGroups: 0, singletons: 0, largestGroup: 0, avgGroupSize: 0, edgesCreated: 0 };
+  return {
+    totalAssets: 0,
+    assetsWithEmbeddings: 0,
+    totalGroups: 0,
+    singletons: 0,
+    largestGroup: 0,
+    avgGroupSize: 0,
+    edgesCreated: 0,
+  };
 }

@@ -32,7 +32,9 @@ if (useImmich) {
   }
   await adapter.close();
 } else {
-  const dbPath = args.find((_, i, a) => a[i - 1] === "--db") ?? resolve(import.meta.dirname ?? ".", "../../..", "facet/photo_scores_pro.db");
+  const dbPath =
+    args.find((_, i, a) => a[i - 1] === "--db") ??
+    resolve(import.meta.dirname ?? ".", "../../..", "facet/photo_scores_pro.db");
   const adapter = new FacetAdapter(dbPath);
   assets = adapter.getAllAssets();
   adapter.close();
@@ -54,7 +56,7 @@ for (let i = 0; i < showCount; i++) {
   const dateStr = b.dateRange.start.toISOString().slice(0, 10);
   const spanMin = (b.dateRange.end.getTime() - b.dateRange.start.getTime()) / 60_000;
   console.log(
-    `[${b.id}] ${b.assets.length} photos | ${b.source} | ${b.folderName ?? dateStr} | ${spanMin.toFixed(0)}min span`
+    `[${b.id}] ${b.assets.length} photos | ${b.source} | ${b.folderName ?? dateStr} | ${spanMin.toFixed(0)}min span`,
   );
 }
 
@@ -81,8 +83,8 @@ for (const bucket of ["1", "2-5", "6-10", "11-20", "21-50", "51-100", "100+"]) {
 // Estimated LLM cost
 const totalTokens = assets.length * 256 + batches.length * 2000; // images + prompts
 const outputTokens = assets.length * 140; // ~140 tokens per image output
-const inputCost = (totalTokens / 1_000_000) * 0.10;
-const outputCost = (outputTokens / 1_000_000) * 0.40;
+const inputCost = (totalTokens / 1_000_000) * 0.1;
+const outputCost = (outputTokens / 1_000_000) * 0.4;
 console.log(`\n=== Estimated LLM Cost (Gemini 2.5 Flash Lite) ===`);
 console.log(`  Input: ${totalTokens.toLocaleString()} tokens → $${inputCost.toFixed(2)}`);
 console.log(`  Output: ${outputTokens.toLocaleString()} tokens → $${outputCost.toFixed(2)}`);

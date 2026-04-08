@@ -37,7 +37,7 @@ export const DEFAULT_SESSION_CONFIG: SessionBatchConfig = {
 
 export function batchBySession(
   assets: Asset[],
-  config: SessionBatchConfig = DEFAULT_SESSION_CONFIG
+  config: SessionBatchConfig = DEFAULT_SESSION_CONFIG,
 ): SessionBatch[] {
   // Separate DSLR (folder-grouped) from phone (time-gap grouped)
   const folderAssets = new Map<string, Asset[]>();
@@ -54,11 +54,13 @@ export function batchBySession(
     }
   }
 
-  const batches: SessionBatch[] = [];
+  let batches: SessionBatch[] = [];
 
   // DSLR folder batches
   for (const [folder, folderPhotos] of folderAssets) {
-    const sorted = folderPhotos.sort((a, b) => a.fileCreatedAt.getTime() - b.fileCreatedAt.getTime());
+    const sorted = folderPhotos.toSorted(
+      (a, b) => a.fileCreatedAt.getTime() - b.fileCreatedAt.getTime(),
+    );
     const subBatches = splitIfTooLarge(sorted, config.maxBatchSize);
     for (const sub of subBatches) {
       batches.push({
@@ -75,7 +77,9 @@ export function batchBySession(
   }
 
   // Phone photos: split by time gaps
-  const sorted = timeAssets.sort((a, b) => a.fileCreatedAt.getTime() - b.fileCreatedAt.getTime());
+  const sorted = timeAssets.toSorted(
+    (a, b) => a.fileCreatedAt.getTime() - b.fileCreatedAt.getTime(),
+  );
   const gapMs = config.gapHours * 3600_000;
 
   if (sorted.length > 0) {
@@ -124,7 +128,7 @@ export function batchBySession(
   // Merge small batches into their nearest neighbor
   if (config.minBatchSize > 1) {
     // Sort by date first so neighbors are temporally adjacent
-    batches.sort((a, b) => a.dateRange.start.getTime() - b.dateRange.start.getTime());
+    batches = batches.toSorted((a, b) => a.dateRange.start.getTime() - b.dateRange.start.getTime());
 
     let merged = true;
     while (merged) {
@@ -142,17 +146,20 @@ export function batchBySession(
           if (batches[j].source === "folder") continue; // don't merge into folders
           if (batches[i].assets.length + batches[j].assets.length > config.maxBatchSize) continue;
           const gap = Math.abs(
-            batches[i].dateRange.start.getTime() - batches[j].dateRange.end.getTime()
+            batches[i].dateRange.start.getTime() - batches[j].dateRange.end.getTime(),
           );
-          if (gap < bestGap) { bestGap = gap; bestIdx = j; }
+          if (gap < bestGap) {
+            bestGap = gap;
+            bestIdx = j;
+          }
         }
 
         if (bestIdx >= 0) {
           // Merge i into bestIdx
           const target = batches[bestIdx];
           const source = batches[i];
-          target.assets = [...target.assets, ...source.assets].sort(
-            (a, b) => a.fileCreatedAt.getTime() - b.fileCreatedAt.getTime()
+          target.assets = [...target.assets, ...source.assets].toSorted(
+            (a, b) => a.fileCreatedAt.getTime() - b.fileCreatedAt.getTime(),
           );
           target.dateRange = {
             start: target.assets[0].fileCreatedAt,
@@ -167,7 +174,7 @@ export function batchBySession(
   }
 
   // Sort batches by date (newest first for review)
-  batches.sort((a, b) => b.dateRange.start.getTime() - a.dateRange.start.getTime());
+  batches = batches.toSorted((a, b) => b.dateRange.start.getTime() - a.dateRange.start.getTime());
 
   // Assign stable content-addressed IDs (hash of asset IDs, not positional)
   return batches.map((b) => ({
@@ -210,7 +217,10 @@ function splitIfTooLarge(assets: Asset[], maxSize: number): Asset[][] {
 
 /** Content-addressed batch ID: stable even if batch order changes */
 function stableBatchId(batch: SessionBatch): string {
-  const ids = batch.assets.map((a) => a.id).sort().join("\n");
+  const ids = batch.assets
+    .map((a) => a.id)
+    .toSorted()
+    .join("\n");
   const hash = createHash("sha256").update(ids).digest("hex").slice(0, 12);
   const date = batch.dateRange.start.toISOString().slice(0, 10);
   return `${date}-${hash}`;
@@ -221,7 +231,7 @@ export function batchStats(batches: SessionBatch[]): string {
   if (batches.length === 0) return "0 batches from 0 photos";
   const totalPhotos = batches.reduce((s, b) => s + b.assets.length, 0);
   const sizes = batches.map((b) => b.assets.length);
-  const sorted = [...sizes].sort((a, b) => a - b);
+  const sorted = [...sizes].toSorted((a, b) => a - b);
   const folderBatches = batches.filter((b) => b.source === "folder").length;
   const timeBatches = batches.filter((b) => b.source === "time-gap").length;
 
