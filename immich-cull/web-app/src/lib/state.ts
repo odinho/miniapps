@@ -22,13 +22,41 @@ export function deriveLlmState(
   const sgs = llm.similaritySubgroups ?? [];
   const inSubgroup = new Set<string>();
 
-  // Subgroup photos: adjust keep count per subgroup
+  // Subgroup photos: at level 0 use LLM's exact picks,
+  // at other levels expand/contract from quality-ordered list
   for (const sg of sgs) {
-    const ids = sg.imageIds;
+    const ids = sg.imageIds; // quality-ordered (best first)
+    const keepIds = new Set(sg.recommendedKeepIds);
     const adjustedKeep = Math.max(1, Math.min(ids.length, sg.recommendedKeepCount + keepLevel));
-    for (let i = 0; i < ids.length; i++) {
-      out[ids[i]] = i < adjustedKeep ? "keep" : "cull";
-      inSubgroup.add(ids[i]);
+
+    if (adjustedKeep === sg.recommendedKeepCount) {
+      // Level 0 (or equivalent): use LLM's exact picks
+      for (const id of ids) {
+        out[id] = keepIds.has(id) ? "keep" : "cull";
+        inSubgroup.add(id);
+      }
+    } else if (adjustedKeep > sg.recommendedKeepCount) {
+      // Expanding: keep LLM picks + add next-best from quality order
+      let extra = adjustedKeep - sg.recommendedKeepCount;
+      for (const id of ids) {
+        if (keepIds.has(id)) {
+          out[id] = "keep";
+        } else if (extra > 0) {
+          out[id] = "keep";
+          extra--;
+        } else {
+          out[id] = "cull";
+        }
+        inSubgroup.add(id);
+      }
+    } else {
+      // Contracting: drop worst kept photos (from end of quality order)
+      const keptInOrder = ids.filter((id) => keepIds.has(id));
+      const keepNow = new Set(keptInOrder.slice(0, adjustedKeep));
+      for (const id of ids) {
+        out[id] = keepNow.has(id) ? "keep" : "cull";
+        inSubgroup.add(id);
+      }
     }
   }
 

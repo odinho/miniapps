@@ -25,7 +25,7 @@
   let loading = false;
   let llmRunning = false;
   let keepLevel = 0; // 0 = LLM default, +N = keep N more per subgroup, -N = keep N fewer
-  let altModel = 'gemini-3.1-flash-lite-preview';
+  let altModel = 'gemini-3.1-flash-lite';
   let modelPickerOpen = false;
 
   let groups: GroupSummary[] = [];
@@ -553,7 +553,7 @@
         </div>
         {#if modelPickerOpen}
           <div class="model-picker">
-            {#each ['gemini-2.5-flash-lite', 'gemini-3.1-flash-lite-preview', 'gemini-3-flash-preview'] as m}
+            {#each ['gemini-2.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3-flash'] as m}
               <!-- svelte-ignore a11y_click_events_have_key_events -->
               <div class="model-opt" class:active={altModel === m} role="button" tabindex="-1"
                 on:click={() => { altModel = m; modelPickerOpen = false; }}>

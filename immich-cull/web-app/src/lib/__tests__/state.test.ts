@@ -64,6 +64,66 @@ describe("deriveLlmState", () => {
     expect(state).toEqual({ a: "keep", b: "keep", c: "cull", d: "cull", e: "cull" });
   });
 
+  it("uses LLM's exact picks at level 0 (non-contiguous)", () => {
+    const llm: LlmResult = {
+      batchSummary: "",
+      overallConfidence: 0.8,
+      images: ["a", "b", "c", "d", "e"].map((id) => ({
+        imageId: id,
+        suggestedStars: 0,
+        categories: [],
+        briefNote: "",
+        llmKeepCull: null,
+        similaritySubgroupId: "g1",
+      })),
+      similaritySubgroups: [
+        {
+          subgroupId: "g1",
+          imageIds: ["a", "b", "c", "d", "e"],
+          subgroupType: "burst",
+          recommendedKeepCount: 2,
+          recommendedKeepIds: ["a", "d"], // non-contiguous: skip b,c
+          cullIds: ["b", "c", "e"],
+          rationale: "",
+        },
+      ],
+    };
+    const state = deriveLlmState(llm, 0);
+    expect(state).toEqual({ a: "keep", b: "cull", c: "cull", d: "keep", e: "cull" });
+  });
+
+  it("expanding adds next-best from quality order", () => {
+    const llm: LlmResult = {
+      batchSummary: "",
+      overallConfidence: 0.8,
+      images: ["a", "b", "c", "d"].map((id) => ({
+        imageId: id,
+        suggestedStars: 0,
+        categories: [],
+        briefNote: "",
+        llmKeepCull: null,
+        similaritySubgroupId: "g1",
+      })),
+      similaritySubgroups: [
+        {
+          subgroupId: "g1",
+          imageIds: ["a", "b", "c", "d"], // quality order
+          subgroupType: "burst",
+          recommendedKeepCount: 1,
+          recommendedKeepIds: ["c"], // LLM picked c (not a)
+          cullIds: ["a", "b", "d"],
+          rationale: "",
+        },
+      ],
+    };
+    // At +1: keep c (LLM pick) + a (next best in quality order)
+    const state = deriveLlmState(llm, 1);
+    expect(state.c).toBe("keep"); // LLM's original pick
+    expect(state.a).toBe("keep"); // added from quality order
+    expect(state.b).toBe("cull");
+    expect(state.d).toBe("cull");
+  });
+
   it("adjusts keep count with positive keepLevel", () => {
     const llm = makeLlm({
       images: [
