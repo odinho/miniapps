@@ -9,11 +9,11 @@
   export let states: Record<string, AssetState> = {};
   export let selectedIdx: number = -1;
   export let llmMap: Record<string, LlmImage> = {};
-  export let keepSet: Set<string> = new Set();
-  export let cullSet: Set<string> = new Set();
+  export let effectiveStarsMap: Record<string, number> = {};
   export let onSelect: (idx: number) => void = () => {};
+  export let onToggleState: (idx: number) => void = () => {};
 
-  let container: HTMLDivElement;
+  let container: HTMLDivElement = undefined!; // bind:this
   let rects: Rect[] = [];
 
   function computeLayout() {
@@ -36,10 +36,11 @@
     {@const r = rects[i] || { x: 0, y: 0, w: 100, h: 100 }}
     {@const llm = llmMap[asset.id]}
     {@const sg = llm?.similaritySubgroupId}
-    {@const manualState = states[asset.id]}
-    {@const isKeep = manualState === 'keep' || (!manualState && keepSet.has(asset.id))}
-    {@const isCull = manualState === 'cull' || (!manualState && cullSet.has(asset.id))}
+    {@const effectiveState = states[asset.id]}
+    {@const isKeep = effectiveState === 'keep'}
+    {@const isCull = effectiveState === 'cull'}
     {@const isSel = i === selectedIdx}
+    {@const effStars = effectiveStarsMap[asset.id] ?? 0}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
       class="cell"
@@ -53,19 +54,21 @@
     >
       <img src={previewUrl(asset.id)} loading="lazy" alt={asset.filename} />
 
-      {#if llm && llm.suggestedStars > 0}
+      {#if effStars > 0}
         <div class="llm-star">
-          {'★'.repeat(llm.suggestedStars)}
+          {'★'.repeat(effStars)}
         </div>
-        {#if llm.briefNote}
-          <div class="llm-note">{llm.briefNote}</div>
-        {/if}
+      {/if}
+      {#if llm?.briefNote}
+        <div class="llm-note">{llm.briefNote}</div>
       {/if}
 
       {#if isKeep}
-        <div class="bdg kb">KEEP</div>
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="bdg kb" role="button" tabindex="-1" on:click|stopPropagation={() => onToggleState(i)}>KEEP</div>
       {:else if isCull}
-        <div class="bdg cb">CULL</div>
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="bdg cb" role="button" tabindex="-1" on:click|stopPropagation={() => onToggleState(i)}>CULL</div>
       {/if}
 
       {#if asset.rating && asset.rating > 0}

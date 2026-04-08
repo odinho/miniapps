@@ -6,8 +6,11 @@
   export let asset: AssetDetail | null = null;
   export let llm: LlmImage | null = null;
   export let subgroup: LlmSubgroup | null = null;
-  export let manualState: AssetState = null;
-  export let llmState: string | null = null;
+  export let currentState: AssetState = null;
+  export let llmPerImage: 'keep' | 'cull' | null = null;
+  export let sgRank: { rank: number; total: number; cutoff: number; keptAtDefault: number } | null = null;
+  export let effectiveStars: number = 0;
+  export let keepLevel: number = 0;
   export let userStars: number = 0;
   export let onSetStars: (stars: number) => void = () => {};
 </script>
@@ -18,6 +21,14 @@
     <div class="ip-filename">{asset.filename}</div>
     <div class="ip-meta">{fmt(asset.bytes || 0)} · {new Date(asset.date).toLocaleString('no')}</div>
 
+    <!-- Current state badge -->
+    {#if currentState}
+      <div class="ip-state" class:keep={currentState === 'keep'} class:cull={currentState === 'cull'}>
+        {currentState.toUpperCase()}
+      </div>
+    {/if}
+
+    <!-- User star rating -->
     <div class="ip-stars-row">
       {#each [1,2,3,4,5] as s}
         <button
@@ -32,30 +43,32 @@
       {/if}
     </div>
 
-    {#if manualState}
-      <div class="ip-state" class:keep={manualState === 'keep'} class:cull={manualState === 'cull'}>
-        You: {manualState.toUpperCase()}
-      </div>
-    {/if}
-
     {#if llm}
       <div class="ip-section">LLM Assessment</div>
+      {#if effectiveStars > 0}
+        <div class="ip-eff-stars">{'★'.repeat(effectiveStars)} effective</div>
+      {/if}
       <div class="ip-stars">
-        {'★'.repeat(llm.suggestedStars)}{'☆'.repeat(3 - llm.suggestedStars)}
+        {'★'.repeat(llm.suggestedStars)}{'☆'.repeat(Math.max(0, 5 - llm.suggestedStars))}
         <span class="ip-star-label">
-          {#if llm.suggestedStars === 0}unremarkable
+          {#if llm.suggestedStars === 0}extra/filler
           {:else if llm.suggestedStars === 1}good
-          {:else if llm.suggestedStars === 2}share-worthy
-          {:else}highlight{/if}
+          {:else if llm.suggestedStars === 2}strong
+          {:else if llm.suggestedStars === 3}excellent
+          {:else if llm.suggestedStars === 4}exceptional
+          {:else}gallery-worthy{/if}
+          {#if subgroup && effectiveStars !== llm.suggestedStars}
+            <span class="ip-raw-note">(raw — {effectiveStars > 0 ? 'primary keeper' : 'not primary'})</span>
+          {/if}
         </span>
       </div>
       <div class="ip-note">{llm.briefNote}</div>
       {#if llm.categories?.length}
         <div class="ip-cats">{llm.categories.join(', ')}</div>
       {/if}
-      {#if llmState}
-        <div class="ip-llm-verdict" class:keep={llmState === 'keep'} class:cull={llmState === 'cull'}>
-          LLM: {llmState.toUpperCase()}
+      {#if llmPerImage}
+        <div class="ip-llm-rec" class:keep={llmPerImage === 'keep'} class:cull={llmPerImage === 'cull'}>
+          LLM says {llmPerImage}
         </div>
       {/if}
     {/if}
@@ -63,8 +76,24 @@
     {#if subgroup}
       <div class="ip-section">Similarity Group</div>
       <div class="ip-sg-type">{subgroup.subgroupType} · {subgroup.imageIds.length} photos</div>
-      <div class="ip-sg-reason">{subgroup.rationale}</div>
-      <div class="ip-sg-keep">Keep {subgroup.recommendedKeepCount} / {subgroup.imageIds.length}</div>
+      {#if subgroup.rationale}
+        <div class="ip-sg-reason">{subgroup.rationale}</div>
+      {/if}
+      {#if sgRank}
+        <div class="ip-sg-rank">
+          <span class="ip-rank-pos">#{sgRank.rank}</span> of {sgRank.total}
+          {#if sgRank.rank <= sgRank.cutoff}
+            <span class="ip-rank-kept">· kept</span>
+          {:else}
+            <span class="ip-rank-culled">· culled</span>
+          {/if}
+        </div>
+        <div class="ip-sg-cutoff">
+          Keeping top {sgRank.cutoff}{#if keepLevel !== 0}
+            <span class="ip-sg-adj">({keepLevel > 0 ? '+' : ''}{keepLevel} from default {sgRank.keptAtDefault})</span>
+          {/if}
+        </div>
+      {/if}
     {/if}
   </div>
 {/if}
@@ -79,18 +108,25 @@
   .ip-star-btn:hover { color: #ffd700; }
   .ip-star-btn.active { color: #ffd700; }
   .ip-stars-label { font-size: 10px; color: #7a8294; margin-left: 4px; }
-  .ip-state { font-weight: 600; font-size: 12px; padding: 2px 6px; border-radius: 3px; display: inline-block; margin-bottom: 4px; }
-  .ip-state.keep { background: rgba(76,175,80,.15); color: #4caf50; }
-  .ip-state.cull { background: rgba(229,57,53,.15); color: #e53935; }
+  .ip-state { font-weight: 600; font-size: 12px; padding: 2px 8px; border-radius: 3px; display: inline-block; margin-bottom: 6px; }
+  .ip-state.keep { background: rgba(76,175,80,.2); color: #4caf50; }
+  .ip-state.cull { background: rgba(229,57,53,.2); color: #e53935; }
   .ip-section { font-size: 9px; text-transform: uppercase; letter-spacing: .5px; color: #7a8294; margin: 8px 0 3px; padding-top: 6px; border-top: 1px solid #1e2028; }
   .ip-stars { font-size: 14px; color: #ffd700; }
   .ip-star-label { font-size: 10px; color: #7a8294; margin-left: 2px; }
   .ip-note { color: #ccc; margin: 2px 0; font-style: italic; }
   .ip-cats { color: #7a8294; font-size: 10px; }
-  .ip-llm-verdict { font-weight: 500; font-size: 11px; margin-top: 4px; }
-  .ip-llm-verdict.keep { color: #4caf50; }
-  .ip-llm-verdict.cull { color: #e53935; }
+  .ip-eff-stars { font-size: 16px; color: #ffd700; margin-bottom: 2px; }
+  .ip-raw-note { color: #555; font-size: 9px; }
+  .ip-llm-rec { font-size: 10px; margin-top: 3px; color: #7a8294; }
+  .ip-llm-rec.keep { color: #81c784; }
+  .ip-llm-rec.cull { color: #ef9a9a; }
   .ip-sg-type { color: #f0a040; }
   .ip-sg-reason { color: #aaa; margin: 2px 0; line-height: 1.3; }
-  .ip-sg-keep { color: #ccc; font-weight: 500; }
+  .ip-sg-rank { color: #ddd; font-weight: 500; margin-top: 3px; }
+  .ip-rank-pos { font-weight: 700; color: #fff; }
+  .ip-rank-kept { color: #4caf50; }
+  .ip-rank-culled { color: #e53935; }
+  .ip-sg-cutoff { color: #7a8294; font-size: 10px; margin-top: 2px; }
+  .ip-sg-adj { color: #f0a040; }
 </style>

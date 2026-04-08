@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import PhotoGrid from './components/PhotoGrid.svelte';
   import Preview from './components/Preview.svelte';
   import InfoPanel from './components/InfoPanel.svelte';
@@ -9,9 +9,13 @@
     type GroupSummary, type GroupDetail, type BatchSummary, type BatchDetail,
     type LlmImage, type Stats,
   } from './lib/api';
+  import {
+    deriveLlmState, mergeStates, countStates, countAtLevel,
+    findNextEffectiveLevel, computeEffectiveStars, computeSgStats,
+    type AssetState,
+  } from './lib/state';
 
   type AppMode = 'groups' | 'batches';
-  type AssetState = 'keep' | 'cull' | null;
 
   let mode: AppMode = 'groups';
   let showPreview = false;
@@ -30,16 +34,29 @@
   let batchIdx = -1;
   let batchDetail: BatchDetail | null = null;
 
-  let states: Record<string, AssetState> = {};
+  // Layer 2: manual overrides (only explicit user clicks)
+  let manualOverrides: Record<string, AssetState> = {};
+  // Groups mode still uses a flat states map (no LLM layer)
+  let groupStates: Record<string, AssetState> = {};
   let userStars: Record<string, number> = {};
   let stats: Stats | null = null;
   let undoStack: Array<{ mode: AppMode; idx: number; viewId: string; prevStates: Record<string, AssetState>; prevUserStars: Record<string, number>; prevSi: number; prevKeepLevel: number }> = [];
 
   $: currentAssets = mode === 'groups' ? (groupDetail?.assets ?? []) : (batchDetail?.assets ?? []);
+  $: currentAssetIds = currentAssets.map(a => a.id);
   $: llmMap = buildLlmMap(batchDetail);
-  $: keepSet = new Set(batchDetail?.llm?.similaritySubgroups?.flatMap(sg => sg.recommendedKeepIds) ?? []);
-  $: cullSet = new Set(batchDetail?.llm?.similaritySubgroups?.flatMap(sg => sg.cullIds) ?? []);
   $: allSubgroups = batchDetail?.llm?.similaritySubgroups ?? [];
+
+  // Layer 1: LLM-derived state (pure reactive derivation)
+  $: llmState = deriveLlmState(batchDetail?.llm ?? null, keepLevel);
+
+  // Layer 3: effective state = manual overrides ?? llm state
+  $: states = mode === 'groups'
+    ? groupStates
+    : mergeStates(currentAssetIds, llmState, manualOverrides);
+
+  // Effective stars from pure function
+  $: effectiveStarsMap = computeEffectiveStars(batchDetail?.llm ?? null, states, llmMap);
 
   // Selected asset info for InfoPanel
   $: selectedAsset = currentAssets[selectedIdx] ?? null;
@@ -47,35 +64,24 @@
   $: selectedSubgroup = selectedLlm?.similaritySubgroupId
     ? allSubgroups.find(sg => sg.subgroupId === selectedLlm!.similaritySubgroupId) ?? null
     : null;
-  $: selectedManualState = selectedAsset ? (states[selectedAsset.id] ?? null) : null;
-  $: selectedLlmState = selectedAsset ? (keepSet.has(selectedAsset.id) ? 'keep' : cullSet.has(selectedAsset.id) ? 'cull' : null) : null;
+  $: selectedCurrentState = selectedAsset ? (states[selectedAsset.id] ?? null) : null;
+  $: selectedLlmPerImage = selectedAsset && selectedLlm ? (selectedLlm.llmKeepCull ?? null) : null;
   $: selectedUserStars = selectedAsset ? (userStars[selectedAsset.id] ?? selectedAsset.rating ?? 0) : 0;
+  $: selectedEffectiveStars = selectedAsset ? (effectiveStarsMap[selectedAsset.id] ?? 0) : 0;
+  $: selectedSgRank = (() => {
+    if (!selectedAsset || !selectedSubgroup) return null;
+    const idx = selectedSubgroup.imageIds.indexOf(selectedAsset.id);
+    if (idx < 0) return null;
+    const total = selectedSubgroup.imageIds.length;
+    const cutoff = Math.max(1, Math.min(total, selectedSubgroup.recommendedKeepCount + keepLevel));
+    return { rank: idx + 1, total, cutoff, keptAtDefault: selectedSubgroup.recommendedKeepCount };
+  })();
 
-  // Keep level stats (reactive)
+  // Keep level stats (reactive, from pure functions)
   $: sgStats = (() => {
-    const sgs = batchDetail?.llm?.similaritySubgroups ?? [];
-    const imgs = batchDetail?.llm?.images ?? [];
-    const inSg = new Set(sgs.flatMap(sg => sg.imageIds));
-    const singletons = imgs.filter(img => !inSg.has(img.imageId));
-
-    const sgTotal = sgs.reduce((s, sg) => s + sg.imageIds.length, 0);
-    const sgAdjusted = sgs.reduce((s, sg) => s + Math.max(1, Math.min(sg.imageIds.length, sg.recommendedKeepCount + keepLevel)), 0);
-
-    // Count how many singletons would be culled at current level
-    const minSgLevel = -(Math.max(...sgs.map(sg => sg.recommendedKeepCount - 1), 0));
-    const aggLevel = keepLevel - minSgLevel;
-    const singletonsCulled = aggLevel < 0
-      ? singletons.filter(img =>
-          (aggLevel <= -2 && img.suggestedStars <= 1) ||
-          (aggLevel <= -1 && img.suggestedStars === 0)
-        ).length
-      : 0;
-
-    const batchAssetIds = new Set((batchDetail?.assets ?? []).map(a => a.id));
-    const totalKept = Object.entries(states).filter(([id, s]) => batchAssetIds.has(id) && s === 'keep').length;
-    const totalCulled = Object.entries(states).filter(([id, s]) => batchAssetIds.has(id) && s === 'cull').length;
-
-    return { sgTotal, sgAdjusted, singletonsCulled, singletonCount: singletons.length, totalKept, totalCulled, isAggressive: aggLevel < 0 };
+    const sg = computeSgStats(batchDetail?.llm ?? null, keepLevel);
+    const c = countStates(currentAssetIds, states);
+    return { ...sg, totalKept: c.kept, totalCulled: c.culled };
   })();
 
   function setStars(stars: number) {
@@ -84,6 +90,17 @@
     userStars = userStars;
     savePhotoDecisions([{ assetId: selectedAsset.id, state: states[selectedAsset.id] ?? null, userStars: stars }]);
   }
+
+  // Find next +/- levels that actually change the split (pure functions)
+  $: levelLimits = (() => {
+    const llm = batchDetail?.llm ?? null;
+    const nextDown = findNextEffectiveLevel(llm, keepLevel, -1);
+    const nextUp = findNextEffectiveLevel(llm, keepLevel, 1);
+    return {
+      canDecrease: nextDown !== null, nextDown: nextDown ?? keepLevel,
+      canIncrease: nextUp !== null, nextUp: nextUp ?? keepLevel,
+    };
+  })();
 
   function buildLlmMap(bd: BatchDetail | null): Record<string, LlmImage> {
     const m: Record<string, LlmImage> = {};
@@ -123,16 +140,14 @@
     }
   });
 
-  async function loadPhotoStates(assets: { id: string }[]) {
+  async function loadSavedStars(assets: { id: string }[]) {
     const ids = assets.map(a => a.id);
     const saved = await fetchPhotoDecisions(ids);
     for (const [id, d] of Object.entries(saved)) {
-      if (d.state) states[id] = d.state as AssetState;
       if (d.userStars != null) userStars[id] = d.userStars;
     }
-    for (const a of assets) if (!(a.id in states)) states[a.id] = null;
-    states = states;
     userStars = userStars;
+    return saved;
   }
 
   async function selectGroup(idx: number) {
@@ -140,38 +155,37 @@
     loading = true;
     groupDetail = await fetchGroup(groups[idx].id);
     loading = false;
-    await loadPhotoStates(groupDetail?.assets ?? []);
-    // Check if this group has been reviewed (from viewStatus)
+    // Groups mode: load saved states into groupStates (no LLM layer)
+    const saved = await loadSavedStars(groupDetail?.assets ?? []);
+    groupStates = {};
+    for (const [id, d] of Object.entries(saved)) {
+      if (d.state) groupStates[id] = d.state as AssetState;
+    }
+    for (const a of groupDetail?.assets ?? []) if (!(a.id in groupStates)) groupStates[a.id] = null;
     groups[idx].decided = (groupDetail as any)?.viewStatus != null;
     groups = groups;
     history.replaceState(null, '', `#group/${idx}`);
   }
 
-  async function selectBatch(idx: number) {
+  async function selectBatch(idx: number, freshLlm = false) {
     batchIdx = idx; selectedIdx = 0; showPreview = false; keepLevel = 0;
     loading = true;
     batchDetail = await fetchBatch(batches[idx].id);
     loading = false;
-    await loadPhotoStates(batchDetail?.assets ?? []);
 
-    // Pre-populate from LLM per-image keep/cull recommendations
-    if (batchDetail?.llm?.images) {
-      for (const img of batchDetail.llm.images) {
-        if (!states[img.imageId] && img.llmKeepCull) {
-          states[img.imageId] = img.llmKeepCull;
-        }
+    // Clear manual overrides for the new batch
+    manualOverrides = {};
+
+    if (!freshLlm) {
+      // Load saved manual overrides from DB
+      const saved = await loadSavedStars(batchDetail?.assets ?? []);
+      for (const [id, d] of Object.entries(saved)) {
+        if (d.state) manualOverrides[id] = d.state as AssetState;
       }
-      // Fallback: use subgroup data for old LLM results without per-image k/c
-      for (const sg of batchDetail.llm.similaritySubgroups ?? []) {
-        for (const id of sg.recommendedKeepIds) { if (!states[id]) states[id] = 'keep'; }
-        for (const id of sg.cullIds) { if (!states[id]) states[id] = 'cull'; }
-      }
-      // Any remaining unset photos default to keep
-      for (const a of batchDetail.assets) {
-        if (!states[a.id]) states[a.id] = 'keep';
-      }
-      states = states;
+      manualOverrides = manualOverrides;
     }
+    // llmState is reactive — it auto-derives from batchDetail.llm + keepLevel
+    // effectiveState = manualOverrides ?? llmState (also reactive)
 
     history.replaceState(null, '', `#batch/${batches[idx].id}`);
   }
@@ -186,37 +200,45 @@
     else { selectedIdx = idx; showPreview = false; }
   }
 
+  /** Set state for a photo — writes to the correct layer based on mode */
+  function setPhotoState(id: string, state: AssetState) {
+    if (mode === 'groups') {
+      groupStates[id] = state;
+      groupStates = groupStates;
+    } else {
+      manualOverrides[id] = state;
+      manualOverrides = manualOverrides;
+    }
+    savePhotoDecisions([{ assetId: id, state, userStars: userStars[id] ?? null }]);
+  }
+
   function mark(s: 'keep' | 'cull') {
     if (selectedIdx < 0) selectedIdx = 0;
     const a = currentAssets[selectedIdx]; if (!a) return;
     const newState = states[a.id] === s ? null : s;
-    states[a.id] = newState;
-    states = states;
-    savePhotoDecisions([{ assetId: a.id, state: newState, userStars: userStars[a.id] ?? null }]);
+    setPhotoState(a.id, newState);
     if (selectedIdx < currentAssets.length - 1) selectedIdx++;
   }
 
   function keepBestCullRest() {
     if (selectedIdx < 0) selectedIdx = 0;
-    const decisions: Array<{ assetId: string; state: string | null; userStars: number | null }> = [];
     for (let i = 0; i < currentAssets.length; i++) {
-      const s = i === selectedIdx ? 'keep' : 'cull';
-      states[currentAssets[i].id] = s;
-      decisions.push({ assetId: currentAssets[i].id, state: s, userStars: userStars[currentAssets[i].id] ?? null });
+      const s: AssetState = i === selectedIdx ? 'keep' : 'cull';
+      if (mode === 'groups') groupStates[currentAssets[i].id] = s;
+      else manualOverrides[currentAssets[i].id] = s;
     }
-    states = states;
-    savePhotoDecisions(decisions);
+    if (mode === 'groups') groupStates = groupStates; else manualOverrides = manualOverrides;
+    saveBatchDecisions();
   }
 
   function keepFirstN(n: number) {
-    const decisions: Array<{ assetId: string; state: string | null; userStars: number | null }> = [];
     for (let i = 0; i < currentAssets.length; i++) {
-      const s = i < n ? 'keep' : 'cull';
-      states[currentAssets[i].id] = s;
-      decisions.push({ assetId: currentAssets[i].id, state: s, userStars: userStars[currentAssets[i].id] ?? null });
+      const s: AssetState = i < n ? 'keep' : 'cull';
+      if (mode === 'groups') groupStates[currentAssets[i].id] = s;
+      else manualOverrides[currentAssets[i].id] = s;
     }
-    states = states;
-    savePhotoDecisions(decisions);
+    if (mode === 'groups') groupStates = groupStates; else manualOverrides = manualOverrides;
+    saveBatchDecisions();
   }
 
   async function approve() {
@@ -233,15 +255,17 @@
     for (const a of assets) if (userStars[a.id] != null) prevUserStars[a.id] = userStars[a.id];
     undoStack = [...undoStack, { mode, idx: undoIdx, viewId: viewId ?? '', prevStates, prevUserStars, prevSi: selectedIdx, prevKeepLevel: keepLevel }];
 
-    // Default unmarked photos to 'keep'
-    for (const a of assets) if (!states[a.id]) states[a.id] = 'keep';
-    states = states;
+    // Default unmarked photos to 'keep' via manual overrides
+    for (const a of assets) {
+      if (!states[a.id]) {
+        if (mode === 'groups') groupStates[a.id] = 'keep';
+        else manualOverrides[a.id] = 'keep';
+      }
+    }
+    if (mode === 'groups') groupStates = groupStates; else manualOverrides = manualOverrides;
 
-    // Save all photo decisions
-    const decisions = assets.map(a => ({
-      assetId: a.id, state: states[a.id], userStars: userStars[a.id] ?? null
-    }));
-    await savePhotoDecisions(decisions);
+    // Save all photo decisions (re-read states after reactive update)
+    await saveBatchDecisions();
 
     if (mode === 'groups' && groupDetail) {
       await decideGroup(groupDetail.id,
@@ -286,10 +310,16 @@
     if (!undoStack.length) return;
     const u = undoStack[undoStack.length - 1];
     undoStack = undoStack.slice(0, -1);
-    // Restore local states and stars
-    for (const [id, s] of Object.entries(u.prevStates)) states[id] = s;
+    // Restore local states and stars — clear all then reapply snapshot
+    if (u.mode === 'groups') {
+      for (const id of Object.keys(u.prevStates)) groupStates[id] = u.prevStates[id];
+      groupStates = groupStates;
+    } else {
+      manualOverrides = { ...u.prevStates };
+    }
+    // Clear stars for all assets in the undone view, then restore from snapshot
+    for (const id of Object.keys(u.prevStates)) delete userStars[id];
     for (const [id, s] of Object.entries(u.prevUserStars)) userStars[id] = s;
-    states = states;
     userStars = userStars;
     // Restore on server
     const decisions = Object.entries(u.prevStates).map(([id, s]) => ({
@@ -323,53 +353,28 @@
     for (let i = 0; i < groupIdx; i++) if (!groups[i].decided) { selectGroup(i); return; }
   }
 
+  const isBatchDecided = (b: any) => b.viewStatus === 'reviewed' || b.viewStatus === 'skipped';
+
   function nextUndecidedBatch() {
-    // Move to next batch (for now just go forward)
-    if (batchIdx < batches.length - 1) selectBatch(batchIdx + 1);
+    for (let i = batchIdx + 1; i < batches.length; i++) if (!isBatchDecided(batches[i])) { selectBatch(i); return; }
+    for (let i = 0; i < batchIdx; i++) if (!isBatchDecided(batches[i])) { selectBatch(i); return; }
   }
 
   function applyKeepLevel(level: number) {
-    if (!batchDetail?.llm) return;
     keepLevel = level;
+    // Clear manual overrides — user is resetting to a computed level
+    manualOverrides = {};
+    // llmState + effectiveState recompute reactively from keepLevel
+    saveBatchDecisions();
+  }
 
-    const inSubgroup = new Set<string>();
-
-    // Apply to subgroup assets: adjust keep count per subgroup
-    for (const sg of batchDetail.llm.similaritySubgroups ?? []) {
-      const ids = sg.imageIds;
-      const adjustedKeep = Math.max(1, Math.min(ids.length, sg.recommendedKeepCount + level));
-      for (let i = 0; i < ids.length; i++) {
-        states[ids[i]] = i < adjustedKeep ? 'keep' : 'cull';
-        inSubgroup.add(ids[i]);
-      }
-    }
-
-    // Non-subgroup (singleton) assets: LLM keep/cull at level 0,
-    // but at aggressive levels (below min subgroup), also cull low-star singletons
-    const minSubgroupLevel = -(Math.max(...(batchDetail.llm.similaritySubgroups ?? []).map(sg => sg.recommendedKeepCount - 1), 0));
-    const aggressiveLevel = level - minSubgroupLevel; // how far below the subgroup floor
-
-    for (const img of batchDetail.llm.images ?? []) {
-      if (inSubgroup.has(img.imageId)) continue;
-      if (aggressiveLevel < 0) {
-        // Below subgroup floor: cull singletons by star rating
-        if (aggressiveLevel <= -2 && img.suggestedStars <= 1) {
-          states[img.imageId] = 'cull';
-        } else if (aggressiveLevel <= -1 && img.suggestedStars === 0) {
-          states[img.imageId] = 'cull';
-        } else {
-          states[img.imageId] = img.llmKeepCull ?? 'keep';
-        }
-      } else {
-        states[img.imageId] = img.llmKeepCull ?? 'keep';
-      }
-    }
-
-    states = states;
+  async function saveBatchDecisions() {
+    if (!batchDetail) return;
+    await tick(); // ensure $: reactive derivations (states) have run
     const decisions = batchDetail.assets.map(a => ({
       assetId: a.id, state: states[a.id] ?? 'keep', userStars: userStars[a.id] ?? null
     }));
-    savePhotoDecisions(decisions);
+    await savePhotoDecisions(decisions);
   }
 
   async function runLlm() {
@@ -379,7 +384,7 @@
       const result = await rankBatch(batches[batchIdx].id);
       if (result.error) { alert('LLM error: ' + result.error); return; }
       batches[batchIdx].hasLlmResult = true; batches = batches;
-      await selectBatch(batchIdx);
+      await selectBatch(batchIdx, true);
     } finally {
       llmRunning = false;
     }
@@ -393,7 +398,7 @@
       const result = await rankBatch(batches[batchIdx].id);
       if (result.error) { alert('LLM error: ' + result.error); return; }
       batches[batchIdx].hasLlmResult = true; batches = batches;
-      await selectBatch(batchIdx);
+      await selectBatch(batchIdx, true);
     } finally {
       llmRunning = false;
     }
@@ -418,21 +423,26 @@
       case ' ': e.preventDefault(); if (selectedIdx >= 0) showPreview = !showPreview; break;
       case 'k': case 'j': mark('keep'); break;
       case 'K': case 'J':
-        for (const a of currentAssets) states[a.id] = 'keep'; states = states;
-        savePhotoDecisions(currentAssets.map(a => ({ assetId: a.id, state: 'keep', userStars: userStars[a.id] ?? null })));
+        for (const a of currentAssets) { if (mode === 'groups') groupStates[a.id] = 'keep'; else manualOverrides[a.id] = 'keep'; }
+        if (mode === 'groups') groupStates = groupStates; else manualOverrides = manualOverrides;
+        saveBatchDecisions();
         break;
       case 'x': case 'f': mark('cull'); break;
       case 'X': case 'F':
-        for (const a of currentAssets) states[a.id] = 'cull'; states = states;
-        savePhotoDecisions(currentAssets.map(a => ({ assetId: a.id, state: 'cull', userStars: userStars[a.id] ?? null })));
+        for (const a of currentAssets) { if (mode === 'groups') groupStates[a.id] = 'cull'; else manualOverrides[a.id] = 'cull'; }
+        if (mode === 'groups') groupStates = groupStates; else manualOverrides = manualOverrides;
+        saveBatchDecisions();
         break;
       case 'b': case 'B': keepBestCullRest(); break;
       case 'a': case 'Enter': e.preventDefault(); approve(); break;
       case 's': if (!shift) skip(); break;
       case 'Backspace': e.preventDefault(); undo(); break;
       case '?': helpOpen = !helpOpen; break;
-      case '1': keepFirstN(1); break; case '2': keepFirstN(2); break; case '3': keepFirstN(3); break;
-      case '4': keepFirstN(4); break; case '5': keepFirstN(5); break;
+      case 'r': if (mode === 'batches' && !llmRunning) { if (batchDetail?.llm) rerunLlm(); else runLlm(); } break;
+      case '-': case '_': if (mode === 'batches' && levelLimits.canDecrease) applyKeepLevel(levelLimits.nextDown); break;
+      case '=': case '+': if (mode === 'batches' && levelLimits.canIncrease) applyKeepLevel(levelLimits.nextUp); break;
+      case '1': setStars(1); break; case '2': setStars(2); break; case '3': setStars(3); break;
+      case '4': setStars(4); break; case '5': setStars(5); break; case '0': setStars(0); break;
     }
   }
 </script>
@@ -458,9 +468,9 @@
     </div>
   </header>
 
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
   {#if sidebarOpen}
-    <div class="sidebar-backdrop" on:click={() => sidebarOpen = false}></div>
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <div class="sidebar-backdrop" role="button" tabindex="-1" on:click={() => sidebarOpen = false}></div>
   {/if}
   <aside class="sidebar" class:open={sidebarOpen}>
     <div class="sidebar-list">
@@ -477,8 +487,11 @@
       asset={selectedAsset}
       llm={selectedLlm}
       subgroup={selectedSubgroup}
-      manualState={selectedManualState}
-      llmState={selectedLlmState}
+      currentState={selectedCurrentState}
+      llmPerImage={selectedLlmPerImage}
+      sgRank={selectedSgRank}
+      effectiveStars={selectedEffectiveStars}
+      {keepLevel}
       userStars={selectedUserStars}
       onSetStars={setStars}
     />
@@ -488,7 +501,13 @@
     {#if loading}
       <div class="empty"><span class="spinner"></span> Loading...</div>
     {:else if currentAssets.length}
-      <PhotoGrid assets={currentAssets} {states} {selectedIdx} {llmMap} {keepSet} {cullSet} onSelect={onGridSelect} />
+      <PhotoGrid assets={currentAssets} {states} {selectedIdx} {llmMap} {effectiveStarsMap} onSelect={onGridSelect}
+        onToggleState={(i) => {
+          const asset = currentAssets[i];
+          if (!asset) return;
+          const effective = states[asset.id] ?? null;
+          setPhotoState(asset.id, effective === 'keep' ? 'cull' : 'keep');
+        }} />
     {:else}
       <div class="empty">Select a group or batch</div>
     {/if}
@@ -507,7 +526,7 @@
         <button class="run-btn" on:click={runLlm}>Run LLM</button>
       {:else}
         <div class="keep-level">
-          <button class="kl-btn" on:click={() => applyKeepLevel(keepLevel - 1)}>−</button>
+          <button class="kl-btn" disabled={!levelLimits.canDecrease} on:click={() => applyKeepLevel(levelLimits.nextDown)}>−</button>
           <span class="kl-label" title="Keep {sgStats.totalKept}, cull {sgStats.totalCulled}">
             {sgStats.totalKept}✓ {sgStats.totalCulled}✗
             <span class="kl-mode" class:kl-aggressive={sgStats.isAggressive}>
@@ -519,7 +538,7 @@
               {/if}
             </span>
           </span>
-          <button class="kl-btn" on:click={() => applyKeepLevel(keepLevel + 1)}>+</button>
+          <button class="kl-btn" disabled={!levelLimits.canIncrease} on:click={() => applyKeepLevel(levelLimits.nextUp)}>+</button>
         </div>
         <button class="run-btn" on:click={rerunLlm} style="background:#555;font-size:11px">Re-run</button>
       {/if}
@@ -531,8 +550,7 @@
 </div>
 
 {#if showPreview && selectedIdx >= 0 && currentAssets.length}
-  <Preview assets={currentAssets} {selectedIdx} {states} {llmMap} {keepSet} {cullSet}
-    subgroups={allSubgroups}
+  <Preview assets={currentAssets} {selectedIdx} {states} {llmMap}
     onSelect={(i) => selectedIdx = i}
     onClose={() => showPreview = false}
     onMark={(s) => mark(s)}
@@ -543,9 +561,7 @@
       if (!cur) next = 'keep';
       else if (cur === 'keep') next = 'cull';
       else next = null;
-      states[selectedAsset.id] = next;
-      states = states;
-      savePhotoDecisions([{ assetId: selectedAsset.id, state: next, userStars: userStars[selectedAsset.id] ?? null }]);
+      setPhotoState(selectedAsset.id, next);
     }} />
 {/if}
 
@@ -570,11 +586,16 @@
         <tr><td><kbd>A</kbd> / <kbd>Enter</kbd></td><td>Approve & next</td></tr>
         <tr><td><kbd>S</kbd></td><td>Skip</td></tr>
       </tbody></table>
+      <h3>LLM (Batch mode)</h3>
+      <table><tbody>
+        <tr><td><kbd>R</kbd></td><td>Run / re-run LLM</td></tr>
+        <tr><td><kbd>−</kbd> <kbd>+</kbd></td><td>Adjust keep level</td></tr>
+        <tr><td><kbd>0</kbd>–<kbd>5</kbd></td><td>Set star rating</td></tr>
+      </tbody></table>
       <h3>Bulk</h3>
       <table><tbody>
         <tr><td><kbd>Shift+K</kbd></td><td>Keep all</td></tr>
         <tr><td><kbd>Shift+X</kbd></td><td>Cull all</td></tr>
-        <tr><td><kbd>1</kbd>–<kbd>5</kbd></td><td>Keep first N</td></tr>
         <tr><td><kbd>Backspace</kbd></td><td>Undo</td></tr>
       </tbody></table>
       <p class="note">Undecided → <strong>keep</strong> on approve.</p>
@@ -619,6 +640,7 @@
   .keep-level { display: flex; align-items: center; gap: 2px; background: #1e2028; border-radius: 5px; padding: 2px; }
   .kl-btn { background: #333; border: none; color: #ddd; width: 26px; height: 26px; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
   .kl-btn:hover { background: #444; }
+  .kl-btn:disabled { opacity: 0.3; cursor: default; }
   .kl-label { font-size: 12px; color: #ddd; padding: 0 6px; min-width: 50px; text-align: center; white-space: nowrap; font-weight: 600; }
   .kl-mode { font-size: 9px; color: #7a8294; font-weight: 400; display: block; margin-top: -2px; }
   .kl-mode.kl-aggressive { color: #e53935; }
@@ -632,7 +654,7 @@
   :global(.cell.sel) { border-color: #f0a040 !important; box-shadow: 0 0 8px rgba(240,160,64,.5); }
   :global(.cell img) { width: 100%; height: 100%; object-fit: contain; display: block; background: #0b0d11; }
   :global(.lbl) { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,.8)); padding: 10px 5px 3px; font-size: 9px; color: #bbb; display: flex; justify-content: space-between; }
-  :global(.bdg) { position: absolute; top: 3px; left: 3px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; color: white; }
+  :global(.bdg) { position: absolute; top: 3px; left: 3px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; color: white; cursor: pointer; }
   :global(.bdg.kb) { background: #4caf50; } :global(.bdg.cb) { background: #e53935; }
   :global(.st) { position: absolute; top: 3px; right: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; }
   :global(.llm-star) { position: absolute; top: 3px; left: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; background: rgba(0,0,0,.6); padding: 1px 4px; border-radius: 3px; }

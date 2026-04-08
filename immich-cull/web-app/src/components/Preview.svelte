@@ -1,30 +1,23 @@
 <script lang="ts">
   import { previewUrl, fullUrl, fmt } from '../lib/api';
-  import type { AssetDetail, LlmImage, LlmSubgroup } from '../lib/api';
+  import type { AssetDetail, LlmImage } from '../lib/api';
   import type { AssetState } from '../lib/stores';
 
   export let assets: AssetDetail[] = [];
   export let selectedIdx: number = 0;
   export let states: Record<string, AssetState> = {};
   export let llmMap: Record<string, LlmImage> = {};
-  export let keepSet: Set<string> = new Set();
-  export let cullSet: Set<string> = new Set();
-  export let subgroups: LlmSubgroup[] = [];
   export let onSelect: (idx: number) => void = () => {};
   export let onClose: () => void = () => {};
   export let onMark: (state: 'keep' | 'cull') => void = () => {};
   export let onCycleState: () => void = () => {};
 
   $: asset = assets[selectedIdx];
-  $: manualState = asset ? states[asset.id] : null;
-  $: llmState = asset ? (keepSet.has(asset.id) ? 'keep' : cullSet.has(asset.id) ? 'cull' : null) : null;
-  // Show manual state if set, otherwise show LLM state.
-  // manualState is the authoritative source (already pre-populated from LLM on batch select).
-  $: displayState = manualState;
+  $: displayState = asset ? states[asset.id] : null;
   $: llm = asset ? llmMap[asset.id] : null;
 
-  let imgEl: HTMLImageElement;
-  let stripEl: HTMLDivElement;
+  let imgEl: HTMLImageElement = undefined!; // bind:this
+  let stripEl: HTMLDivElement = undefined!; // bind:this
 
   $: if (stripEl && selectedIdx >= 0) {
     const thumb = stripEl.children[selectedIdx] as HTMLElement;
@@ -35,9 +28,9 @@
     const url = fullUrl(asset.id);
     const expectedId = asset.id;
     const pre = new Image();
-    pre.onload = () => {
+    pre.addEventListener('load', () => {
       if (imgEl && imgEl.dataset.assetId === expectedId) imgEl.src = url;
-    };
+    });
     pre.src = url;
   }
 
@@ -110,8 +103,7 @@
   <!-- Filmstrip -->
   <div class="pv-strip" bind:this={stripEl}>
     {#each assets as a, i}
-      {@const ms = states[a.id]}
-      {@const ds = ms || (keepSet.has(a.id) ? 'keep' : cullSet.has(a.id) ? 'cull' : null)}
+      {@const ds = states[a.id]}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div
         class="pvt"
@@ -128,8 +120,8 @@
   </div>
 
   <!-- Main image -->
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
-  <div class="pv-main"
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <div class="pv-main" role="button" tabindex="-1"
     on:click={handleMainClick}
     on:touchstart={onTouchStart}
     on:touchmove={onTouchMove}
@@ -151,13 +143,13 @@
       </div>
 
       {#if displayState}
-        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
-        <div class="ptag {displayState}" on:click|stopPropagation={onCycleState}>
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="ptag {displayState}" role="button" tabindex="-1" on:click|stopPropagation={onCycleState}>
           {displayState.toUpperCase()}
         </div>
       {:else}
-        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
-        <div class="ptag none" on:click|stopPropagation={onCycleState}>
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="ptag none" role="button" tabindex="-1" on:click|stopPropagation={onCycleState}>
           TAP TO MARK
         </div>
       {/if}
