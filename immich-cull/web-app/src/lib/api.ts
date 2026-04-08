@@ -153,8 +153,9 @@ export async function fetchPhotoDecisions(
   ).json();
 }
 
-export async function rankBatch(id: string) {
-  return (await fetch(`${BASE}/api/batches/${id}/rank`, { method: "POST" })).json();
+export async function rankBatch(id: string, model?: string) {
+  const qs = model ? `?model=${encodeURIComponent(model)}` : "";
+  return (await fetch(`${BASE}/api/batches/${id}/rank${qs}`, { method: "POST" })).json();
 }
 
 export function previewUrl(id: string): string {

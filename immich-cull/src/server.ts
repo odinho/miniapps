@@ -412,44 +412,56 @@ app.get<{ Params: { id: string } }>("/api/batches/:id", async (req) => {
   };
 });
 
-/** Run LLM on a batch */
-app.post<{ Params: { id: string } }>("/api/batches/:id/rank", async (req) => {
-  const batch = sessionBatches.find((b) => b.id === req.params.id);
-  if (!batch) return { error: "Not found" };
-  if (!llmClient) return { error: "No LLM client configured (need --vertex or OPENROUTER key)" };
+/** Run LLM on a batch. ?model=xxx overrides the default model. */
+app.post<{ Params: { id: string }; Querystring: { model?: string } }>(
+  "/api/batches/:id/rank",
+  async (req) => {
+    const batch = sessionBatches.find((b) => b.id === req.params.id);
+    if (!batch) return { error: "Not found" };
+    if (!llmClient) return { error: "No LLM client configured (need --vertex or OPENROUTER key)" };
 
-  const fp = batchFingerprint(batch.assets.map((a) => a.id));
+    const overrideModel = req.query.model;
+    const fp = batchFingerprint(batch.assets.map((a) => a.id));
 
-  // Check cache
-  const cached = stateDb.getLlmRun(batch.id, fp);
-  if (cached) {
-    return { cached: true, response: JSON.parse(cached.responseJson) };
-  }
+    // Check cache (skip if model override — always run fresh)
+    if (!overrideModel) {
+      const cached = stateDb.getLlmRun(batch.id, fp);
+      if (cached) {
+        return { cached: true, response: JSON.parse(cached.responseJson) };
+      }
+    }
 
-  try {
-    const { response, rawJson, inputTokens, outputTokens } = await llmClient.rankBatch(
-      batch,
-      resolveFilePath,
-      (s) => console.log(`  [LLM] ${s}`),
-    );
+    // Use override model or default
+    const client = overrideModel
+      ? new LlmClient({ ...llmClient.config, model: overrideModel })
+      : llmClient;
+    const usedModel = overrideModel ?? modelArg;
 
-    // Store in DB
-    stateDb.saveLlmRun(batch.id, fp, modelArg, "v3", rawJson, inputTokens, outputTokens);
+    try {
+      const { response, rawJson, inputTokens, outputTokens } = await client.rankBatch(
+        batch,
+        resolveFilePath,
+        (s) => console.log(`  [LLM ${usedModel}] ${s}`),
+      );
 
-    return { cached: false, response, inputTokens, outputTokens };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`  [LLM] Error: ${msg}`);
-    return { error: msg };
-  }
-});
+      // Store in DB (all runs kept, newest wins)
+      stateDb.saveLlmRun(batch.id, fp, usedModel, "v3", rawJson, inputTokens, outputTokens);
 
-/** Delete cached LLM result for a batch (to allow re-run) */
+      return { cached: false, model: usedModel, response, inputTokens, outputTokens };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`  [LLM ${usedModel}] Error: ${msg}`);
+      return { error: msg };
+    }
+  },
+);
+
+/** Invalidate cached LLM result for a batch (marks old, keeps history) */
 app.delete<{ Params: { id: string } }>("/api/batches/:id/rank", async (req) => {
   const batch = sessionBatches.find((b) => b.id === req.params.id);
   if (!batch) return { error: "Not found" };
   const fp = batchFingerprint(batch.assets.map((a) => a.id));
-  stateDb.deleteLlmRun(batch.id, fp);
+  stateDb.invalidateLlmRun(batch.id, fp);
   return { ok: true };
 });
 

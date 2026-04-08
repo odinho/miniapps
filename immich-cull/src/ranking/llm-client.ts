@@ -156,7 +156,7 @@ export const DEFAULT_LLM_CONFIG: LlmClientConfig = {
 };
 
 export class LlmClient {
-  private config: LlmClientConfig;
+  readonly config: LlmClientConfig;
 
   constructor(config: Partial<LlmClientConfig> & { apiKey: string }) {
     this.config = { ...DEFAULT_LLM_CONFIG, ...config };

@@ -377,11 +377,11 @@
     await savePhotoDecisions(decisions);
   }
 
-  async function runLlm() {
+  async function runLlm(model?: string) {
     if (!batches[batchIdx] || llmRunning) return;
     llmRunning = true;
     try {
-      const result = await rankBatch(batches[batchIdx].id);
+      const result = await rankBatch(batches[batchIdx].id, model);
       if (result.error) { alert('LLM error: ' + result.error); return; }
       batches[batchIdx].hasLlmResult = true; batches = batches;
       await selectBatch(batchIdx, true);
@@ -390,12 +390,12 @@
     }
   }
 
-  async function rerunLlm() {
+  async function rerunLlm(model?: string) {
     if (!batches[batchIdx] || llmRunning) return;
     llmRunning = true;
     try {
       await fetch(`/api/batches/${batches[batchIdx].id}/rank`, { method: 'DELETE' });
-      const result = await rankBatch(batches[batchIdx].id);
+      const result = await rankBatch(batches[batchIdx].id, model);
       if (result.error) { alert('LLM error: ' + result.error); return; }
       batches[batchIdx].hasLlmResult = true; batches = batches;
       await selectBatch(batchIdx, true);
@@ -439,6 +439,7 @@
       case 'Backspace': e.preventDefault(); undo(); break;
       case '?': helpOpen = !helpOpen; break;
       case 'r': if (mode === 'batches' && !llmRunning) { if (batchDetail?.llm) rerunLlm(); else runLlm(); } break;
+      case 'R': if (mode === 'batches' && !llmRunning) rerunLlm('gemini-3.5-flash-lite'); break;
       case '-': case '_': if (mode === 'batches' && levelLimits.canDecrease) applyKeepLevel(levelLimits.nextDown); break;
       case '=': case '+': if (mode === 'batches' && levelLimits.canIncrease) applyKeepLevel(levelLimits.nextUp); break;
       case '1': setStars(1); break; case '2': setStars(2); break; case '3': setStars(3); break;

@@ -216,6 +216,15 @@ export class StateDb {
       .run(batchId, fingerprint);
   }
 
+  /** Mark existing runs as superseded (keeps history, getLlmRun ignores them) */
+  invalidateLlmRun(batchId: string, fingerprint: string) {
+    this.db
+      .prepare(
+        "UPDATE llm_batch_runs SET status = 'superseded' WHERE batch_id = ? AND batch_fingerprint = ? AND status = 'completed'",
+      )
+      .run(batchId, fingerprint);
+  }
+
   getLlmRun(batchId: string, fingerprint: string): { id: number; responseJson: string } | null {
     const row = this.db
       .prepare(
