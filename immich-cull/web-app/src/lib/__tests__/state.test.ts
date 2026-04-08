@@ -138,6 +138,34 @@ describe("deriveLlmState", () => {
     expect(state.s2).toBe("keep"); // 1-star, kept
     expect(state.s3).toBe("keep"); // 2-star, kept
   });
+
+  it("promotes culled singletons at generous levels", () => {
+    const llm = makeLlm({
+      images: [
+        { id: "a", sg: "g1", stars: 2 },
+        { id: "b", sg: "g1", stars: 2 },
+        { id: "s1", stars: 0, kc: "cull" },
+        { id: "s2", stars: 1, kc: "cull" },
+        { id: "s3", stars: 2, kc: "cull" },
+      ],
+      subgroups: [{ id: "g1", imageIds: ["a", "b"], keepCount: 1 }],
+    });
+    // At level 0: singletons follow LLM (all cull)
+    const state0 = deriveLlmState(llm, 0);
+    expect(state0.s1).toBe("cull");
+    expect(state0.s2).toBe("cull");
+
+    // maxSgLevel = 2 - 1 = 1. At level 2: generousLevel = 2 - 1 = 1
+    // generousLevel 1: promote singletons with stars >= 1
+    const state2 = deriveLlmState(llm, 2);
+    expect(state2.s1).toBe("cull"); // 0-star, stays culled
+    expect(state2.s2).toBe("keep"); // 1-star, promoted
+    expect(state2.s3).toBe("keep"); // 2-star, promoted
+
+    // generousLevel 2+: promote everything
+    const state3 = deriveLlmState(llm, 3);
+    expect(state3.s1).toBe("keep"); // promoted
+  });
 });
 
 describe("mergeStates", () => {

@@ -73,9 +73,9 @@ DESCRIPTIONS:
 Every photo MUST get a UNIQUE note. If people visible, mention them first.
 
 SIMILARITY GROUPING:
-Group photos that are variations of the same moment — same subject, similar framing, <2 min apart.
-Separate subgroups for different people/actions/locations/time gaps.
-Photos not in any subgroup are singletons — they still need a keep/cull recommendation.
+Group photos that are from the same scene or moment — same subject/location/activity, even if framing varies.
+Time gaps of a few minutes are fine if it's clearly the same scene. Separate subgroups for different people, actions, or locations.
+There should be very few singletons. If a photo is from the same scene as others, group it. Only leave a photo as a singleton if it is genuinely unrelated to everything else in the batch.
 
 OUTPUT — compact JSON, indices 0..N-1 ONLY. Do NOT invent extra indices.
 {

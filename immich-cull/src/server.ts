@@ -426,24 +426,22 @@ app.post<{ Params: { id: string } }>("/api/batches/:id/rank", async (req) => {
     return { cached: true, response: JSON.parse(cached.responseJson) };
   }
 
-  const { response, rawJson, inputTokens, outputTokens } = await llmClient.rankBatch(
-    batch,
-    resolveFilePath,
-    (s) => console.log(`  [LLM] ${s}`),
-  );
+  try {
+    const { response, rawJson, inputTokens, outputTokens } = await llmClient.rankBatch(
+      batch,
+      resolveFilePath,
+      (s) => console.log(`  [LLM] ${s}`),
+    );
 
-  // Store in DB
-  stateDb.saveLlmRun(
-    batch.id,
-    fp,
-    "gemini-2.5-flash-lite",
-    "v2",
-    rawJson,
-    inputTokens,
-    outputTokens,
-  );
+    // Store in DB
+    stateDb.saveLlmRun(batch.id, fp, modelArg, "v3", rawJson, inputTokens, outputTokens);
 
-  return { cached: false, response, inputTokens, outputTokens };
+    return { cached: false, response, inputTokens, outputTokens };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`  [LLM] Error: ${msg}`);
+    return { error: msg };
+  }
 });
 
 /** Delete cached LLM result for a batch (to allow re-run) */

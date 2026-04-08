@@ -32,21 +32,35 @@ export function deriveLlmState(
     }
   }
 
-  // Singleton photos: LLM keep/cull at level >= 0,
-  // aggressive culling by star rating at levels below subgroup floor
+  // Singleton photos:
+  // - At level 0: use LLM's per-image keep/cull
+  // - At negative levels (below subgroup floor): also cull low-star singletons
+  // - At positive levels (above subgroup ceiling): promote culled singletons by star rating
   const minSgLevel =
     sgs.length > 0 ? -Math.max(...sgs.map((sg) => sg.recommendedKeepCount - 1), 0) : 0;
-  const aggressiveLevel = keepLevel - minSgLevel;
+  const maxSgLevel =
+    sgs.length > 0 ? Math.max(...sgs.map((sg) => sg.imageIds.length - sg.recommendedKeepCount), 0) : 0;
+  const aggressiveLevel = keepLevel - minSgLevel; // negative = cull singletons
+  const generousLevel = keepLevel - maxSgLevel; // positive = promote singletons
 
   for (const img of llm.images ?? []) {
     if (inSubgroup.has(img.imageId)) continue;
     if (aggressiveLevel < 0) {
+      // Below subgroup floor: cull singletons by star rating
       if (aggressiveLevel <= -2 && img.suggestedStars <= 1) {
         out[img.imageId] = "cull";
       } else if (aggressiveLevel <= -1 && img.suggestedStars === 0) {
         out[img.imageId] = "cull";
       } else {
         out[img.imageId] = img.llmKeepCull ?? "keep";
+      }
+    } else if (generousLevel > 0) {
+      // Above subgroup ceiling: promote culled singletons by star rating
+      if (generousLevel >= 2) {
+        out[img.imageId] = "keep"; // promote everything
+      } else {
+        // generousLevel === 1: promote singletons with stars >= 1
+        out[img.imageId] = img.suggestedStars >= 1 ? "keep" : (img.llmKeepCull ?? "keep");
       }
     } else {
       out[img.imageId] = img.llmKeepCull ?? "keep";
