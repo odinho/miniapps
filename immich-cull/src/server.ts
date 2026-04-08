@@ -18,7 +18,6 @@ import { fileURLToPath } from "url";
 import { StateDb, batchFingerprint } from "./db/state-db.js";
 import { batchBySession, SessionBatch } from "./batching/session-batcher.js";
 import { LlmClient } from "./ranking/llm-client.js";
-import { DayBatchResponse } from "./ranking/types.js";
 import { config as loadEnv } from "dotenv";
 loadEnv();
 
@@ -47,7 +46,7 @@ const stateDbPath = getArg("--state-db", resolve(__dirname, "../data/state.db"))
 const stateDb = new StateDb(stateDbPath);
 
 /** Resolve the file path, handling Facet's extension-stripped paths */
-function resolveFilePath(asset: Asset): string | null {
+function resolveFilePath(asset: { path: string }): string | null {
   if (existsSync(asset.path)) return asset.path;
   for (const ext of [".jpg", ".jpeg", ".JPG", ".JPEG", ".png", ".PNG", ".heic", ".HEIC"]) {
     if (existsSync(asset.path + ext)) return asset.path + ext;
@@ -128,7 +127,7 @@ async function loadData() {
   const result = clusterAssets(assets, DEFAULT_CLUSTER_CONFIG);
 
   // Sort groups by earliest date (temporally close groups adjacent)
-  groups = result.groups.sort((a, b) => {
+  groups = result.groups.toSorted((a, b) => {
     const aTime = Math.min(...a.assets.map((x) => x.asset.fileCreatedAt.getTime()));
     const bTime = Math.min(...b.assets.map((x) => x.asset.fileCreatedAt.getTime()));
     return bTime - aTime; // newest first
@@ -182,7 +181,7 @@ app.get<{ Params: { id: string } }>("/api/groups/:id", async (req) => {
         w: dims.w,
         h: dims.h,
       };
-    })
+    }),
   );
 
   return {
@@ -196,25 +195,6 @@ app.get<{ Params: { id: string } }>("/api/groups/:id", async (req) => {
   };
 });
 
-function groupToJson(group: PhotoGroup) {
-  return {
-    id: group.id,
-    count: group.assets.length,
-    timeSpanMinutes: group.timeSpanMinutes,
-    avgDistance: group.avgDistance,
-    totalBytes: group.assets.reduce((s, a) => s + getFileSize(a.asset), 0),
-    assets: group.assets.map((a) => ({
-      id: a.asset.id,
-      filename: a.asset.filename,
-      path: a.asset.path,
-      date: a.asset.fileCreatedAt.toISOString(),
-      rating: a.asset.rating,
-      isFavorite: a.asset.isFavorite,
-      bytes: getFileSize(a.asset),
-    })),
-  };
-}
-
 /** Mark a group as reviewed/skipped */
 app.post<{
   Params: { id: string };
@@ -224,16 +204,19 @@ app.post<{
   if (!group) return { error: "Not found" };
 
   if (req.body.skipped) {
-    stateDb.setViewStatus(group.id, 'group', 'skipped');
+    stateDb.setViewStatus(group.id, "group", "skipped");
   } else {
     // Save per-photo decisions (preserve existing user_stars)
     const assetIds = [...req.body.keep, ...req.body.cull];
     const existing = stateDb.getPhotoDecisions(assetIds);
-    const decisions: Array<{ assetId: string; state: string | null; userStars: number | null }> = [];
-    for (const id of req.body.keep) decisions.push({ assetId: id, state: 'keep', userStars: existing[id]?.userStars ?? null });
-    for (const id of req.body.cull) decisions.push({ assetId: id, state: 'cull', userStars: existing[id]?.userStars ?? null });
+    const decisions: Array<{ assetId: string; state: string | null; userStars: number | null }> =
+      [];
+    for (const id of req.body.keep)
+      decisions.push({ assetId: id, state: "keep", userStars: existing[id]?.userStars ?? null });
+    for (const id of req.body.cull)
+      decisions.push({ assetId: id, state: "cull", userStars: existing[id]?.userStars ?? null });
     stateDb.savePhotoDecisions(decisions);
-    stateDb.setViewStatus(group.id, 'group', 'reviewed');
+    stateDb.setViewStatus(group.id, "group", "reviewed");
   }
 
   return { ok: true };
@@ -261,9 +244,15 @@ app.get("/api/stats", async () => {
 /** Preview: auto-rotated, max PREVIEW_MAX_PX */
 app.get<{ Querystring: { id: string } }>("/api/preview", async (req, reply) => {
   const asset = assetMap.get(req.query.id);
-  if (!asset) { reply.code(404); return { error: "Not found" }; }
+  if (!asset) {
+    reply.code(404);
+    return { error: "Not found" };
+  }
   const fp = resolveFilePath(asset);
-  if (!fp) { reply.code(404); return { error: "File not found" }; }
+  if (!fp) {
+    reply.code(404);
+    return { error: "File not found" };
+  }
 
   try {
     const preview = await sharp(fp)
@@ -282,15 +271,18 @@ app.get<{ Querystring: { id: string } }>("/api/preview", async (req, reply) => {
 /** Full-size: auto-rotated, original resolution (for preview overlay) */
 app.get<{ Querystring: { id: string } }>("/api/full", async (req, reply) => {
   const asset = assetMap.get(req.query.id);
-  if (!asset) { reply.code(404); return { error: "Not found" }; }
+  if (!asset) {
+    reply.code(404);
+    return { error: "Not found" };
+  }
   const fp = resolveFilePath(asset);
-  if (!fp) { reply.code(404); return { error: "File not found" }; }
+  if (!fp) {
+    reply.code(404);
+    return { error: "File not found" };
+  }
 
   try {
-    const full = await sharp(fp)
-      .rotate()
-      .jpeg({ quality: 90 })
-      .toBuffer();
+    const full = await sharp(fp).rotate().jpeg({ quality: 90 }).toBuffer();
     reply.type("image/jpeg").header("Cache-Control", "public, max-age=3600");
     return full;
   } catch (e: any) {
@@ -306,33 +298,36 @@ let llmClient: LlmClient | null = null;
 
 /** List all session batches */
 app.get("/api/batches", async () => {
-  return sessionBatches.map((b) => {
-    const fp = batchFingerprint(b.assets.map(a => a.id));
-    const cached = stateDb.getLlmRun(b.id, fp);
-    return {
-      id: b.id,
-      source: b.source,
-      folderName: b.folderName,
-      count: b.assets.length,
-      dateRange: { start: b.dateRange.start.toISOString(), end: b.dateRange.end.toISOString() },
-      hasLlmResult: cached !== null,
-      viewStatus: stateDb.getViewStatus(b.id),
-    };
-  })
-  // Sort: LLM-processed first, then by date
-  .sort((a: any, b: any) => {
-    if (a.hasLlmResult && !b.hasLlmResult) return -1;
-    if (!a.hasLlmResult && b.hasLlmResult) return 1;
-    return 0; // preserve date order within each group
-  });
+  return (
+    sessionBatches
+      .map((b) => {
+        const fp = batchFingerprint(b.assets.map((a) => a.id));
+        const cached = stateDb.getLlmRun(b.id, fp);
+        return {
+          id: b.id,
+          source: b.source,
+          folderName: b.folderName,
+          count: b.assets.length,
+          dateRange: { start: b.dateRange.start.toISOString(), end: b.dateRange.end.toISOString() },
+          hasLlmResult: cached !== null,
+          viewStatus: stateDb.getViewStatus(b.id),
+        };
+      })
+      // Sort: LLM-processed first, then by date
+      .toSorted((a: any, b: any) => {
+        if (a.hasLlmResult && !b.hasLlmResult) return -1;
+        if (!a.hasLlmResult && b.hasLlmResult) return 1;
+        return 0; // preserve date order within each group
+      })
+  );
 });
 
 /** Get a batch with its LLM results (if available) */
 app.get<{ Params: { id: string } }>("/api/batches/:id", async (req) => {
-  const batch = sessionBatches.find(b => b.id === req.params.id);
+  const batch = sessionBatches.find((b) => b.id === req.params.id);
   if (!batch) return { error: "Not found" };
 
-  const fp = batchFingerprint(batch.assets.map(a => a.id));
+  const fp = batchFingerprint(batch.assets.map((a) => a.id));
   const cached = stateDb.getLlmRun(batch.id, fp);
   let llmResult: any = null;
   if (cached) {
@@ -342,25 +337,40 @@ app.get<{ Params: { id: string } }>("/api/batches/:id", async (req) => {
       llmResult = {
         batchSummary: raw.sum ?? raw.batchSummary ?? "",
         overallConfidence: raw.conf ?? raw.overallConfidence ?? 0,
-        images: (raw.img ?? raw.images ?? []).map((img: any) => {
-          if (Array.isArray(img)) {
-            const [idx, stars, cat, note, sg, kc] = img;
-            const asset = batch.assets[idx];
-            return {
-              imageId: asset?.id ?? `unknown-${idx}`,
-              suggestedStars: stars ?? 0,
-              categories: typeof cat === "string" ? [cat] : (cat ?? []),
-              briefNote: note ?? "",
-              similaritySubgroupId: sg ?? null,
-              llmKeepCull: kc === 'k' ? 'keep' : kc === 'c' ? 'cull' : null,
-            };
-          }
-          return img;
-        }).filter((img: any) => img && !String(img.imageId).startsWith("unknown-")),
+        images: (raw.img ?? raw.images ?? [])
+          .map((img: any) => {
+            if (Array.isArray(img)) {
+              const [idx, stars, cat, note, sg, kc] = img;
+              const asset = batch.assets[idx];
+              return {
+                imageId: asset?.id ?? `unknown-${idx}`,
+                suggestedStars: stars ?? 0,
+                categories: typeof cat === "string" ? [cat] : (cat ?? []),
+                briefNote: note ?? "",
+                similaritySubgroupId: sg ?? null,
+                llmKeepCull: kc === "k" ? "keep" : kc === "c" ? "cull" : null,
+              };
+            }
+            return img;
+          })
+          .filter((img: any) => img && !String(img.imageId).startsWith("unknown-")),
         similaritySubgroups: (raw.sg ?? raw.similaritySubgroups ?? []).map((sg: any) => {
           const mapIdx = (idx: number) => batch.assets[idx]?.id ?? `unknown-${idx}`;
-          const allIds = (sg.all ?? sg.imageIds ?? []).map((v: any) => typeof v === "number" ? mapIdx(v) : v);
-          const keepIds = (sg.keep ?? sg.recommendedKeepIds ?? []).map((v: any) => typeof v === "number" ? mapIdx(v) : v);
+          const allIds = (sg.all ?? sg.imageIds ?? []).map((v: any) =>
+            typeof v === "number" ? mapIdx(v) : v,
+          );
+          const rawKeepIds = new Set(
+            (sg.keep ?? sg.recommendedKeepIds ?? []).map((v: any) =>
+              typeof v === "number" ? mapIdx(v) : v,
+            ),
+          );
+          // Guardrail: enforce ceiling of ceil(N*0.5) keeps per subgroup
+          // Use allIds order (best-first) to pick which to keep
+          const maxKeep = Math.max(1, Math.ceil(allIds.length * 0.5));
+          let keepIds = allIds.filter((id: string) => rawKeepIds.has(id));
+          if (keepIds.length > maxKeep && allIds.length >= 3) {
+            keepIds = keepIds.slice(0, maxKeep);
+          }
           return {
             subgroupId: sg.id ?? sg.subgroupId ?? "",
             imageIds: allIds,
@@ -380,30 +390,35 @@ app.get<{ Params: { id: string } }>("/api/batches/:id", async (req) => {
     source: batch.source,
     folderName: batch.folderName,
     count: batch.assets.length,
-    dateRange: { start: batch.dateRange.start.toISOString(), end: batch.dateRange.end.toISOString() },
-    assets: await Promise.all(batch.assets.map(async (a) => {
-      const dims = await getDimensions(a);
-      return {
-        id: a.id,
-        filename: a.filename,
-        date: a.fileCreatedAt.toISOString(),
-        rating: a.rating,
-        bytes: getFileSize(a),
-        w: dims.w,
-        h: dims.h,
-      };
-    })),
+    dateRange: {
+      start: batch.dateRange.start.toISOString(),
+      end: batch.dateRange.end.toISOString(),
+    },
+    assets: await Promise.all(
+      batch.assets.map(async (a) => {
+        const dims = await getDimensions(a);
+        return {
+          id: a.id,
+          filename: a.filename,
+          date: a.fileCreatedAt.toISOString(),
+          rating: a.rating,
+          bytes: getFileSize(a),
+          w: dims.w,
+          h: dims.h,
+        };
+      }),
+    ),
     llm: llmResult,
   };
 });
 
 /** Run LLM on a batch */
 app.post<{ Params: { id: string } }>("/api/batches/:id/rank", async (req) => {
-  const batch = sessionBatches.find(b => b.id === req.params.id);
+  const batch = sessionBatches.find((b) => b.id === req.params.id);
   if (!batch) return { error: "Not found" };
   if (!llmClient) return { error: "No LLM client configured (need --vertex or OPENROUTER key)" };
 
-  const fp = batchFingerprint(batch.assets.map(a => a.id));
+  const fp = batchFingerprint(batch.assets.map((a) => a.id));
 
   // Check cache
   const cached = stateDb.getLlmRun(batch.id, fp);
@@ -412,20 +427,30 @@ app.post<{ Params: { id: string } }>("/api/batches/:id/rank", async (req) => {
   }
 
   const { response, rawJson, inputTokens, outputTokens } = await llmClient.rankBatch(
-    batch, resolveFilePath, (s) => console.log(`  [LLM] ${s}`)
+    batch,
+    resolveFilePath,
+    (s) => console.log(`  [LLM] ${s}`),
   );
 
   // Store in DB
-  stateDb.saveLlmRun(batch.id, fp, "gemini-2.5-flash-lite", "v2", rawJson, inputTokens, outputTokens);
+  stateDb.saveLlmRun(
+    batch.id,
+    fp,
+    "gemini-2.5-flash-lite",
+    "v2",
+    rawJson,
+    inputTokens,
+    outputTokens,
+  );
 
   return { cached: false, response, inputTokens, outputTokens };
 });
 
 /** Delete cached LLM result for a batch (to allow re-run) */
 app.delete<{ Params: { id: string } }>("/api/batches/:id/rank", async (req) => {
-  const batch = sessionBatches.find(b => b.id === req.params.id);
+  const batch = sessionBatches.find((b) => b.id === req.params.id);
   if (!batch) return { error: "Not found" };
-  const fp = batchFingerprint(batch.assets.map(a => a.id));
+  const fp = batchFingerprint(batch.assets.map((a) => a.id));
   stateDb.deleteLlmRun(batch.id, fp);
   return { ok: true };
 });
@@ -433,21 +458,22 @@ app.delete<{ Params: { id: string } }>("/api/batches/:id/rank", async (req) => {
 // === View status ===
 
 app.post<{ Params: { id: string }; Body: { viewType: string; status: string } }>(
-  "/api/view-status/:id", async (req) => {
+  "/api/view-status/:id",
+  async (req) => {
     stateDb.setViewStatus(req.params.id, req.body.viewType, req.body.status);
     return { ok: true };
-  }
+  },
 );
 
 // === Per-photo decisions (shared across all views) ===
 
 /** Save decisions for multiple photos */
-app.post<{ Body: { decisions: Array<{ assetId: string; state: string | null; userStars: number | null }> } }>(
-  "/api/photos/decisions", async (req) => {
-    stateDb.savePhotoDecisions(req.body.decisions);
-    return { ok: true, count: req.body.decisions.length };
-  }
-);
+app.post<{
+  Body: { decisions: Array<{ assetId: string; state: string | null; userStars: number | null }> };
+}>("/api/photos/decisions", async (req) => {
+  stateDb.savePhotoDecisions(req.body.decisions);
+  return { ok: true, count: req.body.decisions.length };
+});
 
 /** Get decisions for a list of photos */
 app.post<{ Body: { assetIds: string[] } }>("/api/photos/decisions/get", async (req) => {
@@ -467,13 +493,25 @@ sessionBatches = batchBySession(allAssets);
 console.log(`${sessionBatches.length} session batches`);
 
 // Initialize LLM client
+const modelArg =
+  args.find((a) => a.startsWith("--model="))?.split("=")[1] ?? "gemini-2.5-flash-lite";
 const orKeyPath = resolve("/home/odin/Kode/miniapps/babysovelogg/OPENROUTER.key");
 if (args.includes("--vertex")) {
-  llmClient = new LlmClient({ apiKey: "", provider: "vertexai", model: "gemini-2.5-flash-lite", vertexProject: "tagrdevin" });
-  console.log("LLM: Vertex AI (tagrdevin)");
+  llmClient = new LlmClient({
+    apiKey: "",
+    provider: "vertexai",
+    model: modelArg,
+    vertexProject: "tagrdevin",
+  });
+  console.log(`LLM: Vertex AI (tagrdevin) — ${modelArg}`);
 } else if (existsSync(orKeyPath)) {
-  llmClient = new LlmClient({ apiKey: readFileSync(orKeyPath, "utf-8").trim(), provider: "openrouter", model: "google/gemini-2.5-flash-lite" });
-  console.log("LLM: OpenRouter");
+  const orModel = modelArg.startsWith("google/") ? modelArg : `google/${modelArg}`;
+  llmClient = new LlmClient({
+    apiKey: readFileSync(orKeyPath, "utf-8").trim(),
+    provider: "openrouter",
+    model: orModel,
+  });
+  console.log(`LLM: OpenRouter — ${orModel}`);
 } else {
   console.log("LLM: not configured (use --vertex or provide OpenRouter key)");
 }
