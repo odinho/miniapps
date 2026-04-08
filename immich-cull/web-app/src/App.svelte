@@ -185,9 +185,10 @@
         if (d.state) manualOverrides[id] = d.state as AssetState;
       }
       manualOverrides = manualOverrides;
+    } else {
+      // Fresh LLM: persist the new LLM state to DB so it survives navigation
+      await saveBatchDecisions();
     }
-    // llmState is reactive — it auto-derives from batchDetail.llm + keepLevel
-    // effectiveState = manualOverrides ?? llmState (also reactive)
 
     history.replaceState(null, '', `#batch/${batches[idx].id}`);
   }
