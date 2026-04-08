@@ -213,10 +213,12 @@ export class LlmClient {
 
     if (this.config.provider === "vertexai") {
       const { GoogleGenAI } = await import("@google/genai");
+      // Gemini 3.x+ models require global routing on Vertex AI
+      const needsGlobal = /^gemini-[3-9]/.test(this.config.model);
       const ai = new GoogleGenAI({
         vertexai: true,
         project: this.config.vertexProject ?? "tagrdevin",
-        location: this.config.vertexLocation ?? "us-central1",
+        location: needsGlobal ? "global" : (this.config.vertexLocation ?? "europe-west1"),
       });
 
       // Single Content with interleaved text labels + images as parts
