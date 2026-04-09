@@ -128,6 +128,35 @@ describe("getTimerMode", () => {
       }
     });
 
+    it("shows expected wake countdown for active nap", () => {
+      const input = makeInput({
+        activeSleep: makeSleep({ start_time: "2026-03-27T10:00:00.000Z", type: "nap" }),
+        prediction: makePrediction({ expectedNapEnd: "2026-03-27T11:00:00.000Z" }),
+        now: new Date("2026-03-27T10:30:00.000Z").getTime(),
+      });
+      const mode = getTimerMode(input);
+      expect(mode.kind).toBe("sleeping");
+      if (mode.kind === "sleeping") {
+        expect(mode.expectedWake).toBe("2026-03-27T11:00:00.000Z");
+        expect(mode.expectedWakeCountdown).toBe(30 * 60 * 1000);
+      }
+    });
+
+    it("F2: shows negative countdown when nap exceeds expected duration", () => {
+      const input = makeInput({
+        activeSleep: makeSleep({ start_time: "2026-03-27T10:00:00.000Z", type: "nap" }),
+        prediction: makePrediction({ expectedNapEnd: "2026-03-27T11:00:00.000Z" }),
+        now: new Date("2026-03-27T11:25:00.000Z").getTime(),
+      });
+      const mode = getTimerMode(input);
+      expect(mode.kind).toBe("sleeping");
+      if (mode.kind === "sleeping") {
+        expect(mode.expectedWake).toBe("2026-03-27T11:00:00.000Z");
+        // 25 minutes overtime = negative countdown
+        expect(mode.expectedWakeCountdown).toBe(-25 * 60 * 1000);
+      }
+    });
+
     it("does not treat ended sleep as sleeping", () => {
       const input = makeInput({
         activeSleep: makeSleep({

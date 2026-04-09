@@ -37,12 +37,12 @@ export function getTimerMode(input: TimerInput): TimerMode {
 		else if (activeSleep.type === 'night') label = '💤 Søv';
 		else label = '😴 Lurar';
 
-		// Expected wake time for naps
+		// Expected wake time for naps (negative = overtime)
 		const expectedWake = activeSleep.type === 'nap' && prediction?.expectedNapEnd
 			? prediction.expectedNapEnd
 			: null;
 		const expectedWakeCountdown = expectedWake
-			? Math.max(0, new Date(expectedWake).getTime() - now)
+			? new Date(expectedWake).getTime() - now
 			: null;
 
 		return { kind: 'sleeping', label, elapsed, startTime: activeSleep.start_time, expectedWake, expectedWakeCountdown };

@@ -33,6 +33,25 @@
 		return Math.max(0, end - start);
 	});
 
+	const MAX_NAP_HOURS = 4;
+	const isLongNap = $derived(
+		sleepSnapshot.type === 'nap' && sleepDurationMs > MAX_NAP_HOURS * 60 * 60 * 1000,
+	);
+
+	async function convertToNight() {
+		if (busy) return;
+		busy = true;
+		try {
+			await sync.sendEvents([{
+				type: 'sleep.updated',
+				payload: { sleepDomainId, type: 'night' },
+			}]);
+			onClose?.();
+		} finally {
+			busy = false;
+		}
+	}
+
 	// Did the user change the wake time?
 	const wakeTimeChanged = $derived.by(() => {
 		const original = defaultWakeTime.toTimeString().slice(0, 5);
@@ -113,6 +132,20 @@
 		<div style="text-align: center; margin: 4px 0 8px; font-size: 1.1rem; font-weight: 600; color: var(--text);" data-testid="sleep-duration">
 			Sov {formatDuration(sleepDurationMs)}
 		</div>
+
+		{#if isLongNap}
+			<div class="long-nap-warning" data-testid="long-nap-warning" style="background: var(--peach); padding: 12px; border-radius: var(--radius-sm); margin-bottom: 12px; color: var(--cream-dark);">
+				<p style="margin: 0 0 8px; font-size: 0.85rem; font-weight: 600;">
+					⚠️ Denne luren er uvanleg lang
+				</p>
+				<p style="margin: 0 0 8px; font-size: 0.8rem;">
+					Gløymde du å stoppa? Sjekk vaknetida ovanfor, eller gjer om til nattesøvn:
+				</p>
+				<button class="btn btn-ghost" style="width: 100%; font-size: 0.85rem;" onclick={convertToNight} disabled={busy}>
+					🌙 Gjer om til nattesøvn
+				</button>
+			</div>
+		{/if}
 
 		<!-- Wake time -->
 		<div class="form-group">

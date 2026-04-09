@@ -69,8 +69,12 @@
 	{#if mode.kind === 'sleeping'}
 		<div class="arc-center-label">{mode.label}</div>
 		<span class="countdown-value">{formatDurationLong(mode.elapsed)}</span>
-		{#if mode.expectedWake && mode.expectedWakeCountdown != null && mode.expectedWakeCountdown > 0}
-			<div class="arc-sub-label" style="opacity: 0.8;">Vaknar ~{formatTime(mode.expectedWake)} ({formatDuration(mode.expectedWakeCountdown)})</div>
+		{#if mode.expectedWake && mode.expectedWakeCountdown != null}
+			{#if mode.expectedWakeCountdown > 0}
+				<div class="arc-sub-label" style="opacity: 0.8;">Vaknar ~{formatTime(mode.expectedWake)} ({formatDuration(mode.expectedWakeCountdown)})</div>
+			{:else if mode.expectedWakeCountdown < -60000}
+				<div class="arc-sub-label" style="opacity: 0.8; color: var(--peach-dark);">+{formatDuration(Math.abs(mode.expectedWakeCountdown))} over forventa</div>
+			{/if}
 		{/if}
 	{:else if mode.kind === 'deep-night'}
 		<div class="arc-center-label">God natt 💤</div>

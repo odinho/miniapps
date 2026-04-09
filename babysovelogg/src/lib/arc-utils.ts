@@ -138,13 +138,18 @@ export function collectBubbles(
       });
     });
   } else if (prediction?.nextNap && !activeSleep) {
-    const predTime = new Date(prediction.nextNap);
-    bubbles.push({
-      startTime: predTime,
-      endTime: new Date(predTime.getTime() + 45 * 60000),
-      type: "nap",
-      status: "predicted",
-    });
+    // Don't show a nap ghost when nextNap === bedtime (naps all done);
+    // the bedtime ghost below handles that case.
+    const isBedtime = prediction.bedtime && prediction.nextNap === prediction.bedtime;
+    if (!isBedtime) {
+      const predTime = new Date(prediction.nextNap);
+      bubbles.push({
+        startTime: predTime,
+        endTime: new Date(predTime.getTime() + 45 * 60000),
+        type: "nap",
+        status: "predicted",
+      });
+    }
   }
 
   // Show bedtime ghost when no predicted nap bubbles remain

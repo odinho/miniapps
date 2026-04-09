@@ -259,20 +259,23 @@ describe("mapNapperToEvents", () => {
       "day.started", // standalone WOKE_UP (no preceding BED_TIME)
       "sleep.manual", // nap 1
       "sleep.manual", // nap 2
-      // bedTime starts a night — no WOKE_UP yet so open-ended
-      "sleep.started",
+      // bedTime is old (>24h), auto-closed with 06:00 estimate
+      "sleep.manual",
     ]);
   });
 
-  it("creates open-ended night for BED_TIME at end of file", () => {
+  it("auto-closes old trailing BED_TIME with 06:00 next morning", () => {
+    // Old BED_TIME (>24h ago) should be auto-closed, not left open
     const events = map(bedTime("2026-01-06T18:26"));
     expect(events).toHaveLength(1);
-    expect(events[0].type).toBe("sleep.started");
+    expect(events[0].type).toBe("sleep.manual");
     expect(events[0].payload).toMatchObject({
       babyId: 1,
       type: "night",
     });
     expect(events[0].payload.startTime).toBe("2026-01-06T17:26:00.000Z");
+    // Auto-closed to 06:00 next morning UTC
+    expect(events[0].payload.endTime).toBe("2026-01-07T06:00:00.000Z");
   });
 
   it("converts timestamps to UTC ISO strings", () => {

@@ -79,22 +79,40 @@ export function mapNapperToEvents(rows: NapperRow[], babyId: number): ImportEven
   function closeNight(endTime: string | null, wakeUpMood: string): void {
     if (!nightCtx) return;
     const sleepDomainId = makeSleepId();
+    const startUtc = toUtc(nightCtx.bedTime.start);
 
     if (endTime) {
       emit("sleep.manual", {
         babyId,
-        startTime: toUtc(nightCtx.bedTime.start),
+        startTime: startUtc,
         endTime: toUtc(endTime),
         type: "night",
         sleepDomainId,
       });
     } else {
-      emit("sleep.started", {
-        babyId,
-        startTime: toUtc(nightCtx.bedTime.start),
-        type: "night",
-        sleepDomainId,
-      });
+      // No explicit wake-up. If the night is older than 24h, auto-close
+      // with a 06:00 next-morning estimate to prevent ghost active sleeps.
+      const startMs = new Date(startUtc).getTime();
+      const ageMs = Date.now() - startMs;
+      if (ageMs > 24 * 60 * 60 * 1000) {
+        const nextMorning = new Date(startMs);
+        nextMorning.setUTCDate(nextMorning.getUTCDate() + 1);
+        nextMorning.setUTCHours(6, 0, 0, 0);
+        emit("sleep.manual", {
+          babyId,
+          startTime: startUtc,
+          endTime: nextMorning.toISOString(),
+          type: "night",
+          sleepDomainId,
+        });
+      } else {
+        emit("sleep.started", {
+          babyId,
+          startTime: startUtc,
+          type: "night",
+          sleepDomainId,
+        });
+      }
     }
 
     // Tag with BED_TIME comment and/or WOKE_UP mood

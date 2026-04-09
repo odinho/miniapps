@@ -217,4 +217,16 @@ describe("collectBubbles", () => {
     expect(nightBubbles2).toHaveLength(1);
     expect(nightBubbles2[0].status).toBe("predicted");
   });
+
+  it("B5: no double bubble when nextNap === bedtime (naps all done)", () => {
+    // When napsAllDone, nextNap === bedtime. Should show exactly ONE
+    // predicted bubble (bedtime ghost), not both a nap ghost AND a bedtime ghost.
+    const bubbles = collectBubbles([], null, {
+      nextNap: "2026-03-27T18:30:00",
+      bedtime: "2026-03-27T18:30:00",
+    });
+    const predicted = bubbles.filter((b) => b.status === "predicted");
+    expect(predicted).toHaveLength(1);
+    expect(predicted[0].type).toBe("night");
+  });
 });
