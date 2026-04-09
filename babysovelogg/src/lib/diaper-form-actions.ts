@@ -19,6 +19,7 @@ export const DIAPER_AMOUNTS = [
 export const POTTY_RESULTS = [
 	{ value: 'potty_wet', label: '💧 Tiss' },
 	{ value: 'potty_dirty', label: '💩 Bæsj' },
+	{ value: 'potty_both', label: '💧💩 Båe' },
 	{ value: 'potty_nothing', label: '∅ Ingenting' },
 	{ value: 'diaper_only', label: '🧷 Ingen do' },
 ] as const;

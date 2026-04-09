@@ -23,11 +23,12 @@ describe('constants', () => {
 		expect(DIAPER_AMOUNTS.map((a) => a.value)).toEqual(['lite', 'middels', 'mykje']);
 	});
 
-	it('POTTY_RESULTS has 4 options', () => {
-		expect(POTTY_RESULTS).toHaveLength(4);
+	it('POTTY_RESULTS has 5 options including potty_both', () => {
+		expect(POTTY_RESULTS).toHaveLength(5);
 		expect(POTTY_RESULTS.map((r) => r.value)).toEqual([
 			'potty_wet',
 			'potty_dirty',
+			'potty_both',
 			'potty_nothing',
 			'diaper_only',
 		]);

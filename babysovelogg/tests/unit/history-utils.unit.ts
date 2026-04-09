@@ -114,8 +114,8 @@ describe('constants', () => {
 		expect(DIAPER_EDIT_AMOUNTS).toHaveLength(3);
 	});
 
-	test('POTTY_EDIT_RESULTS has 4 options', () => {
-		expect(POTTY_EDIT_RESULTS).toHaveLength(4);
+	test('POTTY_EDIT_RESULTS has 5 options including potty_both', () => {
+		expect(POTTY_EDIT_RESULTS).toHaveLength(5);
 	});
 
 	test('POTTY_EDIT_STATUSES has 5 options', () => {

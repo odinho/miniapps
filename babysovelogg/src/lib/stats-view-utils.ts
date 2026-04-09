@@ -868,11 +868,15 @@ export function computeDiaperStats(diapers: DiaperLogRow[], tz?: string): Diaper
 	for (const d of diapers) {
 		if (d.type === "wet" || d.type === "potty_wet") wetCount++;
 		else if (d.type === "dirty" || d.type === "potty_dirty") dirtyCount++;
-		else if (d.type === "both") bothCount++;
+		else if (d.type === "both" || d.type === "potty_both") {
+			bothCount++;
+			wetCount++;
+			dirtyCount++;
+		}
 
 		if (d.type.startsWith("potty_")) {
 			pottyTotal++;
-			if (d.type === "potty_wet" || d.type === "potty_dirty") pottySuccess++;
+			if (d.type === "potty_wet" || d.type === "potty_dirty" || d.type === "potty_both") pottySuccess++;
 		}
 	}
 

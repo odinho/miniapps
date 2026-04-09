@@ -153,7 +153,7 @@ function mkDiaper(type: string, time: string): DiaperLogRow {
 }
 
 describe("computeDiaperStats", () => {
-	it("counts wet/dirty/both", () => {
+	it("counts wet/dirty/both — both increments wet and dirty", () => {
 		const d = [
 			mkDiaper("wet", "2026-03-20T10:00:00"),
 			mkDiaper("wet", "2026-03-20T12:00:00"),
@@ -162,8 +162,9 @@ describe("computeDiaperStats", () => {
 		];
 		const s = computeDiaperStats(d);
 		expect(s.total).toBe(4);
-		expect(s.wetCount).toBe(2);
-		expect(s.dirtyCount).toBe(1);
+		// "both" counts toward wet AND dirty for separate tracking
+		expect(s.wetCount).toBe(3);
+		expect(s.dirtyCount).toBe(2);
 		expect(s.bothCount).toBe(1);
 	});
 

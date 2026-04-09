@@ -11,6 +11,7 @@ export const DIAPER_ICONS: Record<string, string> = {
 	dry: '✨',
 	potty_wet: '🚽',
 	potty_dirty: '🚽',
+	potty_both: '🚽',
 	potty_nothing: '🚽',
 	diaper_only: '🧷',
 };
@@ -22,6 +23,7 @@ export const DIAPER_LABELS: Record<string, string> = {
 	dry: 'Tørr',
 	potty_wet: 'Tiss på do',
 	potty_dirty: 'Bæsj på do',
+	potty_both: 'Tiss + bæsj på do',
 	potty_nothing: 'Ingenting på do',
 	diaper_only: 'Berre bleie',
 };
@@ -54,6 +56,7 @@ export const DIAPER_EDIT_AMOUNTS = [
 export const POTTY_EDIT_RESULTS = [
 	{ value: 'potty_wet', label: '💧 Tiss' },
 	{ value: 'potty_dirty', label: '💩 Bæsj' },
+	{ value: 'potty_both', label: '💧💩 Båe' },
 	{ value: 'potty_nothing', label: '∅ Ingenting' },
 	{ value: 'diaper_only', label: '🧷 Berre bleie' },
 ] as const;

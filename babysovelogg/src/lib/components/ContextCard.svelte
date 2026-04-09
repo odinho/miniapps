@@ -11,6 +11,7 @@
 	}
 
 	let { prediction, ageMonths, birthdate }: Props = $props();
+	let collapsed = $state(false);
 
 	const totalSleepHours = $derived(
 		prediction.totalSleep24h != null ? (prediction.totalSleep24h / 60).toFixed(1) : null,
@@ -64,14 +65,18 @@
 </script>
 
 <div class="context-card" data-testid="context-card">
-	<div class="context-card-title">
-		{#if prediction.strategy === 'newborn_guidance'}
-			Siste døgn
-		{:else}
-			Søvnoversikt
-		{/if}
-	</div>
+	<button class="context-card-title" onclick={() => (collapsed = !collapsed)} aria-expanded={!collapsed}>
+		<span>
+			{#if prediction.strategy === 'newborn_guidance'}
+				Siste døgn
+			{:else}
+				Søvnoversikt
+			{/if}
+		</span>
+		<span style="font-size: 0.7rem; opacity: 0.6;">{collapsed ? '▼' : '▲'}</span>
+	</button>
 
+	{#if !collapsed}
 	<div class="context-rows">
 		{#if totalSleepHours}
 			<div class="context-row">
@@ -125,6 +130,7 @@
 		<p class="guidance-phase">{guidance.phaseDescription}</p>
 		<p class="guidance-look">{guidance.lookFor}</p>
 	</div>
+	{/if}
 </div>
 
 <style>
@@ -142,6 +148,15 @@
 		letter-spacing: 0.05em;
 		color: var(--text-light);
 		margin-bottom: 8px;
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		width: 100%;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		font-family: inherit;
 	}
 
 	.context-rows {
