@@ -329,7 +329,12 @@ export function recommendBedtime(todaySleeps: SleepEntry[], ctx: BabyContext): s
     // But if naps were missed (multiplier < 1), shift toward pressure-based
     // since the day was unusual and earlier bedtime is appropriate.
     const baseWeight = getHabitualBedtimeWeight(ctx);
-    const weight = hasEnoughNaps ? baseWeight : baseWeight * 0.5;
+    // At day start, all sleeps are synthetic (predicted, with future end times).
+    // Reduce habitual influence since we're building on predictions, not actuals.
+    const now = Date.now();
+    const allSynthetic = todaySleeps.every((s) => !s.end_time || new Date(s.end_time).getTime() > now);
+    const syntheticPenalty = allSynthetic ? 0.5 : 1.0;
+    const weight = (hasEnoughNaps ? baseWeight : baseWeight * 0.5) * syntheticPenalty;
     const blendedMs = pressureBedtime.getTime() * (1 - weight) + habitualBedtimeMs * weight;
     bedtime = new Date(Math.round(blendedMs));
   } else {

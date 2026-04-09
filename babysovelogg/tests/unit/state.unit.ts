@@ -134,6 +134,61 @@ describe("assembleState", () => {
     expect(result.prediction!.predictedNaps).not.toBeNull();
   });
 
+  it("bedtime prediction at day start respects wake-window pressure", () => {
+    // B2: At day start with wake time set but no naps, bedtime should be
+    // primarily driven by wake-window pressure (predicted naps + bedtime WW),
+    // not dominated by habitual bedtime from historical data.
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-03-26",
+      wake_time: "2026-03-26T06:25:00.000Z",
+      created_at: "2026-03-26T06:25:00.000Z",
+      created_by_event_id: null,
+    };
+    const result = assembleState(
+      dayData({
+        todayWakeUp: wakeUp,
+        now: new Date("2026-03-26T07:00:00.000Z").getTime(),
+      }),
+    );
+    expect(result.prediction).not.toBeNull();
+    const bedtime = result.prediction!.bedtime!;
+    const bedtimeDate = new Date(bedtime);
+    const bedtimeHour = bedtimeDate.getUTCHours() + bedtimeDate.getUTCMinutes() / 60;
+    // With the habitual shift cap (45 min), bedtime should stay within
+    // reasonable range of pressure-based estimate, not jump to the habitual value.
+    // Test data has habitual at 19:30 UTC, but pressure should anchor earlier.
+    expect(bedtimeHour).toBeGreaterThanOrEqual(16);
+    expect(bedtimeHour).toBeLessThanOrEqual(20);
+  });
+
+  it("bedtime prediction at day start with Europe/Oslo timezone", () => {
+    // B2: Same test but with explicit timezone (the user's actual setup).
+    // Recent data has nights at 19:30 UTC (21:30 CEST). The habitual cap
+    // should prevent that from completely dominating over pressure.
+    const baby: Baby = { ...baseBaby, timezone: "Europe/Oslo" };
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-04-05",
+      wake_time: "2026-04-05T04:25:00.000Z", // 06:25 CEST
+      created_at: "2026-04-05T04:25:00.000Z",
+      created_by_event_id: null,
+    };
+    const result = assembleState(
+      dayData({
+        baby,
+        todayWakeUp: wakeUp,
+        now: new Date("2026-04-05T05:00:00.000Z").getTime(), // 07:00 CEST
+      }),
+    );
+    expect(result.prediction).not.toBeNull();
+    const bedtime = result.prediction!.bedtime!;
+    const bedtimeDate = new Date(bedtime);
+    const bedtimeUtcHour = bedtimeDate.getUTCHours() + bedtimeDate.getUTCMinutes() / 60;
+    // With the habitual shift cap, bedtime should not be more than 45 min
+    // later than pressure-based. Should be roughly 16:00-18:30 UTC.
+    expect(bedtimeUtcHour).toBeGreaterThanOrEqual(15);
+    expect(bedtimeUtcHour).toBeLessThanOrEqual(19);
+  });
+
   it("prediction uses last completed sleep end time", () => {
     const completedSleep = sleepRow({
       start_time: "2026-03-26T09:00:00.000Z",

@@ -43,8 +43,15 @@
 		if (!initialized) {
 			startDate = isoToDateInput(entry.start_time);
 			startTime = isoToTimeInput(entry.start_time);
-			endDate = entry.end_time ? isoToDateInput(entry.end_time) : '';
-			endTime = entry.end_time ? isoToTimeInput(entry.end_time) : '';
+			if (entry.end_time) {
+				endDate = isoToDateInput(entry.end_time);
+				endTime = isoToTimeInput(entry.end_time);
+			} else {
+				// Default to "now" for active sleeps so user can easily end them
+				const nowIso = new Date().toISOString();
+				endDate = isoToDateInput(nowIso);
+				endTime = isoToTimeInput(nowIso);
+			}
 			selectedType = entry.type;
 			selectedMood = entry.mood || null;
 			selectedMethod = entry.method || null;

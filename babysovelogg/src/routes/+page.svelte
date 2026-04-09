@@ -18,6 +18,7 @@
 	import DateInput from '$lib/components/DateInput.svelte';
 	import DstBanner from '$lib/components/DstBanner.svelte';
 	import ContextCard from '$lib/components/ContextCard.svelte';
+	import ManualSleepModal from '$lib/components/ManualSleepModal.svelte';
 
 	// --- modal state ---
 	let showTagSheet = $state(false);
@@ -309,6 +310,8 @@
 		if (!baby || todayWakeUp) return false;
 		if (activeSleep && !activeSleep.end_time) return false;
 		if (todaySleeps.length > 0) return false;
+		const todayStr = new Date().toISOString().slice(0, 10);
+		if (morningDismissedDate === todayStr) return false;
 		const h = new Date().getHours();
 		return h >= 5 && h < 13;
 	});
@@ -317,6 +320,8 @@
 	let morningDate = $state('');
 	let morningTime = $state('07:00');
 	let morningBusy = $state(false);
+	let morningDismissedDate = $state('');
+	let showMorningManualSleep = $state(false);
 
 	$effect(() => {
 		if (needsMorningPrompt && !morningDate) {
@@ -351,20 +356,17 @@
 		}
 	}
 
-	async function skipMorningWakeTime() {
-		if (morningBusy || !baby) return;
-		morningBusy = true;
-		try {
-			const today = new Date();
-			today.setHours(6, 0, 0, 0);
-			await sync.sendEvents([{
-				type: 'day.started',
-				payload: { babyId: baby.id, wakeTime: today.toISOString() },
-			}]);
-			showMorningDialog = false;
-		} finally {
-			morningBusy = false;
-		}
+	function skipMorningWakeTime() {
+		morningDismissedDate = new Date().toISOString().slice(0, 10);
+		showMorningDialog = false;
+	}
+
+	function openMorningManualSleep() {
+		showMorningManualSleep = true;
+	}
+
+	function closeMorningManualSleep() {
+		showMorningManualSleep = false;
 	}
 </script>
 
@@ -395,6 +397,14 @@
 						Hopp over
 					</button>
 				</div>
+				<button
+					class="btn btn-ghost"
+					style="margin-top: 8px; font-size: 0.85rem; width: 100%;"
+					data-testid="morning-add-sleep"
+					onclick={openMorningManualSleep}
+				>
+					🌙 Legg til nattesøvn i går
+				</button>
 			</div>
 		{/if}
 
@@ -569,6 +579,13 @@
 			entry={editingSleep}
 			onClose={onEditSleepClose}
 			onDeleted={onEditSleepClose}
+		/>
+	{/if}
+
+	{#if showMorningManualSleep && baby}
+		<ManualSleepModal
+			babyId={baby.id}
+			onClose={closeMorningManualSleep}
 		/>
 	{/if}
 

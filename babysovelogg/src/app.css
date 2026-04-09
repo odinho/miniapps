@@ -706,6 +706,9 @@ html, body {
   border-radius: var(--radius-sm);
   font-size: 0.85rem;
 }
+[data-theme="night"] .latency-feedback {
+  color: var(--cream);
+}
 
 /* --- FAB button --- */
 .fab {
