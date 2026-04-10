@@ -174,6 +174,7 @@
 
   async function selectBatch(idx: number, opts: { freshLlm?: boolean; model?: string } = {}) {
     batchIdx = idx; selectedIdx = 0; showPreview = false; keepLevel = 0;
+    if (!opts.model && !opts.freshLlm) activeView = 'manual';
     loading = true;
     batchDetail = await fetchBatch(batches[idx].id, opts.model);
     loading = false;
@@ -196,6 +197,9 @@
     history.replaceState(null, '', `#batch/${batches[idx].id}`);
   }
 
+  /** Which view is active: 'manual' or a model ID */
+  let activeView = 'manual';
+
   /** Switch to a model's cached result, or run it if not cached */
   let runningModel = '';
   async function switchOrRunModel(modelId: string) {
@@ -204,6 +208,7 @@
     if (cachedModels.includes(modelId)) {
       // Switch to cached result (freshLlm to avoid stale DB overrides)
       await selectBatch(batchIdx, { freshLlm: true, model: modelId });
+      activeView = modelId;
     } else {
       // Need to run it
       runningModel = modelId;
@@ -212,18 +217,28 @@
         if (result.error) { alert('LLM error: ' + result.error); return; }
         batches[batchIdx].hasLlmResult = true; batches = batches;
         await selectBatch(batchIdx, { freshLlm: true, model: modelId });
+        activeView = modelId;
       } finally {
         runningModel = '';
       }
     }
   }
 
-  /** Cycle to the next model (Shift+R) */
+  /** Switch back to user's saved decisions */
+  async function showManual() {
+    if (!batches[batchIdx]) return;
+    activeView = 'manual';
+    await selectBatch(batchIdx);
+  }
+
+  /** Cycle to the next model (Shift+R), including manual */
   function cycleModel() {
-    const currentModel = batchDetail?.llm?.model ?? models[0].id;
-    const currentIdx = models.findIndex(m => m.id === currentModel);
-    const nextIdx = (currentIdx + 1) % models.length;
-    switchOrRunModel(models[nextIdx].id);
+    const allViews = ['manual', ...models.map(m => m.id)];
+    const currentIdx = allViews.indexOf(activeView);
+    const nextIdx = (currentIdx + 1) % allViews.length;
+    const next = allViews[nextIdx];
+    if (next === 'manual') showManual();
+    else switchOrRunModel(next);
   }
 
   function switchMode(m: AppMode) {
@@ -564,11 +579,15 @@
           </div>
         {/if}
         <div class="model-run">
+          <button class="model-btn" class:current={activeView === 'manual'}
+            disabled={!!runningModel}
+            on:click={showManual} title="Your saved decisions">
+            manual
+          </button>
           {#each models as m}
-            {@const isCurrent = batchDetail.llm?.model === m.id}
             {@const hasCached = (batchDetail.llmModels ?? []).includes(m.id)}
             {@const isRunning = runningModel === m.id}
-            <button class="model-btn" class:current={isCurrent} class:cached={hasCached && !isCurrent}
+            <button class="model-btn" class:current={activeView === m.id} class:cached={hasCached && activeView !== m.id}
               disabled={!!runningModel}
               on:click={() => switchOrRunModel(m.id)} title="{m.id}{hasCached ? ' (cached)' : ''}">
               {#if isRunning}<span class="spinner"></span>{:else}{m.label}{/if}
