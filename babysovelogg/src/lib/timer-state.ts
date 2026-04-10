@@ -2,8 +2,31 @@ import type { SleepLogRow, SleepPauseRow } from '$lib/types.js';
 import type { Prediction } from '$lib/stores/app.svelte.js';
 import { calcPauseMs } from '$lib/engine/classification.js';
 
+export interface CyclePhase {
+	/** Current cycle number (1-based) */
+	cycle: number;
+	/** Minutes into current cycle */
+	minutesIntoCycle: number;
+	/** Minutes until next light phase (cycle boundary) */
+	minutesToNextLight: number;
+	/** Whether baby is likely in light sleep (near cycle boundary) */
+	isLightPhase: boolean;
+}
+
+/** Compute sleep cycle phase. Cycle length ~45min for infants. */
+function computeCyclePhase(elapsedMs: number): CyclePhase {
+	const CYCLE_MIN = 45;
+	const LIGHT_WINDOW = 8; // light sleep ±8 min around cycle boundary
+	const elapsedMin = elapsedMs / 60_000;
+	const cycle = Math.floor(elapsedMin / CYCLE_MIN) + 1;
+	const minutesIntoCycle = elapsedMin % CYCLE_MIN;
+	const minutesToNextLight = CYCLE_MIN - minutesIntoCycle;
+	const isLightPhase = minutesIntoCycle < LIGHT_WINDOW || minutesToNextLight < LIGHT_WINDOW;
+	return { cycle, minutesIntoCycle: Math.round(minutesIntoCycle), minutesToNextLight: Math.round(minutesToNextLight), isLightPhase };
+}
+
 export type TimerMode =
-	| { kind: 'sleeping'; label: string; elapsed: number; startTime: string; expectedWake: string | null; expectedWakeCountdown: number | null }
+	| { kind: 'sleeping'; label: string; elapsed: number; startTime: string; expectedWake: string | null; expectedWakeCountdown: number | null; cyclePhase: CyclePhase | null }
 	| { kind: 'deep-night'; wakeCountdown: number | null; wakeTime: string | null }
 	| { kind: 'next-nap'; countdown: number }
 	| { kind: 'overtime'; overtime: number }
@@ -45,7 +68,10 @@ export function getTimerMode(input: TimerInput): TimerMode {
 			? new Date(expectedWake).getTime() - now
 			: null;
 
-		return { kind: 'sleeping', label, elapsed, startTime: activeSleep.start_time, expectedWake, expectedWakeCountdown };
+		// Sleep cycle phase (only for naps — night cycles are different)
+		const cyclePhase = activeSleep.type === 'nap' && !isPaused ? computeCyclePhase(elapsed) : null;
+
+		return { kind: 'sleeping', label, elapsed, startTime: activeSleep.start_time, expectedWake, expectedWakeCountdown, cyclePhase };
 	}
 
 	const currentHour = new Date(now).getHours();

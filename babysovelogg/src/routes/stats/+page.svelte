@@ -113,8 +113,28 @@
 <div class="view stats-view">
 	<h1 class="history-header">Statistikk</h1>
 
-	<!-- Sleep info for age + predictions -->
+	<!-- Predictions first (most actionable), then age norms -->
 	{#if baby}
+		{#if predictionRows.length > 0}
+			<div class="stats-section">
+				<div
+					data-testid="pred-panel"
+					class="sleep-info-panel"
+					style="background: var(--lavender); border-radius: var(--radius-sm); padding: 12px;"
+				>
+					<div style="font-weight: 600; margin-bottom: 8px; font-size: 0.9rem;">
+						Appen reknar med
+					</div>
+					{#each predictionRows as row}
+						<div class="stats-trend-row">
+							<div class="stats-trend-label">{row.label}</div>
+							<div class="stats-trend-val">{row.value}</div>
+						</div>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
 		<div class="stats-section">
 			<h3 class="stats-section-title">
 				Søvninfo for {formatAge(baby.birthdate)}
@@ -136,23 +156,6 @@
 					</div>
 				{/if}
 			</div>
-
-			{#if predictionRows.length > 0}
-				<div
-					data-testid="pred-panel"
-					style="margin-top: 16px; padding: 12px; background: var(--lavender); border-radius: var(--radius-sm);"
-				>
-					<div style="font-weight: 600; margin-bottom: 8px; font-size: 0.9rem;">
-						Appen reknar med
-					</div>
-					{#each predictionRows as row}
-						<div class="stats-trend-row">
-							<div class="stats-trend-label">{row.label}</div>
-							<div class="stats-trend-val">{row.value}</div>
-						</div>
-					{/each}
-				</div>
-			{/if}
 		</div>
 	{/if}
 
@@ -198,7 +201,7 @@
 						<path d={activeStats.stackedArea.nightPath} fill="var(--moon)" opacity="0.7" />
 						<path d={activeStats.stackedArea.napPath} fill="var(--peach-dark)" opacity="0.7" />
 						{#if activeStats.stackedArea.rollingAvgPath}
-							<path d={activeStats.stackedArea.rollingAvgPath} fill="none" stroke="var(--sun)" stroke-width="2" stroke-linecap="round" opacity="0.6" />
+							<path d={activeStats.stackedArea.rollingAvgPath} fill="none" stroke="var(--danger-dark, #c0392b)" stroke-width="2.5" stroke-linecap="round" opacity="0.8" />
 						{/if}
 						{#each activeStats.stackedArea.xLabels as lbl}
 							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
@@ -226,10 +229,11 @@
 						{#each activeStats.sleepVsNorm.yTicks as tick}
 							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
 						{/each}
-						<!-- Norm band -->
-						<path d={activeStats.sleepVsNorm.bandPath} fill="var(--moon-glow)" opacity="0.25" />
-						<!-- Typical line -->
-						<path d={activeStats.sleepVsNorm.typicalPath} fill="none" stroke="var(--moon)" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6" />
+						<!-- Norm band (recommended range) -->
+						<path d={activeStats.sleepVsNorm.bandPath} fill="var(--lavender)" opacity="0.35" />
+						<!-- Typical line (center of range) -->
+						<path d={activeStats.sleepVsNorm.typicalPath} fill="none" stroke="var(--lavender-dark)" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7" />
+						<text x={TS_CHART.W - TS_CHART.PAD_R - 2} y={(activeStats.sleepVsNorm.yTicks[0]?.y ?? TS_CHART.PAD_T) + 14} text-anchor="end" fill="var(--lavender-dark)" font-size="9" font-family="var(--font)" opacity="0.7">tilrådd</text>
 						<!-- Actual sleep area -->
 						<path d={activeStats.sleepVsNorm.actualPath} fill="var(--moon)" opacity="0.6" />
 						<!-- Data line (no dots — clean design) -->
@@ -263,7 +267,7 @@
 						<path d={activeStats.nightStretchChart.areaPath} fill="var(--moon-glow)" opacity="0.3" />
 						<!-- Rolling average -->
 						{#if activeStats.nightStretchChart.rollingAvgPath}
-							<path d={activeStats.nightStretchChart.rollingAvgPath} fill="none" stroke="var(--sun)" stroke-width="2" stroke-linecap="round" opacity="0.5" />
+							<path d={activeStats.nightStretchChart.rollingAvgPath} fill="none" stroke="var(--danger-dark, #c0392b)" stroke-width="2.5" stroke-linecap="round" opacity="0.8" />
 						{/if}
 						<!-- Line -->
 						<path d={activeStats.nightStretchChart.linePath} fill="none" stroke="var(--moon)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
@@ -320,7 +324,7 @@
 							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
 						{/each}
 						{#if activeStats.napCountChart.rollingAvgPath}
-							<path d={activeStats.napCountChart.rollingAvgPath} fill="none" stroke="var(--sun)" stroke-width="2" stroke-linecap="round" opacity="0.5" />
+							<path d={activeStats.napCountChart.rollingAvgPath} fill="none" stroke="var(--danger-dark, #c0392b)" stroke-width="2.5" stroke-linecap="round" opacity="0.8" />
 						{/if}
 						<path d={activeStats.napCountChart.linePath} fill="none" stroke="var(--peach-dark)" stroke-width="2.5" stroke-linecap="round" />
 						<!-- No dots — clean lines only -->
@@ -367,16 +371,7 @@
 			</div>
 		{/if}
 
-		<!-- Wake windows -->
-		<div class="stats-section">
-			<h3 class="stats-section-title">Vakevindu</h3>
-			<div class="stats-row">
-				<div class="stats-card">
-					<div class="stat-value">{activeStats.wakeAvg ? formatDuration(activeStats.wakeAvg * 60000) : '—'}</div>
-					<div class="stat-label">Snitt vakevindu</div>
-				</div>
-			</div>
-		</div>
+		<!-- Wake windows (merged into the scatter replacement below) -->
 
 		<!-- Sleep trends 7d vs 30d -->
 		<div class="stats-section">
@@ -497,35 +492,23 @@
 				</div>
 			{/if}
 
-			<!-- Chart F: Wake Window Scatter -->
+			<!-- Wake window summary (replaced scatter with readable format) -->
 			{#if activeStats.wakeScatter.dots.length > 0}
 				<div class="stats-section">
-					<h3 class="stats-section-title">Vakevindu-spreiing (7 dagar)</h3>
-					<div class="stats-chart-wrap">
-						<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
-							{#each activeStats.wakeScatter.gridLines as y}
-								<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
-							{/each}
-							{#each activeStats.wakeScatter.yTicks as tick}
-								<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
-							{/each}
-							<!-- Recommended range band -->
-							{#if activeStats.wakeScatter.bandY}
-								<rect
-									x={TS_CHART.PAD_L}
-									y={activeStats.wakeScatter.bandY.top}
-									width={TS_CHART.W - TS_CHART.PAD_L - TS_CHART.PAD_R}
-									height={activeStats.wakeScatter.bandY.bottom - activeStats.wakeScatter.bandY.top}
-									fill="var(--lavender)"
-									opacity="0.3"
-									rx="4"
-								/>
-							{/if}
-							<!-- Dots -->
-							{#each activeStats.wakeScatter.dots as dot}
-								<circle cx={dot.x} cy={dot.y} r="4" fill="var(--peach-dark)" stroke="var(--white)" stroke-width="1" opacity="0.8" />
-							{/each}
-						</svg>
+					<h3 class="stats-section-title">Vakevindu siste 7 dagar</h3>
+					<div class="stats-row">
+						<div class="stats-card">
+							<div class="stat-value">{activeStats.wakeAvg ? formatDuration(activeStats.wakeAvg * 60000) : '—'}</div>
+							<div class="stat-label">Snitt</div>
+						</div>
+						<div class="stats-card">
+							<div class="stat-value">{formatDuration(Math.min(...activeStats.wakeScatter.dots.map(d => d.minutes)) * 60000)}</div>
+							<div class="stat-label">Kortast</div>
+						</div>
+						<div class="stats-card">
+							<div class="stat-value">{formatDuration(Math.max(...activeStats.wakeScatter.dots.map(d => d.minutes)) * 60000)}</div>
+							<div class="stat-label">Lengst</div>
+						</div>
 					</div>
 				</div>
 			{/if}

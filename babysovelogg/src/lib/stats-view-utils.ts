@@ -625,11 +625,20 @@ export function buildGanttChart(
 	};
 
 	// Group by calendar date (00:00–00:00 rows)
+	// Sleeps that span midnight appear on BOTH the start date and end date rows.
 	const byGanttDate = new Map<string, SleepEntry[]>();
 	for (const s of completed) {
 		const dateStr = tz ? isoToDateInTz(s.start_time, tz) : s.start_time.slice(0, 10);
 		if (!byGanttDate.has(dateStr)) byGanttDate.set(dateStr, []);
 		byGanttDate.get(dateStr)!.push(s);
+		// If sleep crosses midnight, also add to the end-date row
+		if (s.end_time) {
+			const endDateStr = tz ? isoToDateInTz(s.end_time, tz) : s.end_time.slice(0, 10);
+			if (endDateStr !== dateStr) {
+				if (!byGanttDate.has(endDateStr)) byGanttDate.set(endDateStr, []);
+				byGanttDate.get(endDateStr)!.push(s);
+			}
+		}
 	}
 
 	// Build continuous calendar date range for last N days, anchored to today
@@ -652,16 +661,38 @@ export function buildGanttChart(
 		for (const s of entries) {
 			const startDate = new Date(s.start_time);
 			const endDate = new Date(s.end_time!);
+			const sleepDateStr = tz ? isoToDateInTz(s.start_time, tz) : s.start_time.slice(0, 10);
 
-			const startH = tz
-				? getLocalHourFrac(startDate, tz)
-				: startDate.getHours() + startDate.getMinutes() / 60;
-			const durationH = Math.min(24, (endDate.getTime() - startDate.getTime()) / 3600000);
+			let clipStartH: number;
+			let clipEndH: number;
 
-			const x = hourToX(startH);
-			const endX = hourToX((startH + durationH) % 24);
-			// Handle wrap-around
-			const w = endX > x ? endX - x : Math.max(2, (plotW - (x - GANTT.PAD_L)) + (endX - GANTT.PAD_L));
+			if (sleepDateStr === date) {
+				// This row owns the start of the sleep
+				clipStartH = tz
+					? getLocalHourFrac(startDate, tz)
+					: startDate.getHours() + startDate.getMinutes() / 60;
+				const endDateStr = tz ? isoToDateInTz(s.end_time!, tz) : s.end_time!.slice(0, 10);
+				if (endDateStr !== date) {
+					// Sleep extends past midnight — clip to end of day
+					clipEndH = 24;
+				} else {
+					clipEndH = tz
+						? getLocalHourFrac(endDate, tz)
+						: endDate.getHours() + endDate.getMinutes() / 60;
+				}
+			} else {
+				// This row shows the morning continuation of a cross-midnight sleep
+				clipStartH = 0;
+				clipEndH = tz
+					? getLocalHourFrac(endDate, tz)
+					: endDate.getHours() + endDate.getMinutes() / 60;
+			}
+
+			const durationH = clipEndH - clipStartH;
+			if (durationH <= 0) continue;
+
+			const x = hourToX(clipStartH);
+			const w = (durationH / hoursSpan) * plotW;
 
 			blocks.push({ x, w: Math.max(2, w), y: y + 2, type: s.type });
 		}

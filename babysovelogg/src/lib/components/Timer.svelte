@@ -76,6 +76,15 @@
 				<div class="arc-sub-label" style="opacity: 0.8; color: var(--peach-dark);">+{formatDuration(Math.abs(mode.expectedWakeCountdown))} over forventa</div>
 			{/if}
 		{/if}
+		{#if mode.cyclePhase}
+			<div class="arc-sub-label" style="opacity: 0.7; font-size: 0.7rem; margin-top: 2px;">
+				{#if mode.cyclePhase.isLightPhase}
+					<span style="color: var(--lavender-dark);">💡 Lett fase — god tid å vekkja</span>
+				{:else}
+					<span>Lett fase om ~{mode.cyclePhase.minutesToNextLight}m</span>
+				{/if}
+			</div>
+		{/if}
 	{:else if mode.kind === 'deep-night'}
 		<div class="arc-center-label">God natt 💤</div>
 		{#if mode.wakeCountdown != null && mode.wakeTime}
