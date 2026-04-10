@@ -1,6 +1,8 @@
 import {
 	calculateAgeMonths,
 	WAKE_WINDOWS,
+	NAP_COUNTS,
+	SLEEP_NEEDS,
 	findByAge,
 	getExpectedNapCount,
 	type PredictedNap,
@@ -136,11 +138,20 @@ export interface SleepInfoRow {
 
 export function buildSleepInfoRows(ageMonths: number): SleepInfoRow[] {
 	const ww = findByAge(WAKE_WINDOWS, ageMonths);
+	const naps = findByAge(NAP_COUNTS, ageMonths);
+	const sleepNeed = findByAge(SLEEP_NEEDS, ageMonths);
 	const fmtMin = (m: number) => (m >= 60 ? formatDuration(m * 60000) : `${Math.round(m)} min`);
+
+	// Compose a 24h budget: naps × napCount + wake windows × (napCount+1) + night = 24h
+	const avgWW = (ww.minMinutes + ww.maxMinutes) / 2;
+	const napCount = naps.naps;
+	const totalWakeMin = avgWW * (napCount + 1);
+	const totalWakeH = Math.round(totalWakeMin / 60 * 10) / 10;
+
 	return [
 		{ label: 'Vakevindu', value: `${fmtMin(ww.minMinutes)} – ${fmtMin(ww.maxMinutes)}` },
 		{ label: 'Lurar per dag', value: getNapCountForAge(ageMonths) },
-		{ label: 'Søvnbehov (24t)', value: getSleepNeedForAge(ageMonths) },
+		{ label: 'Søvnbehov (24t)', value: `${sleepNeed.totalHours}t (${totalWakeH}t vaken)` },
 	];
 }
 

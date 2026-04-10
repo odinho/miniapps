@@ -169,7 +169,9 @@ describe('buildSleepInfoRows', () => {
 	it('uses age-appropriate values', () => {
 		const rows = buildSleepInfoRows(1);
 		expect(rows[1].value).toBe('4–5 lurar');
-		expect(rows[2].value).toBe('14–17 timar');
+		// Now shows total sleep hours with awake complement
+		expect(rows[2].value).toContain('15.5t');
+		expect(rows[2].value).toContain('vaken');
 	});
 
 	it('formats wake window with duration for 60+ min', () => {

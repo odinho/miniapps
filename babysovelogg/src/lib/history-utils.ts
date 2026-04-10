@@ -289,6 +289,7 @@ export interface DiaperUpdatePayload {
 	type: string;
 	amount: string;
 	note?: string;
+	time?: string;
 }
 
 export function buildDiaperUpdateEvent(payload: DiaperUpdatePayload) {
@@ -299,6 +300,7 @@ export function buildDiaperUpdateEvent(payload: DiaperUpdatePayload) {
 			type: payload.type,
 			amount: payload.amount,
 			...(payload.note ? { note: payload.note } : {}),
+			...(payload.time ? { time: payload.time } : {}),
 		},
 		domainId: payload.diaperDomainId,
 	};

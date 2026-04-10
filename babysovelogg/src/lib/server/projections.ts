@@ -297,6 +297,10 @@ export function applyEvent(event: AppEvent): void {
         sets.push("note = ?");
         vals.push(payload.note);
       }
+      if (payload.time !== undefined && payload.time !== null) {
+        sets.push("time = ?");
+        vals.push(payload.time);
+      }
       vals.push(payload.diaperDomainId);
       const result = db
         .prepare(`UPDATE diaper_log SET ${sets.join(", ")} WHERE domain_id = ?`)

@@ -121,6 +121,7 @@ const payloadSchemas: Record<string, v.BaseSchema<unknown, unknown, v.BaseIssue<
     type: optStr,
     amount: optStr,
     note: optStr,
+    time: v.nullish(isoDateTime),
   }),
   "diaper.deleted": v.object({
     diaperDomainId: domainId,

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { DiaperLogRow } from '$lib/types.js';
 	import { sync } from '$lib/stores/sync.svelte.js';
-	import { formatTime } from '$lib/utils.js';
 	import {
 		isPottyEntry,
 		DIAPER_EDIT_TYPES,
@@ -10,7 +9,12 @@
 		POTTY_EDIT_STATUSES,
 		buildDiaperUpdateEvent,
 		buildDiaperDeleteEvent,
+		isoToDateInput,
+		isoToTimeInput,
+		dateTimeToIso,
 	} from '$lib/history-utils.js';
+	import TimeInput from './TimeInput.svelte';
+	import DateInput from './DateInput.svelte';
 
 	interface Props {
 		entry: DiaperLogRow;
@@ -25,17 +29,20 @@
 	let selectedType = $state('');
 	let selectedAmount = $state('');
 	let notes = $state('');
+	let timeDate = $state('');
+	let timeHM = $state('');
 	let busy = $state(false);
 	let confirmDelete = $state(false);
 	let initialized = $state(false);
 
 	// Initialize form fields from entry on first mount only.
-	// SSE updates should NOT reset the form while the user is editing.
 	$effect(() => {
 		if (!initialized) {
 			selectedType = entry.type;
 			selectedAmount = entry.amount || (isPottyEntry(entry.type) ? 'dry' : 'middels');
 			notes = entry.note || '';
+			timeDate = isoToDateInput(entry.time);
+			timeHM = isoToTimeInput(entry.time);
 			initialized = true;
 		}
 	});
@@ -44,11 +51,14 @@
 		if (busy) return;
 		busy = true;
 		try {
+			const newTime = dateTimeToIso(timeDate, timeHM);
+			const timeChanged = newTime !== entry.time;
 			const event = buildDiaperUpdateEvent({
 				diaperDomainId: entry.domain_id,
 				type: selectedType,
 				amount: selectedAmount,
 				note: notes.trim() || undefined,
+				time: timeChanged ? newTime : undefined,
 			});
 			await sync.sendEvents([event]);
 			onClose?.();
@@ -160,9 +170,13 @@
 			<input id="edit-diaper-notes" type="text" placeholder="Valfritt notat..." bind:value={notes} />
 		</div>
 
-		<!-- Time display -->
-		<div style="color: var(--text-light); font-size: 0.85rem; margin-bottom: 16px;">
-			Logga kl. {formatTime(entry.time)}
+		<!-- Time editing -->
+		<div class="form-group">
+			<span class="form-label">Tid</span>
+			<div class="datetime-row">
+				<DateInput bind:value={timeDate} />
+				<TimeInput bind:value={timeHM} />
+			</div>
 		</div>
 
 		<!-- Action buttons -->

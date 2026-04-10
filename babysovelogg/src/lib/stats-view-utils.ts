@@ -13,7 +13,7 @@ import {
 	type BedtimePoint,
 } from "$lib/engine/stats.js";
 import { formatDuration } from "$lib/utils.js";
-import { isoToDateInTz } from "$lib/tz.js";
+import { isoToDateInTz, setHourInTz } from "$lib/tz.js";
 import { regressionEquations, sleepDuration } from "$lib/data/galland2012.js";
 
 // ── SVG bar chart helpers ──────────────────────────────────────
@@ -923,12 +923,13 @@ export function buildSleepPressureChart(
 
 		// Find the earliest wake time (end of first night or start of day)
 		const firstNight = daySleeps.find(s => s.type === 'night');
+		const refDate = new Date(`${dayStr}T12:00:00Z`); // noon UTC as reference for setHourInTz
 		const wakeMs = firstNight?.end_time
 			? new Date(firstNight.end_time).getTime()
-			: new Date(`${dayStr}T06:00:00`).getTime();
+			: setHourInTz(refDate, 6, 0, timezone).getTime();
 
 		// Build minute-by-minute sleep state
-		const dayStartMs = new Date(`${dayStr}T${String(startHour).padStart(2, '0')}:00:00`).getTime();
+		const dayStartMs = setHourInTz(refDate, startHour, 0, timezone).getTime();
 
 		const pressureValues: number[] = [];
 		let pressure = 0;
