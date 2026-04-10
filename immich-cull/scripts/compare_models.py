@@ -86,14 +86,22 @@ def extract_llm_decisions(response_json_str, assets):
         sgs = [sgs]
 
     # Build subgroup keep sets for v2 fallback
+    def to_int(v):
+        """Handle both integer indices and object-with-i from Gemma"""
+        if isinstance(v, int): return v
+        if isinstance(v, dict) and "i" in v: return v["i"]
+        return None
+
     sg_keep_indices = set()
     sg_all_indices = set()
     for sg in sgs:
         if isinstance(sg, dict):
             for idx in (sg.get("keep", []) or []):
-                sg_keep_indices.add(idx)
+                i = to_int(idx)
+                if i is not None: sg_keep_indices.add(i)
             for idx in (sg.get("all", []) or []):
-                sg_all_indices.add(idx)
+                i = to_int(idx)
+                if i is not None: sg_all_indices.add(i)
 
     results = []
     for img in imgs:
