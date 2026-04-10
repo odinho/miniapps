@@ -10,3 +10,4 @@ babysovelogg-bugs*/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+*.key
