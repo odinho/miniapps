@@ -28,6 +28,7 @@
     { id: 'gemini-2.5-flash-lite', label: '2.5-lite' },
     { id: 'gemini-3.1-flash-lite-preview', label: '3.1-lite' },
     { id: 'gemini-3-flash-preview', label: '3-flash' },
+    { id: 'gemma4:e4b', label: 'gemma4' },
   ];
 
   let groups: GroupSummary[] = [];

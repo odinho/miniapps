@@ -142,9 +142,10 @@ export interface LlmClientConfig {
   model: string;
   baseUrl: string;
   previewMaxPx: number;
-  provider: "openrouter" | "vertexai";
+  provider: "openrouter" | "vertexai" | "ollama";
   vertexProject?: string;
   vertexLocation?: string;
+  ollamaUrl?: string;
 }
 
 export const DEFAULT_LLM_CONFIG: LlmClientConfig = {
@@ -250,7 +251,7 @@ export class LlmClient {
       inputTokens = result.usageMetadata?.promptTokenCount ?? 0;
       outputTokens = result.usageMetadata?.candidatesTokenCount ?? 0;
       finishReason = result.candidates?.[0]?.finishReason ?? "unknown";
-    } else {
+    } else if (this.config.provider === "openrouter") {
       // OpenRouter path
       const body = {
         model: this.config.model,
@@ -294,6 +295,43 @@ export class LlmClient {
       inputTokens = result.usage?.prompt_tokens ?? 0;
       outputTokens = result.usage?.completion_tokens ?? 0;
       finishReason = result.choices?.[0]?.finish_reason ?? "unknown";
+    } else if (this.config.provider === "ollama") {
+      // Ollama path: uses /api/chat with image support
+      // Ollama has limited context — send images individually with labels, smaller previews
+      const ollamaUrl = this.config.ollamaUrl ?? "http://localhost:11434";
+      const messages: Array<{ role: string; content: string; images?: string[] }> = [
+        { role: "system", content: SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: userPrompt + "\n\nThe images follow in order (0 to " + (imageBuffers.length - 1) + ").",
+          images: imageBuffers.map((buf) => buf.toString("base64")),
+        },
+      ];
+
+      const resp = await fetch(`${ollamaUrl}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: this.config.model,
+          messages,
+          stream: false,
+          format: "json",
+          options: { temperature: 0.2, num_predict: 16000 },
+        }),
+      });
+
+      if (!resp.ok) {
+        const err = await resp.text();
+        throw new Error(`Ollama error ${resp.status}: ${err.slice(0, 500)}`);
+      }
+
+      const result = (await resp.json()) as any;
+      rawJson = result.message?.content ?? "";
+      inputTokens = result.prompt_eval_count ?? 0;
+      outputTokens = result.eval_count ?? 0;
+      finishReason = result.done_reason ?? "unknown";
+    } else {
+      throw new Error(`Unknown LLM provider: ${this.config.provider}`);
     }
 
     onProgress?.(

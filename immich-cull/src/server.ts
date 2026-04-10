@@ -435,10 +435,15 @@ app.post<{ Params: { id: string }; Querystring: { model?: string } }>(
       return { cached: true, model: usedModel, response: JSON.parse(cached.responseJson) };
     }
 
-    // Use override model or default
-    const client = overrideModel
-      ? new LlmClient({ ...llmClient.config, model: overrideModel })
-      : llmClient;
+    // Use override model or default — detect Ollama models by name
+    let client: LlmClient;
+    if (!overrideModel) {
+      client = llmClient;
+    } else if (/^(gemma|llama|phi|qwen|mistral)/.test(overrideModel) || overrideModel.includes(":")) {
+      client = new LlmClient({ ...llmClient.config, model: overrideModel, provider: "ollama", previewMaxPx: 512 });
+    } else {
+      client = new LlmClient({ ...llmClient.config, model: overrideModel });
+    }
 
     try {
       const { response, rawJson, inputTokens, outputTokens } = await client.rankBatch(
