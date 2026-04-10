@@ -51,7 +51,7 @@ function expandCategory(code: string): string {
   return CATEGORY_MAP[code.toLowerCase()] ?? "other";
 }
 
-function expandCompactResponse(raw: any, batch: SessionBatch): DayBatchResponse {
+export function expandCompactResponse(raw: any, batch: SessionBatch): DayBatchResponse {
   const assets = batch.assets;
 
   // Deduplicate and validate indices
@@ -97,13 +97,11 @@ function expandCompactResponse(raw: any, batch: SessionBatch): DayBatchResponse 
   const similaritySubgroups: SimilaritySubgroup[] = (raw.sg ?? raw.similaritySubgroups ?? []).map(
     (sg: any) => {
       const mapIdx = (idx: number) => assets[idx]?.id ?? `unknown-${idx}`;
-      const allIds = (sg.all ?? sg.imageIds ?? []).map((v: any) =>
-        typeof v === "number" ? mapIdx(v) : v,
-      );
+      const toIdx = (v: any): string =>
+        typeof v === "number" ? mapIdx(v) : typeof v === "object" && v?.i != null ? mapIdx(v.i) : v;
+      const allIds = (sg.all ?? sg.imageIds ?? []).map(toIdx);
       const rawKeepIds = new Set(
-        (sg.keep ?? sg.recommendedKeepIds ?? []).map((v: any) =>
-          typeof v === "number" ? mapIdx(v) : v,
-        ),
+        (sg.keep ?? sg.recommendedKeepIds ?? []).map(toIdx),
       );
       // Guardrail: if LLM keeps too many in a subgroup, enforce ceiling of ceil(N*0.5)
       // Use allIds order (best-first from "all" array) to pick which to keep

@@ -17,7 +17,7 @@ import sharp from "sharp";
 import { fileURLToPath } from "url";
 import { StateDb, batchFingerprint } from "./db/state-db.js";
 import { batchBySession, SessionBatch } from "./batching/session-batcher.js";
-import { LlmClient } from "./ranking/llm-client.js";
+import { LlmClient, expandCompactResponse } from "./ranking/llm-client.js";
 import { config as loadEnv } from "dotenv";
 loadEnv();
 
@@ -336,56 +336,8 @@ app.get<{ Params: { id: string }; Querystring: { model?: string } }>("/api/batch
   if (cached) {
     try {
       const raw = JSON.parse(cached.responseJson);
-      // Expand compact format to full format for the UI
-      llmResult = {
-        model: cached.model,
-        batchSummary: raw.sum ?? raw.batchSummary ?? "",
-        overallConfidence: raw.conf ?? raw.overallConfidence ?? 0,
-        images: (raw.img ?? raw.images ?? [])
-          .map((img: any) => {
-            if (Array.isArray(img)) {
-              const [idx, stars, cat, note, sg, kc] = img;
-              const asset = batch.assets[idx];
-              return {
-                imageId: asset?.id ?? `unknown-${idx}`,
-                suggestedStars: stars ?? 0,
-                categories: typeof cat === "string" ? [cat] : (cat ?? []),
-                briefNote: note ?? "",
-                similaritySubgroupId: sg ?? null,
-                llmKeepCull: kc === "k" ? "keep" : kc === "c" ? "cull" : null,
-              };
-            }
-            return img;
-          })
-          .filter((img: any) => img && !String(img.imageId).startsWith("unknown-")),
-        similaritySubgroups: (raw.sg ?? raw.similaritySubgroups ?? []).map((sg: any) => {
-          const mapIdx = (idx: number) => batch.assets[idx]?.id ?? `unknown-${idx}`;
-          const allIds = (sg.all ?? sg.imageIds ?? []).map((v: any) =>
-            typeof v === "number" ? mapIdx(v) : v,
-          );
-          const rawKeepIds = new Set(
-            (sg.keep ?? sg.recommendedKeepIds ?? []).map((v: any) =>
-              typeof v === "number" ? mapIdx(v) : v,
-            ),
-          );
-          // Guardrail: enforce ceiling of ceil(N*0.5) keeps per subgroup
-          // Use allIds order (best-first) to pick which to keep
-          const maxKeep = Math.max(1, Math.ceil(allIds.length * 0.5));
-          let keepIds = allIds.filter((id: string) => rawKeepIds.has(id));
-          if (keepIds.length > maxKeep && allIds.length >= 3) {
-            keepIds = keepIds.slice(0, maxKeep);
-          }
-          return {
-            subgroupId: sg.id ?? sg.subgroupId ?? "",
-            imageIds: allIds,
-            subgroupType: sg.type ?? sg.subgroupType ?? "scene",
-            recommendedKeepCount: keepIds.length,
-            recommendedKeepIds: keepIds,
-            cullIds: allIds.filter((id: string) => !keepIds.includes(id)),
-            rationale: sg.why ?? sg.rationale ?? "",
-          };
-        }),
-      };
+      const expanded = expandCompactResponse(raw, batch);
+      llmResult = { model: cached.model, ...expanded };
     } catch {}
   }
 
