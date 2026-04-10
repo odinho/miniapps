@@ -37,6 +37,7 @@ export interface AssetDetail extends AssetSummary {
   path: string;
   w: number;
   h: number;
+  autoKeep?: boolean;
 }
 
 export interface BatchSummary {

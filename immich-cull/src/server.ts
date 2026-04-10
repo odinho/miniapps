@@ -409,6 +409,7 @@ app.get<{ Params: { id: string }; Querystring: { model?: string } }>("/api/batch
           bytes: getFileSize(a),
           w: dims.w,
           h: dims.h,
+          autoKeep: stateDb.isAutoKeep(a.id),
         };
       }),
     ),
@@ -496,6 +497,22 @@ app.post<{
 /** Get decisions for a list of photos */
 app.post<{ Body: { assetIds: string[] } }>("/api/photos/decisions/get", async (req) => {
   return stateDb.getPhotoDecisions(req.body.assetIds);
+});
+
+// === Auto-keep patterns ===
+
+app.get("/api/auto-keep-patterns", async () => {
+  return stateDb.getAutoKeepPatterns();
+});
+
+app.post<{ Body: { pattern: string; description?: string } }>("/api/auto-keep-patterns", async (req) => {
+  const id = stateDb.addAutoKeepPattern(req.body.pattern, req.body.description);
+  return { id };
+});
+
+app.delete<{ Params: { id: string } }>("/api/auto-keep-patterns/:id", async (req) => {
+  stateDb.removeAutoKeepPattern(parseInt(req.params.id));
+  return { ok: true };
 });
 
 app.get("/", async (_, reply) => {
