@@ -238,6 +238,17 @@ export function buildComparisonTable(
 		altNorm: altNorm ? `~${fmtD(altNorm.avgWindowH * 60 * 1.2)}` : undefined,
 	});
 
+	// Total sleep (night + naps)
+	const sleepNeed = findByAge(SLEEP_NEEDS, ageMonths);
+	const babyTotalMin = learned
+		? learned.nightDurationMin + learned.napDurationMin * learned.expectedNapCount
+		: 0;
+	rows.push({
+		label: 'Søvn totalt',
+		norm: `~${sleepNeed.totalHours}t`,
+		actual: learned ? `~${fmtD(babyTotalMin)}` : '—',
+		altNorm: altNorm ? `~${sleepNeed.totalHours}t` : undefined,
+	});
 
 	return rows;
 }
