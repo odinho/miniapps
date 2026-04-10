@@ -158,26 +158,29 @@ describe('getNextSleepMilestone', () => {
 });
 
 describe('buildSleepInfoRows', () => {
-	it('returns 3 rows for age info', () => {
-		const rows = buildSleepInfoRows(6);
-		expect(rows).toHaveLength(3);
-		expect(rows[0].label).toBe('Vakevindu');
-		expect(rows[1].label).toBe('Lurar per dag');
-		expect(rows[2].label).toBe('Søvnbehov (24t)');
+	it('returns 4 rows as a 24h budget', () => {
+		const rows = buildSleepInfoRows(9);
+		expect(rows).toHaveLength(4);
+		expect(rows[0].label).toBe('Søvn totalt');
+		expect(rows[1].label).toBe('Nattesøvn');
+		expect(rows[2].label).toBe('Lurar');
+		expect(rows[3].label).toBe('Vaken totalt');
 	});
 
-	it('uses age-appropriate values', () => {
+	it('24h budget adds up for 9-month-old', () => {
+		const rows = buildSleepInfoRows(9);
+		// Total sleep ~14h, so awake ~10h
+		expect(rows[0].value).toContain('14t');
+		expect(rows[3].value).toContain('10t');
+		// 2 naps × ~45m = 1.5h nap, so ~12.5h night
+		expect(rows[2].value).toContain('2 ×');
+		expect(rows[1].value).toContain('12.5t');
+	});
+
+	it('24h budget adds up for 1-month-old', () => {
 		const rows = buildSleepInfoRows(1);
-		expect(rows[1].value).toBe('4–5 lurar');
-		// Now shows total sleep hours with awake complement
-		expect(rows[2].value).toContain('15.5t');
-		expect(rows[2].value).toContain('vaken');
-	});
-
-	it('formats wake window with duration for 60+ min', () => {
-		const rows = buildSleepInfoRows(10);
-		// 10 months: 180-240 min → 3h 0m – 4h 0m
-		expect(rows[0].value).toContain('3h');
+		expect(rows[0].value).toContain('15.5t');
+		expect(rows[3].value).toContain('8.5t');
 	});
 });
 
