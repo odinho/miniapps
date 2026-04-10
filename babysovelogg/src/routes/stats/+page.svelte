@@ -148,6 +148,9 @@
 						{/each}
 					</tbody>
 				</table>
+				<p style="font-size: 0.7rem; color: var(--text-light); margin: 6px 4px 0; line-height: 1.3;">
+					Normverdiar er omtrentlege og varierer mellom barn. {baby.name}-verdiane er baserte på dei siste 7 dagane.
+				</p>
 			</div>
 
 			{#if predictionRows.length > 0}
@@ -249,12 +252,12 @@
 							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
 						{/each}
 						<!-- Norm band (recommended range) -->
-						<path d={activeStats.sleepVsNorm.bandPath} fill="var(--lavender)" opacity="0.35" />
+						<path d={activeStats.sleepVsNorm.bandPath} fill="var(--lavender)" opacity="0.5" />
 						<!-- Typical line (center of range) -->
 						<path d={activeStats.sleepVsNorm.typicalPath} fill="none" stroke="var(--lavender-dark)" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7" />
 						<text x={TS_CHART.W - TS_CHART.PAD_R - 2} y={(activeStats.sleepVsNorm.yTicks[0]?.y ?? TS_CHART.PAD_T) + 14} text-anchor="end" fill="var(--lavender-dark)" font-size="9" font-family="var(--font)" opacity="0.7">tilrådd</text>
 						<!-- Actual sleep area -->
-						<path d={activeStats.sleepVsNorm.actualPath} fill="var(--moon)" opacity="0.6" />
+						<path d={activeStats.sleepVsNorm.actualPath} fill="var(--moon)" opacity="0.75" />
 						<!-- Data line (no dots — clean design) -->
 						{#each activeStats.sleepVsNorm.xLabels as lbl}
 							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
@@ -451,7 +454,9 @@
 			{#if activeStats.gantt.rows.length > 0}
 				<div class="stats-section">
 					<h3 class="stats-section-title">Døgnrytme (30 dagar)</h3>
-					<div class="stats-chart-wrap" style="overflow-x: auto;">
+					<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="stats-chart-wrap" style="overflow-x: auto;" onclick={(e) => handleChartClick(e, 'Døgnrytme')}>
 						<svg viewBox="0 0 {GANTT.W} {activeStats.gantt.height}" width="100%" class="stats-chart" shape-rendering="crispEdges">
 							<!-- Hour labels -->
 							{#each activeStats.gantt.hourLabels as lbl}
@@ -488,7 +493,9 @@
 				{@const hm = activeStats.heatmapChart}
 				<div class="stats-section">
 					<h3 class="stats-section-title">Søvnkart</h3>
-					<div class="stats-chart-wrap" style="overflow-y: auto; max-height: 70vh;">
+					<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="stats-chart-wrap" style="overflow-y: auto; max-height: 70vh;" onclick={(e) => handleChartClick(e, 'Søvnkart')}>
 						<svg viewBox="0 0 {hm.width} {hm.height}" width="100%" class="stats-chart" shape-rendering="crispEdges" style="height: {hm.height}px; width: 100%;">
 							{#each hm.hourLabels as lbl}
 								<text x={lbl.x} y={12} text-anchor="middle" fill="var(--text-light)" font-size="9" font-family="var(--font)" shape-rendering="auto">{lbl.label}</text>
@@ -612,13 +619,17 @@
 		position: fixed;
 		top: 0;
 		left: 0;
-		right: 0;
-		bottom: 0;
+		width: 100vh;
+		height: 100vw;
 		background: var(--cream);
 		z-index: 1000;
 		display: flex;
 		flex-direction: column;
-		padding: 16px;
+		padding: 12px 16px;
+		/* Rotate to landscape */
+		transform: rotate(90deg);
+		transform-origin: top left;
+		translate: 100vw 0;
 	}
 
 	.chart-fullscreen-header {
@@ -627,7 +638,7 @@
 		align-items: center;
 		font-weight: 600;
 		font-size: 0.9rem;
-		margin-bottom: 16px;
+		margin-bottom: 8px;
 	}
 
 	.chart-fullscreen-body {
@@ -635,12 +646,12 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		overflow: auto;
 	}
 
 	.chart-fullscreen-body :global(svg) {
 		width: 100%;
 		height: auto;
-		max-height: 80vh;
 	}
 
 	.stats-chart-wrap {

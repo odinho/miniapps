@@ -1,5 +1,6 @@
 import {
 	calculateAgeMonths,
+	WAKE_WINDOWS,
 	NAP_COUNTS,
 	SLEEP_NEEDS,
 	findByAge,
@@ -158,24 +159,46 @@ export function buildSleepInfoRows(ageMonths: number): SleepInfoRow[] {
 	];
 }
 
-/** Norm budget for a specific nap count at this age (for comparing when baby deviates).
+/** Norm budget as display strings for the comparison table. */
+export interface NormBudgetStrings {
+	napDur: string;
+	nightH: string;
+	wakeWindow: string;
+	bedtimeWW: string;
+	totalSleep: string;
+}
+
+/** Norm budget for a specific nap count at this age.
  *  When napCount differs from the age norm, nap duration scales to keep total nap time
- *  roughly constant (e.g., 2×45m → 1×90m). */
-export function buildNormBudget(ageMonths: number, napCount: number): {
-	nightH: number; napDurMin: number; totalAwakeH: number; avgWindowH: number;
-} {
+ *  roughly constant (e.g., 2×45m → 1×90m). Returns display strings with ranges. */
+export function buildNormBudget(ageMonths: number, napCount: number): NormBudgetStrings {
 	const sleepNeed = findByAge(SLEEP_NEEDS, ageMonths);
+	const ww = findByAge(WAKE_WINDOWS, ageMonths);
 	const norms = findByAge(NAP_COUNTS, ageMonths);
-	const totalSleepH = sleepNeed.totalHours;
-	const totalAwakeH = 24 - totalSleepH;
+	const fmtD = (min: number) => formatDuration(min * 60000);
+
 	const baseNapDurMin = ageMonths < 6 ? 60 : ageMonths < 12 ? 45 : 30;
-	// Scale nap duration to keep total nap time constant across nap counts
 	const napDurMin = Math.round(baseNapDurMin * norms.naps / napCount);
+
+	// Wake windows scale with nap count: fewer naps → wider windows
+	const wwScale = (norms.naps + 1) / (napCount + 1);
+	const wwMin = Math.round(ww.minMinutes * wwScale);
+	const wwMax = Math.round(ww.maxMinutes * wwScale);
+	const bedtimeMin = Math.round(wwMax * 1.15);
+	const bedtimeMax = Math.round(wwMax * 1.3);
+
+	// Night: total sleep minus nap time
 	const totalNapH = napCount * napDurMin / 60;
-	const nightH = Math.round((totalSleepH - totalNapH) * 10) / 10;
-	const numWindows = napCount + 1;
-	const avgWindowH = Math.round(totalAwakeH / numWindows * 10) / 10;
-	return { nightH, napDurMin, totalAwakeH, avgWindowH };
+	const nightMinH = Math.round((sleepNeed.range[0] - totalNapH) * 10) / 10;
+	const nightMaxH = Math.round((sleepNeed.range[1] - totalNapH) * 10) / 10;
+
+	return {
+		napDur: fmtD(napDurMin),
+		nightH: `${nightMinH}–${nightMaxH}t`,
+		wakeWindow: `${fmtD(wwMin)}–${fmtD(wwMax)}`,
+		bedtimeWW: `${fmtD(bedtimeMin)}–${fmtD(bedtimeMax)}`,
+		totalSleep: `${sleepNeed.range[0]}–${sleepNeed.range[1]}t`,
+	};
 }
 
 export interface ComparisonRow {
@@ -197,62 +220,55 @@ export function buildComparisonTable(
 	const napCountDiffers = babyNapCount !== normNapCount;
 
 	const norm = buildNormBudget(ageMonths, normNapCount);
-	const altNorm = napCountDiffers ? buildNormBudget(ageMonths, babyNapCount) : null;
+	const alt = napCountDiffers ? buildNormBudget(ageMonths, babyNapCount) : null;
 
 	const fmtD = (min: number) => formatDuration(min * 60000);
 
 	const rows: ComparisonRow[] = [];
 
-	// Nap count
 	rows.push({
 		label: 'Lurar',
 		norm: `${normNapCount}`,
 		actual: learned ? `${babyNapCount}` : '—',
-		altNorm: altNorm ? `${babyNapCount}` : undefined,
+		altNorm: alt ? `${babyNapCount}` : undefined,
 	});
 
-	// Nap duration
 	rows.push({
 		label: 'Lurvarigheit',
-		norm: `~${fmtD(norm.napDurMin)}`,
-		actual: learned ? `~${fmtD(learned.napDurationMin)}` : '—',
-		altNorm: altNorm ? `~${fmtD(altNorm.napDurMin)}` : undefined,
+		norm: norm.napDur,
+		actual: learned ? fmtD(learned.napDurationMin) : '—',
+		altNorm: alt?.napDur,
 	});
 
-	// Night sleep
 	rows.push({
 		label: 'Nattesøvn',
-		norm: `~${norm.nightH}t`,
-		actual: learned ? `~${fmtD(learned.nightDurationMin)}` : '—',
-		altNorm: altNorm ? `~${altNorm.nightH}t` : undefined,
+		norm: norm.nightH,
+		actual: learned ? fmtD(learned.nightDurationMin) : '—',
+		altNorm: alt?.nightH,
 	});
 
-	// Wake window (average)
 	rows.push({
-		label: 'Vakevindu (snitt)',
-		norm: `~${fmtD(norm.avgWindowH * 60)}`,
-		actual: learned ? `~${fmtD(learned.wakeWindowMin)}` : '—',
-		altNorm: altNorm ? `~${fmtD(altNorm.avgWindowH * 60)}` : undefined,
+		label: 'Vakevindu',
+		norm: norm.wakeWindow,
+		actual: learned ? fmtD(learned.wakeWindowMin) : '—',
+		altNorm: alt?.wakeWindow,
 	});
 
-	// Before bedtime
 	rows.push({
 		label: 'Før leggetid',
-		norm: `~${fmtD(norm.avgWindowH * 60 * 1.2)}`,
-		actual: learned ? `~${fmtD(learned.bedtimeWakeWindowMin)}` : '—',
-		altNorm: altNorm ? `~${fmtD(altNorm.avgWindowH * 60 * 1.2)}` : undefined,
+		norm: norm.bedtimeWW,
+		actual: learned ? fmtD(learned.bedtimeWakeWindowMin) : '—',
+		altNorm: alt?.bedtimeWW,
 	});
 
-	// Total sleep (night + naps)
-	const sleepNeed = findByAge(SLEEP_NEEDS, ageMonths);
 	const babyTotalMin = learned
 		? learned.nightDurationMin + learned.napDurationMin * learned.expectedNapCount
 		: 0;
 	rows.push({
 		label: 'Søvn totalt',
-		norm: `~${sleepNeed.totalHours}t`,
-		actual: learned ? `~${fmtD(babyTotalMin)}` : '—',
-		altNorm: altNorm ? `~${sleepNeed.totalHours}t` : undefined,
+		norm: norm.totalSleep,
+		actual: learned ? fmtD(babyTotalMin) : '—',
+		altNorm: alt?.totalSleep,
 	});
 
 	return rows;
