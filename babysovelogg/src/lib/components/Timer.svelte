@@ -79,9 +79,9 @@
 		{#if mode.cyclePhase}
 			<div class="arc-sub-label" style="opacity: 0.7; font-size: 0.7rem; margin-top: 2px;">
 				{#if mode.cyclePhase.isLightPhase}
-					<span style="color: var(--lavender-dark);">💡 Lett fase — god tid å vekkja</span>
+					<span style="color: var(--lavender-dark);">💡 Truleg lett fase no</span>
 				{:else}
-					<span>Lett fase om ~{mode.cyclePhase.minutesToNextLight}m</span>
+					<span>~{mode.cyclePhase.minutesToNextLight}m til neste lette fase</span>
 				{/if}
 			</div>
 		{/if}

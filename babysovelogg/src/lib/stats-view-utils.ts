@@ -1032,10 +1032,15 @@ export async function fetchStatsData(): Promise<StatsData> {
 	return { sleeps, diapers };
 }
 
-/** Fetch all sleep data (no time limit) for full-history views. */
-export async function fetchFullHistory(): Promise<SleepEntry[]> {
-	const res = await fetch("/api/sleeps?limit=10000");
-	return res.json();
+/** Fetch all sleep + diaper data (no time limit) for full-history views. */
+export async function fetchFullHistory(): Promise<StatsData> {
+	const [sleepRes, diaperRes] = await Promise.all([
+		fetch("/api/sleeps?limit=10000"),
+		fetch("/api/diapers?limit=10000"),
+	]);
+	const sleeps = await sleepRes.json();
+	const diapers = await diaperRes.json();
+	return { sleeps, diapers };
 }
 
 // ── Diaper stats ───────────────────────────────────────────────

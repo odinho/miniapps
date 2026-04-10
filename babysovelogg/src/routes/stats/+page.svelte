@@ -76,8 +76,8 @@
 	async function loadFullHistory() {
 		loadingFullHistory = true;
 		try {
-			const allSleeps = await fetchFullHistory();
-			fullStats = computeAllStats(allSleeps, [], baby?.timezone ?? undefined, baby?.birthdate ?? undefined);
+			const allData = await fetchFullHistory();
+			fullStats = computeAllStats(allData.sleeps, allData.diapers, baby?.timezone ?? undefined, baby?.birthdate ?? undefined);
 			showFullHistory = true;
 		} finally {
 			loadingFullHistory = false;
@@ -431,7 +431,7 @@
 			<!-- Chart D: Sleep Timeline (Gantt) -->
 			{#if activeStats.gantt.rows.length > 0}
 				<div class="stats-section">
-					<h3 class="stats-section-title">Døgnrytme (14 dagar)</h3>
+					<h3 class="stats-section-title">Døgnrytme (30 dagar)</h3>
 					<div class="stats-chart-wrap" style="overflow-x: auto;">
 						<svg viewBox="0 0 {GANTT.W} {activeStats.gantt.height}" width="100%" class="stats-chart" shape-rendering="crispEdges">
 							<!-- Hour labels -->
