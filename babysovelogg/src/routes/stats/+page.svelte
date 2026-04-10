@@ -46,6 +46,7 @@
 	);
 
 	let loading = $state(true);
+	let showSleepDetail = $state(false);
 	let error = $state(false);
 	let empty = $state(false);
 	let stats = $state<ComputedStats | null>(null);
@@ -140,12 +141,29 @@
 				Søvninfo for {formatAge(baby.birthdate)}
 			</h3>
 			<div class="sleep-info-panel">
-				{#each sleepInfoRows as row}
+				{#each sleepInfoRows.filter(r => !r.detail) as row}
 					<div class="stats-trend-row">
 						<div class="stats-trend-label">{row.label}</div>
 						<div class="stats-trend-val">{row.value}</div>
 					</div>
 				{/each}
+				{#if sleepInfoRows.some(r => r.detail)}
+					<button
+						class="btn btn-ghost"
+						style="width: 100%; font-size: 0.8rem; padding: 4px 0; margin-top: 4px; color: var(--text-light);"
+						onclick={() => (showSleepDetail = !showSleepDetail)}
+					>
+						{showSleepDetail ? 'Gøym vakevindauge ▲' : 'Vis vakevindauge ▼'}
+					</button>
+					{#if showSleepDetail}
+						{#each sleepInfoRows.filter(r => r.detail) as row}
+							<div class="stats-trend-row" style="font-size: 0.85rem; opacity: 0.85;">
+								<div class="stats-trend-label">{row.label}</div>
+								<div class="stats-trend-val">{row.value}</div>
+							</div>
+						{/each}
+					{/if}
+				{/if}
 
 				{#if nextMilestone}
 					<div

@@ -158,21 +158,25 @@ describe('getNextSleepMilestone', () => {
 });
 
 describe('buildSleepInfoRows', () => {
-	it('returns 4 rows as a 24h budget', () => {
+	it('returns budget rows + detail rows', () => {
 		const rows = buildSleepInfoRows(9);
-		expect(rows).toHaveLength(4);
-		expect(rows[0].label).toBe('Søvn totalt');
-		expect(rows[1].label).toBe('Nattesøvn');
-		expect(rows[2].label).toBe('Lurar');
-		expect(rows[3].label).toBe('Vaken totalt');
+		const main = rows.filter(r => !r.detail);
+		const detail = rows.filter(r => r.detail);
+		expect(main).toHaveLength(4);
+		expect(main[0].label).toBe('Søvn totalt');
+		expect(main[1].label).toBe('Nattesøvn');
+		expect(main[2].label).toBe('Lurar');
+		expect(main[3].label).toBe('Vaken totalt');
+		// 2-nap baby has 3 positional wake windows
+		expect(detail).toHaveLength(3);
+		expect(detail[0].label).toBe('Morgon');
+		expect(detail[2].label).toBe('Kveld');
 	});
 
 	it('24h budget adds up for 9-month-old', () => {
 		const rows = buildSleepInfoRows(9);
-		// Total sleep ~14h, so awake ~10h
 		expect(rows[0].value).toContain('14t');
 		expect(rows[3].value).toContain('10t');
-		// 2 naps × ~45m = 1.5h nap, so ~12.5h night
 		expect(rows[2].value).toContain('2 ×');
 		expect(rows[1].value).toContain('12.5t');
 	});
@@ -181,6 +185,14 @@ describe('buildSleepInfoRows', () => {
 		const rows = buildSleepInfoRows(1);
 		expect(rows[0].value).toContain('15.5t');
 		expect(rows[3].value).toContain('8.5t');
+	});
+
+	it('1-nap baby has 2 positional windows', () => {
+		const rows = buildSleepInfoRows(15); // 12-18 months: 1 nap
+		const detail = rows.filter(r => r.detail);
+		expect(detail).toHaveLength(2);
+		expect(detail[0].label).toBe('Morgon');
+		expect(detail[1].label).toBe('Kveld');
 	});
 });
 

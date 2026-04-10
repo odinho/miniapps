@@ -1,5 +1,6 @@
 import {
 	calculateAgeMonths,
+	WAKE_WINDOWS,
 	NAP_COUNTS,
 	SLEEP_NEEDS,
 	findByAge,
@@ -133,9 +134,12 @@ export function getNextSleepMilestone(ageMonths: number): string | null {
 export interface SleepInfoRow {
 	label: string;
 	value: string;
+	/** If true, this row is a collapsible detail row */
+	detail?: boolean;
 }
 
 export function buildSleepInfoRows(ageMonths: number): SleepInfoRow[] {
+	const ww = findByAge(WAKE_WINDOWS, ageMonths);
 	const naps = findByAge(NAP_COUNTS, ageMonths);
 	const sleepNeed = findByAge(SLEEP_NEEDS, ageMonths);
 	const fmtMin = (m: number) => (m >= 60 ? formatDuration(m * 60000) : `${Math.round(m)} min`);
@@ -144,20 +148,42 @@ export function buildSleepInfoRows(ageMonths: number): SleepInfoRow[] {
 	// 24h budget: sleep + awake = 24h
 	const totalSleepH = sleepNeed.totalHours;
 	const totalAwakeH = 24 - totalSleepH;
-	// Typical nap duration by age
 	const napDurMin = ageMonths < 6 ? 60 : ageMonths < 12 ? 45 : 30;
 	const totalNapH = Math.round(napCount * napDurMin / 60 * 10) / 10;
 	const nightH = Math.round((totalSleepH - totalNapH) * 10) / 10;
-	// Per-window: awake time / number of wake windows
 	const numWindows = napCount + 1;
 	const avgWindowH = Math.round(totalAwakeH / numWindows * 10) / 10;
 
-	return [
+	// Positional wake windows: first is shorter, last (bedtime) is longer
+	const midMin = (ww.minMinutes + ww.maxMinutes) / 2;
+	const firstMin = Math.round(ww.minMinutes + (midMin - ww.minMinutes) * 0.3);
+	const bedtimeMin = Math.round(midMin * 1.2);
+
+	const rows: SleepInfoRow[] = [
 		{ label: 'Søvn totalt', value: `~${totalSleepH}t av 24t` },
 		{ label: 'Nattesøvn', value: `~${nightH}t` },
 		{ label: 'Lurar', value: `${napCount} × ~${fmtMin(napDurMin)}` },
 		{ label: 'Vaken totalt', value: `~${totalAwakeH}t (${numWindows} vindauge à ~${avgWindowH}t)` },
 	];
+
+	// Detail rows: positional wake window ranges
+	const windowNames = napCount >= 3
+		? ['Morgon', 'Middag 1', 'Middag 2', 'Kveld']
+		: napCount === 2
+			? ['Morgon', 'Middag', 'Kveld']
+			: napCount === 1
+				? ['Morgon', 'Kveld']
+				: ['Vakevindu'];
+
+	if (napCount >= 1) {
+		rows.push({ label: windowNames[0], value: `~${fmtMin(firstMin)} (${fmtMin(ww.minMinutes)}–${fmtMin(midMin)})`, detail: true });
+		for (let i = 1; i < windowNames.length - 1; i++) {
+			rows.push({ label: windowNames[i], value: `~${fmtMin(midMin)} (${fmtMin(midMin * 0.9)}–${fmtMin(midMin * 1.1)})`, detail: true });
+		}
+		rows.push({ label: windowNames[windowNames.length - 1], value: `~${fmtMin(bedtimeMin)} (${fmtMin(midMin)}–${fmtMin(ww.maxMinutes)})`, detail: true });
+	}
+
+	return rows;
 }
 
 // --- Prediction panel ---
