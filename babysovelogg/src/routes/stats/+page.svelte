@@ -13,6 +13,7 @@
 	import {
 		buildSleepInfoRows,
 		buildPredictionRows,
+		buildComparisonTable,
 		getNextSleepMilestone,
 		formatAge,
 	} from '$lib/settings-utils.js';
@@ -24,6 +25,10 @@
 	const nextMilestone = $derived(baby ? getNextSleepMilestone(ageMonths) : null);
 	const selectedNapCount = $derived(baby?.custom_nap_count ?? null);
 	const pottyMode = $derived(baby?.potty_mode === 1);
+	const comparisonRows = $derived(
+		baby ? buildComparisonTable(ageMonths, s.prediction?.learnedSchedule ?? null) : [],
+	);
+	const hasAltNorm = $derived(comparisonRows.some(r => r.altNorm !== undefined));
 
 	const predictionRows = $derived(
 		baby
@@ -114,14 +119,41 @@
 <div class="view stats-view">
 	<h1 class="history-header">Statistikk</h1>
 
-	<!-- Predictions first (most actionable), then age norms -->
+	<!-- Unified comparison: Norm vs Baby -->
 	{#if baby}
-		{#if predictionRows.length > 0}
-			<div class="stats-section">
+		<div class="stats-section">
+			<h3 class="stats-section-title">{baby.name} vs. norm ({formatAge(baby.birthdate)})</h3>
+			<div class="sleep-info-panel" style="padding: 0; overflow: hidden;">
+				<table class="comparison-table">
+					<thead>
+						<tr>
+							<th></th>
+							<th>{hasAltNorm ? `${comparisonRows.find(r => r.label === 'Lurar')?.norm ?? ''}‑lur` : 'Norm'}</th>
+							{#if hasAltNorm}
+								<th>{comparisonRows.find(r => r.label === 'Lurar')?.altNorm ?? ''}‑lur</th>
+							{/if}
+							<th>{baby.name}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each comparisonRows as row}
+							<tr>
+								<td class="comparison-label">{row.label}</td>
+								<td class="comparison-val">{row.norm}</td>
+								{#if hasAltNorm}
+									<td class="comparison-val comparison-alt">{row.altNorm ?? ''}</td>
+								{/if}
+								<td class="comparison-val comparison-actual">{row.actual}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+
+			{#if predictionRows.length > 0}
 				<div
 					data-testid="pred-panel"
-					class="sleep-info-panel"
-					style="background: var(--lavender); border-radius: var(--radius-sm); padding: 12px;"
+					style="margin-top: 12px; padding: 12px; background: var(--lavender); border-radius: var(--radius-sm);"
 				>
 					<div style="font-weight: 600; margin-bottom: 8px; font-size: 0.9rem;">
 						Appen reknar med
@@ -133,47 +165,16 @@
 						</div>
 					{/each}
 				</div>
-			</div>
-		{/if}
+			{/if}
 
-		<div class="stats-section">
-			<h3 class="stats-section-title">
-				Søvninfo for {formatAge(baby.birthdate)}
-			</h3>
-			<div class="sleep-info-panel">
-				{#each sleepInfoRows.filter(r => !r.detail) as row}
-					<div class="stats-trend-row">
-						<div class="stats-trend-label">{row.label}</div>
-						<div class="stats-trend-val">{row.value}</div>
-					</div>
-				{/each}
-				{#if sleepInfoRows.some(r => r.detail)}
-					<button
-						class="btn btn-ghost"
-						style="width: 100%; font-size: 0.8rem; padding: 4px 0; margin-top: 4px; color: var(--text-light);"
-						onclick={() => (showSleepDetail = !showSleepDetail)}
-					>
-						{showSleepDetail ? 'Gøym vakevindauge ▲' : 'Vis vakevindauge ▼'}
-					</button>
-					{#if showSleepDetail}
-						{#each sleepInfoRows.filter(r => r.detail) as row}
-							<div class="stats-trend-row" style="font-size: 0.85rem; opacity: 0.85;">
-								<div class="stats-trend-label">{row.label}</div>
-								<div class="stats-trend-val">{row.value}</div>
-							</div>
-						{/each}
-					{/if}
-				{/if}
-
-				{#if nextMilestone}
-					<div
-						style="margin-top: 12px; padding: 12px; background: var(--lavender); border-radius: var(--radius-sm); font-size: 0.85rem;"
-					>
-						<div style="font-weight: 600; margin-bottom: 4px;">Kva som kjem</div>
-						<div style="color: var(--text-light);">{nextMilestone}</div>
-					</div>
-				{/if}
-			</div>
+			{#if nextMilestone}
+				<div
+					style="margin-top: 12px; padding: 12px; background: var(--lavender); border-radius: var(--radius-sm); font-size: 0.85rem;"
+				>
+					<div style="font-weight: 600; margin-bottom: 4px;">Kva som kjem</div>
+					<div style="color: var(--text-light);">{nextMilestone}</div>
+				</div>
+			{/if}
 		</div>
 	{/if}
 
@@ -644,5 +645,52 @@
 
 	.stats-chart-wrap {
 		cursor: pointer;
+	}
+
+	.comparison-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 0.8rem;
+	}
+
+	.comparison-table th {
+		padding: 6px 4px;
+		text-align: right;
+		font-size: 0.7rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.02em;
+		color: var(--text-light);
+		border-bottom: 1px solid var(--cream-dark);
+		white-space: nowrap;
+	}
+
+	.comparison-table th:first-child {
+		text-align: left;
+	}
+
+	.comparison-table td {
+		padding: 5px 4px;
+		border-bottom: 1px solid var(--cream-dark);
+	}
+
+	.comparison-label {
+		color: var(--text-light);
+		font-size: 0.75rem;
+	}
+
+	.comparison-val {
+		text-align: right;
+		font-weight: 500;
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+
+	.comparison-alt {
+		opacity: 0.6;
+	}
+
+	.comparison-actual {
+		font-weight: 600;
 	}
 </style>

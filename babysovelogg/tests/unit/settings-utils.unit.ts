@@ -9,6 +9,7 @@ import {
 	getNextSleepMilestone,
 	buildSleepInfoRows,
 	buildPredictionRows,
+	buildComparisonTable,
 	formatAge,
 } from '../../src/lib/settings-utils.js';
 
@@ -158,19 +159,13 @@ describe('getNextSleepMilestone', () => {
 });
 
 describe('buildSleepInfoRows', () => {
-	it('returns budget rows + detail rows', () => {
+	it('returns 4 budget rows', () => {
 		const rows = buildSleepInfoRows(9);
-		const main = rows.filter(r => !r.detail);
-		const detail = rows.filter(r => r.detail);
-		expect(main).toHaveLength(4);
-		expect(main[0].label).toBe('Søvn totalt');
-		expect(main[1].label).toBe('Nattesøvn');
-		expect(main[2].label).toBe('Lurar');
-		expect(main[3].label).toBe('Vaken totalt');
-		// 2-nap baby has 3 positional wake windows
-		expect(detail).toHaveLength(3);
-		expect(detail[0].label).toBe('Morgon');
-		expect(detail[2].label).toBe('Kveld');
+		expect(rows).toHaveLength(4);
+		expect(rows[0].label).toBe('Søvn totalt');
+		expect(rows[1].label).toBe('Nattesøvn');
+		expect(rows[2].label).toBe('Lurar');
+		expect(rows[3].label).toBe('Vaken totalt');
 	});
 
 	it('24h budget adds up for 9-month-old', () => {
@@ -185,14 +180,6 @@ describe('buildSleepInfoRows', () => {
 		const rows = buildSleepInfoRows(1);
 		expect(rows[0].value).toContain('15.5t');
 		expect(rows[3].value).toContain('8.5t');
-	});
-
-	it('1-nap baby has 2 positional windows', () => {
-		const rows = buildSleepInfoRows(15); // 12-18 months: 1 nap
-		const detail = rows.filter(r => r.detail);
-		expect(detail).toHaveLength(2);
-		expect(detail[0].label).toBe('Morgon');
-		expect(detail[1].label).toBe('Kveld');
 	});
 });
 
@@ -304,5 +291,59 @@ describe('formatAge', () => {
 
 	it('returns plural for 6 months', () => {
 		expect(formatAge('2025-09-15')).toBe('6 månader');
+	});
+});
+
+describe('buildComparisonTable', () => {
+	it('shows norm and actual side by side', () => {
+		const rows = buildComparisonTable(9, {
+			napDurationMin: 120,
+			nightDurationMin: 660,
+			wakeWindowMin: 270,
+			bedtimeWakeWindowMin: 300,
+			expectedNapCount: 1,
+			});
+		expect(rows.length).toBeGreaterThanOrEqual(5);
+		// Every row should have both norm and actual
+		for (const r of rows.filter(row => row.norm)) {
+			expect(r.actual).not.toBe('—');
+		}
+	});
+
+	it('shows altNorm column when baby nap count differs from norm', () => {
+		// 9mo norm = 2 naps, but baby does 1
+		const rows = buildComparisonTable(9, {
+			napDurationMin: 120,
+			nightDurationMin: 660,
+			wakeWindowMin: 270,
+			bedtimeWakeWindowMin: 300,
+			expectedNapCount: 1,
+			});
+		const hasAlt = rows.some(r => r.altNorm !== undefined);
+		expect(hasAlt).toBe(true);
+		// The nap count row should show the difference
+		const napRow = rows.find(r => r.label === 'Lurar');
+		expect(napRow?.norm).toBe('2');
+		expect(napRow?.actual).toBe('1');
+		expect(napRow?.altNorm).toBe('1');
+	});
+
+	it('no altNorm when baby matches norm', () => {
+		const rows = buildComparisonTable(9, {
+			napDurationMin: 45,
+			nightDurationMin: 660,
+			wakeWindowMin: 180,
+			bedtimeWakeWindowMin: 200,
+			expectedNapCount: 2,
+			});
+		const hasAlt = rows.some(r => r.altNorm !== undefined);
+		expect(hasAlt).toBe(false);
+	});
+
+	it('shows dashes when no learned data', () => {
+		const rows = buildComparisonTable(9, null);
+		for (const r of rows.filter(row => row.norm)) {
+			expect(r.actual).toBe('—');
+		}
 	});
 });

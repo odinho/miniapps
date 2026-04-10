@@ -1,6 +1,5 @@
 import {
 	calculateAgeMonths,
-	WAKE_WINDOWS,
 	NAP_COUNTS,
 	SLEEP_NEEDS,
 	findByAge,
@@ -139,13 +138,10 @@ export interface SleepInfoRow {
 }
 
 export function buildSleepInfoRows(ageMonths: number): SleepInfoRow[] {
-	const ww = findByAge(WAKE_WINDOWS, ageMonths);
 	const naps = findByAge(NAP_COUNTS, ageMonths);
 	const sleepNeed = findByAge(SLEEP_NEEDS, ageMonths);
 	const fmtMin = (m: number) => (m >= 60 ? formatDuration(m * 60000) : `${Math.round(m)} min`);
 	const napCount = naps.naps;
-
-	// 24h budget: sleep + awake = 24h
 	const totalSleepH = sleepNeed.totalHours;
 	const totalAwakeH = 24 - totalSleepH;
 	const napDurMin = ageMonths < 6 ? 60 : ageMonths < 12 ? 45 : 30;
@@ -154,34 +150,94 @@ export function buildSleepInfoRows(ageMonths: number): SleepInfoRow[] {
 	const numWindows = napCount + 1;
 	const avgWindowH = Math.round(totalAwakeH / numWindows * 10) / 10;
 
-	// Positional wake windows: first is shorter, last (bedtime) is longer
-	const midMin = (ww.minMinutes + ww.maxMinutes) / 2;
-	const firstMin = Math.round(ww.minMinutes + (midMin - ww.minMinutes) * 0.3);
-	const bedtimeMin = Math.round(midMin * 1.2);
-
-	const rows: SleepInfoRow[] = [
+	return [
 		{ label: 'Søvn totalt', value: `~${totalSleepH}t av 24t` },
 		{ label: 'Nattesøvn', value: `~${nightH}t` },
 		{ label: 'Lurar', value: `${napCount} × ~${fmtMin(napDurMin)}` },
 		{ label: 'Vaken totalt', value: `~${totalAwakeH}t (${numWindows} vindauge à ~${avgWindowH}t)` },
 	];
+}
 
-	// Detail rows: positional wake window ranges
-	const windowNames = napCount >= 3
-		? ['Morgon', 'Middag 1', 'Middag 2', 'Kveld']
-		: napCount === 2
-			? ['Morgon', 'Middag', 'Kveld']
-			: napCount === 1
-				? ['Morgon', 'Kveld']
-				: ['Vakevindu'];
+/** Norm budget for a specific nap count at this age (for comparing when baby deviates). */
+export function buildNormBudget(ageMonths: number, napCount: number): {
+	nightH: number; napDurMin: number; totalAwakeH: number; avgWindowH: number;
+} {
+	const sleepNeed = findByAge(SLEEP_NEEDS, ageMonths);
+	const totalSleepH = sleepNeed.totalHours;
+	const totalAwakeH = 24 - totalSleepH;
+	const napDurMin = ageMonths < 6 ? 60 : ageMonths < 12 ? 45 : 30;
+	const totalNapH = napCount * napDurMin / 60;
+	const nightH = Math.round((totalSleepH - totalNapH) * 10) / 10;
+	const numWindows = napCount + 1;
+	const avgWindowH = Math.round(totalAwakeH / numWindows * 10) / 10;
+	return { nightH, napDurMin, totalAwakeH, avgWindowH };
+}
 
-	if (napCount >= 1) {
-		rows.push({ label: windowNames[0], value: `~${fmtMin(firstMin)} (${fmtMin(ww.minMinutes)}–${fmtMin(midMin)})`, detail: true });
-		for (let i = 1; i < windowNames.length - 1; i++) {
-			rows.push({ label: windowNames[i], value: `~${fmtMin(midMin)} (${fmtMin(midMin * 0.9)}–${fmtMin(midMin * 1.1)})`, detail: true });
-		}
-		rows.push({ label: windowNames[windowNames.length - 1], value: `~${fmtMin(bedtimeMin)} (${fmtMin(midMin)}–${fmtMin(ww.maxMinutes)})`, detail: true });
-	}
+export interface ComparisonRow {
+	label: string;
+	norm: string;
+	actual: string;
+	/** Alternative norm for the baby's actual nap count if it differs from age norm */
+	altNorm?: string;
+}
+
+/** Build norm vs actual comparison table. */
+export function buildComparisonTable(
+	ageMonths: number,
+	learned: { napDurationMin: number; nightDurationMin: number; wakeWindowMin: number; bedtimeWakeWindowMin: number; expectedNapCount: number } | null,
+): ComparisonRow[] {
+	const naps = findByAge(NAP_COUNTS, ageMonths);
+	const normNapCount = naps.naps;
+	const babyNapCount = learned?.expectedNapCount ?? normNapCount;
+	const napCountDiffers = babyNapCount !== normNapCount;
+
+	const norm = buildNormBudget(ageMonths, normNapCount);
+	const altNorm = napCountDiffers ? buildNormBudget(ageMonths, babyNapCount) : null;
+
+	const fmtD = (min: number) => formatDuration(min * 60000);
+
+	const rows: ComparisonRow[] = [];
+
+	// Nap count
+	rows.push({
+		label: 'Lurar',
+		norm: `${normNapCount}`,
+		actual: learned ? `${babyNapCount}` : '—',
+		altNorm: altNorm ? `${babyNapCount}` : undefined,
+	});
+
+	// Nap duration
+	rows.push({
+		label: 'Lurvarigheit',
+		norm: `~${fmtD(norm.napDurMin)}`,
+		actual: learned ? `~${fmtD(learned.napDurationMin)}` : '—',
+		altNorm: altNorm ? `~${fmtD(altNorm.napDurMin)}` : undefined,
+	});
+
+	// Night sleep
+	rows.push({
+		label: 'Nattesøvn',
+		norm: `~${norm.nightH}t`,
+		actual: learned ? `~${fmtD(learned.nightDurationMin)}` : '—',
+		altNorm: altNorm ? `~${altNorm.nightH}t` : undefined,
+	});
+
+	// Wake window (average)
+	rows.push({
+		label: 'Vakevindu (snitt)',
+		norm: `~${fmtD(norm.avgWindowH * 60)}`,
+		actual: learned ? `~${fmtD(learned.wakeWindowMin)}` : '—',
+		altNorm: altNorm ? `~${fmtD(altNorm.avgWindowH * 60)}` : undefined,
+	});
+
+	// Before bedtime
+	rows.push({
+		label: 'Før leggetid',
+		norm: `~${fmtD(norm.avgWindowH * 60 * 1.2)}`,
+		actual: learned ? `~${fmtD(learned.bedtimeWakeWindowMin)}` : '—',
+		altNorm: altNorm ? `~${fmtD(altNorm.avgWindowH * 60 * 1.2)}` : undefined,
+	});
+
 
 	return rows;
 }
