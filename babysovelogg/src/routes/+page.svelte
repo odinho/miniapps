@@ -19,6 +19,7 @@
 	import DstBanner from '$lib/components/DstBanner.svelte';
 	import ContextCard from '$lib/components/ContextCard.svelte';
 	import ManualSleepModal from '$lib/components/ManualSleepModal.svelte';
+	import SleepInsightsCard from '$lib/components/SleepInsightsCard.svelte';
 
 	// --- modal state ---
 	let showTagSheet = $state(false);
@@ -73,7 +74,8 @@
 	const isNewborn = $derived(strategy === 'newborn_guidance');
 	const isEmerging = $derived(strategy === 'emerging_rhythm');
 	const showContextCard = $derived(isNewborn || isEmerging);
-	const showPopulationNorms = $derived(!showContextCard && prediction?.calibration?.trust === 'age-default');
+	const showInsightsCard = $derived(!showContextCard && prediction?.learnedSchedule && prediction?.calibration?.trust !== 'age-default');
+	const showPopulationNorms = $derived(!showContextCard && !showInsightsCard && prediction?.calibration?.trust === 'age-default');
 	const populationNormsRows = $derived(showPopulationNorms ? buildSleepInfoRows(ageMonths) : []);
 	let pauseBusy = $state(false);
 
@@ -515,6 +517,13 @@
 					</div>
 				{/if}
 			</div>
+		{/if}
+
+		{#if showInsightsCard && prediction?.learnedSchedule}
+			<SleepInsightsCard
+				schedule={prediction.learnedSchedule}
+				calibration={prediction.calibration}
+			/>
 		{/if}
 
 		<!-- Spacer to push stats down -->

@@ -47,6 +47,7 @@ function makePrediction(overrides: Partial<Prediction> = {}): Prediction {
     longestStretchDetail: null,
     ageNorms: null,
     rolling: null,
+    learnedSchedule: null,
     ...overrides,
   };
 }

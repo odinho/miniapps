@@ -601,7 +601,7 @@ function getLearnedNapCount(ctx: BabyContext): number | null {
 }
 
 /** Learn the bedtime wake window (last nap end -> night start) from recent data. */
-function getLearnedBedtimeWakeWindow(ctx: BabyContext): number {
+export function getLearnedBedtimeWakeWindow(ctx: BabyContext): number {
   const wwRange = findByAge(WAKE_WINDOWS, ctx.ageMonths);
   const defaultWW = (wwRange.minMinutes + wwRange.maxMinutes) / 2 * 1.15;
 

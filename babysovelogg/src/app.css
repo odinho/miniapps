@@ -411,11 +411,13 @@ html, body {
 
 .stats-card {
   flex: 1;
+  min-width: 0;
   background: var(--white);
   border-radius: var(--radius);
   padding: 14px 12px;
   box-shadow: var(--shadow);
   text-align: center;
+  overflow-wrap: break-word;
 }
 
 .stats-card .stat-value {

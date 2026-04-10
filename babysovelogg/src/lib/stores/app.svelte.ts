@@ -41,6 +41,21 @@ export interface Prediction {
 	ageNorms: AgeNorms | null;
 	/** Rolling 24h stats for context card */
 	rolling: RollingSleepStats | null;
+	/** Learned schedule parameters (routine_schedule) */
+	learnedSchedule: LearnedSchedule | null;
+}
+
+export interface LearnedSchedule {
+	/** Learned average nap duration in minutes */
+	napDurationMin: number;
+	/** Learned average night duration in minutes */
+	nightDurationMin: number;
+	/** Learned wake window in minutes */
+	wakeWindowMin: number;
+	/** Learned bedtime wake window in minutes */
+	bedtimeWakeWindowMin: number;
+	/** Expected nap count */
+	expectedNapCount: number;
 }
 
 export interface AppState {

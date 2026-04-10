@@ -5,6 +5,10 @@ import {
   predictNapEndTime,
   predictNightEndTime,
   selectBestPlan,
+  getWakeWindow,
+  getLearnedNapDuration,
+  getLearnedNightDuration,
+  getLearnedBedtimeWakeWindow,
 } from "./schedule.js";
 import { getTodayStats } from "./stats.js";
 import { computeConfidence } from "./confidence.js";
@@ -202,6 +206,7 @@ function assembleNewbornPrediction(
     },
     ageNorms: result.ageNorms,
     rolling: result.rolling,
+    learnedSchedule: null,
   };
 }
 
@@ -322,6 +327,7 @@ function assembleEmergingPrediction(
     },
     ageNorms: result.ageNorms,
     rolling: result.rolling,
+    learnedSchedule: null,
   };
 }
 
@@ -442,5 +448,13 @@ function assembleSchedulePrediction(
     longestStretchDetail: null,
     ageNorms: null,
     rolling: null,
+    // Learned schedule parameters for insight display
+    learnedSchedule: {
+      napDurationMin: getLearnedNapDuration(ctx),
+      nightDurationMin: getLearnedNightDuration(ctx),
+      wakeWindowMin: getWakeWindow(ctx),
+      bedtimeWakeWindowMin: getLearnedBedtimeWakeWindow(ctx),
+      expectedNapCount,
+    },
   };
 }

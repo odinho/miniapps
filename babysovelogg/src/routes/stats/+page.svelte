@@ -49,14 +49,28 @@
 	let error = $state(false);
 	let empty = $state(false);
 	let stats = $state<ComputedStats | null>(null);
-	let showAdvanced = $state(typeof localStorage !== 'undefined' && localStorage.getItem('stats_advanced') === '1');
 	let showFullHistory = $state(false);
 	let loadingFullHistory = $state(false);
 	let fullStats = $state<ComputedStats | null>(null);
 
-	function toggleAdvanced() {
-		showAdvanced = !showAdvanced;
-		localStorage.setItem('stats_advanced', showAdvanced ? '1' : '0');
+	// Fullscreen chart overlay
+	let fullscreenSvg = $state<string | null>(null);
+	let fullscreenTitle = $state('');
+
+	function openFullscreen(svgEl: SVGSVGElement | null, title: string) {
+		if (!svgEl) return;
+		fullscreenSvg = svgEl.outerHTML;
+		fullscreenTitle = title;
+	}
+
+	function closeFullscreen() {
+		fullscreenSvg = null;
+	}
+
+	function handleChartClick(e: MouseEvent, title: string) {
+		const wrap = (e.currentTarget as HTMLElement);
+		const svg = wrap.querySelector('svg');
+		openFullscreen(svg, title);
 	}
 
 	async function loadFullHistory() {
@@ -171,7 +185,9 @@
 		{#if activeStats.stackedArea.nightPath}
 			<div class="stats-section">
 				<h3 class="stats-section-title">Søvntrend (30 dagar)</h3>
-				<div class="stats-chart-wrap">
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="stats-chart-wrap" onclick={(e) => handleChartClick(e, 'Søvntrend')}>
 					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
 						{#each activeStats.stackedArea.gridLines as y}
 							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
@@ -200,7 +216,9 @@
 		{#if activeStats.sleepVsNorm && activeStats.sleepVsNorm.actualPath}
 			<div class="stats-section">
 				<h3 class="stats-section-title">Total søvn vs. tilrådd</h3>
-				<div class="stats-chart-wrap">
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="stats-chart-wrap" onclick={(e) => handleChartClick(e, 'Total søvn vs. tilrådd')}>
 					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
 						{#each activeStats.sleepVsNorm.gridLines as y}
 							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
@@ -214,10 +232,7 @@
 						<path d={activeStats.sleepVsNorm.typicalPath} fill="none" stroke="var(--moon)" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6" />
 						<!-- Actual sleep area -->
 						<path d={activeStats.sleepVsNorm.actualPath} fill="var(--moon)" opacity="0.6" />
-						<!-- Dots -->
-						{#each activeStats.sleepVsNorm.dots as dot}
-							<circle cx={dot.x} cy={dot.y} r="2.5" fill="var(--moon)" stroke="var(--white)" stroke-width="0.5" />
-						{/each}
+						<!-- Data line (no dots — clean design) -->
 						{#each activeStats.sleepVsNorm.xLabels as lbl}
 							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
 						{/each}
@@ -234,7 +249,9 @@
 		{#if activeStats.nightStretchChart.linePath}
 			<div class="stats-section">
 				<h3 class="stats-section-title">Lengste nattestrekk</h3>
-				<div class="stats-chart-wrap">
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="stats-chart-wrap" onclick={(e) => handleChartClick(e, 'Lengste nattestrekk')}>
 					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
 						{#each activeStats.nightStretchChart.gridLines as y}
 							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
@@ -250,10 +267,7 @@
 						{/if}
 						<!-- Line -->
 						<path d={activeStats.nightStretchChart.linePath} fill="none" stroke="var(--moon)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-						<!-- Dots -->
-						{#each activeStats.nightStretchChart.dots as dot}
-							<circle cx={dot.x} cy={dot.y} r="3" fill="var(--moon)" stroke="var(--white)" stroke-width="1" />
-						{/each}
+						<!-- No dots — clean lines only -->
 						{#each activeStats.nightStretchChart.xLabels as lbl}
 							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
 						{/each}
@@ -266,7 +280,9 @@
 		{#if activeStats.bedtimeChart.linePath}
 			<div class="stats-section">
 				<h3 class="stats-section-title">Leggetid</h3>
-				<div class="stats-chart-wrap">
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="stats-chart-wrap" onclick={(e) => handleChartClick(e, 'Leggetid')}>
 					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
 						{#each activeStats.bedtimeChart.gridLines as y}
 							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
@@ -280,9 +296,7 @@
 						<!-- Line -->
 						<path d={activeStats.bedtimeChart.linePath} fill="none" stroke="var(--moon)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
 						<!-- Dots -->
-						{#each activeStats.bedtimeChart.dots as dot}
-							<circle cx={dot.x} cy={dot.y} r="3" fill="var(--moon)" stroke="var(--white)" stroke-width="1" />
-						{/each}
+						<!-- No dots — clean lines only -->
 						{#each activeStats.bedtimeChart.xLabels as lbl}
 							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
 						{/each}
@@ -295,7 +309,9 @@
 		{#if activeStats.napCountChart.linePath}
 			<div class="stats-section">
 				<h3 class="stats-section-title">Lurar per dag</h3>
-				<div class="stats-chart-wrap">
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="stats-chart-wrap" onclick={(e) => handleChartClick(e, 'Lurar per dag')}>
 					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
 						{#each activeStats.napCountChart.gridLines as y}
 							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
@@ -307,9 +323,7 @@
 							<path d={activeStats.napCountChart.rollingAvgPath} fill="none" stroke="var(--sun)" stroke-width="2" stroke-linecap="round" opacity="0.5" />
 						{/if}
 						<path d={activeStats.napCountChart.linePath} fill="none" stroke="var(--peach-dark)" stroke-width="2" stroke-linecap="round" />
-						{#each activeStats.napCountChart.dots as dot}
-							<circle cx={dot.x} cy={dot.y} r="3" fill="var(--peach-dark)" stroke="var(--white)" stroke-width="1" />
-						{/each}
+						<!-- No dots — clean lines only -->
 						{#each activeStats.napCountChart.xLabels as lbl}
 							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
 						{/each}
@@ -383,19 +397,7 @@
 			</div>
 		{/if}
 
-		<!-- Advanced toggle -->
-		<div class="stats-section" style="text-align: center;">
-			<button
-				class="btn btn-ghost"
-				style="font-size: 0.85rem; color: var(--text-light);"
-				onclick={toggleAdvanced}
-			>
-				{showAdvanced ? 'Gøym fleire diagram' : 'Vis fleire diagram'}
-			</button>
-		</div>
-
-		<!-- Tier 2: Advanced charts -->
-		{#if showAdvanced}
+		<!-- Tier 2: Additional charts -->
 			<!-- Chart D: Sleep Timeline (Gantt) -->
 			{#if activeStats.gantt.rows.length > 0}
 				<div class="stats-section">
@@ -492,7 +494,6 @@
 					</div>
 				</div>
 			{/if}
-		{/if}
 
 		<!-- Export -->
 		<div class="stats-section">
@@ -519,3 +520,59 @@
 		</div>
 	{/if}
 </div>
+
+<!-- Fullscreen chart overlay -->
+{#if fullscreenSvg}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="chart-fullscreen-overlay" onclick={(e) => { if (e.target === e.currentTarget) closeFullscreen(); }} onkeydown={(e) => { if (e.key === 'Escape') closeFullscreen(); }} tabindex="-1">
+		<div class="chart-fullscreen-header">
+			<span>{fullscreenTitle}</span>
+			<button class="btn btn-ghost" onclick={closeFullscreen} style="color: var(--text); padding: 4px 12px; min-height: 0;">✕</button>
+		</div>
+		<div class="chart-fullscreen-body">
+			{@html fullscreenSvg}
+		</div>
+	</div>
+{/if}
+
+<style>
+	.chart-fullscreen-overlay {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: var(--cream);
+		z-index: 1000;
+		display: flex;
+		flex-direction: column;
+		padding: 16px;
+	}
+
+	.chart-fullscreen-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		font-weight: 600;
+		font-size: 0.9rem;
+		margin-bottom: 16px;
+	}
+
+	.chart-fullscreen-body {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.chart-fullscreen-body :global(svg) {
+		width: 100%;
+		height: auto;
+		max-height: 80vh;
+	}
+
+	.stats-chart-wrap {
+		cursor: pointer;
+	}
+</style>
