@@ -427,14 +427,18 @@
     await savePhotoDecisions(decisions);
   }
 
-  async function runLlm() {
-    if (!batches[batchIdx] || runningModel) return;
-    runningModel = models[0].id;
+  /** Re-run the currently viewed model (force fresh, invalidate cache) */
+  async function rerunCurrentModel() {
+    if (!batches[batchIdx] || runningModel || activeView === 'manual') return;
+    const modelId = activeView;
+    runningModel = modelId;
     try {
-      const result = await rankBatch(batches[batchIdx].id);
+      await fetch(`/api/batches/${batches[batchIdx].id}/rank`, { method: 'DELETE' });
+      const result = await rankBatch(batches[batchIdx].id, modelId);
       if (result.error) { alert('LLM error: ' + result.error); return; }
       batches[batchIdx].hasLlmResult = true; batches = batches;
-      await selectBatch(batchIdx, { freshLlm: true });
+      await selectBatch(batchIdx, { freshLlm: true, model: modelId });
+      activeView = modelId;
     } finally {
       runningModel = '';
     }
@@ -474,7 +478,7 @@
       case 's': if (!shift) skip(); break;
       case 'Backspace': e.preventDefault(); undo(); break;
       case '?': helpOpen = !helpOpen; break;
-      case 'r': if (mode === 'batches' && !runningModel) runLlm(); break;
+      case 'r': if (mode === 'batches' && !runningModel) rerunCurrentModel(); break;
       case 'R': if (mode === 'batches') cycleModel(); break;
       case '-': case '_': if (mode === 'batches' && levelLimits.canDecrease) applyKeepLevel(levelLimits.nextDown); break;
       case '=': case '+': if (mode === 'batches' && levelLimits.canIncrease) applyKeepLevel(levelLimits.nextUp); break;
@@ -558,7 +562,7 @@
     <button class="bs" on:click={skip}>Skip</button>
     {#if mode === 'batches' && batchDetail}
       {#if !batchDetail.llm && !runningModel}
-        <button class="run-btn" on:click={() => runLlm()}>LLM: {models[0].label}</button>
+        <button class="run-btn" on:click={() => switchOrRunModel(models[0].id)}>LLM: {models[0].label}</button>
       {:else}
         {#if batchDetail.llm}
           <div class="keep-level">
@@ -640,7 +644,8 @@
       </tbody></table>
       <h3>LLM (Batch mode)</h3>
       <table><tbody>
-        <tr><td><kbd>R</kbd></td><td>Run / re-run LLM</td></tr>
+        <tr><td><kbd>r</kbd></td><td>Re-run current model (force fresh)</td></tr>
+        <tr><td><kbd>Shift+R</kbd></td><td>Cycle models (manual → 2.5 → 3.1 → ...)</td></tr>
         <tr><td><kbd>−</kbd> <kbd>+</kbd></td><td>Adjust keep level</td></tr>
         <tr><td><kbd>0</kbd>–<kbd>5</kbd></td><td>Set star rating</td></tr>
       </tbody></table>
