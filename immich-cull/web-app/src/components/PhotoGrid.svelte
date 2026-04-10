@@ -63,9 +63,7 @@
         <div class="llm-note">{llm.briefNote}</div>
       {/if}
 
-      {#if asset.autoKeep}
-        <div class="bdg ak">AUTO</div>
-      {:else if isKeep}
+      {#if isKeep}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div class="bdg kb" role="button" tabindex="-1" on:click|stopPropagation={() => onToggleState(i)}>KEEP</div>
       {:else if isCull}

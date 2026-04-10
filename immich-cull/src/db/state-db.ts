@@ -8,7 +8,7 @@ import { dirname } from "path";
 import { mkdirSync } from "fs";
 import { createHash } from "crypto";
 
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 5;
 
 export class StateDb {
   private db: Database.Database;
@@ -123,21 +123,6 @@ export class StateDb {
         ALTER TABLE llm_batch_runs_new RENAME TO llm_batch_runs;
         CREATE INDEX IF NOT EXISTS idx_llm_batch ON llm_batch_runs(batch_id, batch_fingerprint, status);
       `);
-    }
-
-    if (currentVersion < 6) {
-      this.db.exec(`
-        CREATE TABLE IF NOT EXISTS auto_keep_patterns (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          pattern TEXT NOT NULL UNIQUE,
-          description TEXT,
-          created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        );
-      `);
-      // Default: Snapchat saves are almost always kept
-      this.db
-        .prepare("INSERT OR IGNORE INTO auto_keep_patterns (pattern, description) VALUES (?, ?)")
-        .run("/Snapchat/Snapchat-", "Snapchat saves (pre-curated by user)");
     }
 
     this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
@@ -283,31 +268,6 @@ export class StateDb {
           )
           .get(batchId, fingerprint) as any);
     return row ? { id: row.id, responseJson: row.responseJson, model: row.model } : null;
-  }
-
-  // === Auto-keep patterns ===
-
-  getAutoKeepPatterns(): Array<{ id: number; pattern: string; description: string | null }> {
-    return this.db
-      .prepare("SELECT id, pattern, description FROM auto_keep_patterns ORDER BY id")
-      .all() as Array<{ id: number; pattern: string; description: string | null }>;
-  }
-
-  addAutoKeepPattern(pattern: string, description?: string): number {
-    const result = this.db
-      .prepare("INSERT INTO auto_keep_patterns (pattern, description) VALUES (?, ?)")
-      .run(pattern, description ?? null);
-    return Number(result.lastInsertRowid);
-  }
-
-  removeAutoKeepPattern(id: number) {
-    this.db.prepare("DELETE FROM auto_keep_patterns WHERE id = ?").run(id);
-  }
-
-  /** Check if an asset path matches any auto-keep pattern */
-  isAutoKeep(assetPath: string): boolean {
-    const patterns = this.getAutoKeepPatterns();
-    return patterns.some((p) => assetPath.includes(p.pattern));
   }
 
   /** Get list of models with completed results for a batch */

@@ -55,18 +55,10 @@
   // Layer 1: LLM-derived state (pure reactive derivation)
   $: llmState = deriveLlmState(batchDetail?.llm ?? null, keepLevel);
 
-  // Auto-keep: assets matching patterns are always kept
-  $: autoKeepIds = new Set(currentAssets.filter(a => a.autoKeep).map(a => a.id));
-
-  // Layer 3: effective state = auto-keep > manual overrides > llm state
-  $: states = (() => {
-    const base = mode === 'groups'
-      ? groupStates
-      : mergeStates(currentAssetIds, llmState, manualOverrides);
-    // Override auto-keep photos
-    for (const id of autoKeepIds) base[id] = 'keep';
-    return base;
-  })();
+  // Layer 3: effective state = manual overrides ?? llm state
+  $: states = mode === 'groups'
+    ? groupStates
+    : mergeStates(currentAssetIds, llmState, manualOverrides);
 
   // Effective stars from pure function
   $: effectiveStarsMap = computeEffectiveStars(batchDetail?.llm ?? null, states, llmMap);
@@ -720,7 +712,7 @@
   :global(.cell img) { width: 100%; height: 100%; object-fit: contain; display: block; background: #0b0d11; }
   :global(.lbl) { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,.8)); padding: 10px 5px 3px; font-size: 9px; color: #bbb; display: flex; justify-content: space-between; }
   :global(.bdg) { position: absolute; top: 3px; left: 3px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; color: white; cursor: pointer; }
-  :global(.bdg.kb) { background: #4caf50; } :global(.bdg.cb) { background: #e53935; } :global(.bdg.ak) { background: #607d8b; font-size: 8px !important; }
+  :global(.bdg.kb) { background: #4caf50; } :global(.bdg.cb) { background: #e53935; }
   :global(.st) { position: absolute; top: 3px; right: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; }
   :global(.llm-star) { position: absolute; top: 3px; left: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; background: rgba(0,0,0,.6); padding: 1px 4px; border-radius: 3px; }
   :global(.llm-note) { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 9px; color: #ddd; text-shadow: 0 1px 2px #000; }
