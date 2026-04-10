@@ -297,7 +297,7 @@ describe('formatSleepDuration', () => {
 			start_time: '2026-03-27T08:00:00.000Z',
 			end_time: '2026-03-27T09:30:00.000Z',
 		});
-		expect(formatSleepDuration(entry)).toBe('1h 30m');
+		expect(formatSleepDuration(entry)).toBe('1t 30m');
 	});
 });
 

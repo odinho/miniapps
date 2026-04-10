@@ -62,21 +62,23 @@
 	// Fullscreen chart overlay
 	let fullscreenSvg = $state<string | null>(null);
 	let fullscreenTitle = $state('');
+	let fullscreenLandscape = $state(true);
 
-	function openFullscreen(svgEl: SVGSVGElement | null, title: string) {
+	function openFullscreen(svgEl: SVGSVGElement | null, title: string, landscape = true) {
 		if (!svgEl) return;
 		fullscreenSvg = svgEl.outerHTML;
 		fullscreenTitle = title;
+		fullscreenLandscape = landscape;
 	}
 
 	function closeFullscreen() {
 		fullscreenSvg = null;
 	}
 
-	function handleChartClick(e: MouseEvent, title: string) {
+	function handleChartClick(e: MouseEvent, title: string, landscape = true) {
 		const wrap = (e.currentTarget as HTMLElement);
 		const svg = wrap.querySelector('svg');
-		openFullscreen(svg, title);
+		openFullscreen(svg, title, landscape);
 	}
 
 	async function loadFullHistory() {
@@ -251,13 +253,13 @@
 						{#each activeStats.sleepVsNorm.yTicks as tick}
 							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
 						{/each}
-						<!-- Norm band (recommended range) -->
-						<path d={activeStats.sleepVsNorm.bandPath} fill="var(--lavender)" opacity="0.5" />
+						<!-- Norm band (recommended range) — white fill so it stands out on cream -->
+						<path d={activeStats.sleepVsNorm.bandPath} fill="white" opacity="0.8" />
 						<!-- Typical line (center of range) -->
-						<path d={activeStats.sleepVsNorm.typicalPath} fill="none" stroke="var(--lavender-dark)" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7" />
-						<text x={TS_CHART.W - TS_CHART.PAD_R - 2} y={(activeStats.sleepVsNorm.yTicks[0]?.y ?? TS_CHART.PAD_T) + 14} text-anchor="end" fill="var(--lavender-dark)" font-size="9" font-family="var(--font)" opacity="0.7">tilrådd</text>
+						<path d={activeStats.sleepVsNorm.typicalPath} fill="none" stroke="var(--text-light)" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6" />
+						<text x={TS_CHART.W - TS_CHART.PAD_R - 2} y={(activeStats.sleepVsNorm.yTicks[0]?.y ?? TS_CHART.PAD_T) + 14} text-anchor="end" fill="var(--text-light)" font-size="9" font-family="var(--font)" opacity="0.6">tilrådd</text>
 						<!-- Actual sleep area -->
-						<path d={activeStats.sleepVsNorm.actualPath} fill="var(--moon)" opacity="0.75" />
+						<path d={activeStats.sleepVsNorm.actualPath} fill="var(--moon)" opacity="0.85" />
 						<!-- Data line (no dots — clean design) -->
 						{#each activeStats.sleepVsNorm.xLabels as lbl}
 							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
@@ -358,40 +360,6 @@
 			</div>
 		{/if}
 
-		<!-- Sleep pressure chart -->
-		{#if activeStats.pressureChart.curves.length > 0}
-			<div class="stats-section">
-				<h3 class="stats-section-title">Søvntrykk gjennom dagen</h3>
-				<!-- svelte-ignore a11y_click_events_have_key_events -->
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div class="stats-chart-wrap" onclick={(e) => handleChartClick(e, 'Søvntrykk')}>
-					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
-						{#each activeStats.pressureChart.gridLines as y}
-							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
-						{/each}
-						{#each activeStats.pressureChart.yTicks as tick}
-							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
-						{/each}
-						<!-- Individual day curves (translucent) -->
-						{#each activeStats.pressureChart.curves as curve, i}
-							<!-- Nap bands -->
-							{#each curve.sleepBands as band}
-								<rect x={band.x1} y={TS_CHART.PAD_T} width={band.x2 - band.x1} height={TS_CHART.H - TS_CHART.PAD_T - TS_CHART.PAD_B} fill="var(--lavender)" opacity="0.15" />
-							{/each}
-							<path d={curve.areaPath} fill="var(--peach-dark)" opacity={0.08} />
-							<path d={curve.linePath} fill="none" stroke="var(--peach-dark)" stroke-width="1.5" stroke-linecap="round" opacity={0.3} />
-						{/each}
-						<!-- Average curve (bold) -->
-						{#if activeStats.pressureChart.avgLinePath}
-							<path d={activeStats.pressureChart.avgLinePath} fill="none" stroke="var(--peach-dark)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-						{/if}
-						{#each activeStats.pressureChart.xLabels as lbl}
-							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
-						{/each}
-					</svg>
-				</div>
-			</div>
-		{/if}
 
 		<!-- Wake windows (merged into the scatter replacement below) -->
 
@@ -456,7 +424,7 @@
 					<h3 class="stats-section-title">Døgnrytme (30 dagar)</h3>
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="stats-chart-wrap" style="overflow-x: auto;" onclick={(e) => handleChartClick(e, 'Døgnrytme')}>
+					<div class="stats-chart-wrap" style="overflow-x: auto;" onclick={(e) => handleChartClick(e, 'Døgnrytme', false)}>
 						<svg viewBox="0 0 {GANTT.W} {activeStats.gantt.height}" width="100%" class="stats-chart" shape-rendering="crispEdges">
 							<!-- Hour labels -->
 							{#each activeStats.gantt.hourLabels as lbl}
@@ -495,7 +463,7 @@
 					<h3 class="stats-section-title">Søvnkart</h3>
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="stats-chart-wrap" style="overflow-y: auto; max-height: 70vh;" onclick={(e) => handleChartClick(e, 'Søvnkart')}>
+					<div class="stats-chart-wrap" style="overflow-y: auto; max-height: 70vh;" onclick={(e) => handleChartClick(e, 'Søvnkart', false)}>
 						<svg viewBox="0 0 {hm.width} {hm.height}" width="100%" class="stats-chart" shape-rendering="crispEdges" style="height: {hm.height}px; width: 100%;">
 							{#each hm.hourLabels as lbl}
 								<text x={lbl.x} y={12} text-anchor="middle" fill="var(--text-light)" font-size="9" font-family="var(--font)" shape-rendering="auto">{lbl.label}</text>
@@ -603,12 +571,12 @@
 {#if fullscreenSvg}
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="chart-fullscreen-overlay" onclick={(e) => { if (e.target === e.currentTarget) closeFullscreen(); }} onkeydown={(e) => { if (e.key === 'Escape') closeFullscreen(); }} tabindex="-1">
+	<div class="chart-fullscreen-overlay {fullscreenLandscape ? 'landscape' : ''}" onclick={(e) => { if (e.target === e.currentTarget) closeFullscreen(); }} onkeydown={(e) => { if (e.key === 'Escape') closeFullscreen(); }} tabindex="-1">
 		<div class="chart-fullscreen-header">
 			<span>{fullscreenTitle}</span>
-			<button class="btn btn-ghost" onclick={closeFullscreen} style="color: var(--text); padding: 4px 12px; min-height: 0;">✕</button>
+			<button class="chart-fullscreen-close" onclick={closeFullscreen}>✕</button>
 		</div>
-		<div class="chart-fullscreen-body">
+		<div class="chart-fullscreen-body" onclick={closeFullscreen}>
 			{@html fullscreenSvg}
 		</div>
 	</div>
@@ -619,14 +587,20 @@
 		position: fixed;
 		top: 0;
 		left: 0;
-		width: 100vh;
-		height: 100vw;
+		right: 0;
+		bottom: 0;
 		background: var(--cream);
 		z-index: 1000;
 		display: flex;
 		flex-direction: column;
 		padding: 12px 16px;
-		/* Rotate to landscape */
+	}
+
+	.chart-fullscreen-overlay.landscape {
+		width: 100vh;
+		height: 100vw;
+		right: auto;
+		bottom: auto;
 		transform: rotate(90deg);
 		transform-origin: top left;
 		translate: 100vw 0;
@@ -639,6 +613,21 @@
 		font-weight: 600;
 		font-size: 0.9rem;
 		margin-bottom: 8px;
+		flex-shrink: 0;
+	}
+
+	.chart-fullscreen-close {
+		background: var(--lavender);
+		border: none;
+		border-radius: 50%;
+		width: 32px;
+		height: 32px;
+		font-size: 1rem;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--text);
 	}
 
 	.chart-fullscreen-body {
@@ -652,6 +641,7 @@
 	.chart-fullscreen-body :global(svg) {
 		width: 100%;
 		height: auto;
+		max-height: 100%;
 	}
 
 	.stats-chart-wrap {

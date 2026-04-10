@@ -239,8 +239,8 @@ describe("buildTrendRows", () => {
 		const rows = buildTrendRows(ws7, ws30);
 		const totalRow = rows[1];
 		expect(totalRow.label).toBe("Total søvn/dag");
-		expect(totalRow.val7).toBe("5h 0m"); // (120+180) min
-		expect(totalRow.val30).toBe("5h 0m"); // (100+200) min
+		expect(totalRow.val7).toBe("5t 0m"); // (120+180) min
+		expect(totalRow.val30).toBe("5t 0m"); // (100+200) min
 	});
 
 	it("naps per day shown as string", () => {
@@ -293,8 +293,8 @@ describe("getBestWorst", () => {
 		expect(result).not.toBeNull();
 		expect(result!.best.date).toBe("2026-03-22"); // 270 min
 		expect(result!.worst.date).toBe("2026-03-21"); // 90 min
-		expect(result!.best.duration).toBe("4h 30m");
-		expect(result!.worst.duration).toBe("1h 30m");
+		expect(result!.best.duration).toBe("4t 30m");
+		expect(result!.worst.duration).toBe("1t 30m");
 	});
 });
 

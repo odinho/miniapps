@@ -226,7 +226,7 @@ describe('buildPredictionRows', () => {
 		});
 		const sleepRow = rows.find((r) => r.label === 'Søvn i dag');
 		expect(sleepRow).toBeDefined();
-		expect(sleepRow!.value).toBe('1h 30m');
+		expect(sleepRow!.value).toBe('1t 30m');
 	});
 
 	it('uses server prediction when wakeTime and serverPrediction available', () => {

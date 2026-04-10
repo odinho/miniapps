@@ -14,7 +14,18 @@ export function formatDuration(ms: number): string {
   const totalMin = Math.floor(ms / 60000);
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
-  if (h > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}t ${m}m`;
+  return `${m}m`;
+}
+
+/** Compact duration: "2t30" instead of "2t 30m". For tight table cells. */
+export function formatDurationCompact(ms: number): string {
+  if (ms < 0) ms = 0;
+  const totalMin = Math.floor(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h > 0 && m > 0) return `${h}t${String(m).padStart(2, '0')}`;
+  if (h > 0) return `${h}t`;
   return `${m}m`;
 }
 

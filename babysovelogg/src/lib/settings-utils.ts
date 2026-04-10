@@ -8,7 +8,7 @@ import {
 	type PredictedNap,
 } from './engine/schedule.js';
 import type { SleepEntry } from './types.js';
-import { formatDuration, formatTime } from './utils.js';
+import { formatDuration, formatDurationCompact, formatTime } from './utils.js';
 
 // --- Nap count options for custom override pills ---
 
@@ -175,7 +175,6 @@ export function buildNormBudget(ageMonths: number, napCount: number): NormBudget
 	const sleepNeed = findByAge(SLEEP_NEEDS, ageMonths);
 	const ww = findByAge(WAKE_WINDOWS, ageMonths);
 	const norms = findByAge(NAP_COUNTS, ageMonths);
-	const fmtD = (min: number) => formatDuration(min * 60000);
 
 	const baseNapDurMin = ageMonths < 6 ? 60 : ageMonths < 12 ? 45 : 30;
 	const napDurMin = Math.round(baseNapDurMin * norms.naps / napCount);
@@ -192,11 +191,12 @@ export function buildNormBudget(ageMonths: number, napCount: number): NormBudget
 	const nightMinH = Math.round((sleepNeed.range[0] - totalNapH) * 10) / 10;
 	const nightMaxH = Math.round((sleepNeed.range[1] - totalNapH) * 10) / 10;
 
+	const fc = (min: number) => formatDurationCompact(min * 60000);
 	return {
-		napDur: fmtD(napDurMin),
+		napDur: fc(napDurMin),
 		nightH: `${nightMinH}–${nightMaxH}t`,
-		wakeWindow: `${fmtD(wwMin)}–${fmtD(wwMax)}`,
-		bedtimeWW: `${fmtD(bedtimeMin)}–${fmtD(bedtimeMax)}`,
+		wakeWindow: `${fc(wwMin)}–${fc(wwMax)}`,
+		bedtimeWW: `${fc(bedtimeMin)}–${fc(bedtimeMax)}`,
 		totalSleep: `${sleepNeed.range[0]}–${sleepNeed.range[1]}t`,
 	};
 }
@@ -222,7 +222,7 @@ export function buildComparisonTable(
 	const norm = buildNormBudget(ageMonths, normNapCount);
 	const alt = napCountDiffers ? buildNormBudget(ageMonths, babyNapCount) : null;
 
-	const fmtD = (min: number) => formatDuration(min * 60000);
+	const fc = (min: number) => formatDurationCompact(min * 60000);
 
 	const rows: ComparisonRow[] = [];
 
@@ -236,28 +236,28 @@ export function buildComparisonTable(
 	rows.push({
 		label: 'Lurvarigheit',
 		norm: norm.napDur,
-		actual: learned ? fmtD(learned.napDurationMin) : '—',
+		actual: learned ? fc(learned.napDurationMin) : '—',
 		altNorm: alt?.napDur,
 	});
 
 	rows.push({
 		label: 'Nattesøvn',
 		norm: norm.nightH,
-		actual: learned ? fmtD(learned.nightDurationMin) : '—',
+		actual: learned ? fc(learned.nightDurationMin) : '—',
 		altNorm: alt?.nightH,
 	});
 
 	rows.push({
 		label: 'Vakevindu',
 		norm: norm.wakeWindow,
-		actual: learned ? fmtD(learned.wakeWindowMin) : '—',
+		actual: learned ? fc(learned.wakeWindowMin) : '—',
 		altNorm: alt?.wakeWindow,
 	});
 
 	rows.push({
 		label: 'Før leggetid',
 		norm: norm.bedtimeWW,
-		actual: learned ? fmtD(learned.bedtimeWakeWindowMin) : '—',
+		actual: learned ? fc(learned.bedtimeWakeWindowMin) : '—',
 		altNorm: alt?.bedtimeWW,
 	});
 
@@ -267,7 +267,7 @@ export function buildComparisonTable(
 	rows.push({
 		label: 'Søvn totalt',
 		norm: norm.totalSleep,
-		actual: learned ? fmtD(babyTotalMin) : '—',
+		actual: learned ? fc(babyTotalMin) : '—',
 		altNorm: alt?.totalSleep,
 	});
 

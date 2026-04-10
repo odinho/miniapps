@@ -1023,8 +1023,8 @@ export interface StatsData {
 }
 
 export async function fetchStatsData(): Promise<StatsData> {
-	// Fetch 37 days: 30 visible + 7 buffer for rolling average trend lines
-	const thirtyDaysAgo = new Date(Date.now() - 37 * 86400000).toISOString();
+	// Fetch 44 days: 30 visible + 14 buffer for rolling average trend lines
+	const thirtyDaysAgo = new Date(Date.now() - 44 * 86400000).toISOString();
 	const [sleepRes, diaperRes] = await Promise.all([
 		fetch(`/api/sleeps?from=${thirtyDaysAgo}&limit=500`),
 		fetch(`/api/diapers?from=${thirtyDaysAgo}&limit=500`),
