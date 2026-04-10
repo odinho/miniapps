@@ -189,10 +189,9 @@
         if (d.state) manualOverrides[id] = d.state as AssetState;
       }
       manualOverrides = manualOverrides;
-    } else {
-      // Fresh LLM: persist the new LLM state to DB so it survives navigation
-      await saveBatchDecisions();
     }
+    // freshLlm: just show LLM state, do NOT save to DB
+    // Only "Approve & Next" saves decisions to DB
 
     history.replaceState(null, '', `#batch/${batches[idx].id}`);
   }
@@ -579,7 +578,7 @@
           </div>
         {/if}
         <div class="model-run">
-          <button class="model-btn" class:current={activeView === 'manual'}
+          <button class="model-btn" class:current={activeView === 'manual'} class:cached={isBatchDecided(batches[batchIdx]) && activeView !== 'manual'}
             disabled={!!runningModel}
             on:click={showManual} title="Your saved decisions">
             manual
