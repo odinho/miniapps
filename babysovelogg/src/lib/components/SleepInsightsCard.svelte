@@ -54,6 +54,10 @@
 			<span class="insights-value">{nightDurLabel}</span>
 		</div>
 		<div class="insights-row">
+			<span class="insights-label">Søvnsyklus</span>
+			<span class="insights-value">~{schedule.sleepCycleMin}m</span>
+		</div>
+		<div class="insights-row">
 			<span class="insights-label">Forventa totalt</span>
 			<span class="insights-value">{totalSleepLabel}
 				<span class="insights-detail">({schedule.expectedNapCount} {schedule.expectedNapCount === 1 ? 'lur' : 'lurar'})</span>

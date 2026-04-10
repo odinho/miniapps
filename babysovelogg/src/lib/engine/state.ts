@@ -9,6 +9,7 @@ import {
   getLearnedNapDuration,
   getLearnedNightDuration,
   getLearnedBedtimeWakeWindow,
+  estimateSleepCycleFromData,
 } from "./schedule.js";
 import { getTodayStats } from "./stats.js";
 import { computeConfidence } from "./confidence.js";
@@ -455,6 +456,7 @@ function assembleSchedulePrediction(
       wakeWindowMin: getWakeWindow(ctx),
       bedtimeWakeWindowMin: getLearnedBedtimeWakeWindow(ctx),
       expectedNapCount,
+      sleepCycleMin: estimateSleepCycleFromData(ctx),
     },
   };
 }

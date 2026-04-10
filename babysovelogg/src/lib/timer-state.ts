@@ -13,14 +13,13 @@ export interface CyclePhase {
 	isLightPhase: boolean;
 }
 
-/** Compute sleep cycle phase. Cycle length ~45min for infants. */
-function computeCyclePhase(elapsedMs: number): CyclePhase {
-	const CYCLE_MIN = 45;
+/** Compute sleep cycle phase using the baby's estimated cycle length. */
+function computeCyclePhase(elapsedMs: number, cycleMin: number): CyclePhase {
 	const LIGHT_WINDOW = 8; // light sleep ±8 min around cycle boundary
 	const elapsedMin = elapsedMs / 60_000;
-	const cycle = Math.floor(elapsedMin / CYCLE_MIN) + 1;
-	const minutesIntoCycle = elapsedMin % CYCLE_MIN;
-	const minutesToNextLight = CYCLE_MIN - minutesIntoCycle;
+	const cycle = Math.floor(elapsedMin / cycleMin) + 1;
+	const minutesIntoCycle = elapsedMin % cycleMin;
+	const minutesToNextLight = cycleMin - minutesIntoCycle;
 	const isLightPhase = minutesIntoCycle < LIGHT_WINDOW || minutesToNextLight < LIGHT_WINDOW;
 	return { cycle, minutesIntoCycle: Math.round(minutesIntoCycle), minutesToNextLight: Math.round(minutesToNextLight), isLightPhase };
 }
@@ -69,7 +68,8 @@ export function getTimerMode(input: TimerInput): TimerMode {
 			: null;
 
 		// Sleep cycle phase (only for naps — night cycles are different)
-		const cyclePhase = activeSleep.type === 'nap' && !isPaused ? computeCyclePhase(elapsed) : null;
+		const cycleMin = prediction?.learnedSchedule?.sleepCycleMin ?? 45;
+		const cyclePhase = activeSleep.type === 'nap' && !isPaused ? computeCyclePhase(elapsed, cycleMin) : null;
 
 		return { kind: 'sleeping', label, elapsed, startTime: activeSleep.start_time, expectedWake, expectedWakeCountdown, cyclePhase };
 	}

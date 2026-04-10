@@ -56,6 +56,8 @@ export interface LearnedSchedule {
 	bedtimeWakeWindowMin: number;
 	/** Expected nap count */
 	expectedNapCount: number;
+	/** Estimated sleep cycle length in minutes (from data or age default) */
+	sleepCycleMin: number;
 }
 
 export interface AppState {

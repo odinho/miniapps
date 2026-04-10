@@ -802,6 +802,44 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+/**
+ * Estimate the baby's individual sleep cycle length from nap duration data.
+ * Nap durations naturally cluster at cycle multiples (1×, 2×, 3×).
+ * Returns the estimated cycle length or the age-based default.
+ */
+export function estimateSleepCycleFromData(ctx: BabyContext): number {
+  const cache = getCache(ctx);
+  const naps = cache.naps.filter((s) => cache.daysWithNight.has(s.localDate));
+  if (naps.length < 5) return getSleepCycleMinutes(ctx.ageMonths);
+
+  const durations = naps
+    .map((s) => Math.round((s.endMs - s.startMs) / 60000))
+    .filter((d) => d >= 20 && d <= 180);
+  if (durations.length < 5) return getSleepCycleMinutes(ctx.ageMonths);
+
+  // Test cycle lengths from 35-60 min and score each by how well
+  // durations cluster at multiples
+  let bestCycle = getSleepCycleMinutes(ctx.ageMonths);
+  let bestScore = -Infinity;
+
+  for (let c = 35; c <= 60; c++) {
+    let score = 0;
+    for (const d of durations) {
+      // Distance to nearest cycle boundary
+      const remainder = d % c;
+      const dist = Math.min(remainder, c - remainder);
+      // Gaussian-like scoring: closer to boundary = higher score
+      score += Math.exp(-(dist * dist) / (8 * 8));
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestCycle = c;
+    }
+  }
+
+  return bestCycle;
+}
+
 function getSleepCycleMinutes(ageMonths: number): number {
   // Research: newborn ~50 min, infant ~50-60 min, toddler ~60 min
   // School-age 85-90 min. See docs/sleep-science-research.md
