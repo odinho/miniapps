@@ -316,7 +316,7 @@ export class LlmClient {
           messages,
           stream: false,
           format: "json",
-          options: { temperature: 0.2, num_predict: 16000 },
+          options: { temperature: 0.2, num_predict: 16000, num_ctx: 32768 },
         }),
       });
 

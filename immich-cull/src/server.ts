@@ -35,7 +35,7 @@ const sampleSize = parseInt(getArg("--sample", "0"));
 
 const PREVIEW_MAX_PX = 1400;
 
-const app = Fastify({ logger: false });
+const app = Fastify({ logger: false, requestTimeout: 300000 }); // 5min for slow local models
 
 // State
 let groups: PhotoGroup[] = [];
