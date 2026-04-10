@@ -266,7 +266,7 @@
 							<path d={activeStats.nightStretchChart.rollingAvgPath} fill="none" stroke="var(--sun)" stroke-width="2" stroke-linecap="round" opacity="0.5" />
 						{/if}
 						<!-- Line -->
-						<path d={activeStats.nightStretchChart.linePath} fill="none" stroke="var(--moon)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+						<path d={activeStats.nightStretchChart.linePath} fill="none" stroke="var(--moon)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
 						<!-- No dots — clean lines only -->
 						{#each activeStats.nightStretchChart.xLabels as lbl}
 							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
@@ -294,7 +294,7 @@
 						<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={activeStats.bedtimeChart.avgY} y2={activeStats.bedtimeChart.avgY} stroke="var(--lavender-dark)" stroke-width="1" stroke-dasharray="4,3" />
 						<text x={TS_CHART.W - TS_CHART.PAD_R} y={activeStats.bedtimeChart.avgY - 4} text-anchor="end" fill="var(--lavender-dark)" font-size="10" font-family="var(--font)">snitt {activeStats.bedtimeChart.avgLabel}</text>
 						<!-- Line -->
-						<path d={activeStats.bedtimeChart.linePath} fill="none" stroke="var(--moon)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+						<path d={activeStats.bedtimeChart.linePath} fill="none" stroke="var(--moon)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
 						<!-- Dots -->
 						<!-- No dots — clean lines only -->
 						{#each activeStats.bedtimeChart.xLabels as lbl}
@@ -322,9 +322,44 @@
 						{#if activeStats.napCountChart.rollingAvgPath}
 							<path d={activeStats.napCountChart.rollingAvgPath} fill="none" stroke="var(--sun)" stroke-width="2" stroke-linecap="round" opacity="0.5" />
 						{/if}
-						<path d={activeStats.napCountChart.linePath} fill="none" stroke="var(--peach-dark)" stroke-width="2" stroke-linecap="round" />
+						<path d={activeStats.napCountChart.linePath} fill="none" stroke="var(--peach-dark)" stroke-width="2.5" stroke-linecap="round" />
 						<!-- No dots — clean lines only -->
 						{#each activeStats.napCountChart.xLabels as lbl}
+							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
+						{/each}
+					</svg>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Sleep pressure chart -->
+		{#if activeStats.pressureChart.curves.length > 0}
+			<div class="stats-section">
+				<h3 class="stats-section-title">Søvntrykk gjennom dagen</h3>
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="stats-chart-wrap" onclick={(e) => handleChartClick(e, 'Søvntrykk')}>
+					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
+						{#each activeStats.pressureChart.gridLines as y}
+							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
+						{/each}
+						{#each activeStats.pressureChart.yTicks as tick}
+							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
+						{/each}
+						<!-- Individual day curves (translucent) -->
+						{#each activeStats.pressureChart.curves as curve, i}
+							<!-- Nap bands -->
+							{#each curve.sleepBands as band}
+								<rect x={band.x1} y={TS_CHART.PAD_T} width={band.x2 - band.x1} height={TS_CHART.H - TS_CHART.PAD_T - TS_CHART.PAD_B} fill="var(--lavender)" opacity="0.15" />
+							{/each}
+							<path d={curve.areaPath} fill="var(--peach-dark)" opacity={0.08} />
+							<path d={curve.linePath} fill="none" stroke="var(--peach-dark)" stroke-width="1.5" stroke-linecap="round" opacity={0.3} />
+						{/each}
+						<!-- Average curve (bold) -->
+						{#if activeStats.pressureChart.avgLinePath}
+							<path d={activeStats.pressureChart.avgLinePath} fill="none" stroke="var(--peach-dark)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+						{/if}
+						{#each activeStats.pressureChart.xLabels as lbl}
 							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
 						{/each}
 					</svg>
