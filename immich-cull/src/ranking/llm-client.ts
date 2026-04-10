@@ -94,8 +94,11 @@ export function expandCompactResponse(raw: any, batch: SessionBatch): DayBatchRe
     })
     .filter((x: ImageAssessment | null): x is ImageAssessment => x !== null);
 
-  const similaritySubgroups: SimilaritySubgroup[] = (raw.sg ?? raw.similaritySubgroups ?? []).map(
-    (sg: any) => {
+  // Filter out 1-photo "subgroups" (some models create these for singletons)
+  const rawSgs = (raw.sg ?? raw.similaritySubgroups ?? []).filter(
+    (sg: any) => (sg.all ?? sg.imageIds ?? []).length > 1,
+  );
+  const similaritySubgroups: SimilaritySubgroup[] = rawSgs.map((sg: any) => {
       const mapIdx = (idx: number) => assets[idx]?.id ?? `unknown-${idx}`;
       const toIdx = (v: any): string =>
         typeof v === "number" ? mapIdx(v) : typeof v === "object" && v?.i != null ? mapIdx(v.i) : v;
@@ -123,6 +126,14 @@ export function expandCompactResponse(raw: any, batch: SessionBatch): DayBatchRe
       };
     },
   );
+
+  // Clear sgId on images whose subgroup was stripped (1-photo groups)
+  const validSgIds = new Set(similaritySubgroups.map((sg) => sg.subgroupId));
+  for (const img of images) {
+    if (img.similaritySubgroupId && !validSgIds.has(img.similaritySubgroupId)) {
+      img.similaritySubgroupId = null;
+    }
+  }
 
   return {
     batchId: raw.batchId ?? batch.id,
