@@ -201,22 +201,31 @@
 
   /** Switch to a model's cached result, or run it if not cached */
   let runningModel = '';
+  let switching = false;
   async function switchOrRunModel(modelId: string) {
-    if (!batches[batchIdx] || runningModel) return;
+    if (!batches[batchIdx] || runningModel || switching) return;
+    const savedIdx = batchIdx; // capture before async
     const cachedModels = batchDetail?.llmModels ?? [];
     if (cachedModels.includes(modelId)) {
-      // Switch to cached result (freshLlm to avoid stale DB overrides)
-      await selectBatch(batchIdx, { freshLlm: true, model: modelId });
-      activeView = modelId;
+      switching = true;
+      try {
+        await selectBatch(savedIdx, { freshLlm: true, model: modelId });
+        if (batchIdx === savedIdx) activeView = modelId;
+      } finally {
+        switching = false;
+      }
     } else {
       // Need to run it
       runningModel = modelId;
       try {
-        const result = await rankBatch(batches[batchIdx].id, modelId);
+        const batchId = batches[savedIdx].id;
+        const result = await rankBatch(batchId, modelId);
         if (result.error) { alert('LLM error: ' + result.error); return; }
-        batches[batchIdx].hasLlmResult = true; batches = batches;
-        await selectBatch(batchIdx, { freshLlm: true, model: modelId });
-        activeView = modelId;
+        batches[savedIdx].hasLlmResult = true; batches = batches;
+        if (batchIdx === savedIdx) {
+          await selectBatch(savedIdx, { freshLlm: true, model: modelId });
+          activeView = modelId;
+        }
       } finally {
         runningModel = '';
       }
@@ -225,7 +234,7 @@
 
   /** Switch back to user's saved decisions */
   async function showManual() {
-    if (!batches[batchIdx]) return;
+    if (!batches[batchIdx] || switching) return;
     activeView = 'manual';
     await selectBatch(batchIdx);
   }
@@ -430,15 +439,19 @@
   /** Re-run the currently viewed model (force fresh, invalidate cache) */
   async function rerunCurrentModel() {
     if (!batches[batchIdx] || runningModel || activeView === 'manual') return;
+    const savedIdx = batchIdx;
     const modelId = activeView;
+    const batchId = batches[savedIdx].id;
     runningModel = modelId;
     try {
-      await fetch(`/api/batches/${batches[batchIdx].id}/rank?model=${encodeURIComponent(modelId)}`, { method: 'DELETE' });
-      const result = await rankBatch(batches[batchIdx].id, modelId);
+      await fetch(`/api/batches/${batchId}/rank?model=${encodeURIComponent(modelId)}`, { method: 'DELETE' });
+      const result = await rankBatch(batchId, modelId);
       if (result.error) { alert('LLM error: ' + result.error); return; }
-      batches[batchIdx].hasLlmResult = true; batches = batches;
-      await selectBatch(batchIdx, { freshLlm: true, model: modelId });
-      activeView = modelId;
+      batches[savedIdx].hasLlmResult = true; batches = batches;
+      if (batchIdx === savedIdx) {
+        await selectBatch(savedIdx, { freshLlm: true, model: modelId });
+        activeView = modelId;
+      }
     } finally {
       runningModel = '';
     }

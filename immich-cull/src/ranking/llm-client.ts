@@ -317,9 +317,11 @@ export class LlmClient {
         },
       ];
 
+      const ollamaTimeout = AbortSignal.timeout(600000); // 10min for slow local models
       const resp = await fetch(`${ollamaUrl}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: ollamaTimeout,
         body: JSON.stringify({
           model: this.config.model,
           messages,
