@@ -416,12 +416,12 @@ app.post<{ Params: { id: string }; Querystring: { model?: string } }>(
   },
 );
 
-/** Invalidate cached LLM result for a batch (marks old, keeps history) */
-app.delete<{ Params: { id: string } }>("/api/batches/:id/rank", async (req) => {
+/** Invalidate cached LLM result for a batch. ?model=xxx to invalidate only that model. */
+app.delete<{ Params: { id: string }; Querystring: { model?: string } }>("/api/batches/:id/rank", async (req) => {
   const batch = sessionBatches.find((b) => b.id === req.params.id);
   if (!batch) return { error: "Not found" };
   const fp = batchFingerprint(batch.assets.map((a) => a.id));
-  stateDb.invalidateLlmRun(batch.id, fp);
+  stateDb.invalidateLlmRun(batch.id, fp, req.query.model);
   return { ok: true };
 });
 

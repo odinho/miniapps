@@ -243,12 +243,20 @@ export class StateDb {
   }
 
   /** Mark existing runs as superseded (keeps history, getLlmRun ignores them) */
-  invalidateLlmRun(batchId: string, fingerprint: string) {
-    this.db
-      .prepare(
-        "UPDATE llm_batch_runs SET status = 'superseded' WHERE batch_id = ? AND batch_fingerprint = ? AND status = 'completed'",
-      )
-      .run(batchId, fingerprint);
+  invalidateLlmRun(batchId: string, fingerprint: string, model?: string) {
+    if (model) {
+      this.db
+        .prepare(
+          "UPDATE llm_batch_runs SET status = 'superseded' WHERE batch_id = ? AND batch_fingerprint = ? AND model = ? AND status = 'completed'",
+        )
+        .run(batchId, fingerprint, model);
+    } else {
+      this.db
+        .prepare(
+          "UPDATE llm_batch_runs SET status = 'superseded' WHERE batch_id = ? AND batch_fingerprint = ? AND status = 'completed'",
+        )
+        .run(batchId, fingerprint);
+    }
   }
 
   getLlmRun(

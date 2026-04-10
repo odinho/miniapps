@@ -433,7 +433,7 @@
     const modelId = activeView;
     runningModel = modelId;
     try {
-      await fetch(`/api/batches/${batches[batchIdx].id}/rank`, { method: 'DELETE' });
+      await fetch(`/api/batches/${batches[batchIdx].id}/rank?model=${encodeURIComponent(modelId)}`, { method: 'DELETE' });
       const result = await rankBatch(batches[batchIdx].id, modelId);
       if (result.error) { alert('LLM error: ' + result.error); return; }
       batches[batchIdx].hasLlmResult = true; batches = batches;
