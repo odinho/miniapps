@@ -338,7 +338,11 @@ app.get("/api/batches", async () => {
           hasLlmResult: cached !== null,
           viewStatus: stateDb.getViewStatus(b.id),
           autoCullStats: acSummary
-            ? { autoCull: acSummary.autoCull, review: acSummary.review }
+            ? {
+                autoCullHigh: acSummary.autoCullHigh,
+                autoCull: acSummary.autoCull,
+                review: acSummary.review,
+              }
             : null,
         };
       })
@@ -525,7 +529,7 @@ app.post<{
         skipped++;
         continue;
       }
-      if (c.tier === "auto-cull") {
+      if (c.tier === "auto-cull-high" || c.tier === "auto-cull") {
         decisions.push({ assetId: c.assetId, state: "cull", userStars: null });
         approved++;
       }

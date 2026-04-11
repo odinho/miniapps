@@ -41,11 +41,12 @@ export interface AssetDetail extends AssetSummary {
 
 export interface AutoCullClassification {
   assetId: string;
-  tier: "auto-cull" | "review";
+  tier: "auto-cull-high" | "auto-cull" | "review";
   reason: string;
 }
 
 export interface AutoCullSummary {
+  autoCullHigh: number;
   autoCull: number;
   review: number;
   total: number;
@@ -60,7 +61,7 @@ export interface BatchSummary {
   dateRange: { start: string; end: string };
   hasLlmResult: boolean;
   viewStatus: string | null;
-  autoCullStats: { autoCull: number; review: number } | null;
+  autoCullStats: { autoCullHigh: number; autoCull: number; review: number } | null;
 }
 
 export interface BatchDetail {

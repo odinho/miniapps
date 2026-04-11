@@ -54,10 +54,10 @@ describe("classifyBatchForAutoCull", () => {
       makeSubgroup({ subgroupId: "sg1", imageIds: ["a", "b", "c"], recommendedKeepCount: 1 }),
     ];
     const result = classifyBatchForAutoCull(images, subgroups);
-    expect(result.autoCull).toBe(2);
+    expect(result.autoCullHigh).toBe(2); // keeper has 2 stars → high confidence
     expect(result.review).toBe(1); // the keeper is review (not cull)
-    expect(result.classifications.find((c) => c.assetId === "b")?.tier).toBe("auto-cull");
-    expect(result.classifications.find((c) => c.assetId === "c")?.tier).toBe("auto-cull");
+    expect(result.classifications.find((c) => c.assetId === "b")?.tier).toBe("auto-cull-high");
+    expect(result.classifications.find((c) => c.assetId === "c")?.tier).toBe("auto-cull-high");
   });
 
   it("sends 1-star cull to review even in subgroup with keeper", () => {
@@ -86,7 +86,7 @@ describe("classifyBatchForAutoCull", () => {
     ];
     const result = classifyBatchForAutoCull(images, subgroups);
     expect(result.classifications.find((c) => c.assetId === "b")?.tier).toBe("review");
-    expect(result.classifications.find((c) => c.assetId === "c")?.tier).toBe("auto-cull");
+    expect(result.classifications.find((c) => c.assetId === "c")?.tier).toBe("auto-cull-high"); // keeper has 3 stars
   });
 
   it("sends singleton cull to review", () => {
@@ -239,9 +239,39 @@ describe("classifyBatchForAutoCull", () => {
       makeSubgroup({ subgroupId: "sg1", imageIds: ["a", "b", "c", "d"], recommendedKeepCount: 1 }),
     ];
     const result = classifyBatchForAutoCull(images, subgroups);
-    expect(result.autoCull).toBe(3); // b, c, d
+    expect(result.autoCullHigh).toBe(3); // b, c, d — keeper has 2 stars
     expect(result.review).toBe(3); // a (keep), e (singleton), f (keep)
     expect(result.total).toBe(6);
+  });
+
+  it("uses standard tier when keeper has < 2 stars", () => {
+    const images = [
+      makeImage({
+        imageId: "a",
+        suggestedStars: 1,
+        llmKeepCull: "keep",
+        similaritySubgroupId: "sg1",
+      }),
+      makeImage({
+        imageId: "b",
+        suggestedStars: 0,
+        llmKeepCull: "cull",
+        similaritySubgroupId: "sg1",
+      }),
+      makeImage({
+        imageId: "c",
+        suggestedStars: 0,
+        llmKeepCull: "cull",
+        similaritySubgroupId: "sg1",
+      }),
+    ];
+    const subgroups = [
+      makeSubgroup({ subgroupId: "sg1", imageIds: ["a", "b", "c"], recommendedKeepCount: 1 }),
+    ];
+    const result = classifyBatchForAutoCull(images, subgroups);
+    expect(result.autoCullHigh).toBe(0);
+    expect(result.autoCull).toBe(2); // standard tier: keeper only has 1 star
+    expect(result.classifications.find((c) => c.assetId === "b")?.tier).toBe("auto-cull");
   });
 
   it("handles empty inputs", () => {

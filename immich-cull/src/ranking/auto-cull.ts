@@ -3,14 +3,18 @@
  * safe to auto-cull vs needing human review.
  *
  * Based on analysis of 3174 manual decisions vs LLM recommendations.
- * Best single-model strategy (3.1-flash-lite):
- *   stars=0 + in_subgroup + sg_has_keeper + sg_size>=3
- *   → 9.7% wrong-cull rate, 56.4% coverage
+ * Two confidence tiers on gemini-3.1-flash-lite-preview:
+ *
+ *   HIGH: stars=0, sg_size>=3, keeper has 2+ stars (star deficit >= 2)
+ *         → 3.8% wrong-cull, 33.6% coverage
+ *
+ *   STANDARD: stars=0, sg_size>=3, sg has keeper
+ *         → 9.7% wrong-cull, 56.4% coverage
  */
 
 import type { ImageAssessment, SimilaritySubgroup } from "./types.js";
 
-export type AutoCullTier = "auto-cull" | "review";
+export type AutoCullTier = "auto-cull-high" | "auto-cull" | "review";
 
 export interface AutoCullClassification {
   assetId: string;
@@ -19,6 +23,7 @@ export interface AutoCullClassification {
 }
 
 export interface AutoCullSummary {
+  autoCullHigh: number;
   autoCull: number;
   review: number;
   total: number;
@@ -26,15 +31,10 @@ export interface AutoCullSummary {
 }
 
 /**
- * Classify every photo in an LLM result into auto-cull vs review.
- *
- * Auto-cull criteria (ALL must be true):
- * 1. LLM says cull
- * 2. suggestedStars === 0
- * 3. In a subgroup (not singleton)
- * 4. Subgroup has at least one photo with llmKeepCull === "keep"
- * 5. Subgroup has >= 3 photos (stronger safety signal)
- * 6. Photo has an explicit LLM assessment (not omitted)
+ * Classify every photo in an LLM result into tiers:
+ * - auto-cull-high: very safe to cull (3.8% wrong-cull rate)
+ * - auto-cull: safe to cull (9.7% wrong-cull rate)
+ * - review: needs human eyes
  */
 export function classifyBatchForAutoCull(
   images: ImageAssessment[],
@@ -43,36 +43,44 @@ export function classifyBatchForAutoCull(
   const sgMap = new Map<string, SimilaritySubgroup>();
   for (const sg of subgroups) sgMap.set(sg.subgroupId, sg);
 
-  // Pre-compute per-subgroup keeper status from images
+  // Pre-compute per-subgroup: has keeper? max keeper stars?
   const sgHasKeeper = new Map<string, boolean>();
+  const sgMaxKeeperStars = new Map<string, number>();
   for (const sg of subgroups) {
-    const hasKeep = images.some(
-      (img) => img.similaritySubgroupId === sg.subgroupId && img.llmKeepCull === "keep",
-    );
+    let hasKeep = false;
+    let maxStars = 0;
+    for (const img of images) {
+      if (img.similaritySubgroupId === sg.subgroupId && img.llmKeepCull === "keep") {
+        hasKeep = true;
+        maxStars = Math.max(maxStars, img.suggestedStars);
+      }
+    }
     sgHasKeeper.set(sg.subgroupId, hasKeep);
+    sgMaxKeeperStars.set(sg.subgroupId, maxStars);
   }
 
-  // Track which assets have explicit assessments
   const assessed = new Set(images.map((img) => img.imageId));
-
   const classifications: AutoCullClassification[] = [];
+  let autoCullHigh = 0;
   let autoCull = 0;
   let review = 0;
 
   for (const img of images) {
-    const c = classifyPhoto(img, sgMap, sgHasKeeper, assessed);
+    const c = classifyPhoto(img, sgMap, sgHasKeeper, sgMaxKeeperStars, assessed);
     classifications.push(c);
-    if (c.tier === "auto-cull") autoCull++;
+    if (c.tier === "auto-cull-high") autoCullHigh++;
+    else if (c.tier === "auto-cull") autoCull++;
     else review++;
   }
 
-  return { autoCull, review, total: images.length, classifications };
+  return { autoCullHigh, autoCull, review, total: images.length, classifications };
 }
 
 function classifyPhoto(
   img: ImageAssessment,
   sgMap: Map<string, SimilaritySubgroup>,
   sgHasKeeper: Map<string, boolean>,
+  sgMaxKeeperStars: Map<string, number>,
   assessed: Set<string>,
 ): AutoCullClassification {
   const assetId = img.imageId;
@@ -113,7 +121,17 @@ function classifyPhoto(
     return { assetId, tier: "review", reason: "Subgroup has no keeper" };
   }
 
-  // All criteria met
+  // High confidence: keeper has >= 2 stars (star deficit >= 2)
+  const maxKeeperStars = sgMaxKeeperStars.get(sgId) ?? 0;
+  if (maxKeeperStars >= 2) {
+    return {
+      assetId,
+      tier: "auto-cull-high",
+      reason: `0-star cull, keeper has ${maxKeeperStars} stars (${sg.subgroupType}, ${sg.imageIds.length} photos)`,
+    };
+  }
+
+  // Standard confidence: keeper has < 2 stars
   return {
     assetId,
     tier: "auto-cull",

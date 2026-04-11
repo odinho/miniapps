@@ -70,6 +70,8 @@
       {:else if isCull}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div class="bdg cb" role="button" tabindex="-1" on:click|stopPropagation={() => onToggleState(i)}>CULL</div>
+      {:else if autoCullMap[asset.id]?.tier === 'auto-cull-high'}
+        <div class="bdg acb-hi">AUTO</div>
       {:else if autoCullMap[asset.id]?.tier === 'auto-cull'}
         <div class="bdg acb">AUTO</div>
       {/if}

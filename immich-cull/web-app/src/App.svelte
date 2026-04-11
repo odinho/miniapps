@@ -161,7 +161,7 @@
         label: `${g.count} photos`,
         sub: `${g.timeSpanMinutes}min · ${fmt(g.totalBytes)}`,
         date: new Date(g.earliestDate),
-        autoCullStats: null as { autoCull: number; review: number } | null,
+        autoCullStats: null as { autoCullHigh: number; autoCull: number; review: number } | null,
       }))
     : batches.map((b, i) => ({
         idx: i, active: i === batchIdx, decided: b.viewStatus === 'reviewed' || b.viewStatus === 'skipped',
@@ -577,7 +577,7 @@
         <div class="gi" class:active={item.active} class:decided={item.decided}
              on:click={() => { sidebarOpen = false; mode === 'groups' ? selectGroup(item.idx) : selectBatch(item.idx); }} role="button" tabindex="-1">
           <div class="t">{item.label} · {item.date.toLocaleDateString('no', { day: 'numeric', month: 'short', year: '2-digit' })}</div>
-          <div class="m">{item.sub}{#if item.autoCullStats} · <span class="ac-tag">{item.autoCullStats.autoCull}a/{item.autoCullStats.review}r</span>{/if}</div>
+          <div class="m">{item.sub}{#if item.autoCullStats} · <span class="ac-tag">{item.autoCullStats.autoCullHigh + item.autoCullStats.autoCull}a/{item.autoCullStats.review}r</span>{/if}</div>
         </div>
       {/each}
     </div>
@@ -656,9 +656,10 @@
         </div>
       {/if}
     {/if}
-    {#if mode === 'batches' && batchDetail?.autoCull && batchDetail.autoCull.autoCull > 0}
-      <button class="bac" on:click={autoApproveCurrent} title="Auto-cull {batchDetail.autoCull.autoCull} photos in this batch">
-        Auto ({batchDetail.autoCull.autoCull})
+    {#if mode === 'batches' && batchDetail?.autoCull && (batchDetail.autoCull.autoCullHigh + batchDetail.autoCull.autoCull) > 0}
+      {@const acTotal = batchDetail.autoCull.autoCullHigh + batchDetail.autoCull.autoCull}
+      <button class="bac" on:click={autoApproveCurrent} title="Auto-cull {acTotal} photos ({batchDetail.autoCull.autoCullHigh} high confidence)">
+        Auto ({acTotal})
       </button>
     {/if}
     <span class="spacer"></span>
@@ -780,7 +781,7 @@
   :global(.cell img) { width: 100%; height: 100%; object-fit: contain; display: block; background: #0b0d11; }
   :global(.lbl) { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,.8)); padding: 10px 5px 3px; font-size: 9px; color: #bbb; display: flex; justify-content: space-between; }
   :global(.bdg) { position: absolute; top: 3px; left: 3px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; color: white; cursor: pointer; }
-  :global(.bdg.kb) { background: #4caf50; } :global(.bdg.cb) { background: #e53935; } :global(.bdg.acb) { background: #e65100; font-size: 8px; }
+  :global(.bdg.kb) { background: #4caf50; } :global(.bdg.cb) { background: #e53935; } :global(.bdg.acb-hi) { background: #bf360c; font-size: 8px; } :global(.bdg.acb) { background: #e65100; font-size: 8px; }
   .ac-tag { color: #e65100; font-weight: 600; }
   :global(.st) { position: absolute; top: 3px; right: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; }
   :global(.llm-star) { position: absolute; top: 3px; left: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; background: rgba(0,0,0,.6); padding: 1px 4px; border-radius: 3px; }
