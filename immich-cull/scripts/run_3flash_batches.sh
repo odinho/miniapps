@@ -21,8 +21,7 @@ echo
 
 for batch in "${BATCHES[@]}"; do
   echo "=== $batch ==="
-  result=$(curl -sS -X POST "$API/api/batches/$batch/rank?model=$MODEL" \
-    -H "Content-Type: application/json")
+  result=$(curl -sS -X POST "$API/api/batches/$batch/rank?model=$MODEL")
   cached=$(echo "$result" | grep -o '"cached":[^,]*' | cut -d: -f2)
   if [ "$cached" = "true" ]; then
     echo "  Already cached"
