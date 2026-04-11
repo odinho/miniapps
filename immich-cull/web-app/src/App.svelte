@@ -3,12 +3,13 @@
   import PhotoGrid from './components/PhotoGrid.svelte';
   import Preview from './components/Preview.svelte';
   import InfoPanel from './components/InfoPanel.svelte';
+  import CullReview from './components/CullReview.svelte';
   import {
     fetchGroups, fetchGroup, fetchBatches, fetchBatch, fetchStats,
     decideGroup, undecideGroup, rankBatch, savePhotoDecisions, fetchPhotoDecisions, fmt,
-    autoApproveBatches, revertAutoApprovals,
+    autoApproveBatches, revertAutoApprovals, fetchCullComparisons, stagedCull,
     type GroupSummary, type GroupDetail, type BatchSummary, type BatchDetail,
-    type LlmImage, type Stats, type AutoCullClassification,
+    type LlmImage, type Stats, type AutoCullClassification, type CullComparison,
   } from './lib/api';
   import {
     deriveLlmState, mergeStates, countStates, countAtLevel,
@@ -143,6 +144,38 @@
     if (result.ok) {
       batches = await fetchBatches();
       stats = await fetchStats();
+    }
+  }
+
+  let cullReviewOpen = false;
+  let cullComparisons: CullComparison[] = [];
+
+  async function openCullReview() {
+    if (!batches[batchIdx]) return;
+    const data = await fetchCullComparisons(batches[batchIdx].id);
+    cullComparisons = data.comparisons ?? [];
+    cullReviewOpen = true;
+  }
+
+  function onCullReviewKeep(assetId: string) {
+    setPhotoState(assetId, 'keep');
+  }
+
+  function onCullReviewConfirm(assetId: string) {
+    setPhotoState(assetId, 'cull');
+  }
+
+  async function runStagedCull() {
+    const allBatchIds = batches.filter(b => b.hasLlmResult && b.viewStatus !== 'reviewed').map(b => b.id);
+    if (!allBatchIds.length) return;
+    const result = await stagedCull(allBatchIds, 'safe');
+    if (result.ok) {
+      const total = result.results.reduce((s, r) => s + r.autoCulled, 0);
+      const review = result.results.reduce((s, r) => s + r.forReview, 0);
+      console.log(`Staged cull: ${total} auto-culled, ${review} for review`);
+      batches = await fetchBatches();
+      stats = await fetchStats();
+      if (batchIdx >= 0) await selectBatch(batchIdx);
     }
   }
 
@@ -661,6 +694,9 @@
       <button class="bac" on:click={autoApproveCurrent} title="Auto-cull {acTotal} photos ({batchDetail.autoCull.autoCullHigh} high confidence)">
         Auto ({acTotal})
       </button>
+      <button class="bcr" on:click={openCullReview} title="Review culls side-by-side with their keepers">
+        Review
+      </button>
     {/if}
     <span class="spacer"></span>
     <span class="bmeta">{currentAssets.length} photos</span>
@@ -682,6 +718,17 @@
       else next = null;
       setPhotoState(selectedAsset.id, next);
     }} />
+{/if}
+
+{#if cullReviewOpen}
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_interactive_supports_focus -->
+  <div class="help-bg" on:click={() => cullReviewOpen = false} role="dialog">
+    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
+    <div class="cr-overlay" on:click|stopPropagation role="document">
+      <CullReview comparisons={cullComparisons} onKeep={onCullReviewKeep} onConfirmCull={onCullReviewConfirm} />
+      <button class="cr-close" on:click={() => cullReviewOpen = false}>Close</button>
+    </div>
+  </div>
 {/if}
 
 {#if helpOpen}
@@ -754,6 +801,10 @@
   .bs { background: #333; color: #aaa; } .bh { background: none; color: #7a8294; border: 1px solid #2a2e36 !important; padding: 3px 9px; font-size: 12px; }
   .run-btn { background: #7c4dff; color: white; }
   .bac { background: #e65100; color: white; }
+  .bcr { background: #1565c0; color: white; }
+  .cr-overlay { width: min(1200px, 95vw); height: min(800px, 90vh); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; position: relative; }
+  .cr-close { position: absolute; top: 6px; right: 10px; z-index: 10; background: rgba(0,0,0,0.6); border: none; color: #ccc; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+  .cr-close:hover { background: rgba(0,0,0,0.8); }
   .spacer { flex: 1; } .bmeta { font-size: 11px; color: #7a8294; }
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: white; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; }
   @keyframes spin { to { transform: rotate(360deg); } }

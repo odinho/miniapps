@@ -197,6 +197,44 @@ export async function revertAutoApprovals(): Promise<{ ok: boolean; reverted: nu
   return (await fetch(`${BASE}/api/auto-approve`, { method: "DELETE" })).json();
 }
 
+export interface CullComparison {
+  cullId: string;
+  cullFilename: string;
+  cullStars: number;
+  cullNote: string;
+  cullCategory: string;
+  keepers: Array<{ id: string; filename: string; stars: number; note: string }>;
+  subgroupType: string;
+  subgroupSize: number;
+  subgroupReason: string;
+  rank: number;
+}
+
+export async function fetchCullComparisons(
+  batchId: string,
+  model?: string,
+): Promise<{ comparisons: CullComparison[] }> {
+  const qs = model ? `?model=${encodeURIComponent(model)}` : "";
+  return (await fetch(`${BASE}/api/batches/${batchId}/cull-comparisons${qs}`)).json();
+}
+
+export async function stagedCull(
+  batchIds: string[],
+  stage: "safe" | "all" = "safe",
+  model?: string,
+): Promise<{
+  ok: boolean;
+  results: Array<{ batchId: string; autoCulled: number; forReview: number; skipped: number }>;
+}> {
+  return (
+    await fetch(`${BASE}/api/batches/staged-cull`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ batchIds, stage, model }),
+    })
+  ).json();
+}
+
 export function previewUrl(id: string): string {
   return `${BASE}/api/preview?id=${encodeURIComponent(id)}`;
 }

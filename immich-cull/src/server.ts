@@ -547,11 +547,137 @@ app.post<{
   return { ok: true, results };
 });
 
+/** Staged auto-cull: approve high-confidence immediately, return rest for review */
+app.post<{
+  Body: { batchIds: string[]; stage?: "safe" | "all"; model?: string };
+}>("/api/batches/staged-cull", async (req) => {
+  const stage = req.body.stage ?? "safe";
+  const results: Array<{
+    batchId: string;
+    autoCulled: number;
+    forReview: number;
+    skipped: number;
+  }> = [];
+
+  for (const batchId of req.body.batchIds) {
+    const batch = sessionBatches.find((b) => b.id === batchId);
+    if (!batch) continue;
+
+    const fp = batchFingerprint(batch.assets.map((a) => a.id));
+    const llmRun = req.body.model
+      ? stateDb.getLlmRun(batchId, fp, req.body.model)
+      : stateDb.getLlmRun(batchId, fp);
+    if (!llmRun) continue;
+
+    const summary = getAutoCullSummary(batch, llmRun.id, req.body.model);
+    if (!summary) continue;
+
+    const existing = stateDb.getPhotoDecisions(batch.assets.map((a) => a.id));
+    const decisions: Array<{ assetId: string; state: string | null; userStars: number | null }> =
+      [];
+    let autoCulled = 0;
+    let forReview = 0;
+    let skipped = 0;
+
+    for (const c of summary.classifications) {
+      if (existing[c.assetId]?.state) {
+        skipped++;
+        continue;
+      }
+      if (c.tier === "auto-cull-high") {
+        decisions.push({ assetId: c.assetId, state: "cull", userStars: null });
+        autoCulled++;
+      } else if (c.tier === "auto-cull" && stage === "all") {
+        decisions.push({ assetId: c.assetId, state: "cull", userStars: null });
+        autoCulled++;
+      } else if (c.tier === "auto-cull") {
+        forReview++;
+      }
+    }
+
+    if (decisions.length > 0) {
+      stateDb.savePhotoDecisions(decisions, "auto-cull", llmRun.id);
+    }
+    results.push({ batchId, autoCulled, forReview, skipped });
+  }
+
+  return { ok: true, results };
+});
+
 /** Revert all auto-cull decisions (safety valve) */
 app.delete("/api/auto-approve", async () => {
   const reverted = stateDb.revertAutoCullDecisions();
   return { ok: true, reverted };
 });
+
+/** Get cull comparisons for a batch: each culled photo with its keeper and reason */
+app.get<{ Params: { id: string }; Querystring: { model?: string } }>(
+  "/api/batches/:id/cull-comparisons",
+  async (req) => {
+    const batch = sessionBatches.find((b) => b.id === req.params.id);
+    if (!batch) return { error: "Not found" };
+
+    const fp = batchFingerprint(batch.assets.map((a) => a.id));
+    const cached = req.query.model
+      ? stateDb.getLlmRun(batch.id, fp, req.query.model)
+      : stateDb.getLlmRun(batch.id, fp);
+    if (!cached) return { comparisons: [] };
+
+    try {
+      const raw = JSON.parse(cached.responseJson);
+      const expanded = expandCompactResponse(raw, batch);
+
+      // Build subgroup lookup
+      const sgMap = new Map(expanded.similaritySubgroups.map((sg) => [sg.subgroupId, sg]));
+
+      // Build image lookup
+      const imgMap = new Map(expanded.images.map((img) => [img.imageId, img]));
+
+      // For each culled photo in a subgroup, pair with its keeper(s)
+      const comparisons = [];
+      for (const img of expanded.images) {
+        if (img.llmKeepCull !== "cull") continue;
+        if (!img.similaritySubgroupId) continue;
+
+        const sg = sgMap.get(img.similaritySubgroupId);
+        if (!sg) continue;
+
+        // Find keepers in this subgroup
+        const keepers = sg.recommendedKeepIds
+          .map((kid) => {
+            const keeperImg = imgMap.get(kid);
+            const keeperAsset = batch.assets.find((a) => a.id === kid);
+            if (!keeperImg || !keeperAsset) return null;
+            return {
+              id: kid,
+              filename: keeperAsset.filename,
+              stars: keeperImg.suggestedStars,
+              note: keeperImg.briefNote,
+            };
+          })
+          .filter(Boolean);
+
+        const cullAsset = batch.assets.find((a) => a.id === img.imageId);
+        comparisons.push({
+          cullId: img.imageId,
+          cullFilename: cullAsset?.filename ?? "",
+          cullStars: img.suggestedStars,
+          cullNote: img.briefNote,
+          cullCategory: img.categories[0] ?? "other",
+          keepers,
+          subgroupType: sg.subgroupType,
+          subgroupSize: sg.imageIds.length,
+          subgroupReason: sg.rationale,
+          rank: sg.imageIds.indexOf(img.imageId),
+        });
+      }
+
+      return { comparisons };
+    } catch {
+      return { comparisons: [] };
+    }
+  },
+);
 
 // === Per-photo decisions (shared across all views) ===
 
