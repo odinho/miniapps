@@ -35,6 +35,14 @@ moments" approach, causing ~10-23% wrong-cull rates that can't be threshold-tune
 - Codex identified counting bug in multi-model analysis (now fixed)
 - No threshold strategy gets below 8% with meaningful coverage
 - The "single best frame" prompt is the root cause of wrong culls
+- Visual inspection of all 11 deficit>=2 wrong culls: ALL are borderline
+  (user confirmed toddler/cat and snowy streets are acceptable culls)
+
+**Prompt variant experiments (tested on 2 batches, 50 photos):**
+- v0 "single best frame": 76% agree, 10 wrong-culls (too aggressive)
+- v1 "balanced 1-2 per sg": 62% agree, 5 wrong-culls (3 are outliers)
+- v2 "moment-focused": 52% agree, 3 wrong-culls (all outliers), but 21 wrong-keeps
+- **v1 is the recommended prompt** — halves wrong-culls, over-keeping is acceptable
 
 ### Wrong-cull patterns (from looking at actual photos)
 
