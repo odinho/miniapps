@@ -239,7 +239,9 @@ describe("classifyBatchForAutoCull", () => {
       makeSubgroup({ subgroupId: "sg1", imageIds: ["a", "b", "c", "d"], recommendedKeepCount: 1 }),
     ];
     const result = classifyBatchForAutoCull(images, subgroups);
-    expect(result.autoCullHigh).toBe(3); // b, c, d — keeper has 2 stars
+    // b is rank 1/3 = 0.33 (top half → standard), c is 2/3 = 0.67 and d is 3/3 = 1.0 (bottom half → high)
+    expect(result.autoCullHigh).toBe(2); // c, d — keeper 2★ + bottom half
+    expect(result.autoCull).toBe(1); // b — keeper 2★ but top half
     expect(result.review).toBe(3); // a (keep), e (singleton), f (keep)
     expect(result.total).toBe(6);
   });

@@ -1,128 +1,105 @@
-## Handoff — immich-cull session 2026-04-07 to 2026-04-11
+## Handoff — immich-cull session 2026-04-11
 
 ### What happened this session
 
-Massive session: 30+ commits on feat/immich-cull. Started with UI bugs,
-ended with multi-model LLM comparison and Gemma4 local inference.
+Built a complete confidence-based auto-cull system with exhaustive threshold
+analysis. Ran gemini-3.1-flash-lite-preview on 215+ batches (up from 20).
+Key finding: auto-cull works well on discriminating reviews but must filter
+out bulk-kept batches (Snapchat, old photos).
 
-### Key decisions
+### Auto-cull system (new)
 
-- 3-layer state model: llmState (reactive) > manualOverrides (user clicks) > effectiveState
-- Stars are per-subgroup: primary keeper gets max, others get 0 (for useful star filtering)
-- LLM star scale expanded to 0-5 (was 0-3), mapped down for write-back
-- Viewing LLM suggestions is non-destructive — only Approve saves to DB
-- All LLM runs preserved (superseded, not deleted) for analysis
-- Gemini 3.x models need locations/global on Vertex AI (auto-detected)
-- Gemma4 local model works but 58% agreement — not reliable enough for auto-cull
-- gemini-3.1-flash-lite-preview is the best model: 82% agreement, 6.4% over-keep, 11.7% over-cull
-- User prefers LLM to keep too much rather than lose good photos
+**Architecture:**
+- `src/ranking/auto-cull.ts` — pure classification: `auto-cull-high`, `auto-cull`, `review`
+- Server: GET /api/batches includes auto-cull stats, POST /api/batches/auto-approve
+- Frontend: orange AUTO badges, per-batch auto-approve button, sidebar stats
+- DB: `source` + `llm_run_id` columns for provenance, auto-revert on run supersession
 
-### Architecture changes
+**Tiered auto-cull criteria (all require: LLM says cull, stars=0, in subgroup, sg has keeper):**
+- **HIGH confidence** (keeper >= 2 stars): ~3.8% wrong-cull, ~34% coverage
+- **STANDARD** (keeper < 2 stars): ~9.7% wrong-cull, ~56% coverage
+- **Review**: everything else (singletons, stars > 0, small subgroups)
 
-State rearchitected from single mutable `states` map to:
-  web-app/src/lib/state.ts — pure functions (deriveLlmState, mergeStates, countAtLevel, etc)
-  web-app/src/lib/__tests__/state.test.ts — 21 tests
-  web-app/src/App.svelte — reactive $: chains, no imperative state mutation
+**Smart layered strategy** (sub-5% error):
+- L1: keeper>=2 stars — 3.8% error, 33.6% coverage
+- L1+L2a: safe categories (portrait, pet, screenshot, food) — 4.7% error, 40.9% coverage
+- L2b: action/landscape — 20.7% error, needs review
 
-LLM client (src/ranking/llm-client.ts):
-  - Interleaved text+image parts in single Content (fixed index misalignment)
-  - Index watermark (#N) on each image
-  - Three providers: vertexai, openrouter, ollama
-  - expandCompactResponse exported, used by both client and server (deduplicated)
-  - Handles Gemma's object-style sg.all entries
-  - Strips 1-photo subgroups
-  - deriveLlmState uses recommendedKeepIds (not positional first-N)
+### Critical analysis finding
 
-Model switcher UI:
-  - Manual button (shows saved user decisions, yellow when has data)
-  - Model buttons: 2.5-lite, 3.1-lite, 3-flash, gemma4
-  - Green = active, yellow = cached, grey = not run
-  - Click = switch to cached or run if needed
-  - Shift+R = cycle through all views
-  - r = re-run current model (force fresh)
-  - Re-run invalidates only the specific model, not all
+**Batch era matters enormously:**
+- 1970 batches (no-date Snapchat): 100% user keep — auto-cull is 100% wrong
+- 2015-2022 batches: 94% user keep — almost no culling done
+- 2024+ batches: 37% user keep — real discriminating review
 
-### Tooling added
+Auto-cull should ONLY be calibrated on discriminating reviews (keep rate < 90%).
+The known-good filtering (auto_keep_patterns table) handles the Snapchat issue.
 
-  npm run check — full pipeline: oxlint + oxfmt + tsgo + svelte-check + vitest
-  .oxlintrc.json, .oxfmtrc.json in both root and web-app
-  @typescript/native-preview (tsgo) for fast type-checking
-  svelte-check --fail-on-warnings
+### Analysis scripts
+
+- `scripts/extract_autocull_data.py` — extracts enriched LLM data to JSON cache (needs server once)
+- `scripts/analyze_autocull_thresholds.py` — tests 54+ strategies against cache (instant, no server)
+- `scripts/expand_31lite_coverage.sh` — runs 3.1-flash-lite on reviewed batches
+- `scripts/run_3flash_batches.sh` — runs 3-flash on specific batches
+
+### Wrong-cull patterns (from 9 wrong culls in S4+sz>=3 on 2024 data)
+
+1. **User keeps more variants** (3/9): same_scene subgroup, user kept 4 of 5 nearly identical
+2. **User values different photo than LLM** (4/9): user chose the "moment" over technical quality
+3. **User kept one extra from burst** (2/9): action shots, car window landscapes
+
+All borderline, zero severe (no user-starred photos wrongly culled).
+
+### Second-pass system (designed, not yet implemented)
+
+For photos in the "review" tier, head-to-head comparison:
+- Show keeper + cull candidate side by side
+- Binary keep/remove decision with confidence
+- Use thinking-enabled model for higher accuracy
+- Prompt: `src/ranking/second-pass-prompt.ts`
 
 ### Database state
 
-  Schema: v6 (v5 active, v6 added auto_keep_patterns table — reverted but table remains)
-  photo_decisions: 3174 entries (2169 keep, 1005 cull)
-  llm_batch_runs: 480 completed (402 gemma, 45 2.5-lite, 20 3.1-lite, 13 3-flash)
-  view_status: 404 reviewed batches (user went through all batches manually)
-  Backup: data/state.db.backup-20260410-full
+Schema: v6 (added source + llm_run_id columns)
+photo_decisions: 3174 entries, all source='manual'
+llm_batch_runs: 530+ completed (expanding — running 3.1-flash-lite on 145 more 2024 batches)
+auto_keep_patterns: 1 entry (/Snapchat/Snapchat-)
 
-### Model comparison results (scripts/compare_models.py)
+### Known-good filtering (new)
 
-  gemini-3.1-flash-lite-preview: 82% agree, 6.4% over-keep, 11.7% over-cull (BEST)
-  gemini-3-flash-preview:        75% agree, 15.9% over-keep, 9.1% over-cull (limited data)
-  gemini-2.5-flash-lite:         67% agree, 20.7% over-keep, 12.7% over-cull
-  gemma4:e4b:                    58% agree, 11.2% over-keep, 30.6% over-cull
+Server now reads `auto_keep_patterns` table and filters assets before batching.
+`--include-all` flag bypasses. Currently filters Snapchat paths.
 
-  On 100k photos, 3.1-flash-lite would wrongly cull ~11,700 photos (11.7%).
-  Not safe for blind auto-cull yet. Need <2-3% wrong-cull for that.
+### Stale docs archived
 
-### Prompt tuning (src/ranking/prompt.ts)
+PLAN.md, LLM_INTEGRATION_PLAN.md, STAR_RATING_PHILOSOPHY.md → docs/archive/
+README.md and docs/architecture.md are current.
 
-  Calibrated from 3000+ photo agreement analysis.
-  Category-specific: action (strict), snapchat_save (keep), screenshots (keep).
-  Grouping: "very few singletons", scene-based not time-based.
-  Subgroups: "single best frame" default, second only if genuinely different framing.
-  Concrete JSON example added for smaller models.
+### Key decisions this session
 
-### Gemma4 experiments (scripts/)
+- Two-tier auto-cull (high/standard) instead of single threshold
+- Auto-cull decisions bound to llm_run_id, auto-reverted on supersession
+- Dropped auto-keep tier (system defaults to keep, no need to automate)
+- Archive stale docs, don't delete (preserves design rationale)
+- Use auto_keep_patterns DB table instead of hardcoded regex
+- Analysis must filter to discriminating batches (keep rate < 90%)
 
-  gemma_prompt_experiment.py — tested 7 prompt variations
-  gemma_two_pass.py — describe-then-decide + thinking mode
-  run_all_gemma.sh — ran gemma4 on all 402 batches (6 hours)
-  
-  Findings: simplified prompts best (77% on easy batches). Thinking mode
-  inconsistent (helps sometimes, hurts others). Image size (512 vs 800)
-  has no effect. Two-pass descriptions too generic to be useful.
-  Gemma's ceiling is ~58% — too small a model for this task.
+### Remaining work
 
-### Remaining work for next session
+1) EXPAND DATA: Running 3.1-flash-lite on 145 more 2024+ batches (in progress).
+   Will give ~165 discriminating batches for calibration.
 
-1) CONFIDENCE-BASED AUTO-CULL: Only auto-cull when LLM says cull AND stars=0
-   AND photo is in a subgroup with a clearly better alternative. Target <3%
-   wrong-cull rate on a smaller cull volume. Prototype on existing data.
+2) SECOND-PASS IMPLEMENTATION: Wire up head-to-head comparison for review tier.
+   Could use thinking mode on Gemini or Claude Sonnet as oracle.
 
-2) TWO-TIER MODE: Auto-cull obvious (blurry, exact dupes), flag rest for review.
-   Could use the +/- keepLevel mechanism — auto-approve at aggressive level,
-   present borderline cases for human review.
-
-3) MORE 3-FLASH DATA: 7 reviewed batches have 3.1-lite but not 3-flash.
-   Run those to get better 3-flash comparison: 2024-03-24-b289638120b4,
-   2024-02-10-75515d02efc2, 2024-03-29-23dfb15bca68, 2024-01-13-d9e88b447969,
-   2024-05-13-31e8131d9fe9, 2024-05-04-bfd62461f9ed, 2024-03-02-96641cbec175
-
-4) IMMICH WRITE-BACK: Not started. Need soft-delete via Immich API, star
+3) IMMICH WRITE-BACK: Not started. Need soft-delete via Immich API, star
    ratings, XMP sidecars. This is the actual goal of the project.
 
-5) FULL LIBRARY: Immich adapter works (72k images, SSH tunnel tested).
-   Need to run clustering + LLM on full library. Cost estimate for
-   3.1-flash-lite on 72k images: ~$15-25.
+4) FULL LIBRARY: Run clustering + 3.1-flash-lite on full 72k image library.
+   With auto-cull, user reviews ~48% of culls instead of all.
 
-6) Snapchat saves: 99.8% keep rate on /Snapchat/Snapchat-* paths.
-   Auto-keep feature was reverted (LLM still needs to process them).
-   Revisit: exclude from LLM batches entirely, auto-set keep.
-
-7) STALE DOCS: PLAN.md and LLM_INTEGRATION_PLAN.md are outdated.
-   README.md and docs/architecture.md are fresh (updated this session).
-
-### Known bugs / tech debt
-
-- Undo can't restore undecided states (loadPhotoStates skips null)
-- Undo leaves stale star ratings (only restores snapshot keys)
-- No abort controller for rapid group/batch navigation (race condition)
-- App.svelte is still monolithic (~500 lines) — could extract more components
-- PLAN.md, LLM_INTEGRATION_PLAN.md, STAR_RATING_PHILOSOPHY.md are stale
-- auto_keep_patterns table exists in DB (schema v6) but code was reverted
+5) REMOVE GEMMA4: Only 58% agreement, not useful. Remove from model list or
+   deprioritize. Keep data for multi-model ensemble analysis.
 
 ### How to run
 
@@ -131,10 +108,7 @@ Model switcher UI:
   cd web-app && npm run dev -- --host
   # Open http://192.168.10.88:5173
 
-  # SSH tunnel for Immich:
-  ssh -f -N -L 15432:172.20.0.2:5432 odin@192.168.10.74
-  npx tsx src/server.ts --immich --vertex --port 3737
-
   # Analysis:
+  python3 scripts/extract_autocull_data.py --all-models  # needs server
+  python3 scripts/analyze_autocull_thresholds.py --model gemini-3.1-flash-lite-preview
   python3 scripts/compare_models.py
-  python3 scripts/gemma_prompt_experiment.py --batch BATCH_ID

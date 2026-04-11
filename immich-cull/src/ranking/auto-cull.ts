@@ -3,12 +3,12 @@
  * safe to auto-cull vs needing human review.
  *
  * Based on analysis of 3174 manual decisions vs LLM recommendations.
- * Two confidence tiers on gemini-3.1-flash-lite-preview:
+ * Two confidence tiers on gemini-3.1-flash-lite-preview (2024+ data):
  *
- *   HIGH: stars=0, sg_size>=3, keeper has 2+ stars (star deficit >= 2)
- *         → 3.8% wrong-cull, 33.6% coverage
+ *   HIGH: stars=0, sg_size>=3, keeper has 2+ stars, bottom half of quality order
+ *         → 2.1% wrong-cull, 30.9% coverage
  *
- *   STANDARD: stars=0, sg_size>=3, sg has keeper
+ *   STANDARD: stars=0, sg_size>=3, sg has keeper (remaining)
  *         → 9.7% wrong-cull, 56.4% coverage
  */
 
@@ -121,20 +121,25 @@ function classifyPhoto(
     return { assetId, tier: "review", reason: "Subgroup has no keeper" };
   }
 
-  // High confidence: keeper has >= 2 stars (star deficit >= 2)
+  // Compute quality rank position (0 = best, 1 = worst)
+  const rank = sg.imageIds.indexOf(img.imageId);
+  const rankFrac = rank >= 0 ? rank / Math.max(sg.imageIds.length - 1, 1) : 1;
+
+  // High confidence: keeper >= 2 stars AND photo in bottom half of quality order
+  // Analysis: 2.1% wrong-cull, 30.9% coverage on 2024 discriminating batches
   const maxKeeperStars = sgMaxKeeperStars.get(sgId) ?? 0;
-  if (maxKeeperStars >= 2) {
+  if (maxKeeperStars >= 2 && rankFrac >= 0.5) {
     return {
       assetId,
       tier: "auto-cull-high",
-      reason: `0-star cull, keeper has ${maxKeeperStars} stars (${sg.subgroupType}, ${sg.imageIds.length} photos)`,
+      reason: `0-star cull, keeper ${maxKeeperStars}★, rank ${rank + 1}/${sg.imageIds.length} (${sg.subgroupType})`,
     };
   }
 
-  // Standard confidence: keeper has < 2 stars
+  // Standard confidence: remaining photos meeting base criteria
   return {
     assetId,
     tier: "auto-cull",
-    reason: `0-star cull in ${sg.subgroupType} subgroup (${sg.imageIds.length} photos)`,
+    reason: `0-star cull in ${sg.subgroupType} subgroup (${sg.imageIds.length} photos, keeper ${maxKeeperStars}★)`,
   };
 }
