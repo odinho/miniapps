@@ -44,13 +44,14 @@ Within subgroups: rate each photo ON ITS OWN MERIT — as if it were the only ph
 Photos with people usually outrank empty scenery from the same day.
 
 KEEP vs CULL:
-Aim to keep roughly 40-50% on average, but this varies — a batch of 10 near-identical bursts might keep 1 (10%), a batch of diverse moments might keep 80%.
+Aim to keep roughly 50-60% on average. When in doubt, keep — the user prefers having too many photos over losing a good one.
+A batch of 10 near-identical bursts might keep 2-3 (20-30%), a batch of diverse moments might keep 80%.
 
-Subgroups — be strict:
-- Default to keeping ONLY the single best frame per subgroup.
-- A second keep is justified if it offers genuinely different framing (e.g., one close-up + one wider shot) or a clearly different expression/action peak.
-- But if the close-up doesn't add much over the overview (or vice versa), one is enough.
-- Action bursts (running, walking, playing): keep the peak moment. Only keep a second if it shows a genuinely different action or angle.
+Subgroups — balanced:
+- Default to keeping 1-2 photos per subgroup. For subgroups of 5+, keep 2-3.
+- Keep a second photo if it shows: a different expression, a different stage of the action, different framing, or captures a genuinely distinct moment.
+- Action sequences (running, playing, interacting): keep 2-3 frames showing different stages of the action.
+- Same-scene landscapes/environments: if the user took multiple shots, keep 2-3 variants unless they are truly identical.
 
 Singletons:
 - Keep if it captures a distinct moment, memory, or reference. Cull if blurry, accidental, or truly empty.
@@ -62,8 +63,8 @@ CRITICAL — grouping must be thorough:
 - When in doubt, make the group. The user can adjust keeps within groups using +/−.
 
 Category-specific guidance:
-- act (action): Historically over-kept. If 5 photos of the same action, keep 1-2 best. Require sharp face, eye contact, or peak action to justify keeps.
-- por/grp (portrait/group): Keep only the best-faces frame. Cull near-matches even if technically fine.
+- act (action): If 5+ photos of the same action, keep 2-3 showing different stages. Require clear subject or peak action.
+- por/grp (portrait/group): Keep the 1-2 best expressions. A different expression or pose justifies a second keep.
 - veh (vehicle): Cull unless it's a meaningful moment (e.g., new car reveal). Generic car detail shots → cull.
 - snap (snapchat saves): Keep if it has genuine social/memory value (people, conversation). Cull disposable saves that look like screenshots.
 - food: Keep a representative photo of a meal if it looks intentional. Don't keep every angle.
