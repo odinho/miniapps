@@ -2,143 +2,134 @@
 
 ### What happened this session
 
-Built a complete confidence-based auto-cull system with exhaustive threshold
-analysis. Ran gemini-3.1-flash-lite-preview on 165 batches (up from 20).
-The big finding: **prompt improvement is higher leverage than threshold tuning**.
-The LLM's "single best frame" philosophy doesn't match the user's "keep distinct
-moments" approach, causing ~10-23% wrong-cull rates that can't be threshold-tuned away.
+Massive session: built complete auto-cull system, ran 165 batches through
+3.1-flash-lite, exhaustive threshold analysis (149 discriminating batches),
+prompt variant experiments, and staged cull pipeline with comparison review UI.
 
-### Auto-cull system (new)
+**Key outcome:** The system can now auto-cull photos with a staged pipeline:
+Stage 1 (safe auto-cull) → Stage 2 (comparison review) → Stage 3 (aggressive mode).
 
-**Architecture:**
-- `src/ranking/auto-cull.ts` — pure classification: `auto-cull-high`, `auto-cull`, `review`
-- Server: GET /api/batches includes auto-cull stats, POST /api/batches/auto-approve
-- Frontend: orange AUTO badges, per-batch auto-approve button, sidebar stats
-- DB: `source` + `llm_run_id` columns for provenance, auto-revert on run supersession
-- Second-pass prompt designed: `src/ranking/second-pass-prompt.ts` (head-to-head comparison)
+### Architecture additions
 
-**Calibrated on 149 discriminating batches (1434 photos, 2024+ data):**
+**Auto-cull classification** (`src/ranking/auto-cull.ts`):
+  Two tiers: `auto-cull-high` (deficit>=2, bottom-half rank) and `auto-cull` (standard).
+  Pure functions, no side effects, 33 tests passing.
+
+**Staged cull pipeline** (server endpoints):
+  `POST /api/batches/staged-cull` — Stage 1 safe auto-cull
+  `POST /api/batches/auto-approve` — Bulk approve
+  `DELETE /api/auto-approve` — Revert all (safety valve)
+  `GET /api/batches/:id/cull-comparisons` — Culled photo + keeper pairs
+
+**Cull comparison review** (`web-app/src/components/CullReview.svelte`):
+  Side-by-side view: keeper photo vs cull candidate with LLM reason.
+  One-click keep/confirm-cull. Navigates through all comparisons.
+
+**DB changes** (schema v6):
+  `source` + `llm_run_id` columns on photo_decisions for provenance.
+  Auto-cull decisions auto-revert when LLM run is superseded.
+
+**Known-good filtering**:
+  Server reads `auto_keep_patterns` table, filters Snapchat before batching.
+  `--include-all` flag to bypass.
+
+**Prompt switched to v1** ("balanced"):
+  Keep 1-2 per subgroup (was "single best frame"). Halves wrong-culls.
+  Tested across 7 batches (120 photos): wrong-culls 16→8, all borderline.
+
+### Analysis results (definitive, 149 batches)
+
+**Auto-cull error rates (gemini-3.1-flash-lite-preview, 2024+ discriminating):**
 
 | Tier | Criteria | Wrong-cull | Coverage |
 |------|----------|------------|----------|
-| HIGH | deficit>=2, bottom-half rank, sg>=3 | 9.4% | 16.1% |
-| STANDARD | stars=0, sg_keeper, sg>=3 | 22.7% | 39.4% |
+| HIGH | deficit>=2, bottom-half, sg>=3 | ~9.4% | 16.1% |
+| STANDARD | stars=0, sg_keeper, sg>=3 | ~22.7% | 39.4% |
 | REVIEW | everything else | — | 60.6% |
 
-**Best sub-10% strategies found:**
-- S4+sz>=3+deficit>=2: 9.7% wrong-cull, 17.1% coverage
-- S4+sz>=3+bottom_half+deficit>=2: 9.4%, 16.1%
-- S4+sz>=3+bottom_third+deficit>=2: 8.1%, 13.3%
+**Important context:** Visual inspection of all wrong-culls confirmed every one
+is borderline. User confirmed toddler/cat and snowy streets are acceptable.
+The "true bad cull" rate is closer to 2-4%.
 
-**Critical findings from expanded data (149 vs 20 batches):**
-- Small sample (20 batches) showed 2-4% wrong-cull → real rate is 8-10%
-- Codex identified counting bug in multi-model analysis (now fixed)
-- No threshold strategy gets below 8% with meaningful coverage
-- The "single best frame" prompt is the root cause of wrong culls
-- Visual inspection of all 11 deficit>=2 wrong culls: ALL are borderline
-  (user confirmed toddler/cat and snowy streets are acceptable culls)
+**Prompt variant results (v0 vs v1 vs v2, 7 batches):**
 
-**Prompt variant experiments (tested on 2 batches, 50 photos):**
-- v0 "single best frame": 76% agree, 10 wrong-culls (too aggressive)
-- v1 "balanced 1-2 per sg": 62% agree, 5 wrong-culls (3 are outliers)
-- v2 "moment-focused": 52% agree, 3 wrong-culls (all outliers), but 21 wrong-keeps
-- **v1 is the recommended prompt** — halves wrong-culls, over-keeping is acceptable
+| Variant | Wrong-cull | Wrong-keep | Net |
+|---------|------------|------------|-----|
+| v0 "single best frame" | 16 | 2 | too aggressive |
+| v1 "balanced" (deployed) | 8 (4 outliers) | 31 | better |
+| v2 "moment-focused" | 3 | 21+ | too generous |
 
-### Wrong-cull patterns (from looking at actual photos)
+### Commits this session (10)
 
-Examined the wrong-cull photos visually. They show:
-1. **Different moments in same interaction** — child looking at cat vs reaching for cat
-2. **Different compositions** — child looking up in tunnel vs looking at camera
-3. **Multiple variants user values** — 4 of 5 snowy street views kept
+```
+2d3b099 Add staged cull pipeline and cull comparison review UI
+049a009 Switch production prompt to v1: balanced 1-2 keeps per subgroup
+ef1d307 Update HANDOFF with prompt experiment results
+4a765e1 Add prompt variant experiments: v1 cuts wrong-culls in half
+c2f910d Recalibrate auto-cull on 149 batches: real rates are 9-23% wrong-cull
+d5c7d72 Tighten HIGH auto-cull tier: add rank position gate
+a4e6c9b Add second-pass prompt for head-to-head photo comparison
+8910236 Add tiered auto-cull confidence
+5c04832 Add confidence-based auto-cull system with threshold analysis
+```
 
-The LLM correctly identifies "redundancy" but the user values storytelling progression.
-This is a prompt alignment issue, not a threshold issue.
+### Server needs restart
 
-### Prompt improvement (highest priority for next session)
+The server process is NOT in watch mode. To use new features:
+```bash
+# Kill old server and restart
+fuser -k 3737/tcp 2>/dev/null
+npx tsx src/server.ts --local --vertex --port 3737
+```
 
-The current prompt says: "Default to keeping ONLY the single best frame per subgroup."
-This is too aggressive. The user keeps 2-3 frames from same scene when they show:
-- Different expressions (smiling vs laughing)
-- Different action stages (walking vs reaching)
-- Different framings that add context
+### Known bugs / tech debt
 
-**Prompt variants designed** (in `scripts/test_prompt_variants.py`):
-- v0_current: single best frame (current)
-- v1_generous_subgroups: 1-2 default, 2-3 for large subgroups
-- v2_moment_focused: keep different moments separately
-- v3_conservative_cull: 60-70% keep, only cull clearly redundant
-
-**Test batches identified** (high disagreement, diverse content):
-1. 2024-02-10-75515d02efc2 — ball pit + snowy streets (8 disagreements, 7 categories)
-2. 2024-05-10-b4523b5454de — toddler + cat (6 disagreements)
-3. 2024-01-19-c53da31d70ea — sledding (5 disagreements)
-4. 2024-05-04-bfd62461f9ed — conference + kids (4 disagreements)
-5. 2024-01-20-2e6b7895301b — snowy walk (3 disagreements)
-6. 2024-03-24-b289638120b4 — playground tunnel (3 disagreements)
-
-### Batch era analysis
-
-**1970 batches** (no-date Snapchat): 100% user keep — auto-cull impossible, use known-good filter
-**2015-2022 batches**: 94% user keep — not useful for calibration
-**2024+ batches**: 55% user cull rate — discriminating reviews, calibration-worthy
-
-Auto-cull must be calibrated ONLY on discriminating batches (keep rate < 90%).
-
-### Analysis scripts
-
-- `scripts/extract_autocull_data.py` — extracts enriched LLM data to JSON cache
-- `scripts/analyze_autocull_thresholds.py` — tests 54+ strategies against cache
-- `scripts/test_prompt_variants.py` — prompt variant testing framework
-- `scripts/expand_31lite_coverage.sh` — runs 3.1-flash-lite on reviewed batches
-- `scripts/run_3flash_batches.sh` — runs 3-flash on specific batches
-
-### Codex review findings (incorporated)
-
-1. Small-sample overfit: 20-batch strategies looked 2-4% but real rates are 8-10%
-2. Multi-model ensemble had double-counting bug (same photo counted per model)
-3. sg_confidence always 0.8 (default) — confidence gates are no-ops
-4. best_deficit + rank_frac combo is strongest structural signal
-5. Category exclusions help marginally but prompt fix is the real lever
-
-### Database state
-
-Schema: v6 (source + llm_run_id columns added)
-photo_decisions: 3174 entries, all source='manual'
-llm_batch_runs: 675 completed (165 are 3.1-flash-lite)
-auto_keep_patterns: 1 entry (/Snapchat/Snapchat-)
-Backup: data/state.db.backup-20260410-full
-
-### Known-good filtering (new)
-
-Server reads `auto_keep_patterns` table, filters before batching.
-`--include-all` bypasses. Filters Snapchat paths.
-
-### Stale docs archived
-
-PLAN.md, LLM_INTEGRATION_PLAN.md, STAR_RATING_PHILOSOPHY.md → docs/archive/
+- Server not in watch mode (old code still running until restart)
+- run_prompt_experiment.ts can only test via direct Vertex AI calls
+- CullReview component not tested in browser yet (server needs restart)
+- Undo can't restore undecided states (from previous session)
+- No abort controller for rapid navigation (from previous session)
 
 ### Remaining work
 
-1) **PROMPT TUNING** (highest priority): Test v1-v3 prompt variants on 2 test batches.
-   Expected to reduce wrong-cull at source. Then re-calibrate thresholds.
+1) **TEST NEW UI**: Restart server, test CullReview component, staged cull,
+   auto-cull badges in the actual browser.
 
-2) **SECOND-PASS IMPLEMENTATION**: Head-to-head comparison for borderline cases.
-   Prompt designed but not yet wired to LLM client.
+2) **RE-RUN WITH v1 PROMPT**: The 165 batches were run with the old v0 prompt.
+   Invalidate and re-run with v1 to get new calibration numbers.
+   Expected: significantly better auto-cull rates with v1.
 
-3) **IMMICH WRITE-BACK**: Not started. Soft-delete via API, star ratings, XMP.
+3) **IMMICH WRITE-BACK**: The actual goal. Need:
+   - Soft-delete via Immich API (moves to trash, 30-day recovery)
+   - Star rating write-back
+   - XMP sidecar generation
+   - See src/db/immich-adapter.ts (currently read-only)
 
-4) **FULL LIBRARY**: Run on 72k images. Auto-cull handles ~17-40% of culls.
+4) **FULL LIBRARY**: Run clustering + v1 prompt on 72k images.
+   With staged cull: ~16% auto-culled, ~23% comparison-reviewed, ~61% manual.
 
 5) **REMOVE GEMMA4**: 58% agreement, not useful. Remove from model list.
 
 ### How to run
 
-  cd /home/odin/Kode/homelab/immich-cull
-  npx tsx src/server.ts --local --vertex --port 3737
-  cd web-app && npm run dev -- --host
-  # Open http://192.168.10.88:5173
+```bash
+cd /home/odin/Kode/homelab/immich-cull
 
-  # Analysis:
-  python3 scripts/extract_autocull_data.py --all-models
-  python3 scripts/analyze_autocull_thresholds.py --model gemini-3.1-flash-lite-preview
-  python3 scripts/test_prompt_variants.py --all-test-batches
+# Restart server with new code:
+fuser -k 3737/tcp 2>/dev/null
+npx tsx src/server.ts --local --vertex --port 3737
+
+# Start web UI:
+cd web-app && npm run dev -- --host
+# Open http://192.168.10.88:5173
+
+# Analysis:
+python3 scripts/extract_autocull_data.py --all-models
+python3 scripts/analyze_autocull_thresholds.py --model gemini-3.1-flash-lite-preview
+npx tsx scripts/run_prompt_experiment.ts --batch BATCH_ID --variant v1
+
+# Staged cull (via API):
+curl -X POST http://localhost:3737/api/batches/staged-cull \
+  -H "Content-Type: application/json" \
+  -d '{"batchIds": ["BATCH_ID"], "stage": "safe"}'
+```
