@@ -353,6 +353,15 @@ export class StateDb {
     };
   }
 
+  /** Get all decided photos for write-back. */
+  getAllDecisions(): Array<{ assetId: string; state: string; userStars: number | null }> {
+    return this.db
+      .prepare(
+        "SELECT asset_id as assetId, state, user_stars as userStars FROM photo_decisions WHERE state IS NOT NULL",
+      )
+      .all() as Array<{ assetId: string; state: string; userStars: number | null }>;
+  }
+
   // === Auto-cull provenance ===
 
   /** Revert auto-cull decisions. Returns count of reverted. */

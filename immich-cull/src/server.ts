@@ -19,6 +19,8 @@ import { StateDb, batchFingerprint } from "./db/state-db.js";
 import { batchBySession, SessionBatch } from "./batching/session-batcher.js";
 import { LlmClient, expandCompactResponse } from "./ranking/llm-client.js";
 import { classifyBatchForAutoCull, type AutoCullSummary } from "./ranking/auto-cull.js";
+import { ImmichWriteback } from "./db/immich-writeback.js";
+
 import { config as loadEnv } from "dotenv";
 loadEnv();
 
@@ -692,6 +694,65 @@ app.post<{
 /** Get decisions for a list of photos */
 app.post<{ Body: { assetIds: string[] } }>("/api/photos/decisions/get", async (req) => {
   return stateDb.getPhotoDecisions(req.body.assetIds);
+});
+
+// === Immich Write-back ===
+
+let immichWriteback: ImmichWriteback | null = null;
+
+// Initialize write-back if Immich env vars are set
+const immichUrl = process.env.IMMICH_URL;
+const immichApiKey = process.env.IMMICH_API_KEY;
+if (immichUrl && immichApiKey) {
+  immichWriteback = new ImmichWriteback({ serverUrl: immichUrl, apiKey: immichApiKey });
+}
+
+/** Test Immich API connection */
+app.get("/api/immich/status", async () => {
+  if (!immichWriteback) {
+    return { connected: false, error: "IMMICH_URL and IMMICH_API_KEY not set" };
+  }
+  const result = await immichWriteback.testConnection();
+  return { connected: result.ok, version: result.version, error: result.error };
+});
+
+/** Write back decisions to Immich: trash culled photos and set star ratings */
+app.post<{
+  Body: { dryRun?: boolean };
+}>("/api/immich/writeback", async (req) => {
+  if (!immichWriteback) {
+    return { error: "Immich write-back not configured (set IMMICH_URL and IMMICH_API_KEY)" };
+  }
+
+  const dryRun = req.body.dryRun ?? true; // Default to dry-run for safety
+
+  // Get all decided photos
+  const allDecisions = stateDb.getAllDecisions();
+
+  const toTrash = allDecisions.filter((d) => d.state === "cull").map((d) => d.assetId);
+  const toRate = allDecisions
+    .filter((d) => d.userStars != null && d.userStars > 0)
+    .map((d) => ({ assetId: d.assetId, rating: d.userStars! }));
+
+  if (dryRun) {
+    return {
+      dryRun: true,
+      toTrash: toTrash.length,
+      toRate: toRate.length,
+      totalDecisions: allDecisions.length,
+    };
+  }
+
+  // Execute write-back
+  const trashResult = await immichWriteback.trashAssets(toTrash);
+  const rateResult = await immichWriteback.setRatings(toRate);
+
+  return {
+    dryRun: false,
+    trashed: trashResult,
+    rated: rateResult,
+    totalDecisions: allDecisions.length,
+  };
 });
 
 app.get("/", async (_, reply) => {
