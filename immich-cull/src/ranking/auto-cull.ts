@@ -2,14 +2,17 @@
  * Auto-cull classification: pure functions to classify photos as
  * safe to auto-cull vs needing human review.
  *
- * Based on analysis of 3174 manual decisions vs LLM recommendations.
- * Two confidence tiers on gemini-3.1-flash-lite-preview (2024+ data):
+ * Calibrated on 149 discriminating batches (1434 photos, 2024+ data,
+ * gemini-3.1-flash-lite-preview). Numbers from full dataset:
  *
- *   HIGH: stars=0, sg_size>=3, keeper has 2+ stars, bottom half of quality order
- *         → 2.1% wrong-cull, 30.9% coverage
+ *   HIGH: stars=0, sg_size>=3, keeper 2+ stars, bottom half of quality order
+ *         → ~9.4% wrong-cull, 16.1% coverage (106 candidates, 10 wrong)
  *
  *   STANDARD: stars=0, sg_size>=3, sg has keeper (remaining)
- *         → 9.7% wrong-cull, 56.4% coverage
+ *         → ~22.7% wrong-cull, 39.4% coverage (304 candidates, 69 wrong)
+ *
+ * The main improvement path is prompt tuning (LLM is too aggressive on
+ * "single best frame" when the user values distinct moments).
  */
 
 import type { ImageAssessment, SimilaritySubgroup } from "./types.js";
