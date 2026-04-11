@@ -8,7 +8,7 @@ import { dirname } from "path";
 import { mkdirSync } from "fs";
 import { createHash } from "crypto";
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 export class StateDb {
   private db: Database.Database;
@@ -125,6 +125,22 @@ export class StateDb {
       `);
     }
 
+    if (currentVersion < 6) {
+      // Add source and llm_run_id columns for auto-cull provenance.
+      // The CREATE TABLE in v4 migration includes source, but CREATE TABLE IF NOT EXISTS
+      // doesn't alter existing tables — so existing DBs lack the column.
+      const cols = this.db.prepare("PRAGMA table_info(photo_decisions)").all() as Array<{
+        name: string;
+      }>;
+      const colNames = new Set(cols.map((c) => c.name));
+      if (!colNames.has("source")) {
+        this.db.exec("ALTER TABLE photo_decisions ADD COLUMN source TEXT DEFAULT 'manual'");
+      }
+      if (!colNames.has("llm_run_id")) {
+        this.db.exec("ALTER TABLE photo_decisions ADD COLUMN llm_run_id INTEGER");
+      }
+    }
+
     this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
   }
 
@@ -143,15 +159,20 @@ export class StateDb {
 
   savePhotoDecisions(
     decisions: Array<{ assetId: string; state: string | null; userStars: number | null }>,
+    source: string = "manual",
+    llmRunId?: number,
   ) {
     const stmt = this.db.prepare(`
-      INSERT INTO photo_decisions (asset_id, state, user_stars, updated_at)
-      VALUES (?, ?, ?, datetime('now'))
+      INSERT INTO photo_decisions (asset_id, state, user_stars, source, llm_run_id, updated_at)
+      VALUES (?, ?, ?, ?, ?, datetime('now'))
       ON CONFLICT(asset_id) DO UPDATE SET
-        state = excluded.state, user_stars = excluded.user_stars, updated_at = datetime('now')
+        state = excluded.state, user_stars = excluded.user_stars,
+        source = excluded.source, llm_run_id = excluded.llm_run_id,
+        updated_at = datetime('now')
     `);
     this.db.transaction(() => {
-      for (const d of decisions) stmt.run(d.assetId, d.state, d.userStars);
+      for (const d of decisions)
+        stmt.run(d.assetId, d.state, d.userStars, source, llmRunId ?? null);
     })();
   }
 
@@ -242,20 +263,27 @@ export class StateDb {
       .run(batchId, fingerprint);
   }
 
-  /** Mark existing runs as superseded (keeps history, getLlmRun ignores them) */
+  /** Mark existing runs as superseded (keeps history, getLlmRun ignores them).
+   *  Also reverts any auto-cull decisions based on the superseded runs. */
   invalidateLlmRun(batchId: string, fingerprint: string, model?: string) {
-    if (model) {
-      this.db
-        .prepare(
-          "UPDATE llm_batch_runs SET status = 'superseded' WHERE batch_id = ? AND batch_fingerprint = ? AND model = ? AND status = 'completed'",
-        )
-        .run(batchId, fingerprint, model);
-    } else {
-      this.db
-        .prepare(
-          "UPDATE llm_batch_runs SET status = 'superseded' WHERE batch_id = ? AND batch_fingerprint = ? AND status = 'completed'",
-        )
-        .run(batchId, fingerprint);
+    // Find run IDs before superseding so we can revert auto-cull decisions
+    const whereClause = model
+      ? "batch_id = ? AND batch_fingerprint = ? AND model = ? AND status = 'completed'"
+      : "batch_id = ? AND batch_fingerprint = ? AND status = 'completed'";
+    const params = model ? [batchId, fingerprint, model] : [batchId, fingerprint];
+
+    const runs = this.db
+      .prepare(`SELECT id FROM llm_batch_runs WHERE ${whereClause}`)
+      .all(...params) as Array<{ id: number }>;
+
+    // Supersede the runs
+    this.db
+      .prepare(`UPDATE llm_batch_runs SET status = 'superseded' WHERE ${whereClause}`)
+      .run(...params);
+
+    // Revert auto-cull decisions that depended on these runs
+    for (const run of runs) {
+      this.invalidateAutoDecisionsForRun(run.id);
     }
   }
 
@@ -323,6 +351,33 @@ export class StateDb {
       groupsReviewed: views?.reviewed ?? 0,
       groupsSkipped: views?.skipped ?? 0,
     };
+  }
+
+  // === Auto-cull provenance ===
+
+  /** Revert auto-cull decisions. Returns count of reverted. */
+  revertAutoCullDecisions(llmRunId?: number): number {
+    if (llmRunId) {
+      const r = this.db
+        .prepare("DELETE FROM photo_decisions WHERE source = 'auto-cull' AND llm_run_id = ?")
+        .run(llmRunId);
+      return r.changes;
+    }
+    const r = this.db.prepare("DELETE FROM photo_decisions WHERE source = 'auto-cull'").run();
+    return r.changes;
+  }
+
+  /** When an LLM run is superseded, revert any auto-cull decisions based on it. */
+  invalidateAutoDecisionsForRun(llmRunId: number): number {
+    return this.revertAutoCullDecisions(llmRunId);
+  }
+
+  /** Get auto-keep patterns from the DB table. */
+  getAutoKeepPatterns(): Array<{ pattern: string; description: string | null }> {
+    return this.db.prepare("SELECT pattern, description FROM auto_keep_patterns").all() as Array<{
+      pattern: string;
+      description: string | null;
+    }>;
   }
 
   close() {

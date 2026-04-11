@@ -39,6 +39,19 @@ export interface AssetDetail extends AssetSummary {
   h: number;
 }
 
+export interface AutoCullClassification {
+  assetId: string;
+  tier: "auto-cull" | "review";
+  reason: string;
+}
+
+export interface AutoCullSummary {
+  autoCull: number;
+  review: number;
+  total: number;
+  classifications: AutoCullClassification[];
+}
+
 export interface BatchSummary {
   id: string;
   source: string;
@@ -47,6 +60,7 @@ export interface BatchSummary {
   dateRange: { start: string; end: string };
   hasLlmResult: boolean;
   viewStatus: string | null;
+  autoCullStats: { autoCull: number; review: number } | null;
 }
 
 export interface BatchDetail {
@@ -58,6 +72,7 @@ export interface BatchDetail {
   assets: AssetDetail[];
   llm: LlmResult | null;
   llmModels?: string[];
+  autoCull: AutoCullSummary | null;
 }
 
 export interface LlmResult {
@@ -159,6 +174,26 @@ export async function fetchPhotoDecisions(
 export async function rankBatch(id: string, model?: string) {
   const qs = model ? `?model=${encodeURIComponent(model)}` : "";
   return (await fetch(`${BASE}/api/batches/${id}/rank${qs}`, { method: "POST" })).json();
+}
+
+export async function autoApproveBatches(
+  batchIds: string[],
+  model?: string,
+): Promise<{
+  ok: boolean;
+  results: Array<{ batchId: string; approved: number; skipped: number; error?: string }>;
+}> {
+  return (
+    await fetch(`${BASE}/api/batches/auto-approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ batchIds, model }),
+    })
+  ).json();
+}
+
+export async function revertAutoApprovals(): Promise<{ ok: boolean; reverted: number }> {
+  return (await fetch(`${BASE}/api/auto-approve`, { method: "DELETE" })).json();
 }
 
 export function previewUrl(id: string): string {

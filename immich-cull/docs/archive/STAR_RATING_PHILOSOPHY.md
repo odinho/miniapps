@@ -1,3 +1,5 @@
+> **ARCHIVED** — Star rating scale is defined in prompt.ts and README.md.
+
 # Star Rating Philosophy
 
 ## Revised System (2026-04-06)

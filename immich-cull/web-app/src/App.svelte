@@ -6,8 +6,9 @@
   import {
     fetchGroups, fetchGroup, fetchBatches, fetchBatch, fetchStats,
     decideGroup, undecideGroup, rankBatch, savePhotoDecisions, fetchPhotoDecisions, fmt,
+    autoApproveBatches, revertAutoApprovals,
     type GroupSummary, type GroupDetail, type BatchSummary, type BatchDetail,
-    type LlmImage, type Stats,
+    type LlmImage, type Stats, type AutoCullClassification,
   } from './lib/api';
   import {
     deriveLlmState, mergeStates, countStates, countAtLevel,
@@ -113,18 +114,61 @@
     return m;
   }
 
+  // Auto-cull classification per photo
+  $: autoCullMap = buildAutoCullMap(batchDetail);
+  function buildAutoCullMap(bd: BatchDetail | null): Record<string, AutoCullClassification> {
+    const m: Record<string, AutoCullClassification> = {};
+    if (bd?.autoCull?.classifications) {
+      for (const c of bd.autoCull.classifications) m[c.assetId] = c;
+    }
+    return m;
+  }
+
+  async function autoApproveCurrent() {
+    if (!batches[batchIdx]) return;
+    const result = await autoApproveBatches([batches[batchIdx].id]);
+    if (result.ok) {
+      batches = await fetchBatches();
+      stats = await fetchStats();
+      await selectBatch(batchIdx);
+    }
+  }
+
+  async function autoApproveAll() {
+    const safeBatchIds = batches
+      .filter(b => b.autoCullStats && b.autoCullStats.review === 0 && b.viewStatus !== 'reviewed')
+      .map(b => b.id);
+    if (!safeBatchIds.length) return;
+    const result = await autoApproveBatches(safeBatchIds);
+    if (result.ok) {
+      batches = await fetchBatches();
+      stats = await fetchStats();
+    }
+  }
+
+  async function revertAllAutoApprovals() {
+    const result = await revertAutoApprovals();
+    if (result.ok) {
+      batches = await fetchBatches();
+      stats = await fetchStats();
+      if (batchIdx >= 0) await selectBatch(batchIdx);
+    }
+  }
+
   $: sidebarItems = mode === 'groups'
     ? groups.map((g, i) => ({
         idx: i, active: i === groupIdx, decided: g.decided,
         label: `${g.count} photos`,
         sub: `${g.timeSpanMinutes}min · ${fmt(g.totalBytes)}`,
         date: new Date(g.earliestDate),
+        autoCullStats: null as { autoCull: number; review: number } | null,
       }))
     : batches.map((b, i) => ({
         idx: i, active: i === batchIdx, decided: b.viewStatus === 'reviewed' || b.viewStatus === 'skipped',
         label: `${b.count} photos${b.hasLlmResult ? ' ✓' : ''}`,
         sub: `${b.source} ${b.folderName || ''}`,
         date: new Date(b.dateRange.start),
+        autoCullStats: b.autoCullStats,
       }));
 
   onMount(async () => {
@@ -533,7 +577,7 @@
         <div class="gi" class:active={item.active} class:decided={item.decided}
              on:click={() => { sidebarOpen = false; mode === 'groups' ? selectGroup(item.idx) : selectBatch(item.idx); }} role="button" tabindex="-1">
           <div class="t">{item.label} · {item.date.toLocaleDateString('no', { day: 'numeric', month: 'short', year: '2-digit' })}</div>
-          <div class="m">{item.sub}</div>
+          <div class="m">{item.sub}{#if item.autoCullStats} · <span class="ac-tag">{item.autoCullStats.autoCull}a/{item.autoCullStats.review}r</span>{/if}</div>
         </div>
       {/each}
     </div>
@@ -555,7 +599,7 @@
     {#if loading}
       <div class="empty"><span class="spinner"></span> Loading...</div>
     {:else if currentAssets.length}
-      <PhotoGrid assets={currentAssets} {states} {selectedIdx} {llmMap} {effectiveStarsMap} onSelect={onGridSelect}
+      <PhotoGrid assets={currentAssets} {states} {selectedIdx} {llmMap} {effectiveStarsMap} {autoCullMap} onSelect={onGridSelect}
         onToggleState={(i) => {
           const asset = currentAssets[i];
           if (!asset) return;
@@ -611,6 +655,11 @@
           {/each}
         </div>
       {/if}
+    {/if}
+    {#if mode === 'batches' && batchDetail?.autoCull && batchDetail.autoCull.autoCull > 0}
+      <button class="bac" on:click={autoApproveCurrent} title="Auto-cull {batchDetail.autoCull.autoCull} photos in this batch">
+        Auto ({batchDetail.autoCull.autoCull})
+      </button>
     {/if}
     <span class="spacer"></span>
     <span class="bmeta">{currentAssets.length} photos</span>
@@ -703,6 +752,7 @@
   .bb { background: #2196F3; color: white; } .ba { background: #f0a040; color: #1a1a1a; font-weight: 700; }
   .bs { background: #333; color: #aaa; } .bh { background: none; color: #7a8294; border: 1px solid #2a2e36 !important; padding: 3px 9px; font-size: 12px; }
   .run-btn { background: #7c4dff; color: white; }
+  .bac { background: #e65100; color: white; }
   .spacer { flex: 1; } .bmeta { font-size: 11px; color: #7a8294; }
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: white; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -730,7 +780,8 @@
   :global(.cell img) { width: 100%; height: 100%; object-fit: contain; display: block; background: #0b0d11; }
   :global(.lbl) { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,.8)); padding: 10px 5px 3px; font-size: 9px; color: #bbb; display: flex; justify-content: space-between; }
   :global(.bdg) { position: absolute; top: 3px; left: 3px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; color: white; cursor: pointer; }
-  :global(.bdg.kb) { background: #4caf50; } :global(.bdg.cb) { background: #e53935; }
+  :global(.bdg.kb) { background: #4caf50; } :global(.bdg.cb) { background: #e53935; } :global(.bdg.acb) { background: #e65100; font-size: 8px; }
+  .ac-tag { color: #e65100; font-weight: 600; }
   :global(.st) { position: absolute; top: 3px; right: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; }
   :global(.llm-star) { position: absolute; top: 3px; left: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; background: rgba(0,0,0,.6); padding: 1px 4px; border-radius: 3px; }
   :global(.llm-note) { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 9px; color: #ddd; text-shadow: 0 1px 2px #000; }

@@ -67,7 +67,9 @@ export function deriveLlmState(
   const minSgLevel =
     sgs.length > 0 ? -Math.max(...sgs.map((sg) => sg.recommendedKeepCount - 1), 0) : 0;
   const maxSgLevel =
-    sgs.length > 0 ? Math.max(...sgs.map((sg) => sg.imageIds.length - sg.recommendedKeepCount), 0) : 0;
+    sgs.length > 0
+      ? Math.max(...sgs.map((sg) => sg.imageIds.length - sg.recommendedKeepCount), 0)
+      : 0;
   const aggressiveLevel = keepLevel - minSgLevel; // negative = cull singletons
   const generousLevel = keepLevel - maxSgLevel; // positive = promote singletons
 

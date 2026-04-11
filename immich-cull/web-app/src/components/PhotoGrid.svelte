@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { justifiedLayout, type Rect } from '../lib/layout';
   import { previewUrl, fmt } from '../lib/api';
-  import type { AssetDetail, LlmImage } from '../lib/api';
+  import type { AssetDetail, LlmImage, AutoCullClassification } from '../lib/api';
   import type { AssetState } from '../lib/stores';
 
   export let assets: AssetDetail[] = [];
@@ -10,6 +10,7 @@
   export let selectedIdx: number = -1;
   export let llmMap: Record<string, LlmImage> = {};
   export let effectiveStarsMap: Record<string, number> = {};
+  export let autoCullMap: Record<string, AutoCullClassification> = {};
   export let onSelect: (idx: number) => void = () => {};
   export let onToggleState: (idx: number) => void = () => {};
 
@@ -69,6 +70,8 @@
       {:else if isCull}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div class="bdg cb" role="button" tabindex="-1" on:click|stopPropagation={() => onToggleState(i)}>CULL</div>
+      {:else if autoCullMap[asset.id]?.tier === 'auto-cull'}
+        <div class="bdg acb">AUTO</div>
       {/if}
 
       {#if asset.rating && asset.rating > 0}

@@ -18,6 +18,7 @@ import { fileURLToPath } from "url";
 import { StateDb, batchFingerprint } from "./db/state-db.js";
 import { batchBySession, SessionBatch } from "./batching/session-batcher.js";
 import { LlmClient, expandCompactResponse } from "./ranking/llm-client.js";
+import { classifyBatchForAutoCull, type AutoCullSummary } from "./ranking/auto-cull.js";
 import { config as loadEnv } from "dotenv";
 loadEnv();
 
@@ -296,6 +297,30 @@ app.get<{ Querystring: { id: string } }>("/api/full", async (req, reply) => {
 let sessionBatches: SessionBatch[] = [];
 let llmClient: LlmClient | null = null;
 
+// Auto-cull classification cache, keyed by LLM run ID (immutable per run)
+const autoCullCache = new Map<number, AutoCullSummary>();
+
+function getAutoCullSummary(
+  batch: SessionBatch,
+  llmRunId?: number,
+  model?: string,
+): AutoCullSummary | null {
+  const fp = batchFingerprint(batch.assets.map((a) => a.id));
+  const cached = model ? stateDb.getLlmRun(batch.id, fp, model) : stateDb.getLlmRun(batch.id, fp);
+  if (!cached) return null;
+  const runId = llmRunId ?? cached.id;
+  if (autoCullCache.has(runId)) return autoCullCache.get(runId)!;
+  try {
+    const raw = JSON.parse(cached.responseJson);
+    const expanded = expandCompactResponse(raw, batch);
+    const summary = classifyBatchForAutoCull(expanded.images, expanded.similaritySubgroups);
+    autoCullCache.set(runId, summary);
+    return summary;
+  } catch {
+    return null;
+  }
+}
+
 /** List all session batches */
 app.get("/api/batches", async () => {
   return (
@@ -303,6 +328,7 @@ app.get("/api/batches", async () => {
       .map((b) => {
         const fp = batchFingerprint(b.assets.map((a) => a.id));
         const cached = stateDb.getLlmRun(b.id, fp);
+        const acSummary = cached ? getAutoCullSummary(b, cached.id) : null;
         return {
           id: b.id,
           source: b.source,
@@ -311,6 +337,9 @@ app.get("/api/batches", async () => {
           dateRange: { start: b.dateRange.start.toISOString(), end: b.dateRange.end.toISOString() },
           hasLlmResult: cached !== null,
           viewStatus: stateDb.getViewStatus(b.id),
+          autoCullStats: acSummary
+            ? { autoCull: acSummary.autoCull, review: acSummary.review }
+            : null,
         };
       })
       // Sort: LLM-processed first, then by date
@@ -323,51 +352,57 @@ app.get("/api/batches", async () => {
 });
 
 /** Get a batch with its LLM results (if available). ?model=xxx to get a specific model's result. */
-app.get<{ Params: { id: string }; Querystring: { model?: string } }>("/api/batches/:id", async (req) => {
-  const batch = sessionBatches.find((b) => b.id === req.params.id);
-  if (!batch) return { error: "Not found" };
+app.get<{ Params: { id: string }; Querystring: { model?: string } }>(
+  "/api/batches/:id",
+  async (req) => {
+    const batch = sessionBatches.find((b) => b.id === req.params.id);
+    if (!batch) return { error: "Not found" };
 
-  const fp = batchFingerprint(batch.assets.map((a) => a.id));
-  const cached = req.query.model
-    ? stateDb.getLlmRun(batch.id, fp, req.query.model)
-    : stateDb.getLlmRun(batch.id, fp);
-  const llmModels = stateDb.getLlmModels(batch.id, fp);
-  let llmResult: any = null;
-  if (cached) {
-    try {
-      const raw = JSON.parse(cached.responseJson);
-      const expanded = expandCompactResponse(raw, batch);
-      llmResult = { model: cached.model, ...expanded };
-    } catch {}
-  }
+    const fp = batchFingerprint(batch.assets.map((a) => a.id));
+    const cached = req.query.model
+      ? stateDb.getLlmRun(batch.id, fp, req.query.model)
+      : stateDb.getLlmRun(batch.id, fp);
+    const llmModels = stateDb.getLlmModels(batch.id, fp);
+    let llmResult: any = null;
+    if (cached) {
+      try {
+        const raw = JSON.parse(cached.responseJson);
+        const expanded = expandCompactResponse(raw, batch);
+        llmResult = { model: cached.model, ...expanded };
+      } catch {}
+    }
 
-  return {
-    id: batch.id,
-    source: batch.source,
-    folderName: batch.folderName,
-    count: batch.assets.length,
-    dateRange: {
-      start: batch.dateRange.start.toISOString(),
-      end: batch.dateRange.end.toISOString(),
-    },
-    assets: await Promise.all(
-      batch.assets.map(async (a) => {
-        const dims = await getDimensions(a);
-        return {
-          id: a.id,
-          filename: a.filename,
-          date: a.fileCreatedAt.toISOString(),
-          rating: a.rating,
-          bytes: getFileSize(a),
-          w: dims.w,
-          h: dims.h,
-        };
-      }),
-    ),
-    llm: llmResult,
-    llmModels,
-  };
-});
+    const acSummary = cached ? getAutoCullSummary(batch, cached.id, req.query.model) : null;
+
+    return {
+      id: batch.id,
+      source: batch.source,
+      folderName: batch.folderName,
+      count: batch.assets.length,
+      dateRange: {
+        start: batch.dateRange.start.toISOString(),
+        end: batch.dateRange.end.toISOString(),
+      },
+      assets: await Promise.all(
+        batch.assets.map(async (a) => {
+          const dims = await getDimensions(a);
+          return {
+            id: a.id,
+            filename: a.filename,
+            date: a.fileCreatedAt.toISOString(),
+            rating: a.rating,
+            bytes: getFileSize(a),
+            w: dims.w,
+            h: dims.h,
+          };
+        }),
+      ),
+      llm: llmResult,
+      llmModels,
+      autoCull: acSummary,
+    };
+  },
+);
 
 /** Run LLM on a batch. ?model=xxx overrides the default model. */
 app.post<{ Params: { id: string }; Querystring: { model?: string } }>(
@@ -391,8 +426,16 @@ app.post<{ Params: { id: string }; Querystring: { model?: string } }>(
     let client: LlmClient;
     if (!overrideModel) {
       client = llmClient;
-    } else if (/^(gemma|llama|phi|qwen|mistral)/.test(overrideModel) || overrideModel.includes(":")) {
-      client = new LlmClient({ ...llmClient.config, model: overrideModel, provider: "ollama", previewMaxPx: 512 });
+    } else if (
+      /^(gemma|llama|phi|qwen|mistral)/.test(overrideModel) ||
+      overrideModel.includes(":")
+    ) {
+      client = new LlmClient({
+        ...llmClient.config,
+        model: overrideModel,
+        provider: "ollama",
+        previewMaxPx: 512,
+      });
     } else {
       client = new LlmClient({ ...llmClient.config, model: overrideModel });
     }
@@ -417,13 +460,16 @@ app.post<{ Params: { id: string }; Querystring: { model?: string } }>(
 );
 
 /** Invalidate cached LLM result for a batch. ?model=xxx to invalidate only that model. */
-app.delete<{ Params: { id: string }; Querystring: { model?: string } }>("/api/batches/:id/rank", async (req) => {
-  const batch = sessionBatches.find((b) => b.id === req.params.id);
-  if (!batch) return { error: "Not found" };
-  const fp = batchFingerprint(batch.assets.map((a) => a.id));
-  stateDb.invalidateLlmRun(batch.id, fp, req.query.model);
-  return { ok: true };
-});
+app.delete<{ Params: { id: string }; Querystring: { model?: string } }>(
+  "/api/batches/:id/rank",
+  async (req) => {
+    const batch = sessionBatches.find((b) => b.id === req.params.id);
+    if (!batch) return { error: "Not found" };
+    const fp = batchFingerprint(batch.assets.map((a) => a.id));
+    stateDb.invalidateLlmRun(batch.id, fp, req.query.model);
+    return { ok: true };
+  },
+);
 
 // === View status ===
 
@@ -434,6 +480,74 @@ app.post<{ Params: { id: string }; Body: { viewType: string; status: string } }>
     return { ok: true };
   },
 );
+
+// === Auto-cull endpoints ===
+
+/** Bulk-approve auto-cull decisions for given batches */
+app.post<{
+  Body: { batchIds: string[]; model?: string };
+}>("/api/batches/auto-approve", async (req) => {
+  const results: Array<{ batchId: string; approved: number; skipped: number; error?: string }> = [];
+
+  for (const batchId of req.body.batchIds) {
+    const batch = sessionBatches.find((b) => b.id === batchId);
+    if (!batch) {
+      results.push({ batchId, approved: 0, skipped: 0, error: "not found" });
+      continue;
+    }
+
+    const fp = batchFingerprint(batch.assets.map((a) => a.id));
+    const llmRun = req.body.model
+      ? stateDb.getLlmRun(batchId, fp, req.body.model)
+      : stateDb.getLlmRun(batchId, fp);
+    if (!llmRun) {
+      results.push({ batchId, approved: 0, skipped: 0, error: "no LLM result" });
+      continue;
+    }
+
+    const summary = getAutoCullSummary(batch, llmRun.id, req.body.model);
+    if (!summary) {
+      results.push({ batchId, approved: 0, skipped: 0, error: "classification failed" });
+      continue;
+    }
+
+    // Load existing decisions — manual always wins
+    const assetIds = batch.assets.map((a) => a.id);
+    const existing = stateDb.getPhotoDecisions(assetIds);
+
+    const decisions: Array<{ assetId: string; state: string | null; userStars: number | null }> =
+      [];
+    let approved = 0;
+    let skipped = 0;
+
+    for (const c of summary.classifications) {
+      if (existing[c.assetId]?.state) {
+        skipped++;
+        continue;
+      }
+      if (c.tier === "auto-cull") {
+        decisions.push({ assetId: c.assetId, state: "cull", userStars: null });
+        approved++;
+      }
+    }
+
+    if (decisions.length > 0) {
+      stateDb.savePhotoDecisions(decisions, "auto-cull", llmRun.id);
+    }
+
+    // Mark batch as reviewed
+    stateDb.setViewStatus(batchId, "batch", "reviewed");
+    results.push({ batchId, approved, skipped });
+  }
+
+  return { ok: true, results };
+});
+
+/** Revert all auto-cull decisions (safety valve) */
+app.delete("/api/auto-approve", async () => {
+  const reverted = stateDb.revertAutoCullDecisions();
+  return { ok: true, reverted };
+});
 
 // === Per-photo decisions (shared across all views) ===
 
@@ -457,10 +571,24 @@ app.get("/", async (_, reply) => {
 
 await loadData();
 
-// Build session batches from loaded assets
+// Filter out known-good assets before batching (unless --include-all)
 const allAssets = [...assetMap.values()];
-sessionBatches = batchBySession(allAssets);
-console.log(`${sessionBatches.length} session batches`);
+let filteredAssets = allAssets;
+if (!args.includes("--include-all")) {
+  const patterns = stateDb.getAutoKeepPatterns();
+  if (patterns.length > 0) {
+    const compiled = patterns.map((p) => new RegExp(p.pattern));
+    filteredAssets = allAssets.filter((a) => !compiled.some((re) => re.test(a.path)));
+    const excluded = allAssets.length - filteredAssets.length;
+    if (excluded > 0) {
+      console.log(
+        `Filtered ${excluded} known-good assets (${patterns.map((p) => p.pattern).join(", ")})`,
+      );
+    }
+  }
+}
+sessionBatches = batchBySession(filteredAssets);
+console.log(`${sessionBatches.length} session batches (${filteredAssets.length} assets)`);
 
 // Initialize LLM client
 const modelArg =

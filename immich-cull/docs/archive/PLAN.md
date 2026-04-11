@@ -1,3 +1,5 @@
+> **ARCHIVED** — This plan is from early development. See HANDOFF.md and docs/architecture.md for current state.
+
 # immich-cull — Plan
 
 ## Current State (2026-04-06)

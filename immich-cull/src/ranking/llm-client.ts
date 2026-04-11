@@ -99,33 +99,30 @@ export function expandCompactResponse(raw: any, batch: SessionBatch): DayBatchRe
     (sg: any) => (sg.all ?? sg.imageIds ?? []).length > 1,
   );
   const similaritySubgroups: SimilaritySubgroup[] = rawSgs.map((sg: any) => {
-      const mapIdx = (idx: number) => assets[idx]?.id ?? `unknown-${idx}`;
-      const toIdx = (v: any): string =>
-        typeof v === "number" ? mapIdx(v) : typeof v === "object" && v?.i != null ? mapIdx(v.i) : v;
-      const allIds = (sg.all ?? sg.imageIds ?? []).map(toIdx);
-      const rawKeepIds = new Set(
-        (sg.keep ?? sg.recommendedKeepIds ?? []).map(toIdx),
-      );
-      // Guardrail: if LLM keeps too many in a subgroup, enforce ceiling of ceil(N*0.5)
-      // Use allIds order (best-first from "all" array) to pick which to keep
-      const maxKeep = Math.max(1, Math.ceil(allIds.length * 0.5));
-      let keepIds = allIds.filter((id: string) => rawKeepIds.has(id));
-      if (keepIds.length > maxKeep && allIds.length >= 3) {
-        keepIds = keepIds.slice(0, maxKeep);
-      }
-      const cullIds = allIds.filter((id: string) => !keepIds.includes(id));
-      return {
-        subgroupId: sg.id ?? sg.subgroupId ?? "",
-        imageIds: allIds,
-        subgroupType: (sg.type ?? sg.subgroupType ?? "same_scene").replace("dup", "near_duplicate"),
-        recommendedKeepCount: keepIds.length,
-        recommendedKeepIds: keepIds,
-        cullIds,
-        rationale: sg.why ?? sg.rationale ?? "",
-        confidence: sg.conf ?? sg.confidence ?? 0.8,
-      };
-    },
-  );
+    const mapIdx = (idx: number) => assets[idx]?.id ?? `unknown-${idx}`;
+    const toIdx = (v: any): string =>
+      typeof v === "number" ? mapIdx(v) : typeof v === "object" && v?.i != null ? mapIdx(v.i) : v;
+    const allIds = (sg.all ?? sg.imageIds ?? []).map(toIdx);
+    const rawKeepIds = new Set((sg.keep ?? sg.recommendedKeepIds ?? []).map(toIdx));
+    // Guardrail: if LLM keeps too many in a subgroup, enforce ceiling of ceil(N*0.5)
+    // Use allIds order (best-first from "all" array) to pick which to keep
+    const maxKeep = Math.max(1, Math.ceil(allIds.length * 0.5));
+    let keepIds = allIds.filter((id: string) => rawKeepIds.has(id));
+    if (keepIds.length > maxKeep && allIds.length >= 3) {
+      keepIds = keepIds.slice(0, maxKeep);
+    }
+    const cullIds = allIds.filter((id: string) => !keepIds.includes(id));
+    return {
+      subgroupId: sg.id ?? sg.subgroupId ?? "",
+      imageIds: allIds,
+      subgroupType: (sg.type ?? sg.subgroupType ?? "same_scene").replace("dup", "near_duplicate"),
+      recommendedKeepCount: keepIds.length,
+      recommendedKeepIds: keepIds,
+      cullIds,
+      rationale: sg.why ?? sg.rationale ?? "",
+      confidence: sg.conf ?? sg.confidence ?? 0.8,
+    };
+  });
 
   // Clear sgId on images whose subgroup was stripped (1-photo groups)
   const validSgIds = new Set(similaritySubgroups.map((sg) => sg.subgroupId));
@@ -312,7 +309,8 @@ export class LlmClient {
         { role: "system", content: SYSTEM_PROMPT },
         {
           role: "user",
-          content: userPrompt + "\n\nThe images follow in order (0 to " + (imageBuffers.length - 1) + ").",
+          content:
+            userPrompt + "\n\nThe images follow in order (0 to " + (imageBuffers.length - 1) + ").",
           images: imageBuffers.map((buf) => buf.toString("base64")),
         },
       ];

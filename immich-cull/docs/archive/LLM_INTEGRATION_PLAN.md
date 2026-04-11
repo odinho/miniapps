@@ -1,3 +1,5 @@
+> **ARCHIVED** — LLM integration is fully implemented. See HANDOFF.md and docs/architecture.md for current state.
+
 # immich-cull LLM Integration Plan
 
 ## 1. Recommended Approach
