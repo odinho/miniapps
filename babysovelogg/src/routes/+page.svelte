@@ -501,6 +501,30 @@
 			</button>
 		</div>
 
+		{#if prediction?.rescueNap && activeSleep && !activeSleep.end_time && activeSleep.type === 'nap'}
+			{@const recWake = new Date(prediction.rescueNap.recommendedWakeTime)}
+			{@const recCountdown = recWake.getTime() - now}
+			<div class="rescue-nap-banner" data-testid="rescue-nap-banner">
+				<div class="rescue-nap-title">💡 Reddingslur</div>
+				<div class="rescue-nap-body">
+					{#if recCountdown > 0}
+						Tilrådd å vekka kl. {formatTime(prediction.rescueNap.recommendedWakeTime)} ({formatDuration(recCountdown)})
+					{:else}
+						Tilrådd å vekka no — reddingslurar bør vera korte
+					{/if}
+				</div>
+				<div class="rescue-nap-hint">
+					{#if prediction.rescueNap.reason === 'short_prior_nap'}
+						Førre lur var kort — ein kort reddingslur held søvntrykket oppe til natta.
+					{:else if prediction.rescueNap.reason === 'extra_nap'}
+						Ekstra lur utover forventa — hald den kort så leggetida ikkje vert skuva.
+					{:else}
+						Kort førre lur + ekstra lur — hald denne kort for å beskytta leggetida.
+					{/if}
+				</div>
+			</div>
+		{/if}
+
 		{#if showContextCard && prediction}
 			<ContextCard {prediction} {ageMonths} birthdate={baby.birthdate} />
 		{/if}

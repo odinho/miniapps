@@ -4,6 +4,7 @@ import {
   resolveNapCount,
   predictNapEndTime,
   predictNightEndTime,
+  detectRescueNap,
   selectBestPlan,
   getWakeWindow,
   getLearnedNapDuration,
@@ -195,6 +196,7 @@ function assembleNewbornPrediction(
     expectedNightEnd: null,
     confidence: null,
     calibration: null,
+    rescueNap: null,
     // Newborn fields
     sleepWindow: result.sleepWindow,
     sleepPressure: result.sleepPressure,
@@ -295,8 +297,15 @@ function assembleEmergingPrediction(
 
   // Compute expected nap/night end for active sleep (reuse schedule functions)
   let expectedNapEnd: string | null = null;
+  let rescueNap: Prediction["rescueNap"] = null;
   if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
     expectedNapEnd = predictNapEndTime(activeSleep.start_time, ctx);
+    rescueNap = detectRescueNap(
+      activeSleep.start_time,
+      completedNaps.filter((s) => s.end_time).map((s) => ({ start_time: s.start_time, end_time: s.end_time! })),
+      expectedNapCount,
+      bedtime,
+    );
   }
   let expectedNightEnd: string | null = null;
   if (activeSleep && activeSleep.type === "night" && !activeSleep.end_time) {
@@ -317,6 +326,7 @@ function assembleEmergingPrediction(
     expectedNightEnd,
     confidence: null,
     calibration: null,
+    rescueNap,
     sleepWindow: result.sleepWindow,
     sleepPressure: result.sleepPressure,
     totalSleep24h: result.rolling.totalSleep24h,
@@ -416,8 +426,15 @@ function assembleSchedulePrediction(
 
   // Compute expected nap end for active naps
   let expectedNapEnd: string | null = null;
+  let rescueNap: Prediction["rescueNap"] = null;
   if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
     expectedNapEnd = predictNapEndTime(activeSleep.start_time, ctx);
+    rescueNap = detectRescueNap(
+      activeSleep.start_time,
+      completedNaps.filter((s) => s.end_time).map((s) => ({ start_time: s.start_time, end_time: s.end_time! })),
+      expectedNapCount,
+      bedtime,
+    );
   }
 
   // Compute expected night end for active night sleep
@@ -440,6 +457,7 @@ function assembleSchedulePrediction(
     expectedNightEnd,
     confidence,
     calibration,
+    rescueNap,
     // Newborn fields — null for schedule-based strategies
     sleepWindow: null,
     sleepPressure: null,

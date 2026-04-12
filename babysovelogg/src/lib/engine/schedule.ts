@@ -1,5 +1,5 @@
-import { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, findByAge } from "./constants.js";
-export { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, findByAge } from "./constants.js";
+import { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, RESCUE_NAP, findByAge } from "./constants.js";
+export { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, RESCUE_NAP, findByAge } from "./constants.js";
 export type { SleepEntry } from "$lib/types.js";
 import type { SleepEntry, BabyContext, PredictionFeatures } from "$lib/types.js";
 import { getHourInTz, setHourInTz, isoToDateInTz } from "$lib/tz.js";
@@ -687,6 +687,56 @@ export function predictNapEndTime(startTime: string, ctx: BabyContext): string {
     predictedDuration = snapToCycleBoundary(targetDuration, cycleMinutes, 1, 3, 10, 180);
   }
   return new Date(startMs + predictedDuration * 60_000).toISOString();
+}
+
+/** Result of rescue nap analysis. */
+export interface RescueNapInfo {
+  /** Recommended time to wake the baby */
+  recommendedWakeTime: string;
+  /** Why this was flagged as a rescue nap */
+  reason: "extra_nap" | "short_prior_nap" | "both";
+}
+
+/**
+ * Check if an active nap is a rescue nap and compute recommended wake time.
+ * Returns null if this is a normal nap.
+ */
+export function detectRescueNap(
+  napStartTime: string,
+  completedNaps: { start_time: string; end_time: string }[],
+  expectedNapCount: number,
+  bedtime: string | null,
+): RescueNapInfo | null {
+  const isExtraNap = completedNaps.length >= expectedNapCount;
+
+  const lastNap = completedNaps[0]; // sorted most recent first
+  const lastNapShort = lastNap && (
+    (new Date(lastNap.end_time).getTime() - new Date(lastNap.start_time).getTime())
+    < RESCUE_NAP.SHORT_NAP_THRESHOLD * 60_000
+  );
+
+  if (!isExtraNap && !lastNapShort) return null;
+
+  const napStartMs = new Date(napStartTime).getTime();
+  let capEndMs = napStartMs + RESCUE_NAP.CAP_MINUTES * 60_000;
+
+  if (bedtime) {
+    const bedtimeMs = new Date(bedtime).getTime();
+    const latestEndMs = bedtimeMs - RESCUE_NAP.MIN_PRE_BEDTIME_WAKE * 60_000;
+    capEndMs = Math.min(capEndMs, latestEndMs);
+  }
+
+  // Don't recommend waking before the nap even started
+  if (capEndMs <= napStartMs) capEndMs = napStartMs + 20 * 60_000;
+
+  const reason = isExtraNap && lastNapShort ? "both"
+    : isExtraNap ? "extra_nap"
+    : "short_prior_nap";
+
+  return {
+    recommendedWakeTime: new Date(capEndMs).toISOString(),
+    reason,
+  };
 }
 
 /**

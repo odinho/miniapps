@@ -55,6 +55,16 @@ export const SLEEP_NEEDS: SleepNeed[] = [
   { minMonths: 18, maxMonths: 24, totalHours: 13, range: [11, 14] },
 ];
 
+/** Rescue nap thresholds (based on pediatric sleep consultant consensus). */
+export const RESCUE_NAP = {
+  /** Nap shorter than this (minutes) triggers rescue logic for the next nap */
+  SHORT_NAP_THRESHOLD: 45,
+  /** Max rescue nap duration (minutes) — one sleep cycle */
+  CAP_MINUTES: 45,
+  /** Minimum pre-bedtime wake window (minutes) — hard floor */
+  MIN_PRE_BEDTIME_WAKE: 90,
+} as const;
+
 /** Find the matching range for a given age in months. */
 export function findByAge<T extends { minMonths: number; maxMonths: number }>(
   ranges: T[],

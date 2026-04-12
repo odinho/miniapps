@@ -43,6 +43,8 @@ export interface Prediction {
 	rolling: RollingSleepStats | null;
 	/** Learned schedule parameters (routine_schedule) */
 	learnedSchedule: LearnedSchedule | null;
+	/** Rescue nap guidance (when active nap is extra or after a short nap) */
+	rescueNap: { recommendedWakeTime: string; reason: "extra_nap" | "short_prior_nap" | "both" } | null;
 }
 
 export interface LearnedSchedule {
