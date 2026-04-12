@@ -168,21 +168,27 @@ export class StateDb {
   }
 
   savePhotoDecisions(
-    decisions: Array<{ assetId: string; state: string | null; userStars: number | null }>,
+    decisions: Array<{
+      assetId: string;
+      state: string | null;
+      userStars: number | null;
+      starSource?: string;
+    }>,
     source: string = "manual",
     llmRunId?: number,
   ) {
     const stmt = this.db.prepare(`
-      INSERT INTO photo_decisions (asset_id, state, user_stars, source, llm_run_id, updated_at)
-      VALUES (?, ?, ?, ?, ?, datetime('now'))
+      INSERT INTO photo_decisions (asset_id, state, user_stars, source, llm_run_id, star_source, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
       ON CONFLICT(asset_id) DO UPDATE SET
         state = excluded.state, user_stars = excluded.user_stars,
         source = excluded.source, llm_run_id = excluded.llm_run_id,
+        star_source = excluded.star_source,
         updated_at = datetime('now')
     `);
     this.db.transaction(() => {
       for (const d of decisions)
-        stmt.run(d.assetId, d.state, d.userStars, source, llmRunId ?? null);
+        stmt.run(d.assetId, d.state, d.userStars, source, llmRunId ?? null, d.starSource ?? "user");
     })();
   }
 

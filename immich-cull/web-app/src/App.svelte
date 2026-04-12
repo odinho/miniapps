@@ -4,6 +4,8 @@
   import Preview from './components/Preview.svelte';
   import InfoPanel from './components/InfoPanel.svelte';
   import CullReview from './components/CullReview.svelte';
+  import AutoCullReview from './components/AutoCullReview.svelte';
+  import StarsReview from './components/StarsReview.svelte';
   import {
     fetchGroups, fetchGroup, fetchBatches, fetchBatch, fetchStats,
     decideGroup, undecideGroup, rankBatch, savePhotoDecisions, fetchPhotoDecisions, fmt,
@@ -17,9 +19,11 @@
     type AssetState,
   } from './lib/state';
 
-  type AppMode = 'groups' | 'batches';
+  type AppMode = 'groups' | 'batches' | 'review' | 'stars';
 
   let mode: AppMode = 'groups';
+  let starsSummary: Record<number, { count: number; samples: Array<{ id: string; filename: string }> }> = {};
+  let starsTotalKept = 0;
   let showPreview = false;
   let selectedIdx = 0;
   let helpOpen = false;
@@ -326,9 +330,16 @@
     else switchOrRunModel(next);
   }
 
-  function switchMode(m: AppMode) {
+  async function switchMode(m: AppMode) {
     mode = m; showPreview = false; selectedIdx = 0;
     if (m === 'batches' && !batches.length) fetchBatches().then(b => { batches = b; if (b.length) selectBatch(0); });
+    if (m === 'review' && !batches.length) batches = await fetchBatches();
+    if (m === 'stars') {
+      const resp = await fetch('/api/stars/summary');
+      const data = await resp.json();
+      starsSummary = data.summary ?? {};
+      starsTotalKept = data.totalKept ?? 0;
+    }
   }
 
   function onGridSelect(idx: number) {
@@ -520,7 +531,7 @@
       } else if (effective != null && effective >= 2) {
         stars = effective >= 4 ? 3 : effective - 1; // mapLlmStarsToWriteback shift-1
       }
-      return { assetId: a.id, state: states[a.id] ?? 'keep', userStars: stars };
+      return { assetId: a.id, state: states[a.id] ?? 'keep', userStars: stars, starSource: explicit != null ? 'user' : (stars != null && stars > 0 ? 'llm' : 'user') };
     });
     await savePhotoDecisions(decisions);
   }
@@ -598,7 +609,9 @@
     <h1>immich-cull</h1>
     <div class="mode-toggle">
       <button class:active={mode === 'groups'} on:click={() => switchMode('groups')}>Groups</button>
-      <button class:active={mode === 'batches'} on:click={() => switchMode('batches')}>LLM Batches</button>
+      <button class:active={mode === 'batches'} on:click={() => switchMode('batches')}>Batches</button>
+      <button class:active={mode === 'review'} on:click={() => switchMode('review')}>Auto Review</button>
+      <button class:active={mode === 'stars'} on:click={() => switchMode('stars')}>Stars</button>
     </div>
     <div class="stats">
       {#if stats}
@@ -615,7 +628,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div class="sidebar-backdrop" role="button" tabindex="-1" on:click={() => sidebarOpen = false}></div>
   {/if}
-  <aside class="sidebar" class:open={sidebarOpen}>
+  <aside class="sidebar" class:open={sidebarOpen} class:hidden={mode === 'review' || mode === 'stars'}>
     <div class="sidebar-list">
       {#each sidebarItems as item}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -641,7 +654,11 @@
   </aside>
 
   <div class="main">
-    {#if loading}
+    {#if mode === 'review'}
+      <AutoCullReview {batches} onRefresh={async () => { batches = await fetchBatches(); stats = await fetchStats(); }} />
+    {:else if mode === 'stars'}
+      <StarsReview summary={starsSummary} totalKept={starsTotalKept} />
+    {:else if loading}
       <div class="empty"><span class="spinner"></span> Loading...</div>
     {:else if currentAssets.length}
       <PhotoGrid assets={currentAssets} {states} {selectedIdx} {llmMap} {effectiveStarsMap} {autoCullMap} onSelect={onGridSelect}
@@ -656,7 +673,7 @@
     {/if}
   </div>
 
-  <footer class="bar">
+  <footer class="bar" class:hidden={mode === 'review' || mode === 'stars'}>
     <button class="bk" on:click={() => mark('keep')}>Keep</button>
     <button class="bc" on:click={() => mark('cull')}>Cull</button>
     <button class="bb" on:click={keepBestCullRest}>Best + Cull Rest</button>
@@ -797,6 +814,8 @@
   .stats strong { color: #e0e4ea; } .stats .good { color: #4caf50; } .stats .bad { color: #e53935; }
 
   .sidebar { grid-row: 2 / 4; min-height: 0; display: flex; flex-direction: column; border-right: 1px solid #2a2e36; background: #12141a; font-size: 12px; }
+  .sidebar.hidden, .bar.hidden { display: none; }
+  .sidebar.hidden + .main { grid-column: 1 / -1; }
   .sidebar-list { flex: 1; overflow-y: auto; min-height: 0; }
   .gi { padding: 5px 8px; cursor: pointer; border-bottom: 1px solid #1e2028; border-left: 3px solid transparent; }
   .gi:hover { background: #1c1f27; } .gi.active { background: #1f2330; border-left-color: #f0a040; } .gi.decided { opacity: .35; }

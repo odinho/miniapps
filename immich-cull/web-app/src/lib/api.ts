@@ -149,7 +149,12 @@ export async function fetchBatch(id: string, model?: string): Promise<BatchDetai
 }
 
 export async function savePhotoDecisions(
-  decisions: Array<{ assetId: string; state: string | null; userStars: number | null }>,
+  decisions: Array<{
+    assetId: string;
+    state: string | null;
+    userStars: number | null;
+    starSource?: string;
+  }>,
 ) {
   return (
     await fetch(`${BASE}/api/photos/decisions`, {
