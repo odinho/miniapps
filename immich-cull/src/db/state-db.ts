@@ -245,6 +245,16 @@ export class StateDb {
     return row?.status ?? null;
   }
 
+  getRecentlyReviewed(viewType: string, limit: number = 3): string[] {
+    return (
+      this.db
+        .prepare(
+          "SELECT view_id FROM view_status WHERE view_type = ? AND status = 'reviewed' ORDER BY reviewed_at DESC LIMIT ?",
+        )
+        .all(viewType, limit) as any[]
+    ).map((r) => r.view_id);
+  }
+
   getViewStatuses(viewType: string): Record<string, string> {
     const rows = this.db
       .prepare("SELECT view_id, status FROM view_status WHERE view_type = ?")

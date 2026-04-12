@@ -19,6 +19,7 @@ import { fileURLToPath } from "url";
 import { StateDb, batchFingerprint } from "./db/state-db.js";
 import { batchBySession, SessionBatch } from "./batching/session-batcher.js";
 import { LlmClient, DEFAULT_LLM_CONFIG, expandCompactResponse } from "./ranking/llm-client.js";
+import { mapLlmStarsToWriteback } from "./ranking/types.js";
 import { classifyBatchForAutoCull, type AutoCullSummary } from "./ranking/auto-cull.js";
 import { ImmichWriteback } from "./db/immich-writeback.js";
 import { config as loadEnv } from "dotenv";
@@ -438,60 +439,60 @@ function getAutoCullSummary(
 
 /** List all session batches */
 app.get("/api/batches", async () => {
-  return (
-    sessionBatches
-      .map((b) => {
-        const fp = batchFingerprint(b.assets.map((a) => a.id));
-        const cached = stateDb.getLlmRun(b.id, fp);
-        const acSummary = cached ? getAutoCullSummary(b, cached.id) : null;
-        // Get keep/cull counts: user decisions first, fall back to LLM recommendations
-        const decisions = stateDb.getPhotoDecisions(b.assets.map((a) => a.id));
-        let keeps = 0;
-        let culls = 0;
-        const hasUserDecisions = Object.values(decisions).some((d) => d.state);
-        if (hasUserDecisions) {
-          for (const d of Object.values(decisions)) {
-            if (d.state === "keep") keeps++;
-            else if (d.state === "cull") culls++;
-          }
-        } else if (cached) {
-          try {
-            const raw = JSON.parse(cached.responseJson);
-            const expanded = expandCompactResponse(raw, b);
-            for (const img of expanded.images) {
-              if (img.llmKeepCull === "keep") keeps++;
-              else if (img.llmKeepCull === "cull") culls++;
-            }
-          } catch {
-            // ignore parse errors
-          }
+  const recentlyReviewed = stateDb.getRecentlyReviewed("batch", 3);
+  const items = sessionBatches
+    .map((b) => {
+      const fp = batchFingerprint(b.assets.map((a) => a.id));
+      const cached = stateDb.getLlmRun(b.id, fp);
+      const acSummary = cached ? getAutoCullSummary(b, cached.id) : null;
+      // Get keep/cull counts: user decisions first, fall back to LLM recommendations
+      const decisions = stateDb.getPhotoDecisions(b.assets.map((a) => a.id));
+      let keeps = 0;
+      let culls = 0;
+      const hasUserDecisions = Object.values(decisions).some((d) => d.state);
+      if (hasUserDecisions) {
+        for (const d of Object.values(decisions)) {
+          if (d.state === "keep") keeps++;
+          else if (d.state === "cull") culls++;
         }
-        return {
-          id: b.id,
-          source: b.source,
-          folderName: b.folderName,
-          count: b.assets.length,
-          dateRange: { start: b.dateRange.start.toISOString(), end: b.dateRange.end.toISOString() },
-          hasLlmResult: cached !== null,
-          viewStatus: stateDb.getViewStatus(b.id),
-          keeps,
-          culls,
-          autoCullStats: acSummary
-            ? {
-                autoCullHigh: acSummary.autoCullHigh,
-                autoCull: acSummary.autoCull,
-                review: acSummary.review,
-              }
-            : null,
-        };
-      })
-      // Sort: LLM-processed first, then by date
-      .toSorted((a: any, b: any) => {
-        if (a.hasLlmResult && !b.hasLlmResult) return -1;
-        if (!a.hasLlmResult && b.hasLlmResult) return 1;
-        return 0; // preserve date order within each group
-      })
-  );
+      } else if (cached) {
+        try {
+          const raw = JSON.parse(cached.responseJson);
+          const expanded = expandCompactResponse(raw, b);
+          for (const img of expanded.images) {
+            if (img.llmKeepCull === "keep") keeps++;
+            else if (img.llmKeepCull === "cull") culls++;
+          }
+        } catch {
+          // ignore parse errors
+        }
+      }
+      return {
+        id: b.id,
+        source: b.source,
+        folderName: b.folderName,
+        count: b.assets.length,
+        dateRange: { start: b.dateRange.start.toISOString(), end: b.dateRange.end.toISOString() },
+        hasLlmResult: cached !== null,
+        viewStatus: stateDb.getViewStatus(b.id),
+        keeps,
+        culls,
+        autoCullStats: acSummary
+          ? {
+              autoCullHigh: acSummary.autoCullHigh,
+              autoCull: acSummary.autoCull,
+              review: acSummary.review,
+            }
+          : null,
+      };
+    })
+    // Sort: LLM-processed first, then by date
+    .toSorted((a: any, b: any) => {
+      if (a.hasLlmResult && !b.hasLlmResult) return -1;
+      if (!a.hasLlmResult && b.hasLlmResult) return 1;
+      return 0; // preserve date order within each group
+    });
+  return { batches: items, recentlyReviewed };
 });
 
 /** Get a batch with its LLM results (if available). ?model=xxx to get a specific model's result. */
@@ -999,15 +1000,30 @@ app.get("/api/stars/summary", async () => {
     { count: number; samples: Array<{ id: string; filename: string }> }
   > = {};
 
-  // Build a map of all assets for filename lookup
+  // Build lookups for filenames and LLM stars
   const assetLookup = new Map<string, string>();
+  const llmStarsLookup = new Map<string, number>();
   for (const batch of sessionBatches) {
     for (const a of batch.assets) assetLookup.set(a.id, a.filename);
+    const fp = batchFingerprint(batch.assets.map((a) => a.id));
+    const cached = stateDb.getLlmRun(batch.id, fp);
+    if (cached) {
+      try {
+        const raw = JSON.parse(cached.responseJson);
+        const expanded = expandCompactResponse(raw, batch);
+        for (const img of expanded.images) {
+          llmStarsLookup.set(img.imageId, mapLlmStarsToWriteback(img.suggestedStars));
+        }
+      } catch {
+        // skip
+      }
+    }
   }
 
   for (const d of allDecisions) {
     if (d.state !== "keep") continue;
-    const star = d.userStars ?? 0;
+    // User stars take priority, fall back to LLM stars (mapped through shift-1)
+    const star = d.userStars ?? llmStarsLookup.get(d.assetId) ?? 0;
     if (!summary[star]) summary[star] = { count: 0, samples: [] };
     summary[star].count++;
     if (summary[star].samples.length < 20) {

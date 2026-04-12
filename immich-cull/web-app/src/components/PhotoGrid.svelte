@@ -12,6 +12,7 @@
   export let effectiveStarsMap: Record<string, number> = {};
   export let autoCullMap: Record<string, AutoCullClassification> = {};
   export let confirmedIds: Set<string> = new Set();
+  export let userStarsMap: Record<string, number | undefined> = {};
   export let onSelect: (idx: number) => void = () => {};
   export let onToggleState: (idx: number) => void = () => {};
 
@@ -58,7 +59,7 @@
       <img src={previewUrl(asset.id)} loading="lazy" alt={asset.filename} />
 
       {#if effStars > 0}
-        <div class="llm-star">
+        <div class={userStarsMap[asset.id] != null ? 'user-star' : 'llm-star'}>
           {'★'.repeat(effStars)}
         </div>
       {/if}

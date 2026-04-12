@@ -141,7 +141,10 @@ export async function fetchStats(): Promise<Stats> {
   return (await fetch(`${BASE}/api/stats`)).json();
 }
 
-export async function fetchBatches(): Promise<BatchSummary[]> {
+export async function fetchBatches(): Promise<{
+  batches: BatchSummary[];
+  recentlyReviewed: string[];
+}> {
   return (await fetch(`${BASE}/api/batches`)).json();
 }
 

@@ -146,7 +146,7 @@
       const total = result.results.reduce((s, r) => s + r.autoCulled, 0);
       const review = result.results.reduce((s, r) => s + r.forReview, 0);
       console.log(`Staged cull: ${total} auto-culled, ${review} for review`);
-      batches = await fetchBatches();
+      await loadBatches();
       stats = await fetchStats();
       if (batchIdx >= 0) await selectBatch(batchIdx);
     }
@@ -155,7 +155,7 @@
   async function revertAllAutoApprovals() {
     const result = await revertAutoApprovals();
     if (result.ok) {
-      batches = await fetchBatches();
+      await loadBatches();
       stats = await fetchStats();
       if (batchIdx >= 0) await selectBatch(batchIdx);
     }
@@ -175,6 +175,18 @@
     culls: number;
   }
   let recentDoneIdxs: number[] = []; // most recently approved (by approval order)
+
+  async function loadBatches() {
+    const data = await fetchBatches();
+    batches = data.batches;
+    // Initialize recent done from DB (convert batch IDs to indices)
+    const dbRecent = data.recentlyReviewed;
+    if (dbRecent.length && !recentDoneIdxs.length) {
+      recentDoneIdxs = dbRecent
+        .map(id => batches.findIndex(b => b.id === id))
+        .filter(i => i >= 0);
+    }
+  }
 
   $: sidebarAllItems = (mode === 'groups'
     ? groups.map((g, i) => ({
@@ -206,7 +218,7 @@
     const hash = location.hash.slice(1);
     if (hash.startsWith('batch/')) {
       mode = 'batches';
-      batches = await fetchBatches();
+      await loadBatches();
       const id = hash.slice(6);
       const idx = batches.findIndex(b => b.id === id);
       if (idx >= 0) await selectBatch(idx);
@@ -221,7 +233,7 @@
       await switchMode('stars');
     } else {
       // Default: load batches (works in both local and API mode)
-      batches = await fetchBatches();
+      await loadBatches();
       if (batches.length) await selectBatch(0);
     }
   });
@@ -337,8 +349,8 @@
     mode = m; showPreview = false; selectedIdx = 0;
     if (m === 'review') location.hash = 'review';
     else if (m === 'stars') location.hash = 'stars';
-    if (m === 'batches' && !batches.length) fetchBatches().then(b => { batches = b; if (b.length) selectBatch(0); });
-    if (m === 'review' && !batches.length) batches = await fetchBatches();
+    if (m === 'batches' && !batches.length) loadBatches().then(() => { if (batches.length) selectBatch(0); });
+    if (m === 'review' && !batches.length) await loadBatches();
     if (m === 'stars') {
       const resp = await fetch('/api/stars/summary');
       const data = await resp.json();
@@ -539,20 +551,16 @@
   async function saveBatchDecisions() {
     if (!batchDetail) return;
     await tick(); // ensure $: reactive derivations (states) have run
-    // Save user-set stars if available, otherwise save mapped LLM effective stars
-    // for kept photos (LLM 0-2→null, 3→1, 4→2, 5→3)
+    // Only save explicit user stars. LLM stars are mapped at writeback time
+    // via mapLlmStarsToWriteback (shift-1: LLM 0-2→0, 3→1★, 4→2★, 5→3★)
     const decisions = batchDetail.assets.map(a => {
       const explicit = userStars[a.id];
-      const effective = effectiveStarsMap[a.id];
-      // User-set stars take priority. For LLM stars, map through shift-1:
-      // LLM 0-1→0, 2→1★, 3→2★, 4-5→3★
-      let stars: number | null = null;
-      if (explicit != null) {
-        stars = explicit;
-      } else if (effective != null && effective >= 2) {
-        stars = effective >= 4 ? 3 : effective - 1; // mapLlmStarsToWriteback shift-1
-      }
-      return { assetId: a.id, state: states[a.id] ?? 'keep', userStars: stars, starSource: explicit != null ? 'user' : (stars != null && stars > 0 ? 'llm' : 'user') };
+      return {
+        assetId: a.id,
+        state: states[a.id] ?? 'keep',
+        userStars: explicit ?? null,
+        starSource: explicit != null ? 'user' : undefined,
+      };
     });
     await savePhotoDecisions(decisions);
   }
@@ -698,7 +706,7 @@
     {#if mode === 'review'}
       <AutoCullReview onNavigateBatch={async (id) => {
         mode = 'batches';
-        if (!batches.length) batches = await fetchBatches();
+        if (!batches.length) await loadBatches();
         const idx = batches.findIndex(b => b.id === id);
         if (idx >= 0) await selectBatch(idx);
       }} />
@@ -709,6 +717,7 @@
     {:else if currentAssets.length}
       <PhotoGrid assets={currentAssets} {states} {selectedIdx} {llmMap} {effectiveStarsMap} {autoCullMap}
         confirmedIds={new Set(Object.keys(manualOverrides).filter(id => manualOverrides[id]))}
+        userStarsMap={userStars}
         onSelect={onGridSelect}
         onToggleState={(i) => {
           const asset = currentAssets[i];
@@ -728,32 +737,29 @@
     <button class="ba" on:click={approve}>Approve & Next</button>
     <button class="bs" on:click={skip}>Skip</button>
     {#if mode === 'batches' && batchDetail}
-      {#if !batchDetail.llm && !runningModel}
-        <button class="run-btn" on:click={() => switchOrRunModel(models[0].id)}>LLM: {models[0].label}</button>
-      {:else}
-        {#if batchDetail.llm}
-          <div class="keep-level">
-            <button class="kl-btn" disabled={!levelLimits.canDecrease} on:click={() => applyKeepLevel(levelLimits.nextDown)}>−</button>
-            <span class="kl-label" title="Keep {sgStats.totalKept}, cull {sgStats.totalCulled}">
-              {sgStats.totalKept}✓ {sgStats.totalCulled}✗
-              <span class="kl-mode" class:kl-aggressive={sgStats.isAggressive}>
-                {#if keepLevel > 1}keep more
-                {:else if keepLevel === 1}generous
-                {:else if keepLevel === 0}default
-                {:else if !sgStats.isAggressive}trim
-                {:else}cull more
-                {/if}
-              </span>
+      {#if batchDetail.llm}
+        <div class="keep-level">
+          <button class="kl-btn" disabled={!levelLimits.canDecrease} on:click={() => applyKeepLevel(levelLimits.nextDown)}>−</button>
+          <span class="kl-label" title="Keep {sgStats.totalKept}, cull {sgStats.totalCulled}">
+            {sgStats.totalKept}✓ {sgStats.totalCulled}✗
+            <span class="kl-mode" class:kl-aggressive={sgStats.isAggressive}>
+              {#if keepLevel > 1}keep more
+              {:else if keepLevel === 1}generous
+              {:else if keepLevel === 0}default
+              {:else if !sgStats.isAggressive}trim
+              {:else}cull more
+              {/if}
             </span>
-            <button class="kl-btn" disabled={!levelLimits.canIncrease} on:click={() => applyKeepLevel(levelLimits.nextUp)}>+</button>
-          </div>
-        {/if}
-        <div class="model-run">
-          <button class="model-btn" class:current={activeView === 'manual'} class:cached={isBatchDecided(batches[batchIdx]) && activeView !== 'manual'}
-            disabled={!!runningModel}
-            on:click={showManual} title="Your saved decisions">
-            manual
-          </button>
+          </span>
+          <button class="kl-btn" disabled={!levelLimits.canIncrease} on:click={() => applyKeepLevel(levelLimits.nextUp)}>+</button>
+        </div>
+      {/if}
+      <div class="model-run">
+        <button class="model-btn" class:current={activeView === 'manual'} class:cached={isBatchDecided(batches[batchIdx]) && activeView !== 'manual'}
+          disabled={!!runningModel}
+          on:click={showManual} title="Your saved decisions">
+          manual
+        </button>
           {#each models as m}
             {@const hasCached = (batchDetail.llmModels ?? []).includes(m.id)}
             {@const isRunning = runningModel === m.id && runningBatchIdx === batchIdx}
@@ -763,8 +769,7 @@
               {#if isRunning}<span class="spinner"></span>{:else}{m.label}{/if}
             </button>
           {/each}
-        </div>
-      {/if}
+      </div>
     {/if}
     <span class="spacer"></span>
     <span class="bmeta">{currentAssets.length} photos</span>
@@ -866,11 +871,9 @@
   .bk { background: #4caf50; color: white; } .bc { background: #e53935; color: white; }
   .bb { background: #2196F3; color: white; } .ba { background: #f0a040; color: #1a1a1a; font-weight: 700; }
   .bs { background: #333; color: #aaa; } .bh { background: none; color: #7a8294; border: 1px solid #2a2e36 !important; padding: 3px 9px; font-size: 12px; }
-  .run-btn { background: #7c4dff; color: white; }
   .spacer { flex: 1; } .bmeta { font-size: 11px; color: #7a8294; }
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: white; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .run-btn:disabled { opacity: .6; cursor: wait; }
   .model-run { display: flex; gap: 2px; }
   .model-btn { background: #2a2e36; border: none; color: #888; font-size: 10px; padding: 3px 8px; border-radius: 3px; cursor: pointer; white-space: nowrap; }
   .model-btn:hover { background: #3a3e46; color: #ccc; }
@@ -902,6 +905,7 @@
   :global(.bdg.acb-hi) { background: #bf360c; font-size: 8px; } :global(.bdg.acb) { background: #e65100; font-size: 8px; }
   :global(.st) { position: absolute; top: 22px; right: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; z-index: 1; }
   :global(.llm-star) { position: absolute; top: 3px; right: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; background: rgba(0,0,0,.6); padding: 1px 4px; border-radius: 3px; z-index: 1; }
+  :global(.user-star) { position: absolute; top: 3px; right: 3px; font-size: 11px; color: #1a1a1a; text-shadow: none; background: #ffd700; padding: 1px 4px; border-radius: 3px; z-index: 1; font-weight: 700; }
   :global(.llm-note) { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 9px; color: #ddd; text-shadow: 0 1px 2px #000; }
 
   :global(.preview-ov) { position: fixed; top: 34px; left: 200px; right: 0; bottom: 40px; background: #090b0f; z-index: 50; display: flex; flex-direction: column; }
@@ -946,7 +950,6 @@
     .bar { grid-column: 1; gap: 4px; padding: 4px 6px; flex-wrap: wrap; height: auto; min-height: 40px; }
     .bar button { padding: 4px 8px; font-size: 11px; }
     .keep-level { order: 10; } /* push ± to second row via wrap */
-    .run-btn { order: 11; }
     .kl-btn { width: 32px; height: 32px; } /* bigger touch targets */
     .header { padding: 0 8px; gap: 6px; }
     .header h1 { font-size: 12px; }
@@ -959,7 +962,7 @@
     :global(.cell.sel .bdg) { display: block; font-size: 9px; }
     :global(.toggle-zone) { height: 30%; } /* bigger touch target on mobile */
     :global(.llm-note) { display: none; }
-    :global(.llm-star) { display: none; }
-    :global(.cell.sel .llm-star) { display: block; } /* show stars on selected */
+    :global(.llm-star), :global(.user-star) { display: none; }
+    :global(.cell.sel .llm-star), :global(.cell.sel .user-star) { display: block; }
   }
 </style>
