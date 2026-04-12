@@ -21,7 +21,7 @@
 
   type AppMode = 'groups' | 'batches' | 'review' | 'stars';
 
-  let mode: AppMode = 'groups';
+  let mode: AppMode = 'batches'; // default to batches (groups empty in API mode)
   let starsSummary: Record<number, { count: number; samples: Array<{ id: string; filename: string }> }> = {};
   let starsTotalKept = 0;
   let showPreview = false;
@@ -209,7 +209,6 @@
       }));
 
   onMount(async () => {
-    groups = await fetchGroups();
     stats = await fetchStats();
     const hash = location.hash.slice(1);
     if (hash.startsWith('batch/')) {
@@ -219,10 +218,14 @@
       const idx = batches.findIndex(b => b.id === id);
       if (idx >= 0) await selectBatch(idx);
     } else if (hash.startsWith('group/')) {
+      groups = await fetchGroups();
+      mode = 'groups';
       const idx = parseInt(hash.slice(6));
       if (!isNaN(idx) && idx < groups.length) await selectGroup(idx);
-    } else if (groups.length) {
-      await selectGroup(0);
+    } else {
+      // Default: load batches (works in both local and API mode)
+      batches = await fetchBatches();
+      if (batches.length) await selectBatch(0);
     }
   });
 
@@ -630,7 +633,7 @@
   {/if}
   <aside class="sidebar" class:open={sidebarOpen} class:hidden={mode === 'review' || mode === 'stars'}>
     <div class="sidebar-list">
-      {#each sidebarItems as item}
+      {#each sidebarItems.slice(0, 200) as item}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div class="gi" class:active={item.active} class:decided={item.decided}
              on:click={() => { sidebarOpen = false; mode === 'groups' ? selectGroup(item.idx) : selectBatch(item.idx); }} role="button" tabindex="-1">
