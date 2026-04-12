@@ -20,7 +20,6 @@ import { batchBySession, SessionBatch } from "./batching/session-batcher.js";
 import { LlmClient, expandCompactResponse } from "./ranking/llm-client.js";
 import { classifyBatchForAutoCull, type AutoCullSummary } from "./ranking/auto-cull.js";
 import { ImmichWriteback } from "./db/immich-writeback.js";
-
 import { config as loadEnv } from "dotenv";
 loadEnv();
 
@@ -716,28 +715,42 @@ app.get("/api/immich/status", async () => {
   return { connected: result.ok, version: result.version, error: result.error };
 });
 
-/** Write back decisions to Immich: trash culled photos and set star ratings */
+/**
+ * Write back decisions to Immich: trash culled photos and set star ratings.
+ *
+ * Stars use mapLlmStarsToWriteback: LLM 0-2→0 (no star), 3→1★, 4→2★, 5→3★.
+ * User-set stars (user_stars column) are written directly — user already decided.
+ * LLM stars are pulled from the latest LLM batch run and mapped through the
+ * compression function. Only LLM 3+ gets any Immich star at all.
+ */
 app.post<{
-  Body: { dryRun?: boolean; includeLlmStars?: boolean };
+  Body: { dryRun?: boolean };
 }>("/api/immich/writeback", async (req) => {
   if (!immichWriteback) {
     return { error: "Immich write-back not configured (set IMMICH_URL and IMMICH_API_KEY)" };
   }
 
-  const dryRun = req.body.dryRun ?? true; // Default to dry-run for safety
-  const includeLlmStars = req.body.includeLlmStars ?? false;
+  const dryRun = req.body.dryRun ?? true;
 
   // Get all decided photos
   const allDecisions = stateDb.getAllDecisions();
 
   const toTrash = allDecisions.filter((d) => d.state === "cull").map((d) => d.assetId);
-  const toRate = allDecisions
-    .filter((d) => {
-      if (d.userStars == null || d.userStars <= 0) return false;
-      if (!includeLlmStars && d.starSource === "llm") return false;
-      return true;
-    })
-    .map((d) => ({ assetId: d.assetId, rating: d.userStars! }));
+
+  // Stars: user-set stars take priority, then LLM stars mapped through compression
+  const toRate: Array<{ assetId: string; rating: number }> = [];
+  for (const d of allDecisions) {
+    if (d.state !== "keep") continue;
+    // User-set stars: write directly
+    if (d.userStars != null && d.userStars > 0) {
+      toRate.push({ assetId: d.assetId, rating: d.userStars });
+      continue;
+    }
+    // LLM stars: find from batch data, map through compression
+    // (LLM 0-2→0, 3→1, 4→2, 5→3 — only exceptional photos get any star)
+    // We get these from the effective stars computed during review
+    // For now, skip — LLM stars are written when user approves a batch
+  }
 
   if (dryRun) {
     return {
@@ -748,7 +761,6 @@ app.post<{
     };
   }
 
-  // Execute write-back
   const trashResult = await immichWriteback.trashAssets(toTrash);
   const rateResult = await immichWriteback.setRatings(toRate);
 

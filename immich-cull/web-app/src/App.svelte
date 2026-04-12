@@ -507,9 +507,21 @@
   async function saveBatchDecisions() {
     if (!batchDetail) return;
     await tick(); // ensure $: reactive derivations (states) have run
-    const decisions = batchDetail.assets.map(a => ({
-      assetId: a.id, state: states[a.id] ?? 'keep', userStars: userStars[a.id] ?? null
-    }));
+    // Save user-set stars if available, otherwise save mapped LLM effective stars
+    // for kept photos (LLM 0-2→null, 3→1, 4→2, 5→3)
+    const decisions = batchDetail.assets.map(a => {
+      const explicit = userStars[a.id];
+      const effective = effectiveStarsMap[a.id];
+      // User-set stars take priority. For LLM stars, map through compression:
+      // only LLM 3+ gets a star (3→1, 4→2, 5→3)
+      let stars: number | null = null;
+      if (explicit != null) {
+        stars = explicit;
+      } else if (effective != null && effective >= 3) {
+        stars = effective - 2; // mapLlmStarsToWriteback: 3→1, 4→2, 5→3
+      }
+      return { assetId: a.id, state: states[a.id] ?? 'keep', userStars: stars };
+    });
     await savePhotoDecisions(decisions);
   }
 
