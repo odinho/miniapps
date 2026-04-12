@@ -3,7 +3,7 @@
 	import { sync } from '$lib/stores/sync.svelte.js';
 	import { WOKE_OPTIONS, buildWakeUpEvent, getBedtimeSummary } from '$lib/wake-sheet-actions.js';
 	import { WAKE_MOODS } from '$lib/constants.js';
-	import { formatDuration } from '$lib/utils.js';
+	import { formatDuration, formatTime } from '$lib/utils.js';
 	import TimeInput from './TimeInput.svelte';
 
 	interface Props {
@@ -14,8 +14,16 @@
 
 	let { sleepDomainId, sleepSnapshot, onClose }: Props = $props();
 
+	// Detect trailing pause (active pause = baby never went back to sleep)
 	// svelte-ignore state_referenced_locally — intentional: snapshot is immutable once passed
-	const defaultWakeTime = sleepSnapshot.end_time ? new Date(sleepSnapshot.end_time) : new Date();
+	const trailingPause = sleepSnapshot.pauses?.findLast(p => !p.resume_time) ?? null;
+	// svelte-ignore state_referenced_locally
+	const trailingPauseIdx = sleepSnapshot.pauses?.findLastIndex(p => !p.resume_time) ?? -1;
+
+	// svelte-ignore state_referenced_locally — intentional: snapshot is immutable once passed
+	const defaultWakeTime = trailingPause
+		? new Date(trailingPause.pause_time)
+		: sleepSnapshot.end_time ? new Date(sleepSnapshot.end_time) : new Date();
 	let wakeTime = $state(defaultWakeTime.toTimeString().slice(0, 5));
 	let wakeDate = $state(`${defaultWakeTime.getFullYear()}-${String(defaultWakeTime.getMonth() + 1).padStart(2, '0')}-${String(defaultWakeTime.getDate()).padStart(2, '0')}`);
 
@@ -79,9 +87,18 @@
 		try {
 			const endTimeIso = wakeTimeChanged
 				? new Date(`${wakeDate}T${wakeTime}:00`).toISOString()
-				: null;
+				: trailingPause
+					? new Date(trailingPause.pause_time).toISOString()
+					: null;
 			const event = buildWakeUpEvent(sleepDomainId, wokeBy, notes, endTimeIso, wakeMood);
 			const events: Array<{ type: string; payload: Record<string, unknown> }> = [];
+			// Delete trailing pause (it wasn't real sleep time)
+			if (trailingPause && trailingPauseIdx >= 0) {
+				events.push({
+					type: 'sleep.pause_deleted',
+					payload: { sleepDomainId, pauseIndex: trailingPauseIdx },
+				});
+			}
 			if (event) events.push(event);
 
 			if (events.length > 0) {
@@ -125,6 +142,13 @@
 						"{summary.notes}"
 					</div>
 				{/if}
+			</div>
+		{/if}
+
+		<!-- Trailing pause notice -->
+		{#if trailingPause}
+			<div style="background: var(--lavender); padding: 10px 12px; border-radius: var(--radius-sm); margin-bottom: 8px; font-size: 0.8rem; color: var(--text);">
+				⏸️ Pausen frå {formatTime(trailingPause.pause_time)} vert fjerna og vaknetida sett dit.
 			</div>
 		{/if}
 

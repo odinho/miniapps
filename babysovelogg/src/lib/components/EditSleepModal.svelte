@@ -37,6 +37,9 @@
 	let confirmDelete = $state(false);
 	let initialized = $state(false);
 
+	// svelte-ignore state_referenced_locally — intentional: entry is immutable once passed
+	const isOngoing = !entry.end_time;
+
 	// Initialize form fields from entry on first mount only.
 	// SSE updates should NOT reset the form while the user is editing.
 	$effect(() => {
@@ -47,10 +50,8 @@
 				endDate = isoToDateInput(entry.end_time);
 				endTime = isoToTimeInput(entry.end_time);
 			} else {
-				// Default to "now" for active sleeps so user can easily end them
-				const nowIso = new Date().toISOString();
-				endDate = isoToDateInput(nowIso);
-				endTime = isoToTimeInput(nowIso);
+				endDate = '';
+				endTime = '';
 			}
 			selectedType = entry.type;
 			selectedMood = entry.mood || null;
@@ -172,14 +173,16 @@
 			</div>
 		</div>
 
-		<!-- End -->
-		<div class="form-group">
-			<span class="form-label">Slutt</span>
-			<div class="datetime-row">
-				<DateInput bind:value={endDate} />
-				<TimeInput bind:value={endTime} />
+		<!-- End (hidden for ongoing sleeps — end via wake-up flow) -->
+		{#if !isOngoing}
+			<div class="form-group">
+				<span class="form-label">Slutt</span>
+				<div class="datetime-row">
+					<DateInput bind:value={endDate} />
+					<TimeInput bind:value={endTime} />
+				</div>
 			</div>
-		</div>
+		{/if}
 
 		<!-- Mood -->
 		<div class="form-group">
