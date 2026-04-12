@@ -71,6 +71,40 @@ export class ImmichWriteback {
     return { success, failed: results.length - success };
   }
 
+  // === Tagging ===
+
+  /** Create a tag if it doesn't exist, return its ID. */
+  async getOrCreateTag(name: string): Promise<string> {
+    // List existing tags
+    const listResp = await fetch(`${this.baseUrl}/api/tags`, { headers: this.headers });
+    if (!listResp.ok) throw new Error(`Immich list tags failed: ${listResp.status}`);
+    const tags = (await listResp.json()) as Array<{ id: string; name: string }>;
+
+    const existing = tags.find((t) => t.name === name);
+    if (existing) return existing.id;
+
+    // Create new tag
+    const createResp = await fetch(`${this.baseUrl}/api/tags`, {
+      method: "POST",
+      headers: this.headers,
+      body: JSON.stringify({ name }),
+    });
+    if (!createResp.ok) throw new Error(`Immich create tag failed: ${createResp.status}`);
+    const created = (await createResp.json()) as { id: string };
+    return created.id;
+  }
+
+  /** Bulk-tag assets. */
+  async tagAssets(tagId: string, assetIds: string[]): Promise<void> {
+    if (assetIds.length === 0) return;
+    const resp = await fetch(`${this.baseUrl}/api/tags/${tagId}/assets`, {
+      method: "PUT",
+      headers: this.headers,
+      body: JSON.stringify({ ids: assetIds }),
+    });
+    if (!resp.ok) throw new Error(`Immich tag assets failed: ${resp.status}`);
+  }
+
   /** Test connection to Immich API. */
   async testConnection(): Promise<{ ok: boolean; version?: string; error?: string }> {
     try {

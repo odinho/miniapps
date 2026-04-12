@@ -752,22 +752,42 @@ app.post<{
     // For now, skip — LLM stars are written when user approves a batch
   }
 
+  // Identify LLM-rated photos for tagging
+  const llmRated = allDecisions
+    .filter((d) => d.starSource === "llm" && d.userStars != null && d.userStars > 0)
+    .map((d) => d.assetId);
+
   if (dryRun) {
     return {
       dryRun: true,
       toTrash: toTrash.length,
       toRate: toRate.length,
+      toTagLlmRated: llmRated.length,
       totalDecisions: allDecisions.length,
     };
   }
 
+  // Execute write-back
   const trashResult = await immichWriteback.trashAssets(toTrash);
   const rateResult = await immichWriteback.setRatings(toRate);
+
+  // Tag LLM-rated photos so they're identifiable in Immich
+  let tagged = 0;
+  if (llmRated.length > 0) {
+    try {
+      const tagId = await immichWriteback.getOrCreateTag("ai:rated");
+      await immichWriteback.tagAssets(tagId, llmRated);
+      tagged = llmRated.length;
+    } catch (e: any) {
+      console.error("Failed to tag LLM-rated photos:", e.message);
+    }
+  }
 
   return {
     dryRun: false,
     trashed: trashResult,
     rated: rateResult,
+    tagged,
     totalDecisions: allDecisions.length,
   };
 });
