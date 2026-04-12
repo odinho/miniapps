@@ -10,6 +10,7 @@ import { resolve, dirname } from "path";
 import { readFileSync, existsSync, statSync } from "fs";
 import { FacetAdapter } from "./db/facet-adapter.js";
 import { ImmichAdapter } from "./db/immich-adapter.js";
+import { ImmichApiAdapter } from "./db/immich-api-adapter.js";
 import { clusterAssets } from "./clustering/engine.js";
 import { DEFAULT_CLUSTER_CONFIG, PhotoGroup, Asset } from "./shared/types.js";
 import { getImmichDbConfig } from "./shared/config.js";
@@ -32,6 +33,7 @@ function getArg(flag: string, defaultVal: string): string {
 }
 
 const useImmich = args.includes("--immich");
+const useImmichApi = args.includes("--immich-api");
 const port = parseInt(getArg("--port", "3000"));
 const sampleSize = parseInt(getArg("--sample", "0"));
 
@@ -97,10 +99,29 @@ async function getDimensions(asset: Asset): Promise<{ w: number; h: number }> {
   }
 }
 
+let immichApiAdapter: ImmichApiAdapter | null = null;
+
 async function loadData() {
   let assets: Asset[];
 
-  if (useImmich) {
+  if (useImmichApi) {
+    const url = process.env.IMMICH_URL;
+    const key = process.env.IMMICH_API_KEY;
+    if (!url || !key) {
+      console.error("IMMICH_URL and IMMICH_API_KEY required for --immich-api mode");
+      process.exit(1);
+    }
+    console.log(`Connecting to Immich API at ${url}...`);
+    immichApiAdapter = new ImmichApiAdapter({ serverUrl: url, apiKey: key });
+    const count = await immichApiAdapter.getAssetCount();
+    console.log(`Immich has ${count} images`);
+
+    console.log("Loading all assets via API...");
+    assets = await immichApiAdapter.getAllAssets((loaded) => {
+      process.stdout.write(`\r  ${loaded} loaded...`);
+    });
+    console.log();
+  } else if (useImmich) {
     console.log("Connecting to Immich PostgreSQL...");
     const adapter = new ImmichAdapter(getImmichDbConfig());
     const count = await adapter.getAssetCount();
@@ -125,20 +146,25 @@ async function loadData() {
     adapter.close();
   }
 
-  console.log(`Loaded ${assets.length} assets, clustering...`);
-  const result = clusterAssets(assets, DEFAULT_CLUSTER_CONFIG);
+  console.log(`Loaded ${assets.length} assets`);
 
-  // Sort groups by earliest date (temporally close groups adjacent)
-  groups = result.groups.toSorted((a, b) => {
-    const aTime = Math.min(...a.assets.map((x) => x.asset.fileCreatedAt.getTime()));
-    const bTime = Math.min(...b.assets.map((x) => x.asset.fileCreatedAt.getTime()));
-    return bTime - aTime; // newest first
-  });
-  // Re-index after sort
-  groups = groups.map((g, i) => ({ ...g, id: `group-${i}` }));
+  // Only cluster if we have CLIP embeddings (local/PG mode)
+  if (!useImmichApi && assets.some((a) => a.embedding.length > 0)) {
+    console.log("Clustering...");
+    const result = clusterAssets(assets, DEFAULT_CLUSTER_CONFIG);
+    groups = result.groups.toSorted((a, b) => {
+      const aTime = Math.min(...a.assets.map((x) => x.asset.fileCreatedAt.getTime()));
+      const bTime = Math.min(...b.assets.map((x) => x.asset.fileCreatedAt.getTime()));
+      return bTime - aTime;
+    });
+    groups = groups.map((g, i) => ({ ...g, id: `group-${i}` }));
+    console.log(`${groups.length} groups found (${result.stats.singletons} singletons)`);
+  } else {
+    console.log("Skipping clustering (no CLIP embeddings in API mode)");
+    groups = [];
+  }
 
   for (const a of assets) assetMap.set(a.id, a);
-  console.log(`${groups.length} groups found (${result.stats.singletons} singletons)`);
 }
 
 // === API Routes ===
@@ -250,6 +276,20 @@ app.get<{ Querystring: { id: string } }>("/api/preview", async (req, reply) => {
     reply.code(404);
     return { error: "Not found" };
   }
+
+  // Immich API mode: proxy thumbnail from Immich
+  if (immichApiAdapter) {
+    try {
+      const buf = await immichApiAdapter.getThumbnail(asset.id, "preview");
+      reply.type("image/jpeg").header("Cache-Control", "public, max-age=3600");
+      return buf;
+    } catch (e: any) {
+      reply.code(500);
+      return { error: e.message };
+    }
+  }
+
+  // Local/PG mode: read from filesystem
   const fp = resolveFilePath(asset);
   if (!fp) {
     reply.code(404);
@@ -258,7 +298,7 @@ app.get<{ Querystring: { id: string } }>("/api/preview", async (req, reply) => {
 
   try {
     const preview = await sharp(fp)
-      .rotate() // auto-rotate based on EXIF orientation
+      .rotate()
       .resize(PREVIEW_MAX_PX, PREVIEW_MAX_PX, { fit: "inside", withoutEnlargement: true })
       .jpeg({ quality: 85 })
       .toBuffer();
@@ -277,6 +317,18 @@ app.get<{ Querystring: { id: string } }>("/api/full", async (req, reply) => {
     reply.code(404);
     return { error: "Not found" };
   }
+
+  if (immichApiAdapter) {
+    try {
+      const buf = await immichApiAdapter.getOriginal(asset.id);
+      reply.type("image/jpeg").header("Cache-Control", "public, max-age=3600");
+      return buf;
+    } catch (e: any) {
+      reply.code(500);
+      return { error: e.message };
+    }
+  }
+
   const fp = resolveFilePath(asset);
   if (!fp) {
     reply.code(404);

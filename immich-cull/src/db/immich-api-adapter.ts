@@ -28,18 +28,15 @@ export class ImmichApiAdapter {
 
   /** Get total asset count. */
   async getAssetCount(): Promise<number> {
-    const resp = await fetch(`${this.baseUrl}/api/assets/statistics`, { headers: this.headers });
+    const resp = await fetch(`${this.baseUrl}/api/server/statistics`, { headers: this.headers });
     if (!resp.ok) throw new Error(`Immich API error: ${resp.status}`);
-    const data = (await resp.json()) as { images: number; videos: number; total: number };
-    return data.images;
+    const data = (await resp.json()) as { photos: number; videos: number; usage: number };
+    return data.photos;
   }
 
   /** Fetch all image assets with metadata. No CLIP embeddings — returns empty Float32Array. */
   async getAllAssets(onProgress?: (loaded: number) => void): Promise<Asset[]> {
-    return this.fetchPaginated(
-      `${this.baseUrl}/api/assets?order=desc&isVisible=true&type=IMAGE`,
-      onProgress,
-    );
+    return this.searchAssets({ type: "IMAGE" }, onProgress);
   }
 
   /** Get thumbnail JPEG buffer for an asset. */
@@ -66,44 +63,45 @@ export class ImmichApiAdapter {
     end: Date,
     onProgress?: (loaded: number) => void,
   ): Promise<Asset[]> {
-    const startStr = start.toISOString();
-    const endStr = end.toISOString();
-    return this.fetchPaginated(
-      `${this.baseUrl}/api/assets?takenAfter=${startStr}&takenBefore=${endStr}&order=asc&isVisible=true&type=IMAGE`,
+    return this.searchAssets(
+      { type: "IMAGE", takenAfter: start.toISOString(), takenBefore: end.toISOString() },
       onProgress,
     );
   }
 
-  /** Internal: paginated fetch with asset parsing. */
-  private async fetchPaginated(
-    baseUrl: string,
+  /** Internal: paginated search via POST /api/search/metadata. */
+  private async searchAssets(
+    query: Record<string, unknown>,
     onProgress?: (loaded: number) => void,
   ): Promise<Asset[]> {
     const assets: Asset[] = [];
-    const fetchPage = async (page: number): Promise<any[]> => {
-      const sep = baseUrl.includes("?") ? "&" : "?";
-      const resp = await fetch(`${baseUrl}${sep}page=${page}&size=1000`, {
-        headers: this.headers,
+    const fetchPage = async (page: number): Promise<{ items: any[]; nextPage: string | null }> => {
+      const resp = await fetch(`${this.baseUrl}/api/search/metadata`, {
+        method: "POST",
+        headers: { ...this.headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ ...query, page, size: 1000 }),
       });
-      if (!resp.ok) throw new Error(`Immich API error: ${resp.status}`);
-      return (await resp.json()) as any[];
+      if (!resp.ok) throw new Error(`Immich search error: ${resp.status}`);
+      const data = (await resp.json()) as any;
+      return { items: data.assets?.items ?? [], nextPage: data.assets?.nextPage ?? null };
     };
 
     const processPage = async (page: number): Promise<Asset[]> => {
-      const items = await fetchPage(page);
-      const parsed: Asset[] = items.map((item: any) => ({
-        id: item.id,
-        path: item.originalPath ?? "",
-        filename: item.originalFileName ?? "",
-        fileCreatedAt: new Date(item.fileCreatedAt ?? item.createdAt),
-        embedding: new Float32Array(0),
-        rating: item.rating ?? 0,
-        isFavorite: item.isFavorite ?? false,
-        duplicateId: item.duplicateId ?? null,
-      }));
-      assets.push(...parsed);
+      const { items, nextPage } = await fetchPage(page);
+      for (const item of items) {
+        assets.push({
+          id: item.id,
+          path: item.originalPath ?? "",
+          filename: item.originalFileName ?? "",
+          fileCreatedAt: new Date(item.fileCreatedAt ?? item.createdAt),
+          embedding: new Float32Array(0),
+          rating: item.rating ?? 0,
+          isFavorite: item.isFavorite ?? false,
+          duplicateId: item.duplicateId ?? null,
+        });
+      }
       onProgress?.(assets.length);
-      if (items.length >= 1000) return processPage(page + 1);
+      if (nextPage) return processPage(Number(nextPage));
       return assets;
     };
 

@@ -118,7 +118,8 @@ export class StateDb {
           created_at TEXT NOT NULL DEFAULT (datetime('now')),
           completed_at TEXT
         );
-        INSERT INTO llm_batch_runs_new SELECT * FROM llm_batch_runs;
+        INSERT INTO llm_batch_runs_new (id, batch_id, batch_fingerprint, model, prompt_version, status, response_json, input_tokens, output_tokens, cost_estimate_usd, created_at, completed_at)
+        SELECT id, batch_id, batch_fingerprint, model, prompt_version, status, response_json, input_tokens, output_tokens, cost_estimate_usd, created_at, completed_at FROM llm_batch_runs;
         DROP TABLE llm_batch_runs;
         ALTER TABLE llm_batch_runs_new RENAME TO llm_batch_runs;
         CREATE INDEX IF NOT EXISTS idx_llm_batch ON llm_batch_runs(batch_id, batch_fingerprint, status);
@@ -149,6 +150,16 @@ export class StateDb {
       if (!new Set(cols.map((c) => c.name)).has("star_source")) {
         this.db.exec("ALTER TABLE photo_decisions ADD COLUMN star_source TEXT DEFAULT 'user'");
       }
+
+      // Ensure auto_keep_patterns table exists
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS auto_keep_patterns (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          pattern TEXT NOT NULL UNIQUE,
+          description TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+      `);
     }
 
     this.db.pragma(`user_version = ${SCHEMA_VERSION}`);
