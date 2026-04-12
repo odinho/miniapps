@@ -28,6 +28,8 @@
   let selectedIdx = 0;
   let helpOpen = false;
   let sidebarOpen = false;
+  let sidebarLimit = 100;
+  let sidebarShowAllDone = false;
   let loading = false;
   let keepLevel = 0; // 0 = LLM default, +N = keep N more per subgroup, -N = keep N fewer
   const models = [
@@ -192,6 +194,8 @@
     }
   }
 
+  $: sidebarUndecided = sidebarItems.filter(i => !i.decided);
+  $: sidebarDecided = sidebarItems.filter(i => i.decided);
   $: sidebarItems = mode === 'groups'
     ? groups.map((g, i) => ({
         idx: i, active: i === groupIdx, decided: g.decided,
@@ -633,14 +637,44 @@
   {/if}
   <aside class="sidebar" class:open={sidebarOpen} class:hidden={mode === 'review' || mode === 'stars'}>
     <div class="sidebar-list">
-      {#each sidebarItems.slice(0, 200) as item}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="gi" class:active={item.active} class:decided={item.decided}
-             on:click={() => { sidebarOpen = false; mode === 'groups' ? selectGroup(item.idx) : selectBatch(item.idx); }} role="button" tabindex="-1">
-          <div class="t">{item.label} · {item.date.toLocaleDateString('no', { day: 'numeric', month: 'short', year: '2-digit' })}</div>
-          <div class="m">{item.sub}{#if item.autoCullStats} · <span class="ac-tag">{item.autoCullStats.autoCullHigh + item.autoCullStats.autoCull}a/{item.autoCullStats.review}r</span>{/if}</div>
-        </div>
-      {/each}
+      {#if sidebarUndecided.length}
+        <div class="si-section">Open ({sidebarUndecided.length})</div>
+        {#each sidebarUndecided.slice(0, sidebarLimit) as item (item.idx)}
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <div class="gi" class:active={item.active}
+               on:click={() => { sidebarOpen = false; mode === 'groups' ? selectGroup(item.idx) : selectBatch(item.idx); }} role="button" tabindex="-1">
+            <div class="t">{item.label} · {item.date.toLocaleDateString('no', { day: 'numeric', month: 'short', year: '2-digit' })}</div>
+            <div class="m">{item.sub}{#if item.autoCullStats} · <span class="ac-tag">{item.autoCullStats.autoCullHigh + item.autoCullStats.autoCull}a/{item.autoCullStats.review}r</span>{/if}</div>
+          </div>
+        {/each}
+        {#if sidebarUndecided.length > sidebarLimit}
+          <button class="si-more" on:click={() => sidebarLimit += 100}>Show more ({sidebarUndecided.length - sidebarLimit} remaining)</button>
+        {/if}
+      {/if}
+      {#if sidebarDecided.length}
+        <div class="si-section">Done ({sidebarDecided.length})</div>
+        {#each sidebarDecided.slice(0, 3) as item (item.idx)}
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <div class="gi decided" class:active={item.active}
+               on:click={() => { sidebarOpen = false; mode === 'groups' ? selectGroup(item.idx) : selectBatch(item.idx); }} role="button" tabindex="-1">
+            <div class="t">{item.label} · {item.date.toLocaleDateString('no', { day: 'numeric', month: 'short', year: '2-digit' })}</div>
+            <div class="m">{item.sub}</div>
+          </div>
+        {/each}
+        {#if sidebarDecided.length > 3}
+          <button class="si-more" on:click={() => sidebarShowAllDone = !sidebarShowAllDone}>{sidebarShowAllDone ? 'Collapse' : `Show all ${sidebarDecided.length}`}</button>
+          {#if sidebarShowAllDone}
+            {#each sidebarDecided.slice(3) as item (item.idx)}
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <div class="gi decided" class:active={item.active}
+                   on:click={() => { sidebarOpen = false; mode === 'groups' ? selectGroup(item.idx) : selectBatch(item.idx); }} role="button" tabindex="-1">
+                <div class="t">{item.label} · {item.date.toLocaleDateString('no', { day: 'numeric', month: 'short', year: '2-digit' })}</div>
+                <div class="m">{item.sub}</div>
+              </div>
+            {/each}
+          {/if}
+        {/if}
+      {/if}
     </div>
     <InfoPanel
       asset={selectedAsset}
@@ -823,6 +857,9 @@
   .gi { padding: 5px 8px; cursor: pointer; border-bottom: 1px solid #1e2028; border-left: 3px solid transparent; }
   .gi:hover { background: #1c1f27; } .gi.active { background: #1f2330; border-left-color: #f0a040; } .gi.decided { opacity: .35; }
   .gi .t { font-weight: 500; } .gi .m { color: #666; font-size: 11px; }
+  .si-section { padding: 6px 8px 3px; font-size: 10px; color: #7a8294; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; border-bottom: 1px solid #1e2028; background: #0e1014; position: sticky; top: 0; z-index: 1; }
+  .si-more { display: block; width: 100%; padding: 6px 8px; background: none; border: none; border-bottom: 1px solid #1e2028; color: #f0a040; font-size: 11px; cursor: pointer; text-align: left; }
+  .si-more:hover { background: #1c1f27; }
 
   .main { min-width: 0; min-height: 0; overflow: hidden; position: relative; }
   .empty { display: flex; align-items: center; justify-content: center; height: 100%; color: #666; }
