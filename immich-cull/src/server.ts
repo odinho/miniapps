@@ -718,20 +718,25 @@ app.get("/api/immich/status", async () => {
 
 /** Write back decisions to Immich: trash culled photos and set star ratings */
 app.post<{
-  Body: { dryRun?: boolean };
+  Body: { dryRun?: boolean; includeLlmStars?: boolean };
 }>("/api/immich/writeback", async (req) => {
   if (!immichWriteback) {
     return { error: "Immich write-back not configured (set IMMICH_URL and IMMICH_API_KEY)" };
   }
 
   const dryRun = req.body.dryRun ?? true; // Default to dry-run for safety
+  const includeLlmStars = req.body.includeLlmStars ?? false;
 
   // Get all decided photos
   const allDecisions = stateDb.getAllDecisions();
 
   const toTrash = allDecisions.filter((d) => d.state === "cull").map((d) => d.assetId);
   const toRate = allDecisions
-    .filter((d) => d.userStars != null && d.userStars > 0)
+    .filter((d) => {
+      if (d.userStars == null || d.userStars <= 0) return false;
+      if (!includeLlmStars && d.starSource === "llm") return false;
+      return true;
+    })
     .map((d) => ({ assetId: d.assetId, rating: d.userStars! }));
 
   if (dryRun) {

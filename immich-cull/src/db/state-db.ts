@@ -8,7 +8,7 @@ import { dirname } from "path";
 import { mkdirSync } from "fs";
 import { createHash } from "crypto";
 
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 export class StateDb {
   private db: Database.Database;
@@ -138,6 +138,16 @@ export class StateDb {
       }
       if (!colNames.has("llm_run_id")) {
         this.db.exec("ALTER TABLE photo_decisions ADD COLUMN llm_run_id INTEGER");
+      }
+    }
+
+    if (currentVersion < 7) {
+      // Add star_source to distinguish LLM-set stars from user-confirmed stars
+      const cols = this.db.prepare("PRAGMA table_info(photo_decisions)").all() as Array<{
+        name: string;
+      }>;
+      if (!new Set(cols.map((c) => c.name)).has("star_source")) {
+        this.db.exec("ALTER TABLE photo_decisions ADD COLUMN star_source TEXT DEFAULT 'user'");
       }
     }
 
@@ -354,12 +364,43 @@ export class StateDb {
   }
 
   /** Get all decided photos for write-back. */
-  getAllDecisions(): Array<{ assetId: string; state: string; userStars: number | null }> {
+  getAllDecisions(): Array<{
+    assetId: string;
+    state: string;
+    userStars: number | null;
+    starSource: string | null;
+  }> {
     return this.db
       .prepare(
-        "SELECT asset_id as assetId, state, user_stars as userStars FROM photo_decisions WHERE state IS NOT NULL",
+        "SELECT asset_id as assetId, state, user_stars as userStars, star_source as starSource FROM photo_decisions WHERE state IS NOT NULL",
       )
-      .all() as Array<{ assetId: string; state: string; userStars: number | null }>;
+      .all() as Array<{
+      assetId: string;
+      state: string;
+      userStars: number | null;
+      starSource: string | null;
+    }>;
+  }
+
+  /** Save LLM-derived star ratings (marked as source='llm'). */
+  saveLlmStars(ratings: Array<{ assetId: string; stars: number }>) {
+    const stmt = this.db.prepare(`
+      UPDATE photo_decisions SET user_stars = ?, star_source = 'llm', updated_at = datetime('now')
+      WHERE asset_id = ? AND (user_stars IS NULL OR star_source = 'llm')
+    `);
+    this.db.transaction(() => {
+      for (const r of ratings) stmt.run(r.stars, r.assetId);
+    })();
+  }
+
+  /** Clear all LLM-set star ratings (reset to null). */
+  clearLlmStars(): number {
+    const r = this.db
+      .prepare(
+        "UPDATE photo_decisions SET user_stars = NULL, star_source = NULL WHERE star_source = 'llm'",
+      )
+      .run();
+    return r.changes;
   }
 
   // === Auto-cull provenance ===
