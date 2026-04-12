@@ -95,9 +95,12 @@
 	const isNightMode = $derived.by(() => {
 		void now; // re-derive when clock ticks
 		const h = new Date().getHours();
-		// Stay night while active night sleep (even after 06:00)
-		const activeNight = activeSleep && !activeSleep.end_time && activeSleep.type === 'night';
-		return activeNight || h < 6 || h >= 18;
+		// Night while active night sleep (even after 06:00)
+		if (activeSleep && !activeSleep.end_time && activeSleep.type === 'night') return true;
+		// Day once baby has been marked awake today (until next night sleep starts)
+		if (todayWakeUp) return false;
+		// Fallback to clock when no sleep context
+		return h < 6 || h >= 18;
 	});
 
 	// Apply theme based on night mode (keeps layout theme in sync with dashboard state)

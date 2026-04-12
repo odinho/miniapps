@@ -125,7 +125,7 @@
 	{#if baby}
 		<div class="stats-section">
 			<h3 class="stats-section-title">{baby.name} vs. norm ({formatAge(baby.birthdate)})</h3>
-			<div class="sleep-info-panel" style="padding: 0; overflow: hidden;">
+			<div class="sleep-info-panel" style="overflow: hidden;">
 				<table class="comparison-table">
 					<thead>
 						<tr>
@@ -150,7 +150,7 @@
 						{/each}
 					</tbody>
 				</table>
-				<p style="font-size: 0.7rem; color: var(--text-light); margin: 6px 4px 0; line-height: 1.3;">
+				<p style="font-size: 0.7rem; color: var(--text-light); margin: 6px 12px 0; line-height: 1.3;">
 					Normverdiar er omtrentlege og varierer mellom barn. {baby.name}-verdiane er baserte på dei siste 7 dagane.
 				</p>
 			</div>
@@ -253,11 +253,10 @@
 						{#each activeStats.sleepVsNorm.yTicks as tick}
 							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
 						{/each}
-						<!-- Norm band (recommended range) — white fill so it stands out on cream -->
-						<path d={activeStats.sleepVsNorm.bandPath} fill="white" opacity="0.8" />
+						<!-- Norm band (recommended range) -->
+						<path d={activeStats.sleepVsNorm.bandPath} fill="var(--moon-glow)" opacity="0.5" />
 						<!-- Typical line (center of range) -->
 						<path d={activeStats.sleepVsNorm.typicalPath} fill="none" stroke="var(--text-light)" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6" />
-						<text x={TS_CHART.W - TS_CHART.PAD_R - 2} y={(activeStats.sleepVsNorm.yTicks[0]?.y ?? TS_CHART.PAD_T) + 14} text-anchor="end" fill="var(--text-light)" font-size="9" font-family="var(--font)" opacity="0.6">tilrådd</text>
 						<!-- Actual sleep area -->
 						<path d={activeStats.sleepVsNorm.actualPath} fill="var(--moon)" opacity="0.85" />
 						<!-- Data line (no dots — clean design) -->
@@ -651,11 +650,11 @@
 	.comparison-table {
 		width: 100%;
 		border-collapse: collapse;
-		font-size: 0.8rem;
+		font-size: 0.85rem;
 	}
 
 	.comparison-table th {
-		padding: 6px 4px;
+		padding: 8px 10px;
 		text-align: right;
 		font-size: 0.7rem;
 		font-weight: 600;
@@ -671,13 +670,17 @@
 	}
 
 	.comparison-table td {
-		padding: 5px 4px;
+		padding: 7px 10px;
 		border-bottom: 1px solid var(--cream-dark);
+	}
+
+	.comparison-table tbody tr:last-child td {
+		border-bottom: none;
 	}
 
 	.comparison-label {
 		color: var(--text-light);
-		font-size: 0.75rem;
+		font-size: 0.8rem;
 	}
 
 	.comparison-val {
