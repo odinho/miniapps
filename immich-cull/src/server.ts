@@ -706,6 +706,33 @@ if (immichUrl && immichApiKey) {
   immichWriteback = new ImmichWriteback({ serverUrl: immichUrl, apiKey: immichApiKey });
 }
 
+/** Get star rating summary and sample photos at each star level */
+app.get("/api/stars/summary", async () => {
+  const allDecisions = stateDb.getAllDecisions();
+  const summary: Record<
+    number,
+    { count: number; samples: Array<{ id: string; filename: string }> }
+  > = {};
+
+  // Build a map of all assets for filename lookup
+  const assetLookup = new Map<string, string>();
+  for (const batch of sessionBatches) {
+    for (const a of batch.assets) assetLookup.set(a.id, a.filename);
+  }
+
+  for (const d of allDecisions) {
+    if (d.state !== "keep") continue;
+    const star = d.userStars ?? 0;
+    if (!summary[star]) summary[star] = { count: 0, samples: [] };
+    summary[star].count++;
+    if (summary[star].samples.length < 20) {
+      summary[star].samples.push({ id: d.assetId, filename: assetLookup.get(d.assetId) ?? "" });
+    }
+  }
+
+  return { summary, totalKept: allDecisions.filter((d) => d.state === "keep").length };
+});
+
 /** Test Immich API connection */
 app.get("/api/immich/status", async () => {
   if (!immichWriteback) {

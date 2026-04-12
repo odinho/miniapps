@@ -39,10 +39,20 @@ export interface ImageAssessment {
   llmKeepCull: "keep" | "cull" | null;
 }
 
-/** Map LLM 0-5 stars to write-back 0-3 stars: LLM 0-2→0, 3→1, 4→2, 5→3 */
+/**
+ * Map LLM 0-5 stars to Immich 0-3 stars.
+ *
+ * Shift-1 mapping: LLM uses full 0-5 for discrimination, but LLMs
+ * rarely give 4-5★. Shifting by 1 gives a better Immich distribution:
+ *   LLM 0-1 → 0★ (unstarred filler, ~72% of photos)
+ *   LLM 2   → 1★ (good photo, stands out, ~20%)
+ *   LLM 3   → 2★ (share-worthy, ~7%)
+ *   LLM 4-5 → 3★ (exceptional/gallery-worthy, ~0.5%)
+ */
 export function mapLlmStarsToWriteback(llmStars: number): number {
-  if (llmStars <= 2) return 0;
-  return llmStars - 2; // 3→1, 4→2, 5→3
+  if (llmStars <= 1) return 0;
+  if (llmStars >= 4) return 3;
+  return llmStars - 1; // 2→1, 3→2
 }
 
 export interface SimilaritySubgroup {

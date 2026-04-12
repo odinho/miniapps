@@ -512,13 +512,13 @@
     const decisions = batchDetail.assets.map(a => {
       const explicit = userStars[a.id];
       const effective = effectiveStarsMap[a.id];
-      // User-set stars take priority. For LLM stars, map through compression:
-      // only LLM 3+ gets a star (3→1, 4→2, 5→3)
+      // User-set stars take priority. For LLM stars, map through shift-1:
+      // LLM 0-1→0, 2→1★, 3→2★, 4-5→3★
       let stars: number | null = null;
       if (explicit != null) {
         stars = explicit;
-      } else if (effective != null && effective >= 3) {
-        stars = effective - 2; // mapLlmStarsToWriteback: 3→1, 4→2, 5→3
+      } else if (effective != null && effective >= 2) {
+        stars = effective >= 4 ? 3 : effective - 1; // mapLlmStarsToWriteback shift-1
       }
       return { assetId: a.id, state: states[a.id] ?? 'keep', userStars: stars };
     });

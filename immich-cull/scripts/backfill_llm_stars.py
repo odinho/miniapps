@@ -25,10 +25,12 @@ API_BASE = "http://localhost:3737"
 
 
 def map_llm_stars(llm_stars):
-    """LLM 0-2→0, 3→1, 4→2, 5→3"""
-    if llm_stars <= 2:
+    """Shift-1: LLM 0-1→0, 2→1, 3→2, 4-5→3"""
+    if llm_stars <= 1:
         return 0
-    return llm_stars - 2
+    if llm_stars >= 4:
+        return 3
+    return llm_stars - 1  # 2→1, 3→2
 
 
 def fetch_batch_assets(batch_id):
