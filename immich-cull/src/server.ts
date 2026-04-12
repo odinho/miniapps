@@ -444,13 +444,27 @@ app.get("/api/batches", async () => {
         const fp = batchFingerprint(b.assets.map((a) => a.id));
         const cached = stateDb.getLlmRun(b.id, fp);
         const acSummary = cached ? getAutoCullSummary(b, cached.id) : null;
-        // Get keep/cull counts from user decisions
+        // Get keep/cull counts: user decisions first, fall back to LLM recommendations
         const decisions = stateDb.getPhotoDecisions(b.assets.map((a) => a.id));
         let keeps = 0;
         let culls = 0;
-        for (const d of Object.values(decisions)) {
-          if (d.state === "keep") keeps++;
-          else if (d.state === "cull") culls++;
+        const hasUserDecisions = Object.values(decisions).some((d) => d.state);
+        if (hasUserDecisions) {
+          for (const d of Object.values(decisions)) {
+            if (d.state === "keep") keeps++;
+            else if (d.state === "cull") culls++;
+          }
+        } else if (cached) {
+          try {
+            const raw = JSON.parse(cached.responseJson);
+            const expanded = expandCompactResponse(raw, b);
+            for (const img of expanded.images) {
+              if (img.llmKeepCull === "keep") keeps++;
+              else if (img.llmKeepCull === "cull") culls++;
+            }
+          } catch {
+            // ignore parse errors
+          }
         }
         return {
           id: b.id,

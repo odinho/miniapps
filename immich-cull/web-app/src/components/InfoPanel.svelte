@@ -14,12 +14,25 @@
   export let userStars: number = 0;
   export let onSetStars: (stars: number) => void = () => {};
   export let assetPath: string = '';
+  export let userStarsExplicit: boolean = false;
 
   let showPath = false;
+  let panelEl: HTMLDivElement = undefined!;
+  let maxHeight = 0;
+
+  $: if (panelEl && asset) {
+    // After render, ratchet min-height to largest seen
+    requestAnimationFrame(() => {
+      if (panelEl && panelEl.scrollHeight > maxHeight) {
+        maxHeight = panelEl.scrollHeight;
+        panelEl.style.minHeight = maxHeight + 'px';
+      }
+    });
+  }
 </script>
 
 {#if asset}
-  <div class="info-panel">
+  <div class="info-panel" bind:this={panelEl}>
     <div class="ip-header">Selected Photo</div>
     <div class="ip-filename-row">
       <span class="ip-filename">{asset.filename}</span>
@@ -51,6 +64,8 @@
       {/each}
       {#if userStars > 0}
         <span class="ip-stars-label">{userStars}★</span>
+      {:else if userStarsExplicit}
+        <span class="ip-stars-label ip-stars-zero">0★ (override)</span>
       {/if}
     </div>
 
@@ -123,6 +138,7 @@
   .ip-star-btn:hover { color: #ffd700; }
   .ip-star-btn.active { color: #ffd700; }
   .ip-stars-label { font-size: 10px; color: #7a8294; margin-left: 4px; }
+  .ip-stars-zero { color: #e53935; }
   .ip-state { font-weight: 600; font-size: 12px; padding: 2px 8px; border-radius: 3px; display: inline-block; margin-bottom: 6px; }
   .ip-state.keep { background: rgba(76,175,80,.2); color: #4caf50; }
   .ip-state.cull { background: rgba(229,57,53,.2); color: #e53935; }

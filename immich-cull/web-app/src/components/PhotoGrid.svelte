@@ -11,6 +11,7 @@
   export let llmMap: Record<string, LlmImage> = {};
   export let effectiveStarsMap: Record<string, number> = {};
   export let autoCullMap: Record<string, AutoCullClassification> = {};
+  export let confirmedIds: Set<string> = new Set();
   export let onSelect: (idx: number) => void = () => {};
   export let onToggleState: (idx: number) => void = () => {};
 
@@ -42,6 +43,7 @@
     {@const isCull = effectiveState === 'cull'}
     {@const isSel = i === selectedIdx}
     {@const effStars = effectiveStarsMap[asset.id] ?? 0}
+    {@const isConfirmed = confirmedIds.has(asset.id)}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
       class="cell"
@@ -67,9 +69,9 @@
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div class="toggle-zone" role="button" tabindex="-1" on:click|stopPropagation={() => onToggleState(i)}>
         {#if isKeep}
-          <div class="bdg kb">KEEP</div>
+          <div class="bdg kb" class:confirmed={isConfirmed}>{isConfirmed ? 'KEEP' : 'KEEP?'}</div>
         {:else if isCull}
-          <div class="bdg cb">CULL</div>
+          <div class="bdg cb" class:confirmed={isConfirmed}>{isConfirmed ? 'CULL' : 'CULL?'}</div>
         {:else if autoCullMap[asset.id]?.tier === 'auto-cull-high'}
           <div class="bdg acb-hi">AUTO</div>
         {:else if autoCullMap[asset.id]?.tier === 'auto-cull'}

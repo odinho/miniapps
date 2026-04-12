@@ -28,6 +28,7 @@
   let helpOpen = false;
   let sidebarOpen = false;
   let sidebarLimit = 100;
+  let sidebarShowDone = false;
   let loading = false;
   let keepLevel = 0; // 0 = LLM default, +N = keep N more per subgroup, -N = keep N fewer
   const models = [
@@ -66,8 +67,15 @@
     ? groupStates
     : mergeStates(currentAssetIds, llmState, manualOverrides);
 
-  // Effective stars from pure function
-  $: effectiveStarsMap = computeEffectiveStars(batchDetail?.llm ?? null, states, llmMap);
+  // Effective stars: user overrides win over LLM-computed stars
+  $: effectiveStarsMap = (() => {
+    const llmStars = computeEffectiveStars(batchDetail?.llm ?? null, states, llmMap);
+    // User star overrides (including explicit 0) take priority
+    for (const [id, s] of Object.entries(userStars)) {
+      if (s != null) llmStars[id] = s;
+    }
+    return llmStars;
+  })();
 
   // Selected asset info for InfoPanel
   $: selectedAsset = currentAssets[selectedIdx] ?? null;
@@ -153,7 +161,22 @@
     }
   }
 
-  $: sidebarItems = mode === 'groups'
+  // --- Sidebar view model: single source of truth for what's visible ---
+  interface SidebarItem {
+    idx: number;
+    active: boolean;
+    decided: boolean;
+    visible: boolean;
+    label: string;
+    sub: string;
+    date: Date;
+    hasLlm: boolean;
+    keeps: number;
+    culls: number;
+  }
+  let recentDoneIdxs: number[] = []; // most recently approved (by approval order)
+
+  $: sidebarAllItems = (mode === 'groups'
     ? groups.map((g, i) => ({
         idx: i, active: i === groupIdx, decided: g.decided,
         label: `${g.count} photos`,
@@ -162,15 +185,21 @@
         hasLlm: false, keeps: 0, culls: 0,
       }))
     : batches.map((b, i) => ({
-        idx: i, active: i === batchIdx, decided: b.viewStatus === 'reviewed' || b.viewStatus === 'skipped',
+        idx: i, active: i === batchIdx,
+        decided: b.viewStatus === 'reviewed' || b.viewStatus === 'skipped',
         label: `${b.count} photos`,
         sub: `${b.source}${b.folderName ? ' ' + b.folderName : ''}`,
         date: new Date(b.dateRange.start),
         hasLlm: b.hasLlmResult, keeps: b.keeps, culls: b.culls,
-      }));
-  $: sidebarShowDone = false;
-  $: sidebarUndecided = sidebarItems.filter(i => !i.decided);
-  $: sidebarDecidedCount = sidebarItems.filter(i => i.decided).length;
+      }))
+  ).map(item => ({
+    ...item,
+    visible: !item.decided || recentDoneIdxs.includes(item.idx) || sidebarShowDone,
+  })) as SidebarItem[];
+
+  $: sidebarVisible = sidebarAllItems.filter(i => i.visible).slice(0, sidebarLimit);
+  $: sidebarDecidedCount = sidebarAllItems.filter(i => i.decided).length;
+  $: sidebarHasMore = sidebarAllItems.filter(i => i.visible).length > sidebarLimit;
 
   onMount(async () => {
     stats = await fetchStats();
@@ -403,6 +432,8 @@
         body: JSON.stringify({ viewType: 'batch', status: 'reviewed' }),
       });
       (batches[batchIdx] as any).viewStatus = 'reviewed';
+      // Track as recently done (keep last 3)
+      recentDoneIdxs = [batchIdx, ...recentDoneIdxs.filter(i => i !== batchIdx)].slice(0, 3);
       batches = batches;
       stats = await fetchStats();
       nextUndecidedBatch();
@@ -479,8 +510,22 @@
   const isBatchDecided = (b: any) => b.viewStatus === 'reviewed' || b.viewStatus === 'skipped';
 
   function nextUndecidedBatch() {
-    for (let i = batchIdx + 1; i < batches.length; i++) if (!isBatchDecided(batches[i])) { selectBatch(i); return; }
-    for (let i = 0; i < batchIdx; i++) if (!isBatchDecided(batches[i])) { selectBatch(i); return; }
+    // Jump to next undecided visible batch
+    const curPos = sidebarVisible.findIndex(i => i.idx === batchIdx);
+    for (let j = curPos + 1; j < sidebarVisible.length; j++) {
+      if (!sidebarVisible[j].decided) { selectBatch(sidebarVisible[j].idx); return; }
+    }
+    for (let j = 0; j < curPos; j++) {
+      if (!sidebarVisible[j].decided) { selectBatch(sidebarVisible[j].idx); return; }
+    }
+  }
+
+  function nextVisibleBatch(dir: 1 | -1) {
+    const curPos = sidebarVisible.findIndex(i => i.idx === batchIdx);
+    const next = curPos + dir;
+    if (next >= 0 && next < sidebarVisible.length) {
+      selectBatch(sidebarVisible[next].idx);
+    }
   }
 
   function applyKeepLevel(level: number) {
@@ -545,11 +590,11 @@
       case 'ArrowLeft': case 'g': e.preventDefault(); if (selectedIdx > 0) selectedIdx--; break;
       case 'ArrowDown': e.preventDefault();
         if (mode === 'groups' && groupIdx < groups.length - 1) selectGroup(groupIdx + 1);
-        else if (mode === 'batches' && batchIdx < batches.length - 1) selectBatch(batchIdx + 1);
+        else if (mode === 'batches') nextVisibleBatch(1);
         break;
       case 'ArrowUp': e.preventDefault();
         if (mode === 'groups' && groupIdx > 0) selectGroup(groupIdx - 1);
-        else if (mode === 'batches' && batchIdx > 0) selectBatch(batchIdx - 1);
+        else if (mode === 'batches') nextVisibleBatch(-1);
         break;
       case 'Escape': showPreview = false; break;
       case ' ': e.preventDefault(); if (selectedIdx >= 0) showPreview = !showPreview; break;
@@ -609,30 +654,28 @@
   {/if}
   <aside class="sidebar" class:open={sidebarOpen} class:hidden={mode === 'review' || mode === 'stars'}>
     <div class="sidebar-list">
-      {#if sidebarDecidedCount > 0}
+      {#if sidebarDecidedCount > 3}
         <button class="si-more si-done-toggle" on:click={() => sidebarShowDone = !sidebarShowDone}>
-          {sidebarShowDone ? 'Hide' : 'Show'} {sidebarDecidedCount} done
+          {sidebarShowDone ? 'Hide' : 'Show all'} {sidebarDecidedCount} done
         </button>
       {/if}
-      {#each sidebarItems.slice(0, sidebarLimit) as item (item.idx)}
-        {#if !item.decided || sidebarShowDone}
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <div class="gi" class:active={item.active} class:decided={item.decided}
-               on:click={() => { sidebarOpen = false; mode === 'groups' ? selectGroup(item.idx) : selectBatch(item.idx); }} role="button" tabindex="-1">
-            <div class="t">
-              {item.label} · {item.date.toLocaleDateString('no', { day: 'numeric', month: 'short', year: '2-digit' })}
-            </div>
-            <div class="m">
-              {item.sub}{#if item.hasLlm}
-                · {#if item.keeps || item.culls}<span class="si-keep">{item.keeps}✓</span> <span class="si-cull">{item.culls}✗</span>{/if}
-                <span class="si-llm">llm</span>
-              {/if}
-            </div>
+      {#each sidebarVisible as item (item.idx)}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="gi" class:active={item.active} class:decided={item.decided}
+             on:click={() => { sidebarOpen = false; mode === 'groups' ? selectGroup(item.idx) : selectBatch(item.idx); }} role="button" tabindex="-1">
+          <div class="t">
+            {item.label} · {item.date.toLocaleDateString('no', { day: 'numeric', month: 'short', year: '2-digit' })}
           </div>
-        {/if}
+          <div class="m">
+            {item.sub}{#if item.hasLlm}
+              · {#if item.keeps || item.culls}<span class="si-keep">{item.keeps}✓</span> <span class="si-cull">{item.culls}✗</span>{/if}
+              <span class="si-llm">llm</span>
+            {/if}
+          </div>
+        </div>
       {/each}
-      {#if sidebarItems.length > sidebarLimit}
-        <button class="si-more" on:click={() => sidebarLimit += 100}>Show more ({sidebarItems.length - sidebarLimit} remaining)</button>
+      {#if sidebarHasMore}
+        <button class="si-more" on:click={() => sidebarLimit += 100}>Show more</button>
       {/if}
     </div>
     <InfoPanel
@@ -646,6 +689,7 @@
       effectiveStars={selectedEffectiveStars}
       {keepLevel}
       userStars={selectedUserStars}
+      userStarsExplicit={selectedAsset ? userStars[selectedAsset.id] != null : false}
       onSetStars={setStars}
     />
   </aside>
@@ -663,7 +707,9 @@
     {:else if loading}
       <div class="empty"><span class="spinner"></span> Loading...</div>
     {:else if currentAssets.length}
-      <PhotoGrid assets={currentAssets} {states} {selectedIdx} {llmMap} {effectiveStarsMap} {autoCullMap} onSelect={onGridSelect}
+      <PhotoGrid assets={currentAssets} {states} {selectedIdx} {llmMap} {effectiveStarsMap} {autoCullMap}
+        confirmedIds={new Set(Object.keys(manualOverrides).filter(id => manualOverrides[id]))}
+        onSelect={onGridSelect}
         onToggleState={(i) => {
           const asset = currentAssets[i];
           if (!asset) return;
@@ -801,13 +847,15 @@
   .sidebar.hidden + .main { grid-column: 1 / -1; }
   .sidebar-list { flex: 1; overflow-y: auto; min-height: 0; }
   .gi { padding: 5px 8px; cursor: pointer; border-bottom: 1px solid #1e2028; border-left: 3px solid transparent; }
-  .gi:hover { background: #1c1f27; } .gi.active { background: #1f2330; border-left-color: #f0a040; } .gi.decided { opacity: .35; }
+  .gi:hover { background: #1c1f27; } .gi.active { background: #1f2330; border-left-color: #f0a040; }
+  .gi.decided { opacity: .5; border-left-color: #66bb6a; }
+  .gi.decided.active { opacity: 1; border-left-color: #a5d6a7; background: rgba(76,175,80,.15); }
   .gi .t { font-weight: 500; } .gi .m { color: #666; font-size: 11px; }
   .si-more { display: block; width: 100%; padding: 6px 8px; background: none; border: none; border-bottom: 1px solid #1e2028; color: #f0a040; font-size: 11px; cursor: pointer; text-align: left; }
   .si-more:hover { background: #1c1f27; }
   .si-done-toggle { position: sticky; top: 0; z-index: 1; background: #0e1014; font-weight: 600; }
   .si-keep { color: #4caf50; } .si-cull { color: #e53935; }
-  .si-llm { color: #7a8294; font-size: 10px; }
+  .si-llm { color: #f0a040; font-size: 10px; font-weight: 600; }
 
   .main { min-width: 0; min-height: 0; overflow: hidden; position: relative; }
   .empty { display: flex; align-items: center; justify-content: center; height: 100%; color: #666; }
@@ -847,9 +895,13 @@
   :global(.lbl) { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,.8)); padding: 10px 5px 3px; font-size: 9px; color: #bbb; display: flex; justify-content: space-between; }
   :global(.toggle-zone) { position: absolute; top: 0; left: 0; right: 0; height: 20%; min-height: 24px; cursor: pointer; z-index: 2; }
   :global(.bdg) { position: absolute; top: 3px; left: 3px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; color: white; pointer-events: none; }
-  :global(.bdg.kb) { background: #4caf50; } :global(.bdg.cb) { background: #e53935; } :global(.bdg.acb-hi) { background: #bf360c; font-size: 8px; } :global(.bdg.acb) { background: #e65100; font-size: 8px; }
-  :global(.st) { position: absolute; top: 3px; right: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; }
-  :global(.llm-star) { position: absolute; top: 3px; left: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; background: rgba(0,0,0,.6); padding: 1px 4px; border-radius: 3px; }
+  :global(.bdg.kb) { background: #4caf50; opacity: 0.75; }
+  :global(.bdg.cb) { background: #e53935; opacity: 0.75; }
+  :global(.bdg.kb.confirmed) { opacity: 1; }
+  :global(.bdg.cb.confirmed) { opacity: 1; }
+  :global(.bdg.acb-hi) { background: #bf360c; font-size: 8px; } :global(.bdg.acb) { background: #e65100; font-size: 8px; }
+  :global(.st) { position: absolute; top: 22px; right: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; z-index: 1; }
+  :global(.llm-star) { position: absolute; top: 3px; right: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; background: rgba(0,0,0,.6); padding: 1px 4px; border-radius: 3px; z-index: 1; }
   :global(.llm-note) { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 9px; color: #ddd; text-shadow: 0 1px 2px #000; }
 
   :global(.preview-ov) { position: fixed; top: 34px; left: 200px; right: 0; bottom: 40px; background: #090b0f; z-index: 50; display: flex; flex-direction: column; }
