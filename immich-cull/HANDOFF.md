@@ -46,6 +46,10 @@ npx tsx src/server.ts --immich-api --vertex --port 3737
   `auto_keep_patterns` — regex patterns for known-good filtering
   `view_status` — group/batch completion tracking
 
+### Auto-keep patterns
+
+See README.md. Current pattern: `/Snapchat/Snapchat-` (filters ~2000 assets).
+
 ### Auto-cull calibration (from Facet test data)
 
 Calibrated on 149 discriminating batches (1434 photos, 2024+, 3.1-flash-lite).

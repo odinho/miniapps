@@ -98,6 +98,8 @@ export class ImmichApiAdapter {
           rating: item.rating ?? 0,
           isFavorite: item.isFavorite ?? false,
           duplicateId: item.duplicateId ?? null,
+          width: item.width ?? 0,
+          height: item.height ?? 0,
         });
       }
       onProgress?.(assets.length);

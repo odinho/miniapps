@@ -64,17 +64,18 @@
         <div class="llm-note">{llm.briefNote}</div>
       {/if}
 
-      {#if isKeep}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="bdg kb" role="button" tabindex="-1" on:click|stopPropagation={() => onToggleState(i)}>KEEP</div>
-      {:else if isCull}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="bdg cb" role="button" tabindex="-1" on:click|stopPropagation={() => onToggleState(i)}>CULL</div>
-      {:else if autoCullMap[asset.id]?.tier === 'auto-cull-high'}
-        <div class="bdg acb-hi">AUTO</div>
-      {:else if autoCullMap[asset.id]?.tier === 'auto-cull'}
-        <div class="bdg acb">AUTO</div>
-      {/if}
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <div class="toggle-zone" role="button" tabindex="-1" on:click|stopPropagation={() => onToggleState(i)}>
+        {#if isKeep}
+          <div class="bdg kb">KEEP</div>
+        {:else if isCull}
+          <div class="bdg cb">CULL</div>
+        {:else if autoCullMap[asset.id]?.tier === 'auto-cull-high'}
+          <div class="bdg acb-hi">AUTO</div>
+        {:else if autoCullMap[asset.id]?.tier === 'auto-cull'}
+          <div class="bdg acb">AUTO</div>
+        {/if}
+      </div>
 
       {#if asset.rating && asset.rating > 0}
         <div class="st">{'★'.repeat(asset.rating)}</div>

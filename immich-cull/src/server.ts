@@ -18,7 +18,7 @@ import sharp from "sharp";
 import { fileURLToPath } from "url";
 import { StateDb, batchFingerprint } from "./db/state-db.js";
 import { batchBySession, SessionBatch } from "./batching/session-batcher.js";
-import { LlmClient, expandCompactResponse } from "./ranking/llm-client.js";
+import { LlmClient, DEFAULT_LLM_CONFIG, expandCompactResponse } from "./ranking/llm-client.js";
 import { classifyBatchForAutoCull, type AutoCullSummary } from "./ranking/auto-cull.js";
 import { ImmichWriteback } from "./db/immich-writeback.js";
 import { config as loadEnv } from "dotenv";
@@ -75,6 +75,12 @@ function getFileSize(asset: Asset): number {
 /** Get image dimensions (rotated), cached */
 async function getDimensions(asset: Asset): Promise<{ w: number; h: number }> {
   if (dimensionCache.has(asset.id)) return dimensionCache.get(asset.id)!;
+  // Use Immich-provided dimensions when available (avoids filesystem access)
+  if (asset.width && asset.height) {
+    const dims = { w: asset.width, h: asset.height };
+    dimensionCache.set(asset.id, dims);
+    return dims;
+  }
   const fp = resolveFilePath(asset);
   if (!fp) return { w: 4, h: 3 };
   try {
@@ -497,10 +503,22 @@ app.post<{ Params: { id: string }; Querystring: { model?: string } }>(
       client = new LlmClient({ ...llmClient.config, model: overrideModel });
     }
 
+    // In Immich API mode, fetch thumbnails over HTTP; otherwise use local filesystem
+    const imageResolver = immichApiAdapter
+      ? async (asset: { path: string; id: string }) => {
+          try {
+            return await immichApiAdapter!.getThumbnail(asset.id, "preview");
+          } catch {
+            console.warn(`  Thumbnail fetch failed for ${asset.id}, using placeholder`);
+            return null;
+          }
+        }
+      : (asset: { path: string; id: string }) => resolveFilePath(asset);
+
     try {
       const { response, rawJson, inputTokens, outputTokens } = await client.rankBatch(
         batch,
-        resolveFilePath,
+        imageResolver,
         (s) => console.log(`  [LLM ${usedModel}] ${s}`),
       );
 
@@ -686,11 +704,18 @@ app.get<{ Params: { id: string }; Querystring: { model?: string } }>(
       // Build image lookup
       const imgMap = new Map(expanded.images.map((img) => [img.imageId, img]));
 
+      // Filter out photos the user has already decided on
+      const allCullIds = expanded.images
+        .filter((img) => img.llmKeepCull === "cull" && img.similaritySubgroupId)
+        .map((img) => img.imageId);
+      const existingDecisions = stateDb.getPhotoDecisions(allCullIds);
+
       // For each culled photo in a subgroup, pair with its keeper(s)
       const comparisons = [];
       for (const img of expanded.images) {
         if (img.llmKeepCull !== "cull") continue;
         if (!img.similaritySubgroupId) continue;
+        if (existingDecisions[img.imageId]?.state) continue;
 
         const sg = sgMap.get(img.similaritySubgroupId);
         if (!sg) continue;
@@ -731,6 +756,131 @@ app.get<{ Params: { id: string }; Querystring: { model?: string } }>(
     }
   },
 );
+
+/** Get all subgroups across batches for review. Each subgroup shows all photos with keep/cull status. */
+app.get("/api/review-groups", async () => {
+  interface ReviewPhoto {
+    id: string;
+    filename: string;
+    date: string;
+    w: number;
+    h: number;
+    bytes: number;
+    stars: number;
+    note: string;
+    category: string;
+    llmAction: "keep" | "cull";
+  }
+  interface ReviewGroup {
+    batchId: string;
+    subgroupId: string;
+    subgroupType: string;
+    rationale: string;
+    batchSummary: string;
+    photos: ReviewPhoto[];
+    tier: "high" | "standard" | "review";
+  }
+
+  const reviewGroups: ReviewGroup[] = [];
+  const singletons: ReviewPhoto[] = [];
+
+  for (const batch of sessionBatches) {
+    const fp = batchFingerprint(batch.assets.map((a) => a.id));
+    const cached = stateDb.getLlmRun(batch.id, fp);
+    if (!cached) continue;
+
+    try {
+      const raw = JSON.parse(cached.responseJson);
+      const expanded = expandCompactResponse(raw, batch);
+      const imgMap = new Map(expanded.images.map((img) => [img.imageId, img]));
+
+      const toPhoto = (aid: string, action: "keep" | "cull"): ReviewPhoto => {
+        const img = imgMap.get(aid);
+        const asset = batch.assets.find((a) => a.id === aid);
+        return {
+          id: aid,
+          filename: asset?.filename ?? "",
+          date: asset?.fileCreatedAt.toISOString() ?? "",
+          w: asset?.width ?? 4,
+          h: asset?.height ?? 3,
+          bytes: fileSizeCache.get(aid) ?? 0,
+          stars: img?.suggestedStars ?? 0,
+          note: img?.briefNote ?? "",
+          category: img?.categories[0] ?? "other",
+          llmAction: action,
+        };
+      };
+
+      // Compute auto-cull tiers for this batch
+      const acResult = classifyBatchForAutoCull(expanded.images, expanded.similaritySubgroups);
+      const tierMap = new Map(acResult.classifications.map((c) => [c.assetId, c.tier]));
+
+      for (const sg of expanded.similaritySubgroups) {
+        if (sg.imageIds.length < 2) continue;
+        const keepSet = new Set(sg.recommendedKeepIds);
+        // Group tier = best tier among its culls (high > standard > review)
+        const cullTiers = new Set(sg.cullIds.map((id) => tierMap.get(id) ?? "review"));
+        const groupTier = cullTiers.has("auto-cull-high")
+          ? "high"
+          : cullTiers.has("auto-cull")
+            ? "standard"
+            : "review";
+        reviewGroups.push({
+          batchId: batch.id,
+          subgroupId: sg.subgroupId,
+          subgroupType: sg.subgroupType,
+          rationale: sg.rationale,
+          batchSummary: expanded.batchSummary,
+          photos: sg.imageIds.map((aid) => toPhoto(aid, keepSet.has(aid) ? "keep" : "cull")),
+          tier: groupTier,
+        });
+      }
+
+      // Collect singleton culls for batching
+      for (const img of expanded.images) {
+        if (img.llmKeepCull !== "cull") continue;
+        if (img.similaritySubgroupId) continue;
+        singletons.push(toPhoto(img.imageId, "cull"));
+      }
+    } catch {
+      // skip bad batch
+    }
+  }
+
+  // Batch singletons into groups of 8
+  for (let i = 0; i < singletons.length; i += 8) {
+    const chunk = singletons.slice(i, i + 8);
+    reviewGroups.push({
+      batchId: "singletons",
+      subgroupId: `singletons-${i}`,
+      subgroupType: "singleton-batch",
+      rationale: `${chunk.length} standalone culls — no similar photo to compare against`,
+      batchSummary: "",
+      photos: chunk,
+      tier: "review",
+    });
+  }
+
+  // Filter out groups where all culls are already decided
+  const allIds = reviewGroups.flatMap((g) => g.photos.map((p) => p.id));
+  const decisions = stateDb.getPhotoDecisions(allIds);
+  const filtered = reviewGroups.filter((g) => {
+    const culls = g.photos.filter((p) => p.llmAction === "cull");
+    return culls.some((p) => !decisions[p.id]?.state);
+  });
+
+  // Sort: high confidence first, then standard, then review
+  const tierOrder = { high: 0, standard: 1, review: 2 };
+  filtered.sort((a, b) => tierOrder[a.tier] - tierOrder[b.tier]);
+
+  const tierCounts = {
+    high: filtered.filter((g) => g.tier === "high").length,
+    standard: filtered.filter((g) => g.tier === "standard").length,
+    review: filtered.filter((g) => g.tier === "review").length,
+  };
+
+  return { groups: filtered, total: reviewGroups.length, tierCounts };
+});
 
 // === Per-photo decisions (shared across all views) ===
 
@@ -885,7 +1035,9 @@ if (!args.includes("--include-all")) {
   const patterns = stateDb.getAutoKeepPatterns();
   if (patterns.length > 0) {
     const compiled = patterns.map((p) => new RegExp(p.pattern));
-    filteredAssets = allAssets.filter((a) => !compiled.some((re) => re.test(a.path)));
+    filteredAssets = allAssets.filter(
+      (a) => !compiled.some((re) => re.test(a.path) || re.test(a.filename)),
+    );
     const excluded = allAssets.length - filteredAssets.length;
     if (excluded > 0) {
       console.log(
@@ -899,7 +1051,8 @@ console.log(`${sessionBatches.length} session batches (${filteredAssets.length} 
 
 // Initialize LLM client
 const modelArg =
-  args.find((a) => a.startsWith("--model="))?.split("=")[1] ?? "gemini-2.5-flash-lite";
+  args.find((a) => a.startsWith("--model="))?.split("=")[1] ??
+  DEFAULT_LLM_CONFIG.model.replace("google/", "");
 const orKeyPath = resolve("/home/odin/Kode/miniapps/babysovelogg/OPENROUTER.key");
 if (args.includes("--vertex")) {
   llmClient = new LlmClient({

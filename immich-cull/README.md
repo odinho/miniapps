@@ -45,16 +45,21 @@ cd web-app && npm run dev -- --host
 # Open http://localhost:5173
 ```
 
-### With Immich
+### With Immich (API mode, recommended)
 
 ```bash
-# SSH tunnel to Immich PostgreSQL
-ssh -f -N -L 15432:<postgres-container-ip>:5432 user@immich-host
-
-# Copy and edit .env
+# Set IMMICH_URL and IMMICH_API_KEY in .env
 cp .env.example .env
 
-# Start with Immich
+npx tsx src/server.ts --immich-api --vertex --port 3737
+```
+
+### With Immich (PostgreSQL mode)
+
+```bash
+# SSH tunnel to Immich PostgreSQL (needed for CLIP embeddings)
+ssh -f -N -L 15432:<postgres-container-ip>:5432 user@immich-host
+
 npx tsx src/server.ts --immich --vertex --port 3737
 ```
 
@@ -93,8 +98,8 @@ npx tsx src/server.ts --local --vertex --model=gemini-3.1-flash-lite-preview --p
 
 | Model | Agreement | Cost | Speed | Notes |
 |-------|-----------|------|-------|-------|
-| gemini-3.1-flash-lite | **82%** | $$ | ~5s/batch | Best accuracy, recommended |
-| gemini-2.5-flash-lite | 67% | $ | ~3s/batch | Default, cheapest cloud |
+| gemini-3.1-flash-lite | **82%** | $$ | ~5s/batch | **Default**, best accuracy |
+| gemini-2.5-flash-lite | 67% | $ | ~3s/batch | Cheapest cloud |
 | gemini-3-flash | 75% | $$$ | ~8s/batch | Good but expensive |
 | gemma4:e4b (local) | 58% | Free | ~70s/batch | Ollama, no cloud needed |
 
@@ -134,7 +139,16 @@ See [docs/architecture.md](docs/architecture.md) for the full picture.
 ## Data Sources
 
 - **Facet SQLite**: Local testing with CLIP ViT-L-14 embeddings (768-dim)
-- **Immich PostgreSQL**: Production mode with CLIP ViT-B-32 embeddings (512-dim), read-only
+- **Immich API**: Production mode via REST API — no tunnel needed, no CLIP
+- **Immich PostgreSQL**: Direct DB access with CLIP ViT-B-32 embeddings (512-dim), read-only
+
+## Auto-keep patterns
+
+Regex patterns in `auto_keep_patterns` exclude matching assets from batching (auto-kept). Matched against asset path and filename. Requires server restart.
+
+```bash
+sqlite3 data/state.db "INSERT INTO auto_keep_patterns (pattern, description) VALUES ('/Snapchat/', 'Snapchat saves');"
+```
 
 ## Safety
 

@@ -33,8 +33,8 @@
   let loading = false;
   let keepLevel = 0; // 0 = LLM default, +N = keep N more per subgroup, -N = keep N fewer
   const models = [
-    { id: 'gemini-2.5-flash-lite', label: '2.5-lite' },
     { id: 'gemini-3.1-flash-lite-preview', label: '3.1-lite' },
+    { id: 'gemini-2.5-flash-lite', label: '2.5-lite' },
     { id: 'gemini-3-flash-preview', label: '3-flash' },
     { id: 'gemma4:e4b', label: 'gemma4' },
   ];
@@ -565,6 +565,7 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    if (mode === 'review' || mode === 'stars') return; // these modes handle their own keys
     if (helpOpen) { if (e.key === 'Escape' || e.key === '?') helpOpen = false; return; }
     if (!currentAssets.length) return;
     const shift = e.shiftKey;
@@ -902,7 +903,8 @@
   :global(.cell.sel) { border-color: #f0a040 !important; box-shadow: 0 0 8px rgba(240,160,64,.5); }
   :global(.cell img) { width: 100%; height: 100%; object-fit: contain; display: block; background: #0b0d11; }
   :global(.lbl) { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,.8)); padding: 10px 5px 3px; font-size: 9px; color: #bbb; display: flex; justify-content: space-between; }
-  :global(.bdg) { position: absolute; top: 3px; left: 3px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; color: white; cursor: pointer; }
+  :global(.toggle-zone) { position: absolute; top: 0; left: 0; right: 0; height: 20%; min-height: 24px; cursor: pointer; z-index: 2; }
+  :global(.bdg) { position: absolute; top: 3px; left: 3px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; color: white; pointer-events: none; }
   :global(.bdg.kb) { background: #4caf50; } :global(.bdg.cb) { background: #e53935; } :global(.bdg.acb-hi) { background: #bf360c; font-size: 8px; } :global(.bdg.acb) { background: #e65100; font-size: 8px; }
   .ac-tag { color: #e65100; font-weight: 600; }
   :global(.st) { position: absolute; top: 3px; right: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; }
@@ -961,7 +963,8 @@
     :global(.pvt) { height: 50px; }
     :global(.lbl) { display: none; }
     :global(.bdg) { display: none; }
-    :global(.cell.sel .bdg) { display: block; font-size: 9px; } /* show on selected */
+    :global(.cell.sel .bdg) { display: block; font-size: 9px; }
+    :global(.toggle-zone) { height: 30%; } /* bigger touch target on mobile */
     :global(.llm-note) { display: none; }
     :global(.llm-star) { display: none; }
     :global(.cell.sel .llm-star) { display: block; } /* show stars on selected */

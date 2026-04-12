@@ -156,7 +156,7 @@ export interface LlmClientConfig {
 
 export const DEFAULT_LLM_CONFIG: LlmClientConfig = {
   apiKey: "",
-  model: "google/gemini-2.5-flash-lite",
+  model: "google/gemini-3.1-flash-lite-preview",
   baseUrl: "https://openrouter.ai/api/v1",
   previewMaxPx: 1200, // larger previews for better LLM detail recognition
   provider: "openrouter",
@@ -175,7 +175,10 @@ export class LlmClient {
    */
   async rankBatch(
     batch: SessionBatch,
-    resolveFilePath: (asset: { path: string }) => string | null,
+    resolveImage: (asset: {
+      path: string;
+      id: string;
+    }) => string | Buffer | null | Promise<string | Buffer | null>,
     onProgress?: (status: string) => void,
   ): Promise<{
     response: DayBatchResponse;
@@ -189,16 +192,26 @@ export class LlmClient {
     const imageBuffers: Buffer[] = [];
     for (let idx = 0; idx < batch.assets.length; idx++) {
       const asset = batch.assets[idx];
-      const fp = resolveFilePath(asset);
-      if (!fp) {
-        imageBuffers.push(Buffer.from("/9j/4AAQSkZJRg==", "base64")); // tiny placeholder
+      // resolveImage can return a file path (string), raw image bytes (Buffer), or null
+      // eslint-disable-next-line no-await-in-loop -- resolver may be async (e.g. Immich API fetch)
+      const resolved = await resolveImage(asset);
+      if (!resolved) {
+        // Generate a valid gray placeholder so the LLM sees something (not a broken image)
+        // eslint-disable-next-line no-await-in-loop
+        const placeholder = await sharp({
+          create: { width: 100, height: 100, channels: 3, background: { r: 128, g: 128, b: 128 } },
+        })
+          .jpeg({ quality: 50 })
+          .toBuffer();
+        imageBuffers.push(placeholder);
         continue;
       }
       const svgOverlay = Buffer.from(
         `<svg width="80" height="36"><rect x="0" y="0" width="80" height="36" rx="4" fill="rgba(0,0,0,0.7)"/><text x="40" y="26" font-size="24" font-weight="bold" fill="white" text-anchor="middle" font-family="sans-serif">#${idx}</text></svg>`,
       );
+      // sharp() accepts both file paths (string) and raw image bytes (Buffer)
       // eslint-disable-next-line no-await-in-loop -- intentional sequential image processing
-      const buf = await sharp(fp)
+      const buf = await sharp(resolved)
         .rotate()
         .resize(this.config.previewMaxPx, this.config.previewMaxPx, {
           fit: "inside",

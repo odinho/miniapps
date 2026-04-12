@@ -5,7 +5,7 @@
  */
 import { FacetAdapter } from "../db/facet-adapter.js";
 import { batchBySession } from "../batching/session-batcher.js";
-import { LlmClient } from "../ranking/llm-client.js";
+import { LlmClient, DEFAULT_LLM_CONFIG } from "../ranking/llm-client.js";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { resolve } from "path";
 import { config as loadEnv } from "dotenv";
@@ -60,7 +60,7 @@ function resolveFilePath(asset: { path: string }): string | null {
 }
 
 console.log(`\nSending to LLM...`);
-const client = new LlmClient({ apiKey, model: getArg("--model", "google/gemini-2.5-flash-lite") });
+const client = new LlmClient({ apiKey, model: getArg("--model", DEFAULT_LLM_CONFIG.model) });
 
 try {
   const { response, rawJson, inputTokens, outputTokens } = await client.rankBatch(

@@ -240,6 +240,37 @@ export async function stagedCull(
   ).json();
 }
 
+export interface ReviewPhoto {
+  id: string;
+  filename: string;
+  date: string;
+  w: number;
+  h: number;
+  bytes: number;
+  stars: number;
+  note: string;
+  category: string;
+  llmAction: "keep" | "cull";
+}
+
+export interface ReviewGroup {
+  batchId: string;
+  subgroupId: string;
+  subgroupType: string;
+  rationale: string;
+  batchSummary: string;
+  photos: ReviewPhoto[];
+  tier: "high" | "standard" | "review";
+}
+
+export async function fetchReviewGroups(): Promise<{
+  groups: ReviewGroup[];
+  total: number;
+  tierCounts: { high: number; standard: number; review: number };
+}> {
+  return (await fetch(`${BASE}/api/review-groups`)).json();
+}
+
 export function previewUrl(id: string): string {
   return `${BASE}/api/preview?id=${encodeURIComponent(id)}`;
 }

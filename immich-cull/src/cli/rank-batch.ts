@@ -5,7 +5,7 @@
  */
 import { FacetAdapter } from "../db/facet-adapter.js";
 import { batchBySession } from "../batching/session-batcher.js";
-import { LlmClient } from "../ranking/llm-client.js";
+import { LlmClient, DEFAULT_LLM_CONFIG } from "../ranking/llm-client.js";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { resolve } from "path";
 import { config as loadEnv } from "dotenv";
@@ -69,7 +69,7 @@ const useVertex = args.includes("--vertex");
 console.log(`\nSending to LLM via ${useVertex ? "Vertex AI" : "OpenRouter"}...`);
 const client = new LlmClient({
   apiKey: useVertex ? "" : apiKey,
-  model: getArg("--model", "gemini-2.5-flash-lite"),
+  model: getArg("--model", DEFAULT_LLM_CONFIG.model.replace("google/", "")),
   provider: useVertex ? "vertexai" : "openrouter",
   vertexProject: "tagrdevin",
 });

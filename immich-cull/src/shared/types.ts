@@ -9,6 +9,8 @@ export interface Asset {
   rating: number | null;
   isFavorite: boolean;
   duplicateId: string | null;
+  width?: number;
+  height?: number;
 }
 
 export interface GroupAsset {
