@@ -11,6 +11,7 @@ export interface Asset {
   duplicateId: string | null;
   width?: number;
   height?: number;
+  fileSize?: number;
 }
 
 export interface GroupAsset {

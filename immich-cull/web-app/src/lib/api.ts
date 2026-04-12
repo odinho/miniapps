@@ -61,6 +61,8 @@ export interface BatchSummary {
   dateRange: { start: string; end: string };
   hasLlmResult: boolean;
   viewStatus: string | null;
+  keeps: number;
+  culls: number;
   autoCullStats: { autoCullHigh: number; autoCull: number; review: number } | null;
 }
 
@@ -243,6 +245,7 @@ export async function stagedCull(
 export interface ReviewPhoto {
   id: string;
   filename: string;
+  path: string;
   date: string;
   w: number;
   h: number;

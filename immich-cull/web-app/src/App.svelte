@@ -3,7 +3,6 @@
   import PhotoGrid from './components/PhotoGrid.svelte';
   import Preview from './components/Preview.svelte';
   import InfoPanel from './components/InfoPanel.svelte';
-  import CullReview from './components/CullReview.svelte';
   import AutoCullReview from './components/AutoCullReview.svelte';
   import StarsReview from './components/StarsReview.svelte';
   import {
@@ -29,7 +28,6 @@
   let helpOpen = false;
   let sidebarOpen = false;
   let sidebarLimit = 100;
-  let sidebarShowAllDone = false;
   let loading = false;
   let keepLevel = 0; // 0 = LLM default, +N = keep N more per subgroup, -N = keep N fewer
   const models = [
@@ -131,45 +129,6 @@
     return m;
   }
 
-  async function autoApproveCurrent() {
-    if (!batches[batchIdx]) return;
-    const result = await autoApproveBatches([batches[batchIdx].id]);
-    if (result.ok) {
-      batches = await fetchBatches();
-      stats = await fetchStats();
-      await selectBatch(batchIdx);
-    }
-  }
-
-  async function autoApproveAll() {
-    const safeBatchIds = batches
-      .filter(b => b.autoCullStats && b.autoCullStats.review === 0 && b.viewStatus !== 'reviewed')
-      .map(b => b.id);
-    if (!safeBatchIds.length) return;
-    const result = await autoApproveBatches(safeBatchIds);
-    if (result.ok) {
-      batches = await fetchBatches();
-      stats = await fetchStats();
-    }
-  }
-
-  let cullReviewOpen = false;
-  let cullComparisons: CullComparison[] = [];
-
-  async function openCullReview() {
-    if (!batches[batchIdx]) return;
-    const data = await fetchCullComparisons(batches[batchIdx].id);
-    cullComparisons = data.comparisons ?? [];
-    cullReviewOpen = true;
-  }
-
-  function onCullReviewKeep(assetId: string) {
-    setPhotoState(assetId, 'keep');
-  }
-
-  function onCullReviewConfirm(assetId: string) {
-    setPhotoState(assetId, 'cull');
-  }
 
   async function runStagedCull() {
     const allBatchIds = batches.filter(b => b.hasLlmResult && b.viewStatus !== 'reviewed').map(b => b.id);
@@ -194,23 +153,24 @@
     }
   }
 
-  $: sidebarUndecided = sidebarItems.filter(i => !i.decided);
-  $: sidebarDecided = sidebarItems.filter(i => i.decided);
   $: sidebarItems = mode === 'groups'
     ? groups.map((g, i) => ({
         idx: i, active: i === groupIdx, decided: g.decided,
         label: `${g.count} photos`,
         sub: `${g.timeSpanMinutes}min · ${fmt(g.totalBytes)}`,
         date: new Date(g.earliestDate),
-        autoCullStats: null as { autoCullHigh: number; autoCull: number; review: number } | null,
+        hasLlm: false, keeps: 0, culls: 0,
       }))
     : batches.map((b, i) => ({
         idx: i, active: i === batchIdx, decided: b.viewStatus === 'reviewed' || b.viewStatus === 'skipped',
-        label: `${b.count} photos${b.hasLlmResult ? ' ✓' : ''}`,
-        sub: `${b.source} ${b.folderName || ''}`,
+        label: `${b.count} photos`,
+        sub: `${b.source}${b.folderName ? ' ' + b.folderName : ''}`,
         date: new Date(b.dateRange.start),
-        autoCullStats: b.autoCullStats,
+        hasLlm: b.hasLlmResult, keeps: b.keeps, culls: b.culls,
       }));
+  $: sidebarShowDone = false;
+  $: sidebarUndecided = sidebarItems.filter(i => !i.decided);
+  $: sidebarDecidedCount = sidebarItems.filter(i => i.decided).length;
 
   onMount(async () => {
     stats = await fetchStats();
@@ -226,6 +186,10 @@
       mode = 'groups';
       const idx = parseInt(hash.slice(6));
       if (!isNaN(idx) && idx < groups.length) await selectGroup(idx);
+    } else if (hash === 'review') {
+      await switchMode('review');
+    } else if (hash === 'stars') {
+      await switchMode('stars');
     } else {
       // Default: load batches (works in both local and API mode)
       batches = await fetchBatches();
@@ -288,11 +252,14 @@
   let activeView = 'manual';
 
   /** Switch to a model's cached result, or run it if not cached */
-  let runningModel = '';
+  let runningModel = ''; // which model is running
+  let runningBatchIdx = -1; // which batch it's running on
   let switching = false;
   async function switchOrRunModel(modelId: string) {
-    if (!batches[batchIdx] || runningModel || switching) return;
-    const savedIdx = batchIdx; // capture before async
+    if (!batches[batchIdx] || switching) return;
+    // Allow running on a different batch even if another is in-flight
+    if (runningModel && runningBatchIdx === batchIdx) return;
+    const savedIdx = batchIdx;
     const cachedModels = batchDetail?.llmModels ?? [];
     if (cachedModels.includes(modelId)) {
       switching = true;
@@ -303,19 +270,19 @@
         switching = false;
       }
     } else {
-      // Need to run it
       runningModel = modelId;
+      runningBatchIdx = savedIdx;
       try {
         const batchId = batches[savedIdx].id;
         const result = await rankBatch(batchId, modelId);
-        if (result.error) { alert('LLM error: ' + result.error); return; }
+        if (result.error) { console.error('LLM error:', result.error); return; }
         batches[savedIdx].hasLlmResult = true; batches = batches;
         if (batchIdx === savedIdx) {
           await selectBatch(savedIdx, { freshLlm: true, model: modelId });
           activeView = modelId;
         }
       } finally {
-        runningModel = '';
+        if (runningBatchIdx === savedIdx) { runningModel = ''; runningBatchIdx = -1; }
       }
     }
   }
@@ -339,6 +306,8 @@
 
   async function switchMode(m: AppMode) {
     mode = m; showPreview = false; selectedIdx = 0;
+    if (m === 'review') location.hash = 'review';
+    else if (m === 'stars') location.hash = 'stars';
     if (m === 'batches' && !batches.length) fetchBatches().then(b => { batches = b; if (b.length) selectBatch(0); });
     if (m === 'review' && !batches.length) batches = await fetchBatches();
     if (m === 'stars') {
@@ -545,22 +514,24 @@
 
   /** Re-run the currently viewed model (force fresh, invalidate cache) */
   async function rerunCurrentModel() {
-    if (!batches[batchIdx] || runningModel || activeView === 'manual') return;
+    if (!batches[batchIdx] || activeView === 'manual') return;
+    if (runningModel && runningBatchIdx === batchIdx) return;
     const savedIdx = batchIdx;
     const modelId = activeView;
     const batchId = batches[savedIdx].id;
     runningModel = modelId;
+    runningBatchIdx = savedIdx;
     try {
       await fetch(`/api/batches/${batchId}/rank?model=${encodeURIComponent(modelId)}`, { method: 'DELETE' });
       const result = await rankBatch(batchId, modelId);
-      if (result.error) { alert('LLM error: ' + result.error); return; }
+      if (result.error) { console.error('LLM error:', result.error); return; }
       batches[savedIdx].hasLlmResult = true; batches = batches;
       if (batchIdx === savedIdx) {
         await selectBatch(savedIdx, { freshLlm: true, model: modelId });
         activeView = modelId;
       }
     } finally {
-      runningModel = '';
+      if (runningBatchIdx === savedIdx) { runningModel = ''; runningBatchIdx = -1; }
     }
   }
 
@@ -638,47 +609,35 @@
   {/if}
   <aside class="sidebar" class:open={sidebarOpen} class:hidden={mode === 'review' || mode === 'stars'}>
     <div class="sidebar-list">
-      {#if sidebarUndecided.length}
-        <div class="si-section">Open ({sidebarUndecided.length})</div>
-        {#each sidebarUndecided.slice(0, sidebarLimit) as item (item.idx)}
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <div class="gi" class:active={item.active}
-               on:click={() => { sidebarOpen = false; mode === 'groups' ? selectGroup(item.idx) : selectBatch(item.idx); }} role="button" tabindex="-1">
-            <div class="t">{item.label} · {item.date.toLocaleDateString('no', { day: 'numeric', month: 'short', year: '2-digit' })}</div>
-            <div class="m">{item.sub}{#if item.autoCullStats} · <span class="ac-tag">{item.autoCullStats.autoCullHigh + item.autoCullStats.autoCull}a/{item.autoCullStats.review}r</span>{/if}</div>
-          </div>
-        {/each}
-        {#if sidebarUndecided.length > sidebarLimit}
-          <button class="si-more" on:click={() => sidebarLimit += 100}>Show more ({sidebarUndecided.length - sidebarLimit} remaining)</button>
-        {/if}
+      {#if sidebarDecidedCount > 0}
+        <button class="si-more si-done-toggle" on:click={() => sidebarShowDone = !sidebarShowDone}>
+          {sidebarShowDone ? 'Hide' : 'Show'} {sidebarDecidedCount} done
+        </button>
       {/if}
-      {#if sidebarDecided.length}
-        <div class="si-section">Done ({sidebarDecided.length})</div>
-        {#each sidebarDecided.slice(0, 3) as item (item.idx)}
+      {#each sidebarItems.slice(0, sidebarLimit) as item (item.idx)}
+        {#if !item.decided || sidebarShowDone}
           <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <div class="gi decided" class:active={item.active}
+          <div class="gi" class:active={item.active} class:decided={item.decided}
                on:click={() => { sidebarOpen = false; mode === 'groups' ? selectGroup(item.idx) : selectBatch(item.idx); }} role="button" tabindex="-1">
-            <div class="t">{item.label} · {item.date.toLocaleDateString('no', { day: 'numeric', month: 'short', year: '2-digit' })}</div>
-            <div class="m">{item.sub}</div>
+            <div class="t">
+              {item.label} · {item.date.toLocaleDateString('no', { day: 'numeric', month: 'short', year: '2-digit' })}
+            </div>
+            <div class="m">
+              {item.sub}{#if item.hasLlm}
+                · {#if item.keeps || item.culls}<span class="si-keep">{item.keeps}✓</span> <span class="si-cull">{item.culls}✗</span>{/if}
+                <span class="si-llm">llm</span>
+              {/if}
+            </div>
           </div>
-        {/each}
-        {#if sidebarDecided.length > 3}
-          <button class="si-more" on:click={() => sidebarShowAllDone = !sidebarShowAllDone}>{sidebarShowAllDone ? 'Collapse' : `Show all ${sidebarDecided.length}`}</button>
-          {#if sidebarShowAllDone}
-            {#each sidebarDecided.slice(3) as item (item.idx)}
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <div class="gi decided" class:active={item.active}
-                   on:click={() => { sidebarOpen = false; mode === 'groups' ? selectGroup(item.idx) : selectBatch(item.idx); }} role="button" tabindex="-1">
-                <div class="t">{item.label} · {item.date.toLocaleDateString('no', { day: 'numeric', month: 'short', year: '2-digit' })}</div>
-                <div class="m">{item.sub}</div>
-              </div>
-            {/each}
-          {/if}
         {/if}
+      {/each}
+      {#if sidebarItems.length > sidebarLimit}
+        <button class="si-more" on:click={() => sidebarLimit += 100}>Show more ({sidebarItems.length - sidebarLimit} remaining)</button>
       {/if}
     </div>
     <InfoPanel
       asset={selectedAsset}
+      assetPath={selectedAsset?.path ?? ''}
       llm={selectedLlm}
       subgroup={selectedSubgroup}
       currentState={selectedCurrentState}
@@ -693,7 +652,12 @@
 
   <div class="main">
     {#if mode === 'review'}
-      <AutoCullReview {batches} onRefresh={async () => { batches = await fetchBatches(); stats = await fetchStats(); }} />
+      <AutoCullReview onNavigateBatch={async (id) => {
+        mode = 'batches';
+        if (!batches.length) batches = await fetchBatches();
+        const idx = batches.findIndex(b => b.id === id);
+        if (idx >= 0) await selectBatch(idx);
+      }} />
     {:else if mode === 'stars'}
       <StarsReview summary={starsSummary} totalKept={starsTotalKept} />
     {:else if loading}
@@ -746,24 +710,15 @@
           </button>
           {#each models as m}
             {@const hasCached = (batchDetail.llmModels ?? []).includes(m.id)}
-            {@const isRunning = runningModel === m.id}
+            {@const isRunning = runningModel === m.id && runningBatchIdx === batchIdx}
             <button class="model-btn" class:current={activeView === m.id} class:cached={hasCached && activeView !== m.id}
-              disabled={!!runningModel}
+              disabled={runningBatchIdx === batchIdx && !!runningModel}
               on:click={() => switchOrRunModel(m.id)} title="{m.id}{hasCached ? ' (cached)' : ''}">
               {#if isRunning}<span class="spinner"></span>{:else}{m.label}{/if}
             </button>
           {/each}
         </div>
       {/if}
-    {/if}
-    {#if mode === 'batches' && batchDetail?.autoCull && (batchDetail.autoCull.autoCullHigh + batchDetail.autoCull.autoCull) > 0}
-      {@const acTotal = batchDetail.autoCull.autoCullHigh + batchDetail.autoCull.autoCull}
-      <button class="bac" on:click={autoApproveCurrent} title="Auto-cull {acTotal} photos ({batchDetail.autoCull.autoCullHigh} high confidence)">
-        Auto ({acTotal})
-      </button>
-      <button class="bcr" on:click={openCullReview} title="Review culls side-by-side with their keepers">
-        Review
-      </button>
     {/if}
     <span class="spacer"></span>
     <span class="bmeta">{currentAssets.length} photos</span>
@@ -787,16 +742,6 @@
     }} />
 {/if}
 
-{#if cullReviewOpen}
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_interactive_supports_focus -->
-  <div class="help-bg" on:click={() => cullReviewOpen = false} role="dialog">
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
-    <div class="cr-overlay" on:click|stopPropagation role="document">
-      <CullReview comparisons={cullComparisons} onKeep={onCullReviewKeep} onConfirmCull={onCullReviewConfirm} />
-      <button class="cr-close" on:click={() => cullReviewOpen = false}>Close</button>
-    </div>
-  </div>
-{/if}
 
 {#if helpOpen}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_interactive_supports_focus -->
@@ -858,9 +803,11 @@
   .gi { padding: 5px 8px; cursor: pointer; border-bottom: 1px solid #1e2028; border-left: 3px solid transparent; }
   .gi:hover { background: #1c1f27; } .gi.active { background: #1f2330; border-left-color: #f0a040; } .gi.decided { opacity: .35; }
   .gi .t { font-weight: 500; } .gi .m { color: #666; font-size: 11px; }
-  .si-section { padding: 6px 8px 3px; font-size: 10px; color: #7a8294; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; border-bottom: 1px solid #1e2028; background: #0e1014; position: sticky; top: 0; z-index: 1; }
   .si-more { display: block; width: 100%; padding: 6px 8px; background: none; border: none; border-bottom: 1px solid #1e2028; color: #f0a040; font-size: 11px; cursor: pointer; text-align: left; }
   .si-more:hover { background: #1c1f27; }
+  .si-done-toggle { position: sticky; top: 0; z-index: 1; background: #0e1014; font-weight: 600; }
+  .si-keep { color: #4caf50; } .si-cull { color: #e53935; }
+  .si-llm { color: #7a8294; font-size: 10px; }
 
   .main { min-width: 0; min-height: 0; overflow: hidden; position: relative; }
   .empty { display: flex; align-items: center; justify-content: center; height: 100%; color: #666; }
@@ -872,11 +819,6 @@
   .bb { background: #2196F3; color: white; } .ba { background: #f0a040; color: #1a1a1a; font-weight: 700; }
   .bs { background: #333; color: #aaa; } .bh { background: none; color: #7a8294; border: 1px solid #2a2e36 !important; padding: 3px 9px; font-size: 12px; }
   .run-btn { background: #7c4dff; color: white; }
-  .bac { background: #e65100; color: white; }
-  .bcr { background: #1565c0; color: white; }
-  .cr-overlay { width: min(1200px, 95vw); height: min(800px, 90vh); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; position: relative; }
-  .cr-close { position: absolute; top: 6px; right: 10px; z-index: 10; background: rgba(0,0,0,0.6); border: none; color: #ccc; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
-  .cr-close:hover { background: rgba(0,0,0,0.8); }
   .spacer { flex: 1; } .bmeta { font-size: 11px; color: #7a8294; }
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: white; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -906,7 +848,6 @@
   :global(.toggle-zone) { position: absolute; top: 0; left: 0; right: 0; height: 20%; min-height: 24px; cursor: pointer; z-index: 2; }
   :global(.bdg) { position: absolute; top: 3px; left: 3px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; color: white; pointer-events: none; }
   :global(.bdg.kb) { background: #4caf50; } :global(.bdg.cb) { background: #e53935; } :global(.bdg.acb-hi) { background: #bf360c; font-size: 8px; } :global(.bdg.acb) { background: #e65100; font-size: 8px; }
-  .ac-tag { color: #e65100; font-weight: 600; }
   :global(.st) { position: absolute; top: 3px; right: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; }
   :global(.llm-star) { position: absolute; top: 3px; left: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; background: rgba(0,0,0,.6); padding: 1px 4px; border-radius: 3px; }
   :global(.llm-note) { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 9px; color: #ddd; text-shadow: 0 1px 2px #000; }

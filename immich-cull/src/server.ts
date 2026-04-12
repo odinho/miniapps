@@ -7,7 +7,7 @@
  */
 import Fastify from "fastify";
 import { resolve, dirname } from "path";
-import { readFileSync, existsSync, statSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, statSync } from "fs";
 import { FacetAdapter } from "./db/facet-adapter.js";
 import { ImmichAdapter } from "./db/immich-adapter.js";
 import { ImmichApiAdapter } from "./db/immich-api-adapter.js";
@@ -61,6 +61,11 @@ function resolveFilePath(asset: { path: string }): string | null {
 /** Get file size in bytes, cached */
 function getFileSize(asset: Asset): number {
   if (fileSizeCache.has(asset.id)) return fileSizeCache.get(asset.id)!;
+  // Use Immich-provided file size when available
+  if (asset.fileSize) {
+    fileSizeCache.set(asset.id, asset.fileSize);
+    return asset.fileSize;
+  }
   const fp = resolveFilePath(asset);
   if (!fp) return 0;
   try {
@@ -108,7 +113,7 @@ async function getDimensions(asset: Asset): Promise<{ w: number; h: number }> {
 let immichApiAdapter: ImmichApiAdapter | null = null;
 
 async function loadData() {
-  let assets: Asset[];
+  let assets: Asset[] = [];
 
   if (useImmichApi) {
     const url = process.env.IMMICH_URL;
@@ -119,14 +124,63 @@ async function loadData() {
     }
     console.log(`Connecting to Immich API at ${url}...`);
     immichApiAdapter = new ImmichApiAdapter({ serverUrl: url, apiKey: key });
-    const count = await immichApiAdapter.getAssetCount();
-    console.log(`Immich has ${count} images`);
 
-    console.log("Loading all assets via API...");
-    assets = await immichApiAdapter.getAllAssets((loaded) => {
-      process.stdout.write(`\r  ${loaded} loaded...`);
-    });
-    console.log();
+    // Cache asset list to disk — only fetch new/updated assets on subsequent starts
+    const cachePath = resolve(__dirname, "../data/immich-assets-cache.json");
+    let cachedAssets: Asset[] = [];
+    let newestDate: Date | null = null;
+
+    if (existsSync(cachePath)) {
+      try {
+        const raw = JSON.parse(readFileSync(cachePath, "utf-8"));
+        cachedAssets = raw.map((a: any) => ({
+          ...a,
+          fileCreatedAt: new Date(a.fileCreatedAt),
+          embedding: new Float32Array(0),
+        }));
+        newestDate = cachedAssets.reduce(
+          (max, a) => (a.fileCreatedAt > max ? a.fileCreatedAt : max),
+          new Date(0),
+        );
+        console.log(
+          `Cache: ${cachedAssets.length} assets (newest: ${newestDate.toISOString().slice(0, 10)})`,
+        );
+      } catch {
+        cachedAssets = [];
+      }
+    }
+
+    if (cachedAssets.length > 0) {
+      // Fetch only assets newer than cache (with 1-day buffer for edge cases)
+      const fetchSince = new Date(newestDate!.getTime() - 86400_000);
+      console.log("Fetching new assets since cache...");
+      const newAssets = await immichApiAdapter.getAssetsByDateRange(fetchSince, new Date(), (n) =>
+        process.stdout.write(`\r  ${n} new...`),
+      );
+      console.log();
+      // Merge: start from cache, add/update with new
+      const merged = new Map(cachedAssets.map((a) => [a.id, a]));
+      let added = 0;
+      for (const a of newAssets) {
+        if (!merged.has(a.id)) added++;
+        merged.set(a.id, a);
+      }
+      assets = [...merged.values()];
+      console.log(`${added} new, ${newAssets.length - added} updated, ${assets.length} total`);
+    } else {
+      const count = await immichApiAdapter.getAssetCount();
+      console.log(`Immich has ${count} images`);
+      console.log("Loading all assets via API...");
+      assets = await immichApiAdapter.getAllAssets((loaded) => {
+        process.stdout.write(`\r  ${loaded} loaded...`);
+      });
+      console.log();
+    }
+
+    // Update cache (strip embedding — always empty in API mode)
+    const toCache = assets.map((a) => ({ ...a, embedding: undefined }));
+    writeFileSync(cachePath, JSON.stringify(toCache));
+    console.log(`Cached ${assets.length} assets`);
   } else if (useImmich) {
     console.log("Connecting to Immich PostgreSQL...");
     const adapter = new ImmichAdapter(getImmichDbConfig());
@@ -271,7 +325,9 @@ app.get("/api/stats", async () => {
     photosToKeep: s.photosKept,
     photosToCull: s.photosCulled,
     remaining: groups.length - s.groupsReviewed - s.groupsSkipped,
-    cullBytes: 0, // TODO: compute efficiently with a join query
+    cullBytes: stateDb
+      .getCulledAssetIds()
+      .reduce((sum, id) => sum + (assetMap.has(id) ? getFileSize(assetMap.get(id)!) : 0), 0),
   };
 });
 
@@ -388,6 +444,14 @@ app.get("/api/batches", async () => {
         const fp = batchFingerprint(b.assets.map((a) => a.id));
         const cached = stateDb.getLlmRun(b.id, fp);
         const acSummary = cached ? getAutoCullSummary(b, cached.id) : null;
+        // Get keep/cull counts from user decisions
+        const decisions = stateDb.getPhotoDecisions(b.assets.map((a) => a.id));
+        let keeps = 0;
+        let culls = 0;
+        for (const d of Object.values(decisions)) {
+          if (d.state === "keep") keeps++;
+          else if (d.state === "cull") culls++;
+        }
         return {
           id: b.id,
           source: b.source,
@@ -396,6 +460,8 @@ app.get("/api/batches", async () => {
           dateRange: { start: b.dateRange.start.toISOString(), end: b.dateRange.end.toISOString() },
           hasLlmResult: cached !== null,
           viewStatus: stateDb.getViewStatus(b.id),
+          keeps,
+          culls,
           autoCullStats: acSummary
             ? {
                 autoCullHigh: acSummary.autoCullHigh,
@@ -452,6 +518,7 @@ app.get<{ Params: { id: string }; Querystring: { model?: string } }>(
           return {
             id: a.id,
             filename: a.filename,
+            path: a.path,
             date: a.fileCreatedAt.toISOString(),
             rating: a.rating,
             bytes: getFileSize(a),
@@ -762,6 +829,7 @@ app.get("/api/review-groups", async () => {
   interface ReviewPhoto {
     id: string;
     filename: string;
+    path: string;
     date: string;
     w: number;
     h: number;
@@ -800,6 +868,7 @@ app.get("/api/review-groups", async () => {
         return {
           id: aid,
           filename: asset?.filename ?? "",
+          path: asset?.path ?? "",
           date: asset?.fileCreatedAt.toISOString() ?? "",
           w: asset?.width ?? 4,
           h: asset?.height ?? 3,

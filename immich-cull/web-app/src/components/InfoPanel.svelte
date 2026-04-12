@@ -13,12 +13,23 @@
   export let keepLevel: number = 0;
   export let userStars: number = 0;
   export let onSetStars: (stars: number) => void = () => {};
+  export let assetPath: string = '';
+
+  let showPath = false;
 </script>
 
 {#if asset}
   <div class="info-panel">
     <div class="ip-header">Selected Photo</div>
-    <div class="ip-filename">{asset.filename}</div>
+    <div class="ip-filename-row">
+      <span class="ip-filename">{asset.filename}</span>
+      {#if assetPath}
+        <button class="ip-info-btn" on:click={() => showPath = !showPath} title="Show file path">i</button>
+      {/if}
+    </div>
+    {#if showPath && assetPath}
+      <div class="ip-path">{assetPath}</div>
+    {/if}
     <div class="ip-meta">{fmt(asset.bytes || 0)} · {new Date(asset.date).toLocaleString('no')}</div>
 
     <!-- Current state badge -->
@@ -101,7 +112,11 @@
 <style>
   .info-panel { padding: 10px 8px; font-size: 11px; background: #0e1014; }
   .ip-header { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #555; padding: 4px 8px; margin: 0 -8px 8px; background: #181a20; border-bottom: 1px solid #2a2e36; border-top: 1px solid #2a2e36; }
-  .ip-filename { font-weight: 600; font-size: 12px; margin-bottom: 2px; word-break: break-all; }
+  .ip-filename-row { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+  .ip-filename { font-weight: 600; font-size: 12px; word-break: break-all; }
+  .ip-info-btn { background: none; border: 1px solid #3a3e46; color: #7a8294; width: 16px; height: 16px; border-radius: 50%; font-size: 10px; font-style: italic; font-family: serif; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0; }
+  .ip-info-btn:hover { background: #2a2e36; color: #ccc; }
+  .ip-path { font-family: monospace; font-size: 10px; color: #7a8294; word-break: break-all; margin-bottom: 4px; padding: 2px 4px; background: #181a20; border-radius: 3px; }
   .ip-meta { color: #7a8294; margin-bottom: 6px; }
   .ip-stars-row { display: flex; align-items: center; gap: 1px; margin-bottom: 6px; }
   .ip-star-btn { background: none; border: none; color: #444; font-size: 18px; cursor: pointer; padding: 0 1px; line-height: 1; }

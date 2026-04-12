@@ -380,6 +380,13 @@ export class StateDb {
     };
   }
 
+  /** Get all culled asset IDs. */
+  getCulledAssetIds(): string[] {
+    return (
+      this.db.prepare("SELECT asset_id FROM photo_decisions WHERE state = 'cull'").all() as any[]
+    ).map((r) => r.asset_id);
+  }
+
   /** Get all decided photos for write-back. */
   getAllDecisions(): Array<{
     assetId: string;

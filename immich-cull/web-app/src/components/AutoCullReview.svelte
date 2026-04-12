@@ -1,13 +1,12 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { fetchReviewGroups, savePhotoDecisions } from '../lib/api';
-  import type { ReviewGroup, ReviewPhoto, AssetDetail, LlmImage, BatchSummary } from '../lib/api';
+  import type { ReviewGroup, ReviewPhoto, AssetDetail, LlmImage } from '../lib/api';
   import type { AssetState } from '../lib/stores';
   import PhotoGrid from './PhotoGrid.svelte';
   import Preview from './Preview.svelte';
 
-  export const batches: BatchSummary[] = [];
-  export const onRefresh: () => void = () => {};
+  export let onNavigateBatch: (batchId: string) => void = () => {};
 
   let allGroups: ReviewGroup[] = []; // includes approved ones for go-back
   let approvedSet = new Set<number>(); // indices of approved groups
@@ -16,6 +15,7 @@
   let totalGroups = 0;
   let tierCounts = { high: 0, standard: 0, review: 0 };
   let showHelp = false;
+  let showInfo = false;
   let previewIdx = -1;
 
   $: pendingGroups = allGroups.filter((_, i) => !approvedSet.has(i));
@@ -134,6 +134,7 @@
     }
     if (loading || !current) return;
     switch (e.key) {
+      case ' ': e.preventDefault(); previewIdx = 0; break;
       case 'a': case 'Enter': e.preventDefault(); approveGroup(); break;
       case 'c': case 'x': cullAll(); break;
       case 'k': keepAll(); break;
@@ -199,7 +200,22 @@
         keep {current.photos.filter(p => p.llmAction === 'keep').length},
         cull {current.photos.filter(p => p.llmAction === 'cull').length}
       </span>
+      {#if current.batchId !== 'singletons'}
+        <button class="acr-batch-link" on:click={() => onNavigateBatch(current.batchId)}>View batch</button>
+      {/if}
+      <button class="acr-info-btn" on:click={() => showInfo = !showInfo} title="Show file paths">i</button>
     </div>
+
+    {#if showInfo}
+      <div class="acr-info-panel">
+        {#each current.photos as photo (photo.id)}
+          <div class="acr-info-row" class:is-cull={photo.llmAction === 'cull'}>
+            <span class="acr-info-action">{photo.llmAction}</span>
+            <span class="acr-info-path" title={photo.path}>{photo.path || photo.filename}</span>
+          </div>
+        {/each}
+      </div>
+    {/if}
 
     <div class="acr-grid" class:singleton-grid={isSingletonBatch} class:approved-grid={isApproved}>
       <PhotoGrid
@@ -253,10 +269,10 @@
           <kbd>A</kbd> <span>Approve group (save keep/cull split)</span>
           <kbd>K</kbd> <span>Keep all photos in group</span>
           <kbd>C</kbd> <span>Cull all photos in group</span>
+          <kbd class="wide">Space</kbd> <span>Open preview (K=keep, X=cull, Esc=close)</span>
           <kbd class="wide">&larr; &rarr;</kbd> <span>Previous / next group</span>
           <kbd class="wide">Bksp</kbd> <span>Go back to previous group</span>
           <kbd>?</kbd> <span>Toggle this help</span>
-          <kbd>Click</kbd> <span>Open preview / top of photo toggles state</span>
         </div>
         <button class="help-close" on:click={() => showHelp = false}>Close</button>
       </div>
@@ -302,6 +318,18 @@
   .singleton-reason .acr-sg-type { background: #e53935; color: white; }
   .acr-sg-reason { flex: 1; min-width: 150px; }
   .acr-sg-meta { color: #555; }
+
+  .acr-batch-link { background: none; border: none; color: #f0a040; font-size: 11px; font-weight: 500; white-space: nowrap; cursor: pointer; padding: 0; }
+  .acr-batch-link:hover { text-decoration: underline; }
+  .acr-info-btn { background: none; border: 1px solid #3a3e46; color: #7a8294; width: 20px; height: 20px; border-radius: 50%; font-size: 11px; font-style: italic; font-family: serif; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0; }
+  .acr-info-btn:hover { background: #2a2e36; color: #ccc; }
+
+  .acr-info-panel { padding: 4px 14px; background: #111319; border-bottom: 1px solid #2a2e36; font-size: 11px; font-family: monospace; max-height: 120px; overflow-y: auto; }
+  .acr-info-row { display: flex; gap: 8px; padding: 1px 0; }
+  .acr-info-row.is-cull { opacity: 0.5; }
+  .acr-info-action { color: #4caf50; font-weight: 600; min-width: 32px; text-transform: uppercase; }
+  .acr-info-row.is-cull .acr-info-action { color: #e53935; }
+  .acr-info-path { color: #7a8294; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .acr-grid { flex: 1; position: relative; min-height: 0; }
   .acr-grid.singleton-grid { background: #1a0a0a; }

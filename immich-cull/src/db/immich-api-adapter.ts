@@ -79,7 +79,7 @@ export class ImmichApiAdapter {
       const resp = await fetch(`${this.baseUrl}/api/search/metadata`, {
         method: "POST",
         headers: { ...this.headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ ...query, page, size: 1000 }),
+        body: JSON.stringify({ ...query, page, size: 1000, withExif: true }),
       });
       if (!resp.ok) throw new Error(`Immich search error: ${resp.status}`);
       const data = (await resp.json()) as any;
@@ -100,6 +100,7 @@ export class ImmichApiAdapter {
           duplicateId: item.duplicateId ?? null,
           width: item.width ?? 0,
           height: item.height ?? 0,
+          fileSize: item.exifInfo?.fileSizeInByte ?? 0,
         });
       }
       onProgress?.(assets.length);
