@@ -142,6 +142,20 @@ See [docs/architecture.md](docs/architecture.md) for the full picture.
 - **Immich API**: Production mode via REST API — no tunnel needed, no CLIP
 - **Immich PostgreSQL**: Direct DB access with CLIP ViT-B-32 embeddings (512-dim), read-only
 
+## Bulk LLM processing
+
+For a few batches, use the UI. For many:
+
+```bash
+# Parallel real-time (simple, same cost)
+npm run rank:many -- --count 500 --concurrent 8
+
+# Vertex batch prediction (~50% cheaper, async, needs a GCS bucket)
+# See docs/batch-mode.md
+npm run rank:batch:submit -- --bucket gs://tagrdevin-immich-cull-batch
+npm run rank:batch:status
+```
+
 ## Auto-keep patterns
 
 Regex patterns in `auto_keep_patterns` exclude matching assets from batching (auto-kept). Matched against asset path and filename. Requires server restart.

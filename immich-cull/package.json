@@ -9,6 +9,8 @@
     "dev": "tsx watch src/server.ts --immich-api --vertex --port 3737",
     "start:local": "tsx src/server.ts --local --vertex --port 3737",
     "rank:many": "tsx src/cli/rank-many.ts",
+    "rank:batch:submit": "tsx src/cli/rank-batch-job.ts",
+    "rank:batch:status": "tsx src/cli/rank-batch-status.ts",
     "test:unit": "vitest run",
     "test:legacy": "tsx src/cli/cluster-local.ts --dry-run",
     "lint": "oxlint --deny-warnings src/",

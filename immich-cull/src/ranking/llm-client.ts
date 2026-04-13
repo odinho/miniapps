@@ -187,41 +187,7 @@ export class LlmClient {
     outputTokens: number;
   }> {
     onProgress?.(`Preparing ${batch.assets.length} images...`);
-
-    // Prepare image buffers with index watermarks
-    const imageBuffers: Buffer[] = [];
-    for (let idx = 0; idx < batch.assets.length; idx++) {
-      const asset = batch.assets[idx];
-      // resolveImage can return a file path (string), raw image bytes (Buffer), or null
-      // eslint-disable-next-line no-await-in-loop -- resolver may be async (e.g. Immich API fetch)
-      const resolved = await resolveImage(asset);
-      if (!resolved) {
-        // Generate a valid gray placeholder so the LLM sees something (not a broken image)
-        // eslint-disable-next-line no-await-in-loop
-        const placeholder = await sharp({
-          create: { width: 100, height: 100, channels: 3, background: { r: 128, g: 128, b: 128 } },
-        })
-          .jpeg({ quality: 50 })
-          .toBuffer();
-        imageBuffers.push(placeholder);
-        continue;
-      }
-      const svgOverlay = Buffer.from(
-        `<svg width="80" height="36"><rect x="0" y="0" width="80" height="36" rx="4" fill="rgba(0,0,0,0.7)"/><text x="40" y="26" font-size="24" font-weight="bold" fill="white" text-anchor="middle" font-family="sans-serif">#${idx}</text></svg>`,
-      );
-      // sharp() accepts both file paths (string) and raw image bytes (Buffer)
-      // eslint-disable-next-line no-await-in-loop -- intentional sequential image processing
-      const buf = await sharp(resolved)
-        .rotate()
-        .resize(this.config.previewMaxPx, this.config.previewMaxPx, {
-          fit: "inside",
-          withoutEnlargement: true,
-        })
-        .composite([{ input: svgOverlay, gravity: "northwest" }])
-        .jpeg({ quality: 75 })
-        .toBuffer();
-      imageBuffers.push(buf);
-    }
+    const imageBuffers = await this.prepareImageBuffers(batch, resolveImage);
 
     onProgress?.(`Sending to ${this.config.model} via ${this.config.provider}...`);
 
@@ -241,29 +207,12 @@ export class LlmClient {
         location: needsGlobal ? "global" : (this.config.vertexLocation ?? "europe-west1"),
       });
 
-      // Single Content with interleaved text labels + images as parts
-      const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [
-        { text: SYSTEM_PROMPT + "\n\n" + userPrompt },
-      ];
-      for (let i = 0; i < imageBuffers.length; i++) {
-        const a = batch.assets[i];
-        parts.push({
-          text: `--- Image ${i}: ${a.filename} (${a.fileCreatedAt.toISOString().slice(11, 19)}) ---`,
-        });
-        parts.push({
-          inlineData: { mimeType: "image/jpeg", data: imageBuffers[i].toString("base64") },
-        });
-      }
-      parts.push({ text: "Now return your JSON assessment for all images above." });
+      const { contents, generationConfig } = this.buildGeminiContents(batch, imageBuffers);
 
       const result = await ai.models.generateContent({
         model: this.config.model.replace("google/", ""),
-        contents: [{ role: "user", parts }],
-        config: {
-          temperature: 0.2,
-          maxOutputTokens: 65000,
-          responseMimeType: "application/json",
-        },
+        contents,
+        config: generationConfig,
       });
 
       rawJson = result.text ?? "";
@@ -393,5 +342,95 @@ export class LlmClient {
     }
 
     return { response: expanded, rawJson, inputTokens, outputTokens };
+  }
+
+  /**
+   * Prepare resized JPEG buffers with index watermarks for each asset.
+   * Missing images get a gray placeholder. Public so the batch prediction
+   * CLI path can reuse the same prep logic.
+   */
+  async prepareImageBuffers(
+    batch: SessionBatch,
+    resolveImage: (asset: {
+      path: string;
+      id: string;
+    }) => string | Buffer | null | Promise<string | Buffer | null>,
+  ): Promise<Buffer[]> {
+    const imageBuffers: Buffer[] = [];
+    for (let idx = 0; idx < batch.assets.length; idx++) {
+      const asset = batch.assets[idx];
+      // eslint-disable-next-line no-await-in-loop -- resolver may be async (e.g. Immich API fetch)
+      const resolved = await resolveImage(asset);
+      if (!resolved) {
+        // eslint-disable-next-line no-await-in-loop
+        const placeholder = await sharp({
+          create: { width: 100, height: 100, channels: 3, background: { r: 128, g: 128, b: 128 } },
+        })
+          .jpeg({ quality: 50 })
+          .toBuffer();
+        imageBuffers.push(placeholder);
+        continue;
+      }
+      const svgOverlay = Buffer.from(
+        `<svg width="80" height="36"><rect x="0" y="0" width="80" height="36" rx="4" fill="rgba(0,0,0,0.7)"/><text x="40" y="26" font-size="24" font-weight="bold" fill="white" text-anchor="middle" font-family="sans-serif">#${idx}</text></svg>`,
+      );
+      // eslint-disable-next-line no-await-in-loop -- intentional sequential image processing
+      const buf = await sharp(resolved)
+        .rotate()
+        .resize(this.config.previewMaxPx, this.config.previewMaxPx, {
+          fit: "inside",
+          withoutEnlargement: true,
+        })
+        .composite([{ input: svgOverlay, gravity: "northwest" }])
+        .jpeg({ quality: 75 })
+        .toBuffer();
+      imageBuffers.push(buf);
+    }
+    return imageBuffers;
+  }
+
+  /**
+   * Build the Gemini request body (contents + generationConfig) from a batch
+   * and pre-prepared image buffers. This is the raw structure the Vertex AI
+   * generateContent call takes, and it matches the format Vertex batch
+   * prediction expects per JSONL line.
+   */
+  buildGeminiContents(
+    batch: SessionBatch,
+    imageBuffers: Buffer[],
+  ): {
+    contents: Array<{
+      role: "user";
+      parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }>;
+    }>;
+    generationConfig: {
+      temperature: number;
+      maxOutputTokens: number;
+      responseMimeType: string;
+    };
+  } {
+    const userPrompt = buildPrompt(batch);
+    const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [
+      { text: SYSTEM_PROMPT + "\n\n" + userPrompt },
+    ];
+    for (let i = 0; i < imageBuffers.length; i++) {
+      const a = batch.assets[i];
+      parts.push({
+        text: `--- Image ${i}: ${a.filename} (${a.fileCreatedAt.toISOString().slice(11, 19)}) ---`,
+      });
+      parts.push({
+        inlineData: { mimeType: "image/jpeg", data: imageBuffers[i].toString("base64") },
+      });
+    }
+    parts.push({ text: "Now return your JSON assessment for all images above." });
+
+    return {
+      contents: [{ role: "user", parts }],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 65000,
+        responseMimeType: "application/json",
+      },
+    };
   }
 }

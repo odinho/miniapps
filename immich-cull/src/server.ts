@@ -628,6 +628,61 @@ app.delete<{ Params: { id: string }; Querystring: { model?: string } }>(
   },
 );
 
+/**
+ * Build the Gemini request body (contents + generationConfig) for a batch.
+ * Used by the batch prediction CLI to assemble a JSONL file for Vertex AI.
+ * Returns the same structure the real-time rank endpoint sends to the model.
+ */
+app.get<{ Params: { id: string } }>("/api/batches/:id/llm-request", async (req) => {
+  const batch = sessionBatches.find((b) => b.id === req.params.id);
+  if (!batch) return { error: "Not found" };
+  if (!llmClient) return { error: "No LLM client configured" };
+
+  const imageResolver = immichApiAdapter
+    ? async (asset: { path: string; id: string }) => {
+        try {
+          return await immichApiAdapter!.getThumbnail(asset.id, "preview");
+        } catch {
+          return null;
+        }
+      }
+    : (asset: { path: string; id: string }) => resolveFilePath(asset);
+
+  const imageBuffers = await llmClient.prepareImageBuffers(batch, imageResolver);
+  const { contents, generationConfig } = llmClient.buildGeminiContents(batch, imageBuffers);
+  const fp = batchFingerprint(batch.assets.map((a) => a.id));
+  return { batchId: batch.id, fingerprint: fp, contents, generationConfig };
+});
+
+/**
+ * Save an LLM run result from an external source (e.g. batch prediction job).
+ * Body: { model, promptVersion?, rawJson, inputTokens, outputTokens }
+ */
+app.post<{
+  Params: { id: string };
+  Body: {
+    model: string;
+    promptVersion?: string;
+    rawJson: string;
+    inputTokens: number;
+    outputTokens: number;
+  };
+}>("/api/batches/:id/llm-run", async (req) => {
+  const batch = sessionBatches.find((b) => b.id === req.params.id);
+  if (!batch) return { error: "Not found" };
+  const fp = batchFingerprint(batch.assets.map((a) => a.id));
+  const runId = stateDb.saveLlmRun(
+    batch.id,
+    fp,
+    req.body.model,
+    req.body.promptVersion ?? "v3",
+    req.body.rawJson,
+    req.body.inputTokens,
+    req.body.outputTokens,
+  );
+  return { ok: true, llmRunId: runId };
+});
+
 // === View status ===
 
 app.post<{ Params: { id: string }; Body: { viewType: string; status: string } }>(
