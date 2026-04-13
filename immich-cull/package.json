@@ -8,12 +8,14 @@
     "build": "tsc",
     "dev": "tsx watch src/server.ts --immich-api --vertex --port 3737",
     "start:local": "tsx src/server.ts --local --vertex --port 3737",
-    "test": "tsx src/cli/cluster-local.ts --dry-run",
+    "rank:many": "tsx src/cli/rank-many.ts",
+    "test:unit": "vitest run",
+    "test:legacy": "tsx src/cli/cluster-local.ts --dry-run",
     "lint": "oxlint --deny-warnings src/",
     "fmt": "oxfmt --write src/",
     "fmt:check": "oxfmt --check src/",
     "typecheck": "tsgo --noEmit",
-    "check": "npm run lint && npm run fmt:check && npm run typecheck && npm --prefix web-app run lint && npm --prefix web-app run fmt:check && npm --prefix web-app run check && npm --prefix web-app run test"
+    "check": "npm run lint && npm run fmt:check && npm run typecheck && npm run test:unit && npm --prefix web-app run lint && npm --prefix web-app run fmt:check && npm --prefix web-app run check && npm --prefix web-app run test"
   },
   "dependencies": {
     "@google/genai": "^1.0.0",
