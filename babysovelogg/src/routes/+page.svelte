@@ -515,11 +515,11 @@
 				</div>
 				<div class="rescue-nap-hint">
 					{#if prediction.rescueNap.reason === 'short_prior_nap'}
-						Førre lur var kort — ein kort reddingslur held søvntrykket oppe til natta.
+						Førre lur var under forventa. Vekking i lett fase gjev mjukare oppvakning og held søvntrykket til natta.
 					{:else if prediction.rescueNap.reason === 'extra_nap'}
-						Ekstra lur utover forventa — hald den kort så leggetida ikkje vert skuva.
+						Ekstra lur utover forventa — vekking i lett fase gjev mjukare oppvakning og beskyttar leggetida.
 					{:else}
-						Kort førre lur + ekstra lur — hald denne kort for å beskytta leggetida.
+						Kort førre lur + ekstra lur — vekking i lett fase beskyttar både mjuk oppvakning og leggetida.
 					{/if}
 				</div>
 			</div>

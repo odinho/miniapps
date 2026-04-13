@@ -55,16 +55,16 @@ export const SLEEP_NEEDS: SleepNeed[] = [
   { minMonths: 18, maxMonths: 24, totalHours: 13, range: [11, 14] },
 ];
 
-/** Rescue nap thresholds (based on pediatric sleep consultant consensus). */
+/** Rescue nap thresholds (based on pediatric sleep consultant consensus + sleep cycle biology). */
 export const RESCUE_NAP = {
-  /** Prior nap is "short" if < this fraction of the baby's learned nap duration */
-  SHORT_NAP_FRACTION: 0.6,
   /** Absolute floor for short-nap threshold (minutes) — avoids catching micro-naps from low data */
   SHORT_NAP_FLOOR_MIN: 15,
   /** Floor for rescue-nap cap (minutes) — guards against low-data cycle estimates */
   CAP_FLOOR_MIN: 20,
   /** Ceiling for rescue-nap cap (minutes) — past this it's effectively a real nap */
   CAP_CEILING_MIN: 60,
+  /** Light-phase window (minutes) each side of cycle boundary — same as timer-state LIGHT_WINDOW */
+  LIGHT_WINDOW_MIN: 8,
   /** Minimum pre-bedtime wake window (minutes) — hard floor */
   MIN_PRE_BEDTIME_WAKE: 90,
 } as const;

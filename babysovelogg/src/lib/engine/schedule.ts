@@ -698,25 +698,34 @@ export interface RescueNapInfo {
 }
 
 /**
- * Compute the "short nap" threshold (minutes) based on the baby's learned nap duration.
- * A nap shorter than this for THIS baby indicates they didn't get a restorative nap.
+ * Compute the "short nap" threshold (minutes) in a cycle-aware way.
+ *
+ * A nap is "short" (needs rescue) if it missed at least one of the baby's
+ * expected sleep cycles. We use `learnedNapMin - cycleMin * 0.5` so that:
+ * - A 2-cycle napper (e.g. 110m with 55m cycle): threshold 82m → 1-cycle nap is short
+ * - A 1-cycle napper (e.g. 55m with 55m cycle): threshold 27m → 36m+ nap is fine
+ * - A 3-cycle napper: threshold flags missing a single cycle
  */
-export function computeShortNapThreshold(learnedNapMin: number): number {
+export function computeShortNapThreshold(learnedNapMin: number, cycleMin: number): number {
   return Math.max(
     RESCUE_NAP.SHORT_NAP_FLOOR_MIN,
-    Math.round(learnedNapMin * RESCUE_NAP.SHORT_NAP_FRACTION),
+    Math.round(learnedNapMin - cycleMin * 0.5),
   );
 }
 
 /**
- * Compute the rescue nap duration cap (minutes), anchored to the baby's learned
- * sleep cycle. Sleep consultants recommend "about one sleep cycle" — so we use
- * the learned cycle, bounded by sensible floor/ceiling values.
+ * Compute the rescue nap duration cap (minutes).
+ *
+ * We aim to wake during the light phase that precedes a cycle boundary — waking
+ * in light sleep is smoother than waking from deep/REM. The target is midway
+ * through the pre-boundary light window: `cycleMin - LIGHT_WINDOW / 2`.
+ * Bounded by floor/ceiling to guard against bad data and runaway cycle estimates.
  */
 export function computeRescueNapCap(learnedCycleMin: number): number {
+  const target = Math.round(learnedCycleMin - RESCUE_NAP.LIGHT_WINDOW_MIN / 2);
   return Math.max(
     RESCUE_NAP.CAP_FLOOR_MIN,
-    Math.min(RESCUE_NAP.CAP_CEILING_MIN, Math.round(learnedCycleMin)),
+    Math.min(RESCUE_NAP.CAP_CEILING_MIN, target),
   );
 }
 

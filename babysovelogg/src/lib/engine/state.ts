@@ -302,8 +302,9 @@ function assembleEmergingPrediction(
   let rescueNap: Prediction["rescueNap"] = null;
   if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
     expectedNapEnd = predictNapEndTime(activeSleep.start_time, ctx);
-    const shortThreshold = computeShortNapThreshold(getLearnedNapDuration(ctx));
-    const rescueCap = computeRescueNapCap(estimateSleepCycleFromData(ctx));
+    const cycleMin = estimateSleepCycleFromData(ctx);
+    const shortThreshold = computeShortNapThreshold(getLearnedNapDuration(ctx), cycleMin);
+    const rescueCap = computeRescueNapCap(cycleMin);
     rescueNap = detectRescueNap(
       activeSleep.start_time,
       completedNaps.filter((s) => s.end_time).map((s) => ({ start_time: s.start_time, end_time: s.end_time! })),
@@ -435,8 +436,9 @@ function assembleSchedulePrediction(
   let rescueNap: Prediction["rescueNap"] = null;
   if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
     expectedNapEnd = predictNapEndTime(activeSleep.start_time, ctx);
-    const shortThreshold = computeShortNapThreshold(getLearnedNapDuration(ctx));
-    const rescueCap = computeRescueNapCap(estimateSleepCycleFromData(ctx));
+    const cycleMin = estimateSleepCycleFromData(ctx);
+    const shortThreshold = computeShortNapThreshold(getLearnedNapDuration(ctx), cycleMin);
+    const rescueCap = computeRescueNapCap(cycleMin);
     rescueNap = detectRescueNap(
       activeSleep.start_time,
       completedNaps.filter((s) => s.end_time).map((s) => ({ start_time: s.start_time, end_time: s.end_time! })),
