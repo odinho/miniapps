@@ -698,7 +698,20 @@ export interface RescueNapInfo {
 }
 
 /**
+ * Compute the "short nap" threshold (minutes) based on the baby's learned nap duration.
+ * A nap shorter than this for THIS baby indicates they didn't get a restorative nap.
+ */
+export function computeShortNapThreshold(learnedNapMin: number): number {
+  return Math.max(
+    RESCUE_NAP.SHORT_NAP_FLOOR_MIN,
+    Math.round(learnedNapMin * RESCUE_NAP.SHORT_NAP_FRACTION),
+  );
+}
+
+/**
  * Check if an active nap is a rescue nap and compute recommended wake time.
+ * `shortNapThresholdMin` is the per-baby threshold below which the prior nap
+ * counts as "short" (see computeShortNapThreshold).
  * Returns null if this is a normal nap.
  */
 export function detectRescueNap(
@@ -706,13 +719,14 @@ export function detectRescueNap(
   completedNaps: { start_time: string; end_time: string }[],
   expectedNapCount: number,
   bedtime: string | null,
+  shortNapThresholdMin: number,
 ): RescueNapInfo | null {
   const isExtraNap = completedNaps.length >= expectedNapCount;
 
   const lastNap = completedNaps[0]; // sorted most recent first
   const lastNapShort = lastNap && (
     (new Date(lastNap.end_time).getTime() - new Date(lastNap.start_time).getTime())
-    < RESCUE_NAP.SHORT_NAP_THRESHOLD * 60_000
+    < shortNapThresholdMin * 60_000
   );
 
   if (!isExtraNap && !lastNapShort) return null;
