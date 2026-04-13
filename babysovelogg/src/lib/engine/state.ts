@@ -6,6 +6,7 @@ import {
   predictNightEndTime,
   detectRescueNap,
   computeShortNapThreshold,
+  computeRescueNapCap,
   selectBestPlan,
   getWakeWindow,
   getLearnedNapDuration,
@@ -302,12 +303,14 @@ function assembleEmergingPrediction(
   if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
     expectedNapEnd = predictNapEndTime(activeSleep.start_time, ctx);
     const shortThreshold = computeShortNapThreshold(getLearnedNapDuration(ctx));
+    const rescueCap = computeRescueNapCap(estimateSleepCycleFromData(ctx));
     rescueNap = detectRescueNap(
       activeSleep.start_time,
       completedNaps.filter((s) => s.end_time).map((s) => ({ start_time: s.start_time, end_time: s.end_time! })),
       expectedNapCount,
       bedtime,
       shortThreshold,
+      rescueCap,
     );
   }
   let expectedNightEnd: string | null = null;
@@ -433,12 +436,14 @@ function assembleSchedulePrediction(
   if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
     expectedNapEnd = predictNapEndTime(activeSleep.start_time, ctx);
     const shortThreshold = computeShortNapThreshold(getLearnedNapDuration(ctx));
+    const rescueCap = computeRescueNapCap(estimateSleepCycleFromData(ctx));
     rescueNap = detectRescueNap(
       activeSleep.start_time,
       completedNaps.filter((s) => s.end_time).map((s) => ({ start_time: s.start_time, end_time: s.end_time! })),
       expectedNapCount,
       bedtime,
       shortThreshold,
+      rescueCap,
     );
   }
 

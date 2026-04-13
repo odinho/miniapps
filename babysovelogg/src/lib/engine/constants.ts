@@ -61,8 +61,10 @@ export const RESCUE_NAP = {
   SHORT_NAP_FRACTION: 0.6,
   /** Absolute floor for short-nap threshold (minutes) — avoids catching micro-naps from low data */
   SHORT_NAP_FLOOR_MIN: 15,
-  /** Max rescue nap duration (minutes) — one sleep cycle, per sleep-science consensus */
-  CAP_MINUTES: 45,
+  /** Floor for rescue-nap cap (minutes) — guards against low-data cycle estimates */
+  CAP_FLOOR_MIN: 20,
+  /** Ceiling for rescue-nap cap (minutes) — past this it's effectively a real nap */
+  CAP_CEILING_MIN: 60,
   /** Minimum pre-bedtime wake window (minutes) — hard floor */
   MIN_PRE_BEDTIME_WAKE: 90,
 } as const;

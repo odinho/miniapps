@@ -709,9 +709,21 @@ export function computeShortNapThreshold(learnedNapMin: number): number {
 }
 
 /**
+ * Compute the rescue nap duration cap (minutes), anchored to the baby's learned
+ * sleep cycle. Sleep consultants recommend "about one sleep cycle" — so we use
+ * the learned cycle, bounded by sensible floor/ceiling values.
+ */
+export function computeRescueNapCap(learnedCycleMin: number): number {
+  return Math.max(
+    RESCUE_NAP.CAP_FLOOR_MIN,
+    Math.min(RESCUE_NAP.CAP_CEILING_MIN, Math.round(learnedCycleMin)),
+  );
+}
+
+/**
  * Check if an active nap is a rescue nap and compute recommended wake time.
  * `shortNapThresholdMin` is the per-baby threshold below which the prior nap
- * counts as "short" (see computeShortNapThreshold).
+ * counts as "short". `rescueCapMin` is the per-baby max rescue nap duration.
  * Returns null if this is a normal nap.
  */
 export function detectRescueNap(
@@ -720,6 +732,7 @@ export function detectRescueNap(
   expectedNapCount: number,
   bedtime: string | null,
   shortNapThresholdMin: number,
+  rescueCapMin: number,
 ): RescueNapInfo | null {
   const isExtraNap = completedNaps.length >= expectedNapCount;
 
@@ -732,7 +745,7 @@ export function detectRescueNap(
   if (!isExtraNap && !lastNapShort) return null;
 
   const napStartMs = new Date(napStartTime).getTime();
-  let capEndMs = napStartMs + RESCUE_NAP.CAP_MINUTES * 60_000;
+  let capEndMs = napStartMs + rescueCapMin * 60_000;
 
   if (bedtime) {
     const bedtimeMs = new Date(bedtime).getTime();

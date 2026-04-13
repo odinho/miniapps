@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   detectRescueNap,
   computeShortNapThreshold,
+  computeRescueNapCap,
   RESCUE_NAP,
 } from "$lib/engine/schedule.js";
 
@@ -42,10 +43,12 @@ describe("detectRescueNap", () => {
   const bedtime = "2026-04-12T16:00:00.000Z"; // 18:00 Oslo
   // Halldis-like baby: typical nap ~90 min, short threshold = 54 min
   const shortThresh = 54;
+  // Default cap for a 10-month-old: learned cycle ~55 min
+  const rescueCap = 55;
 
   it("returns null for a normal nap within expected count", () => {
     const completedNaps = [
-      nap("2026-04-12T08:00:00Z", "2026-04-12T09:30:00Z"), // 90 min — normal
+      nap("2026-04-12T08:00:00Z", "2026-04-12T09:30:00Z"),
     ];
     const result = detectRescueNap(
       "2026-04-12T12:00:00Z",
@@ -53,6 +56,7 @@ describe("detectRescueNap", () => {
       2,
       bedtime,
       shortThresh,
+      rescueCap,
     );
     expect(result).toBeNull();
   });
@@ -64,9 +68,10 @@ describe("detectRescueNap", () => {
     const result = detectRescueNap(
       "2026-04-12T12:12:00Z",
       completedNaps,
-      1, // expected 1, completed 1 → extra!
+      1,
       bedtime,
       shortThresh,
+      rescueCap,
     );
     expect(result).not.toBeNull();
     expect(result!.reason).toBe("extra_nap");
@@ -74,7 +79,7 @@ describe("detectRescueNap", () => {
 
   it("detects rescue after short prior nap (relative to baby)", () => {
     const completedNaps = [
-      nap("2026-04-12T08:12:00Z", "2026-04-12T08:50:00Z"), // 38 min < 54 threshold
+      nap("2026-04-12T08:12:00Z", "2026-04-12T08:50:00Z"),
     ];
     const result = detectRescueNap(
       "2026-04-12T12:12:00Z",
@@ -82,29 +87,30 @@ describe("detectRescueNap", () => {
       2,
       bedtime,
       shortThresh,
+      rescueCap,
     );
     expect(result).not.toBeNull();
     expect(result!.reason).toBe("short_prior_nap");
   });
 
   it("does NOT trigger for 40-min nap when baby's threshold allows it", () => {
-    // Single-cycle-napper baby: threshold = 24 min
     const completedNaps = [
-      nap("2026-04-12T08:00:00Z", "2026-04-12T08:40:00Z"), // 40 min
+      nap("2026-04-12T08:00:00Z", "2026-04-12T08:40:00Z"),
     ];
     const result = detectRescueNap(
       "2026-04-12T12:00:00Z",
       completedNaps,
       2,
       bedtime,
-      24, // low threshold for this baby
+      24, // low threshold — single-cycle napper
+      rescueCap,
     );
     expect(result).toBeNull();
   });
 
   it("detects 'both' when extra and short prior", () => {
     const completedNaps = [
-      nap("2026-04-12T08:12:00Z", "2026-04-12T08:50:00Z"), // 38 min short
+      nap("2026-04-12T08:12:00Z", "2026-04-12T08:50:00Z"),
     ];
     const result = detectRescueNap(
       "2026-04-12T12:12:00Z",
@@ -112,20 +118,33 @@ describe("detectRescueNap", () => {
       1,
       bedtime,
       shortThresh,
+      rescueCap,
     );
     expect(result).not.toBeNull();
     expect(result!.reason).toBe("both");
   });
 
-  it("caps recommended wake at nap start + 45 min", () => {
+  it("caps recommended wake at nap start + learned cycle", () => {
     const completedNaps = [
       nap("2026-04-12T08:00:00Z", "2026-04-12T10:00:00Z"),
     ];
     const napStart = "2026-04-12T12:00:00.000Z";
-    const result = detectRescueNap(napStart, completedNaps, 1, bedtime, shortThresh);
+    const result = detectRescueNap(napStart, completedNaps, 1, bedtime, shortThresh, rescueCap);
     const napStartMs = new Date(napStart).getTime();
     const wakeMs = new Date(result!.recommendedWakeTime).getTime();
-    expect(wakeMs - napStartMs).toBe(RESCUE_NAP.CAP_MINUTES * 60_000);
+    expect(wakeMs - napStartMs).toBe(rescueCap * 60_000);
+  });
+
+  it("uses shorter cap for short-cycle babies", () => {
+    const completedNaps = [
+      nap("2026-04-12T08:00:00Z", "2026-04-12T10:00:00Z"),
+    ];
+    const napStart = "2026-04-12T12:00:00.000Z";
+    const shortCycleCap = 30; // baby's cycle is 30 min
+    const result = detectRescueNap(napStart, completedNaps, 1, bedtime, shortThresh, shortCycleCap);
+    const napStartMs = new Date(napStart).getTime();
+    const wakeMs = new Date(result!.recommendedWakeTime).getTime();
+    expect(wakeMs - napStartMs).toBe(shortCycleCap * 60_000);
   });
 
   it("caps recommended wake to respect bedtime - 90 min", () => {
@@ -134,7 +153,7 @@ describe("detectRescueNap", () => {
     ];
     const earlyBedtime = "2026-04-12T15:40:00.000Z";
     const napStart = "2026-04-12T14:00:00.000Z";
-    const result = detectRescueNap(napStart, completedNaps, 1, earlyBedtime, shortThresh);
+    const result = detectRescueNap(napStart, completedNaps, 1, earlyBedtime, shortThresh, rescueCap);
 
     const bedtimeMs = new Date(earlyBedtime).getTime();
     const wakeMs = new Date(result!.recommendedWakeTime).getTime();
@@ -151,11 +170,12 @@ describe("detectRescueNap", () => {
       1,
       null,
       shortThresh,
+      rescueCap,
     );
     expect(result).not.toBeNull();
     const wakeMs = new Date(result!.recommendedWakeTime).getTime();
     const startMs = new Date("2026-04-12T14:00:00Z").getTime();
-    expect(wakeMs - startMs).toBe(RESCUE_NAP.CAP_MINUTES * 60_000);
+    expect(wakeMs - startMs).toBe(rescueCap * 60_000);
   });
 
   it("ensures minimum 20 min when cap is very tight", () => {
@@ -164,7 +184,7 @@ describe("detectRescueNap", () => {
     ];
     const veryLateBedtime = "2026-04-12T14:30:00.000Z";
     const napStart = "2026-04-12T14:00:00.000Z";
-    const result = detectRescueNap(napStart, completedNaps, 1, veryLateBedtime, shortThresh);
+    const result = detectRescueNap(napStart, completedNaps, 1, veryLateBedtime, shortThresh, rescueCap);
 
     const startMs = new Date(napStart).getTime();
     const wakeMs = new Date(result!.recommendedWakeTime).getTime();
@@ -173,7 +193,7 @@ describe("detectRescueNap", () => {
 
   it("not triggered when prior nap exceeds threshold", () => {
     const completedNaps = [
-      nap("2026-04-12T08:00:00Z", "2026-04-12T09:20:00Z"), // 80 min > 54 threshold
+      nap("2026-04-12T08:00:00Z", "2026-04-12T09:20:00Z"),
     ];
     const result = detectRescueNap(
       "2026-04-12T12:00:00Z",
@@ -181,7 +201,26 @@ describe("detectRescueNap", () => {
       2,
       bedtime,
       shortThresh,
+      rescueCap,
     );
     expect(result).toBeNull();
+  });
+});
+
+describe("computeRescueNapCap", () => {
+  it("uses the learned cycle as the cap", () => {
+    expect(computeRescueNapCap(55)).toBe(55);
+    expect(computeRescueNapCap(40)).toBe(40);
+    expect(computeRescueNapCap(30)).toBe(30);
+  });
+
+  it("enforces floor for very low cycles (bad data)", () => {
+    expect(computeRescueNapCap(10)).toBe(RESCUE_NAP.CAP_FLOOR_MIN);
+    expect(computeRescueNapCap(5)).toBe(RESCUE_NAP.CAP_FLOOR_MIN);
+  });
+
+  it("enforces ceiling so rescue naps don't become full naps", () => {
+    expect(computeRescueNapCap(75)).toBe(RESCUE_NAP.CAP_CEILING_MIN);
+    expect(computeRescueNapCap(90)).toBe(RESCUE_NAP.CAP_CEILING_MIN);
   });
 });
