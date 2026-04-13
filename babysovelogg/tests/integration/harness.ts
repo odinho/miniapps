@@ -98,13 +98,23 @@ import { GET as wakeupsGET } from "../../src/routes/api/wakeups/+server.js";
 import { GET as exportGET } from "../../src/routes/api/export/+server.js";
 import { POST as importNapperPOST } from "../../src/routes/api/import/napper/+server.js";
 import { POST as adminRebuildPOST } from "../../src/routes/api/admin/rebuild/+server.js";
+import { GET as vapidKeyGET } from "../../src/routes/api/notifications/vapid-key/+server.js";
+import {
+  POST as notifSubscribePOST,
+  DELETE as notifSubscribeDELETE,
+} from "../../src/routes/api/notifications/subscribe/+server.js";
 
 // Re-export db for direct use in tests
 export { db } from "$lib/server/db.js";
 
 // Route table mapping paths to handlers
 type Handler = (event: { request: Request; url: URL; params: Record<string, string> }) => Response | Promise<Response>;
-const routes: { pattern: string; GET?: Handler; POST?: Handler }[] = [
+const routes: {
+  pattern: string;
+  GET?: Handler;
+  POST?: Handler;
+  DELETE?: Handler;
+}[] = [
   { pattern: "/api/events", GET: eventsGET as Handler, POST: eventsPOST as Handler },
   { pattern: "/api/state", GET: stateGET as Handler },
   { pattern: "/api/sleeps", GET: sleepsGET as Handler },
@@ -113,6 +123,12 @@ const routes: { pattern: string; GET?: Handler; POST?: Handler }[] = [
   { pattern: "/api/export", GET: exportGET as Handler },
   { pattern: "/api/import/napper", POST: importNapperPOST as Handler },
   { pattern: "/api/admin/rebuild", POST: adminRebuildPOST as Handler },
+  { pattern: "/api/notifications/vapid-key", GET: vapidKeyGET as Handler },
+  {
+    pattern: "/api/notifications/subscribe",
+    POST: notifSubscribePOST as Handler,
+    DELETE: notifSubscribeDELETE as Handler,
+  },
 ];
 
 // Convert Node IncomingMessage → Web Request
@@ -154,7 +170,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
-  const method = req.method as "GET" | "POST";
+  const method = req.method as "GET" | "POST" | "DELETE";
   const handler = route[method];
   if (!handler) {
     res.statusCode = 405;
@@ -201,6 +217,8 @@ export function setupHarness() {
     db.prepare("DELETE FROM diaper_log").run();
     db.prepare("DELETE FROM sleep_log").run();
     db.prepare("DELETE FROM day_start").run();
+    db.prepare("DELETE FROM notification_schedule").run();
+    db.prepare("DELETE FROM notification_subscriptions").run();
     db.prepare("DELETE FROM baby").run();
     db.prepare("DELETE FROM events").run();
     try {
@@ -221,6 +239,14 @@ export async function post(path: string, body: unknown) {
 
 export async function get(path: string) {
   return fetch(`${baseUrl}${path}`);
+}
+
+export async function del(path: string, body?: unknown) {
+  return fetch(`${baseUrl}${path}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
 }
 
 export async function postEvents(events: Record<string, unknown>[]) {

@@ -96,3 +96,16 @@ SQLite file (`db.sqlite`) in the working directory. Uses DELETE journal mode —
 | `PORT` | `3000` | Server port |
 | `DB_PATH` | `./db.sqlite` | SQLite database file path |
 | `ORIGIN` | — | Required in production for CSRF (e.g. `https://sove.example.com`) |
+| `VAPID_PUBLIC_KEY` | — | Web Push VAPID public key. If unset, push notifications are disabled. |
+| `VAPID_PRIVATE_KEY` | — | Web Push VAPID private key. Keep secret. |
+| `VAPID_SUBJECT` | `mailto:noreply@babysovelogg.local` | Contact for push service (mailto: or https: URL) |
+
+## Push Notifications
+
+Generate VAPID keys once per deployment:
+
+```bash
+bun scripts/generate-vapid-keys.ts
+```
+
+Add the output to the systemd service as `Environment=` lines. The server must have outbound HTTPS access to push endpoints (FCM at `fcm.googleapis.com`, Mozilla at `updates.push.services.mozilla.com`, Apple at `web.push.apple.com`) — if your firewall blocks these, web push won't work without a proxy.

@@ -5,6 +5,7 @@ import { processBatchTx, getEvents } from "$lib/server/events.js";
 import { validateBatch } from "$lib/server/schemas.js";
 import { getState } from "$lib/server/state.js";
 import { broadcast } from "$lib/server/broadcast.js";
+import { reconcileNotifications } from "$lib/server/notification-scheduler.js";
 import type { EventRow } from "$lib/types.js";
 
 export const GET: RequestHandler = ({ url }) => {
@@ -78,6 +79,11 @@ export const POST: RequestHandler = async ({ request }) => {
     // Only broadcast if at least one event was actually applied (not duplicate)
     if (results.some((r) => !r.duplicate)) {
       broadcast("update", { state });
+      try {
+        reconcileNotifications(state);
+      } catch (err) {
+        console.error("[reconcileNotifications]", err);
+      }
     }
     return json({
       events: results.map((r) => ({ ...r.event, duplicate: r.duplicate })),

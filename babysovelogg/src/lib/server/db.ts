@@ -140,6 +140,33 @@ function initSchema(database: SqliteDb) {
       UNIQUE(baby_id, date)
     );
   `);
+
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS notification_subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      baby_id INTEGER NOT NULL REFERENCES baby(id),
+      endpoint TEXT NOT NULL UNIQUE,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      user_agent TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS notification_schedule (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      baby_id INTEGER NOT NULL REFERENCES baby(id),
+      kind TEXT NOT NULL,
+      fire_at TEXT NOT NULL,
+      dedupe_key TEXT NOT NULL UNIQUE,
+      payload_json TEXT,
+      sent_at TEXT,
+      cancelled_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_notif_schedule_due
+      ON notification_schedule(fire_at) WHERE sent_at IS NULL AND cancelled_at IS NULL;
+  `);
 }
 
 /** Initialize (or re-initialize) the database. Defaults to file-based db.sqlite. */

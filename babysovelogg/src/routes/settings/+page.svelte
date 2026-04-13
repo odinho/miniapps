@@ -10,6 +10,14 @@
 	} from '$lib/settings-utils.js';
 	import DateInput from '$lib/components/DateInput.svelte';
 	import TimeInput from '$lib/components/TimeInput.svelte';
+	import {
+		isSupported as isNotifSupported,
+		getStatus as getNotifStatus,
+		subscribe as subscribeNotif,
+		unsubscribe as unsubscribeNotif,
+		sendTest as sendTestNotif,
+		type NotificationStatus,
+	} from '$lib/notifications.js';
 
 	// --- derived state ---
 	const s = $derived(appState.state);
@@ -43,6 +51,52 @@
 	// --- import state ---
 	let importFile = $state<File | null>(null);
 	let importing = $state(false);
+
+	// --- notifications state ---
+	let notifStatus = $state<NotificationStatus>('unsupported');
+	let notifBusy = $state(false);
+
+	async function refreshNotifStatus() {
+		notifStatus = await getNotifStatus();
+	}
+
+	$effect(() => {
+		if (isNotifSupported()) refreshNotifStatus();
+	});
+
+	async function onNotifToggle() {
+		if (notifBusy) return;
+		notifBusy = true;
+		try {
+			if (notifStatus === 'subscribed') {
+				await unsubscribeNotif();
+				showToast('Varsel slått av', 'success');
+			} else {
+				const res = await subscribeNotif();
+				if (res.ok) {
+					showToast('Varsel slått på', 'success');
+				} else if (res.error === 'permission_denied') {
+					showToast('Du må tillate varsel i nettlesaren', 'warning');
+				} else {
+					showToast('Kunne ikkje slå på varsel', 'error');
+				}
+			}
+			await refreshNotifStatus();
+		} finally {
+			notifBusy = false;
+		}
+	}
+
+	async function onNotifTest() {
+		if (notifBusy) return;
+		notifBusy = true;
+		try {
+			await sendTestNotif();
+			showToast('Test sendt', 'success');
+		} finally {
+			notifBusy = false;
+		}
+	}
 
 	// --- actions ---
 	function showToast(text: string, type: 'success' | 'error' | 'warning') {
@@ -226,6 +280,49 @@
 				{isOnboarding ? 'Kom i gang ✨' : 'Lagra'}
 			</button>
 		</div>
+
+		<!-- Notifications (only when baby exists) -->
+		{#if baby}
+			<div
+				style="margin-top: 32px; border-top: 1px solid var(--cream-dark); padding-top: 24px;"
+				data-testid="notifications-section"
+			>
+				<h2 style="font-size: 1.1rem; margin-bottom: 8px;">Varsel</h2>
+				<div style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 12px;">
+					Få varsel på telefonen når reddingslurar bør endast i lett fase.
+				</div>
+				{#if notifStatus === 'unsupported'}
+					<div style="font-size: 0.85rem; color: var(--text-light);">
+						Nettlesaren støttar ikkje varsel.
+					</div>
+				{:else if notifStatus === 'permission-denied'}
+					<div style="font-size: 0.85rem; color: var(--danger-dark);">
+						Varsel er blokkert i nettlesaren. Endra i nettstadinnstillingane for å slå på.
+					</div>
+				{:else}
+					<div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+						<button
+							class="btn {notifStatus === 'subscribed' ? 'btn-ghost' : 'btn-primary'}"
+							onclick={onNotifToggle}
+							disabled={notifBusy}
+							data-testid="notif-toggle"
+						>
+							{notifStatus === 'subscribed' ? 'Slå av varsel' : 'Slå på varsel'}
+						</button>
+						{#if notifStatus === 'subscribed'}
+							<button
+								class="btn btn-ghost"
+								onclick={onNotifTest}
+								disabled={notifBusy}
+								data-testid="notif-test"
+							>
+								Send test
+							</button>
+						{/if}
+					</div>
+				{/if}
+			</div>
+		{/if}
 
 		<!-- Napper import section (only when baby exists) -->
 		{#if baby}
