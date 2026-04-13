@@ -103,3 +103,55 @@ export async function sendTest(): Promise<unknown> {
   const res = await fetch("/api/notifications/test", { method: "POST" });
   return res.json();
 }
+
+export type NotificationKind =
+  | "rescue_wake"
+  | "nap_ending_soon"
+  | "nap_overtime"
+  | "bedtime_approaching"
+  | "nap_overdue";
+
+export type NotificationPrefs = Record<NotificationKind, boolean>;
+
+export const TRIGGER_LABELS: Record<NotificationKind, { title: string; hint: string }> = {
+  rescue_wake: {
+    title: "Reddingslur – vekking snart",
+    hint: "2 min før tilrådd vaknetid ved reddingslurar.",
+  },
+  nap_ending_soon: {
+    title: "Luren sluttar snart",
+    hint: "2 min før forventa vaknetid for vanlege lurar.",
+  },
+  nap_overtime: {
+    title: "Luren er over forventa",
+    hint: "20 min etter forventa slutt — kanskje på tide å vekka.",
+  },
+  bedtime_approaching: {
+    title: "Leggetid snart",
+    hint: "30 min før forventa leggetid.",
+  },
+  nap_overdue: {
+    title: "Lur er forsinka",
+    hint: "30 min etter forventa lurstart. Kan vere noko masete.",
+  },
+};
+
+export async function getPrefs(): Promise<{
+  prefs: NotificationPrefs;
+  kinds: NotificationKind[];
+} | null> {
+  const res = await fetch("/api/notifications/preferences");
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function setPrefs(patch: Partial<NotificationPrefs>): Promise<NotificationPrefs | null> {
+  const res = await fetch("/api/notifications/preferences", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) return null;
+  const body = (await res.json()) as { prefs: NotificationPrefs };
+  return body.prefs;
+}

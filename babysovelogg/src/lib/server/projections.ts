@@ -387,6 +387,11 @@ export function rebuildAll(): RebuildReport {
     db.prepare("DELETE FROM sleep_pauses").run();
     db.prepare("DELETE FROM diaper_log").run();
     db.prepare("DELETE FROM sleep_log").run();
+    // Notification tables reference baby(id) — clear before deleting baby rows.
+    // Subscriptions will need to be re-added after rebuild.
+    db.prepare("DELETE FROM notification_schedule").run();
+    db.prepare("DELETE FROM notification_subscriptions").run();
+    db.prepare("DELETE FROM notification_preferences").run();
     db.prepare("DELETE FROM baby").run();
     // Reset autoincrement so replayed baby IDs match original payload references
     db.prepare(

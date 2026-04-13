@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll, afterAll } from "bun:test";
-import { setupHarness, post, get, del, db, createBaby } from "./harness.js";
+import { setupHarness, post, put, get, del, db, createBaby } from "./harness.js";
 
 setupHarness();
 
@@ -112,5 +112,60 @@ describe("DELETE /api/notifications/subscribe", () => {
       endpoint: "https://fcm.googleapis.com/never-was",
     });
     expect(res.status).toBe(200);
+  });
+});
+
+describe("GET /api/notifications/preferences", () => {
+  it("returns default prefs when none set", async () => {
+    createBaby();
+    const res = await get("/api/notifications/preferences");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.prefs.rescue_wake).toBe(true);
+    expect(body.prefs.nap_ending_soon).toBe(true);
+    expect(body.prefs.nap_overtime).toBe(true);
+    expect(body.prefs.bedtime_approaching).toBe(true);
+    expect(body.prefs.nap_overdue).toBe(false);
+    expect(body.kinds).toContain("rescue_wake");
+  });
+
+  it("returns 400 with no baby", async () => {
+    const res = await get("/api/notifications/preferences");
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("PUT /api/notifications/preferences", () => {
+  it("updates prefs", async () => {
+    createBaby();
+    const res = await put("/api/notifications/preferences", {
+      nap_overdue: true,
+      rescue_wake: false,
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.prefs.nap_overdue).toBe(true);
+    expect(body.prefs.rescue_wake).toBe(false);
+    expect(body.prefs.nap_ending_soon).toBe(true); // unchanged
+  });
+
+  it("ignores unknown keys", async () => {
+    createBaby();
+    const res = await put("/api/notifications/preferences", {
+      not_a_real_kind: true,
+      nap_ending_soon: false,
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.prefs.nap_ending_soon).toBe(false);
+    expect(body.prefs).not.toHaveProperty("not_a_real_kind");
+  });
+
+  it("persists across requests", async () => {
+    createBaby();
+    await put("/api/notifications/preferences", { nap_overdue: true });
+    const res = await get("/api/notifications/preferences");
+    const body = await res.json();
+    expect(body.prefs.nap_overdue).toBe(true);
   });
 });

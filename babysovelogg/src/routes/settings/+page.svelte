@@ -16,7 +16,12 @@
 		subscribe as subscribeNotif,
 		unsubscribe as unsubscribeNotif,
 		sendTest as sendTestNotif,
+		getPrefs as getNotifPrefs,
+		setPrefs as setNotifPrefs,
+		TRIGGER_LABELS,
 		type NotificationStatus,
+		type NotificationKind,
+		type NotificationPrefs,
 	} from '$lib/notifications.js';
 
 	// --- derived state ---
@@ -55,14 +60,34 @@
 	// --- notifications state ---
 	let notifStatus = $state<NotificationStatus>('unsupported');
 	let notifBusy = $state(false);
+	let notifPrefs = $state<NotificationPrefs | null>(null);
+	let notifKinds = $state<NotificationKind[]>([]);
 
 	async function refreshNotifStatus() {
 		notifStatus = await getNotifStatus();
 	}
 
+	async function loadPrefs() {
+		const res = await getNotifPrefs();
+		if (res) {
+			notifPrefs = res.prefs;
+			notifKinds = res.kinds;
+		}
+	}
+
 	$effect(() => {
 		if (isNotifSupported()) refreshNotifStatus();
+		if (baby) loadPrefs();
 	});
+
+	async function onPrefToggle(kind: NotificationKind) {
+		if (!notifPrefs) return;
+		const next = !notifPrefs[kind];
+		// Optimistic update
+		notifPrefs = { ...notifPrefs, [kind]: next };
+		const result = await setNotifPrefs({ [kind]: next });
+		if (result) notifPrefs = result;
+	}
 
 	async function onNotifToggle() {
 		if (notifBusy) return;
@@ -320,6 +345,30 @@
 							</button>
 						{/if}
 					</div>
+
+					{#if notifPrefs && notifKinds.length > 0}
+						<div style="margin-top: 16px; display: flex; flex-direction: column; gap: 10px;" data-testid="notif-prefs">
+							{#each notifKinds as kind}
+								<label style="display: flex; gap: 10px; align-items: flex-start; cursor: pointer;">
+									<input
+										type="checkbox"
+										checked={notifPrefs[kind]}
+										onchange={() => onPrefToggle(kind)}
+										data-testid="notif-pref-{kind}"
+										style="margin-top: 3px; flex-shrink: 0;"
+									/>
+									<div style="flex: 1;">
+										<div style="font-size: 0.9rem; font-weight: 500;">
+											{TRIGGER_LABELS[kind].title}
+										</div>
+										<div style="font-size: 0.75rem; color: var(--text-light); line-height: 1.3;">
+											{TRIGGER_LABELS[kind].hint}
+										</div>
+									</div>
+								</label>
+							{/each}
+						</div>
+					{/if}
 				{/if}
 			</div>
 		{/if}

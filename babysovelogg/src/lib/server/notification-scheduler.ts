@@ -1,7 +1,18 @@
 import { db } from "./db.js";
 import { sendPushToBaby } from "./webpush.js";
+import { getPrefs, type NotificationKind } from "./notification-prefs.js";
+import { isoToDateInTz } from "$lib/tz.js";
 import type { Baby, SleepLogRow } from "$lib/types.js";
 import type { Prediction } from "$lib/stores/app.svelte.js";
+
+/** Pre-notify offset: fire this many minutes before end-of-nap / bedtime. */
+const PRE_NOTIFY_MIN = 2;
+/** Minutes past expected end before "nap overtime" fires. */
+const OVERTIME_OFFSET_MIN = 20;
+/** Minutes before bedtime to fire bedtime_approaching. */
+const BEDTIME_APPROACH_MIN = 30;
+/** Minutes past nextNap before "nap overdue" fires. */
+const OVERDUE_OFFSET_MIN = 30;
 
 /** Looser shape than AppState — accepts server-side state where activeSleep may be undefined. */
 export interface ReconcileInput {
@@ -9,9 +20,6 @@ export interface ReconcileInput {
   activeSleep: SleepLogRow | null | undefined;
   prediction: Prediction | null;
 }
-
-/** Pre-notify offset: fire this many minutes before the recommended wake time. */
-const PRE_NOTIFY_MIN = 2;
 
 interface NotificationRow {
   id: number;
@@ -27,45 +35,140 @@ function formatTime(iso: string): string {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+function upsert(
+  babyId: number,
+  kind: NotificationKind,
+  fireAtMs: number,
+  dedupeKey: string,
+  payload: { title: string; body: string; data?: Record<string, unknown> },
+): void {
+  const fireAt = new Date(fireAtMs).toISOString();
+  const payloadJson = JSON.stringify({ ...payload, tag: dedupeKey });
+  db.prepare(
+    `INSERT INTO notification_schedule (baby_id, kind, fire_at, dedupe_key, payload_json)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(dedupe_key) DO UPDATE SET
+       fire_at = excluded.fire_at,
+       payload_json = excluded.payload_json,
+       cancelled_at = NULL
+     WHERE notification_schedule.sent_at IS NULL`,
+  ).run(babyId, kind, fireAt, dedupeKey, payloadJson);
+}
+
+function cancelByKind(babyId: number, kind: NotificationKind): void {
+  db.prepare(
+    `UPDATE notification_schedule
+     SET cancelled_at = datetime('now')
+     WHERE baby_id = ? AND kind = ?
+       AND sent_at IS NULL AND cancelled_at IS NULL`,
+  ).run(babyId, kind);
+}
+
+function cancelByDedupe(dedupeKey: string): void {
+  db.prepare(
+    `UPDATE notification_schedule
+     SET cancelled_at = datetime('now')
+     WHERE dedupe_key = ? AND sent_at IS NULL AND cancelled_at IS NULL`,
+  ).run(dedupeKey);
+}
+
 /**
  * Called after every state update. Upserts/cancels notification rows based on
- * current state. Idempotent — re-running with the same state is a no-op.
+ * current state and per-baby preferences. Idempotent.
  */
 export function reconcileNotifications(state: ReconcileInput): void {
   const baby = state.baby;
   if (!baby) return;
+  const prefs = getPrefs(baby.id);
 
-  const active = state.activeSleep;
-  const rescue = state.prediction?.rescueNap;
+  const active = state.activeSleep ?? null;
+  const pred = state.prediction;
+  const isNappingActive = !!(active && active.type === "nap" && !active.end_time);
+  const isAwake = !active || !!active.end_time;
+  const tz = baby.timezone ?? "Europe/Oslo";
 
-  if (active && active.type === "nap" && !active.end_time && rescue) {
-    const dedupeKey = `rescue_wake:${active.domain_id}`;
-    const fireAtMs = new Date(rescue.recommendedWakeTime).getTime() - PRE_NOTIFY_MIN * 60_000;
-    const fireAt = new Date(fireAtMs).toISOString();
-    const payload = {
+  // ── Rescue wake ─────────────────────────────────────────────────
+  if (prefs.rescue_wake && isNappingActive && active && pred?.rescueNap) {
+    const dedupe = `rescue_wake:${active.domain_id}`;
+    const fireAt =
+      new Date(pred.rescueNap.recommendedWakeTime).getTime() - PRE_NOTIFY_MIN * 60_000;
+    upsert(baby.id, "rescue_wake", fireAt, dedupe, {
       title: "Reddingslur – vekking snart",
-      body: `Tilrådd å vekka kl. ${formatTime(rescue.recommendedWakeTime)} (lett fase)`,
-      tag: dedupeKey,
+      body: `Tilrådd å vekka kl. ${formatTime(pred.rescueNap.recommendedWakeTime)} (lett fase)`,
       data: { kind: "rescue_wake", sleepDomainId: active.domain_id },
-    };
-
-    db.prepare(
-      `INSERT INTO notification_schedule (baby_id, kind, fire_at, dedupe_key, payload_json)
-       VALUES (?, 'rescue_wake', ?, ?, ?)
-       ON CONFLICT(dedupe_key) DO UPDATE SET
-         fire_at = excluded.fire_at,
-         payload_json = excluded.payload_json,
-         cancelled_at = NULL
-       WHERE notification_schedule.sent_at IS NULL`,
-    ).run(baby.id, fireAt, dedupeKey, JSON.stringify(payload));
+    });
   } else {
-    // No active rescue nap — cancel any pending rescue wake rows for this baby
-    db.prepare(
-      `UPDATE notification_schedule
-       SET cancelled_at = datetime('now')
-       WHERE baby_id = ? AND kind = 'rescue_wake'
-         AND sent_at IS NULL AND cancelled_at IS NULL`,
-    ).run(baby.id);
+    cancelByKind(baby.id, "rescue_wake");
+  }
+
+  // ── Nap ending soon ─────────────────────────────────────────────
+  // Skip when rescue wake is active — don't double-notify
+  if (
+    prefs.nap_ending_soon &&
+    isNappingActive &&
+    active &&
+    pred?.expectedNapEnd &&
+    !pred.rescueNap
+  ) {
+    const dedupe = `nap_ending_soon:${active.domain_id}`;
+    const fireAt = new Date(pred.expectedNapEnd).getTime() - PRE_NOTIFY_MIN * 60_000;
+    upsert(baby.id, "nap_ending_soon", fireAt, dedupe, {
+      title: "Luren sluttar snart",
+      body: `Forventa vaknetid kl. ${formatTime(pred.expectedNapEnd)} – lett fase no`,
+      data: { kind: "nap_ending_soon", sleepDomainId: active.domain_id },
+    });
+  } else {
+    cancelByKind(baby.id, "nap_ending_soon");
+  }
+
+  // ── Nap overtime ────────────────────────────────────────────────
+  if (prefs.nap_overtime && isNappingActive && active && pred?.expectedNapEnd) {
+    const dedupe = `nap_overtime:${active.domain_id}`;
+    const fireAt = new Date(pred.expectedNapEnd).getTime() + OVERTIME_OFFSET_MIN * 60_000;
+    upsert(baby.id, "nap_overtime", fireAt, dedupe, {
+      title: "Luren er over forventa",
+      body: `Starta kl. ${formatTime(active.start_time)} – sjekk om ho bør vekkast`,
+      data: { kind: "nap_overtime", sleepDomainId: active.domain_id },
+    });
+  } else {
+    cancelByKind(baby.id, "nap_overtime");
+  }
+
+  // ── Bedtime approaching ─────────────────────────────────────────
+  if (prefs.bedtime_approaching && isAwake && pred?.bedtime) {
+    const bedtimeMs = new Date(pred.bedtime).getTime();
+    const fireAt = bedtimeMs - BEDTIME_APPROACH_MIN * 60_000;
+    const localDate = isoToDateInTz(new Date(bedtimeMs).toISOString(), tz);
+    const dedupe = `bedtime_approaching:${localDate}`;
+    upsert(baby.id, "bedtime_approaching", fireAt, dedupe, {
+      title: "Leggetid snart",
+      body: `Forventa kl. ${formatTime(pred.bedtime)}`,
+      data: { kind: "bedtime_approaching" },
+    });
+  } else if (active && active.type === "night") {
+    // Night sleep started — cancel any pending bedtime_approaching
+    cancelByKind(baby.id, "bedtime_approaching");
+  }
+
+  // ── Nap overdue ─────────────────────────────────────────────────
+  if (
+    prefs.nap_overdue &&
+    isAwake &&
+    pred?.nextNap &&
+    !pred.napsAllDone
+  ) {
+    const nextNapMs = new Date(pred.nextNap).getTime();
+    const fireAt = nextNapMs + OVERDUE_OFFSET_MIN * 60_000;
+    const localDate = isoToDateInTz(new Date(nextNapMs).toISOString(), tz);
+    const dedupe = `nap_overdue:${localDate}:${pred.expectedNapCount - (pred.predictedNaps?.length ?? 0)}`;
+    upsert(baby.id, "nap_overdue", fireAt, dedupe, {
+      title: "Lur er forsinka",
+      body: `Venta kl. ${formatTime(pred.nextNap)} – søvntrykk byggjer seg opp`,
+      data: { kind: "nap_overdue" },
+    });
+  } else if (isNappingActive) {
+    // Nap started — cancel any pending overdue for this session
+    cancelByKind(baby.id, "nap_overdue");
   }
 }
 
@@ -121,3 +224,6 @@ export function stopNotificationLoop(): void {
     loopHandle = null;
   }
 }
+
+// Exported for testing
+export { cancelByDedupe };

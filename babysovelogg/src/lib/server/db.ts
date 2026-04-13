@@ -166,6 +166,11 @@ function initSchema(database: SqliteDb) {
 
     CREATE INDEX IF NOT EXISTS idx_notif_schedule_due
       ON notification_schedule(fire_at) WHERE sent_at IS NULL AND cancelled_at IS NULL;
+
+    CREATE TABLE IF NOT EXISTS notification_preferences (
+      baby_id INTEGER PRIMARY KEY REFERENCES baby(id),
+      prefs_json TEXT NOT NULL DEFAULT '{}'
+    );
   `);
 }
 

@@ -103,6 +103,10 @@ import {
   POST as notifSubscribePOST,
   DELETE as notifSubscribeDELETE,
 } from "../../src/routes/api/notifications/subscribe/+server.js";
+import {
+  GET as notifPrefsGET,
+  PUT as notifPrefsPUT,
+} from "../../src/routes/api/notifications/preferences/+server.js";
 
 // Re-export db for direct use in tests
 export { db } from "$lib/server/db.js";
@@ -113,6 +117,7 @@ const routes: {
   pattern: string;
   GET?: Handler;
   POST?: Handler;
+  PUT?: Handler;
   DELETE?: Handler;
 }[] = [
   { pattern: "/api/events", GET: eventsGET as Handler, POST: eventsPOST as Handler },
@@ -128,6 +133,11 @@ const routes: {
     pattern: "/api/notifications/subscribe",
     POST: notifSubscribePOST as Handler,
     DELETE: notifSubscribeDELETE as Handler,
+  },
+  {
+    pattern: "/api/notifications/preferences",
+    GET: notifPrefsGET as Handler,
+    PUT: notifPrefsPUT as Handler,
   },
 ];
 
@@ -170,7 +180,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
-  const method = req.method as "GET" | "POST" | "DELETE";
+  const method = req.method as "GET" | "POST" | "PUT" | "DELETE";
   const handler = route[method];
   if (!handler) {
     res.statusCode = 405;
@@ -219,6 +229,7 @@ export function setupHarness() {
     db.prepare("DELETE FROM day_start").run();
     db.prepare("DELETE FROM notification_schedule").run();
     db.prepare("DELETE FROM notification_subscriptions").run();
+    db.prepare("DELETE FROM notification_preferences").run();
     db.prepare("DELETE FROM baby").run();
     db.prepare("DELETE FROM events").run();
     try {
@@ -246,6 +257,14 @@ export async function del(path: string, body?: unknown) {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
+  });
+}
+
+export async function put(path: string, body: unknown) {
+  return fetch(`${baseUrl}${path}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
 }
 

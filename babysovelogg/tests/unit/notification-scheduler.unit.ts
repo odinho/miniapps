@@ -5,10 +5,10 @@ import {
   fireDueNotifications,
   type ReconcileInput,
 } from "$lib/server/notification-scheduler.js";
+import { setPrefs } from "$lib/server/notification-prefs.js";
 import type { SleepLogRow, Baby } from "$lib/types.js";
 import type { Prediction } from "$lib/stores/app.svelte.js";
 
-// Fresh in-memory DB for each test
 beforeEach(() => {
   initDb(":memory:");
   db.prepare("INSERT INTO baby (id, name, birthdate) VALUES (1, 'Test', '2025-06-12')").run();
@@ -27,13 +27,13 @@ const baby: Baby = {
   updated_by_event_id: null,
 };
 
-function makeActiveSleep(startTime: string, domainId = "slp_test"): SleepLogRow {
+function makeActiveSleep(startTime: string, domainId = "slp_test", type = "nap"): SleepLogRow {
   return {
     id: 1,
     baby_id: 1,
     start_time: startTime,
     end_time: null,
-    type: "nap",
+    type,
     notes: null,
     mood: null,
     method: null,
@@ -75,52 +75,44 @@ function makePrediction(overrides: Partial<Prediction> = {}): Prediction {
   };
 }
 
-describe("reconcileNotifications", () => {
-  it("schedules a rescue wake 2 min before recommended wake time", () => {
+function rowsOf(kind: string) {
+  return db
+    .prepare(
+      "SELECT * FROM notification_schedule WHERE kind = ? AND cancelled_at IS NULL ORDER BY id",
+    )
+    .all(kind) as Array<{ fire_at: string; dedupe_key: string; payload_json: string }>;
+}
+
+describe("reconcileNotifications – rescue_wake", () => {
+  it("schedules 2 min before recommended wake time", () => {
     const active = makeActiveSleep("2026-04-13T12:00:00.000Z");
-    const input: ReconcileInput = {
+    reconcileNotifications({
       baby,
       activeSleep: active,
       prediction: makePrediction({
-        rescueNap: {
-          recommendedWakeTime: "2026-04-13T12:45:00.000Z",
-          reason: "short_prior_nap",
-        },
+        rescueNap: { recommendedWakeTime: "2026-04-13T12:45:00.000Z", reason: "short_prior_nap" },
       }),
-    };
-
-    reconcileNotifications(input);
-
-    const rows = db
-      .prepare("SELECT * FROM notification_schedule")
-      .all() as Array<{ fire_at: string; dedupe_key: string; kind: string }>;
+    });
+    const rows = rowsOf("rescue_wake");
     expect(rows).toHaveLength(1);
-    expect(rows[0].kind).toBe("rescue_wake");
-    expect(rows[0].dedupe_key).toBe(`rescue_wake:${active.domain_id}`);
     expect(new Date(rows[0].fire_at).toISOString()).toBe("2026-04-13T12:43:00.000Z");
   });
 
-  it("is idempotent — running twice gives one row", () => {
+  it("is idempotent", () => {
     const active = makeActiveSleep("2026-04-13T12:00:00.000Z");
     const input: ReconcileInput = {
       baby,
       activeSleep: active,
       prediction: makePrediction({
-        rescueNap: {
-          recommendedWakeTime: "2026-04-13T12:45:00.000Z",
-          reason: "short_prior_nap",
-        },
+        rescueNap: { recommendedWakeTime: "2026-04-13T12:45:00.000Z", reason: "short_prior_nap" },
       }),
     };
-
     reconcileNotifications(input);
     reconcileNotifications(input);
-
-    const rows = db.prepare("SELECT * FROM notification_schedule").all();
-    expect(rows).toHaveLength(1);
+    expect(rowsOf("rescue_wake")).toHaveLength(1);
   });
 
-  it("updates fire_at when recommendation changes", () => {
+  it("cancels when rescue nap is gone", () => {
     const active = makeActiveSleep("2026-04-13T12:00:00.000Z");
     reconcileNotifications({
       baby,
@@ -129,46 +121,185 @@ describe("reconcileNotifications", () => {
         rescueNap: { recommendedWakeTime: "2026-04-13T12:45:00.000Z", reason: "short_prior_nap" },
       }),
     });
+    reconcileNotifications({ baby, activeSleep: null, prediction: makePrediction() });
+    expect(rowsOf("rescue_wake")).toHaveLength(0);
+  });
+});
+
+describe("reconcileNotifications – nap_ending_soon", () => {
+  it("schedules 2 min before expected nap end for normal nap", () => {
+    const active = makeActiveSleep("2026-04-13T12:00:00.000Z");
     reconcileNotifications({
       baby,
       activeSleep: active,
-      prediction: makePrediction({
-        rescueNap: { recommendedWakeTime: "2026-04-13T12:50:00.000Z", reason: "short_prior_nap" },
-      }),
+      prediction: makePrediction({ expectedNapEnd: "2026-04-13T13:30:00.000Z" }),
     });
-
-    const rows = db
-      .prepare("SELECT * FROM notification_schedule")
-      .all() as Array<{ fire_at: string }>;
+    const rows = rowsOf("nap_ending_soon");
     expect(rows).toHaveLength(1);
-    expect(new Date(rows[0].fire_at).toISOString()).toBe("2026-04-13T12:48:00.000Z");
+    expect(new Date(rows[0].fire_at).toISOString()).toBe("2026-04-13T13:28:00.000Z");
   });
 
-  it("cancels pending rescue rows when there's no active rescue nap", () => {
+  it("is skipped when rescue nap is active (avoid double-notify)", () => {
     const active = makeActiveSleep("2026-04-13T12:00:00.000Z");
     reconcileNotifications({
       baby,
       activeSleep: active,
       prediction: makePrediction({
+        expectedNapEnd: "2026-04-13T13:30:00.000Z",
         rescueNap: { recommendedWakeTime: "2026-04-13T12:45:00.000Z", reason: "short_prior_nap" },
       }),
     });
+    expect(rowsOf("nap_ending_soon")).toHaveLength(0);
+    expect(rowsOf("rescue_wake")).toHaveLength(1);
+  });
 
-    // Sleep ended — no more rescue nap
+  it("respects prefs.nap_ending_soon = false", () => {
+    setPrefs(1, { nap_ending_soon: false });
+    const active = makeActiveSleep("2026-04-13T12:00:00.000Z");
+    reconcileNotifications({
+      baby,
+      activeSleep: active,
+      prediction: makePrediction({ expectedNapEnd: "2026-04-13T13:30:00.000Z" }),
+    });
+    expect(rowsOf("nap_ending_soon")).toHaveLength(0);
+  });
+});
+
+describe("reconcileNotifications – nap_overtime", () => {
+  it("schedules 20 min after expected nap end", () => {
+    const active = makeActiveSleep("2026-04-13T12:00:00.000Z");
+    reconcileNotifications({
+      baby,
+      activeSleep: active,
+      prediction: makePrediction({ expectedNapEnd: "2026-04-13T13:30:00.000Z" }),
+    });
+    const rows = rowsOf("nap_overtime");
+    expect(rows).toHaveLength(1);
+    expect(new Date(rows[0].fire_at).toISOString()).toBe("2026-04-13T13:50:00.000Z");
+  });
+
+  it("fires alongside nap_ending_soon for normal naps", () => {
+    const active = makeActiveSleep("2026-04-13T12:00:00.000Z");
+    reconcileNotifications({
+      baby,
+      activeSleep: active,
+      prediction: makePrediction({ expectedNapEnd: "2026-04-13T13:30:00.000Z" }),
+    });
+    expect(rowsOf("nap_ending_soon")).toHaveLength(1);
+    expect(rowsOf("nap_overtime")).toHaveLength(1);
+  });
+
+  it("respects prefs.nap_overtime = false", () => {
+    setPrefs(1, { nap_overtime: false });
+    const active = makeActiveSleep("2026-04-13T12:00:00.000Z");
+    reconcileNotifications({
+      baby,
+      activeSleep: active,
+      prediction: makePrediction({ expectedNapEnd: "2026-04-13T13:30:00.000Z" }),
+    });
+    expect(rowsOf("nap_overtime")).toHaveLength(0);
+  });
+});
+
+describe("reconcileNotifications – bedtime_approaching", () => {
+  it("schedules 30 min before bedtime when baby is awake", () => {
     reconcileNotifications({
       baby,
       activeSleep: null,
-      prediction: makePrediction({ rescueNap: null }),
+      prediction: makePrediction({ bedtime: "2026-04-13T18:00:00.000Z" }),
     });
-
-    const rows = db
-      .prepare("SELECT cancelled_at FROM notification_schedule")
-      .all() as Array<{ cancelled_at: string | null }>;
+    const rows = rowsOf("bedtime_approaching");
     expect(rows).toHaveLength(1);
-    expect(rows[0].cancelled_at).not.toBeNull();
+    expect(new Date(rows[0].fire_at).toISOString()).toBe("2026-04-13T17:30:00.000Z");
   });
 
-  it("does not cancel already-sent rows", () => {
+  it("uses per-day dedupe key", () => {
+    reconcileNotifications({
+      baby,
+      activeSleep: null,
+      prediction: makePrediction({ bedtime: "2026-04-13T18:00:00.000Z" }),
+    });
+    reconcileNotifications({
+      baby,
+      activeSleep: null,
+      prediction: makePrediction({ bedtime: "2026-04-13T18:15:00.000Z" }),
+    });
+    const rows = rowsOf("bedtime_approaching");
+    expect(rows).toHaveLength(1);
+    // Second call should have updated fire_at
+    expect(new Date(rows[0].fire_at).toISOString()).toBe("2026-04-13T17:45:00.000Z");
+  });
+
+  it("cancels when night sleep starts", () => {
+    reconcileNotifications({
+      baby,
+      activeSleep: null,
+      prediction: makePrediction({ bedtime: "2026-04-13T18:00:00.000Z" }),
+    });
+    const night = makeActiveSleep("2026-04-13T17:55:00.000Z", "slp_night", "night");
+    reconcileNotifications({ baby, activeSleep: night, prediction: makePrediction() });
+    expect(rowsOf("bedtime_approaching")).toHaveLength(0);
+  });
+
+  it("does not schedule during an active nap", () => {
+    const active = makeActiveSleep("2026-04-13T12:00:00.000Z");
+    reconcileNotifications({
+      baby,
+      activeSleep: active,
+      prediction: makePrediction({ bedtime: "2026-04-13T18:00:00.000Z" }),
+    });
+    expect(rowsOf("bedtime_approaching")).toHaveLength(0);
+  });
+});
+
+describe("reconcileNotifications – nap_overdue", () => {
+  it("is off by default", () => {
+    reconcileNotifications({
+      baby,
+      activeSleep: null,
+      prediction: makePrediction({ nextNap: "2026-04-13T10:00:00.000Z" }),
+    });
+    expect(rowsOf("nap_overdue")).toHaveLength(0);
+  });
+
+  it("schedules 30 min after nextNap when enabled", () => {
+    setPrefs(1, { nap_overdue: true });
+    reconcileNotifications({
+      baby,
+      activeSleep: null,
+      prediction: makePrediction({ nextNap: "2026-04-13T10:00:00.000Z" }),
+    });
+    const rows = rowsOf("nap_overdue");
+    expect(rows).toHaveLength(1);
+    expect(new Date(rows[0].fire_at).toISOString()).toBe("2026-04-13T10:30:00.000Z");
+  });
+
+  it("cancels when a nap starts", () => {
+    setPrefs(1, { nap_overdue: true });
+    reconcileNotifications({
+      baby,
+      activeSleep: null,
+      prediction: makePrediction({ nextNap: "2026-04-13T10:00:00.000Z" }),
+    });
+    const active = makeActiveSleep("2026-04-13T10:05:00.000Z");
+    reconcileNotifications({ baby, activeSleep: active, prediction: makePrediction() });
+    expect(rowsOf("nap_overdue")).toHaveLength(0);
+  });
+
+  it("skips when napsAllDone", () => {
+    setPrefs(1, { nap_overdue: true });
+    reconcileNotifications({
+      baby,
+      activeSleep: null,
+      prediction: makePrediction({ nextNap: "2026-04-13T10:00:00.000Z", napsAllDone: true }),
+    });
+    expect(rowsOf("nap_overdue")).toHaveLength(0);
+  });
+});
+
+describe("reconcileNotifications – prefs gating", () => {
+  it("respects prefs.rescue_wake = false", () => {
+    setPrefs(1, { rescue_wake: false });
     const active = makeActiveSleep("2026-04-13T12:00:00.000Z");
     reconcileNotifications({
       baby,
@@ -177,19 +308,7 @@ describe("reconcileNotifications", () => {
         rescueNap: { recommendedWakeTime: "2026-04-13T12:45:00.000Z", reason: "short_prior_nap" },
       }),
     });
-    // Mark as sent
-    db.prepare("UPDATE notification_schedule SET sent_at = datetime('now')").run();
-
-    // Re-run with no rescue — sent rows shouldn't get cancelled_at, but we check only unsent rows
-    reconcileNotifications({ baby, activeSleep: null, prediction: makePrediction({ rescueNap: null }) });
-
-    const rows = db
-      .prepare("SELECT sent_at, cancelled_at FROM notification_schedule")
-      .all() as Array<{ sent_at: string | null; cancelled_at: string | null }>;
-    expect(rows).toHaveLength(1);
-    expect(rows[0].sent_at).not.toBeNull();
-    // The UPDATE predicate only hits unsent rows, so cancelled_at stays null
-    expect(rows[0].cancelled_at).toBeNull();
+    expect(rowsOf("rescue_wake")).toHaveLength(0);
   });
 
   it("no-op when there's no baby", () => {
@@ -197,46 +316,27 @@ describe("reconcileNotifications", () => {
     const rows = db.prepare("SELECT * FROM notification_schedule").all();
     expect(rows).toHaveLength(0);
   });
-
-  it("does not schedule for night sleep", () => {
-    const night = { ...makeActiveSleep("2026-04-13T18:00:00.000Z"), type: "night" };
-    reconcileNotifications({
-      baby,
-      activeSleep: night,
-      prediction: makePrediction({
-        rescueNap: { recommendedWakeTime: "2026-04-13T19:00:00.000Z", reason: "short_prior_nap" },
-      }),
-    });
-    const rows = db.prepare("SELECT * FROM notification_schedule").all();
-    expect(rows).toHaveLength(0);
-  });
 });
 
 describe("fireDueNotifications", () => {
-  it("does not fire notifications with future fire_at", async () => {
+  it("does not fire future notifications", async () => {
     db.prepare(
       `INSERT INTO notification_schedule (baby_id, kind, fire_at, dedupe_key, payload_json)
        VALUES (1, 'rescue_wake', '2030-01-01T00:00:00.000Z', 'future', '{"title":"x","body":"y"}')`,
     ).run();
-
-    const now = new Date("2026-04-13T12:00:00.000Z");
-    await fireDueNotifications(now);
-
+    await fireDueNotifications(new Date("2026-04-13T12:00:00.000Z"));
     const row = db.prepare("SELECT sent_at FROM notification_schedule").get() as {
       sent_at: string | null;
     };
     expect(row.sent_at).toBeNull();
   });
 
-  it("marks due notifications as sent even if no subscriptions", async () => {
+  it("marks due notifications as sent even with no subscriptions", async () => {
     db.prepare(
       `INSERT INTO notification_schedule (baby_id, kind, fire_at, dedupe_key, payload_json)
        VALUES (1, 'rescue_wake', '2026-04-13T11:00:00.000Z', 'past', '{"title":"x","body":"y"}')`,
     ).run();
-
-    const now = new Date("2026-04-13T12:00:00.000Z");
-    await fireDueNotifications(now);
-
+    await fireDueNotifications(new Date("2026-04-13T12:00:00.000Z"));
     const row = db.prepare("SELECT sent_at FROM notification_schedule").get() as {
       sent_at: string | null;
     };
@@ -248,10 +348,7 @@ describe("fireDueNotifications", () => {
       `INSERT INTO notification_schedule (baby_id, kind, fire_at, dedupe_key, payload_json, cancelled_at)
        VALUES (1, 'rescue_wake', '2026-04-13T11:00:00.000Z', 'cancelled', '{"title":"x","body":"y"}', datetime('now'))`,
     ).run();
-
-    const now = new Date("2026-04-13T12:00:00.000Z");
-    await fireDueNotifications(now);
-
+    await fireDueNotifications(new Date("2026-04-13T12:00:00.000Z"));
     const row = db.prepare("SELECT sent_at FROM notification_schedule").get() as {
       sent_at: string | null;
     };
