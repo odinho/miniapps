@@ -46,17 +46,27 @@
       const prev = rects[i-1];
       const cur = rects[i];
       if (!prev || !cur) continue;
-      // Check if they're on the same row (y positions similar)
-      if (Math.abs(prev.y - cur.y) > prev.h * 0.5) continue;
-      // Connector: from inside right edge of prev, across gap, into left edge of cur
-      const overlap = 8; // how far into each photo
-      const x = prev.x + prev.w - overlap;
-      const w = (cur.x - prev.x - prev.w) + overlap * 2;
-      const midY = Math.max(prev.y, cur.y);
-      const botY = Math.min(prev.y + prev.h, cur.y + cur.h);
-      const connH = 3;
-      const y = midY + (botY - midY) / 2 - connH / 2;
-      result.push({ x, y, w, h: connH });
+
+      const sameRow = Math.abs(prev.y - cur.y) < prev.h * 0.3;
+      const overlap = 3;
+
+      if (sameRow) {
+        // Vertical bar in the gap between same-row cells
+        const gap = cur.x - (prev.x + prev.w);
+        const x = prev.x + prev.w - overlap;
+        const w = gap + overlap * 2;
+        const connH = Math.min(prev.h, cur.h) * 0.3;
+        const midY = (Math.max(prev.y, cur.y) + Math.min(prev.y + prev.h, cur.y + cur.h)) / 2;
+        result.push({ x, y: midY - connH / 2, w, h: connH });
+      } else {
+        // Cross-row: centered tabs on right edge of prev + left edge of cur
+        const tabW = 3;
+        const tabH = Math.min(prev.h, cur.h) * 0.3;
+        // Right edge of prev, vertically centered
+        result.push({ x: prev.x + prev.w - overlap, y: prev.y + (prev.h - tabH) / 2, w: tabW + overlap, h: tabH });
+        // Left edge of cur, vertically centered
+        result.push({ x: cur.x - overlap, y: cur.y + (cur.h - tabH) / 2, w: tabW + overlap, h: tabH });
+      }
     }
     return result;
   })();
