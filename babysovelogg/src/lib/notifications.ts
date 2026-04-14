@@ -26,11 +26,18 @@ async function getRegistration(): Promise<ServiceWorkerRegistration | null> {
 
 export async function getStatus(): Promise<NotificationStatus> {
   if (!isSupported()) return "unsupported";
-  // Firefox for Android doesn't expose window.Notification — check permission
-  // via pushManager subscription state instead
   if ("Notification" in window) {
     if (Notification.permission === "denied") return "permission-denied";
     if (Notification.permission === "default") return "permission-default";
+  } else {
+    // Firefox for Android doesn't expose window.Notification — use
+    // PushManager.permissionState() to detect denied/prompt states
+    const reg = await getRegistration();
+    if (reg) {
+      const state = await reg.pushManager.permissionState({ userVisibleOnly: true });
+      if (state === "denied") return "permission-denied";
+      if (state === "prompt") return "permission-default";
+    }
   }
   const reg = await getRegistration();
   const sub = await reg?.pushManager.getSubscription();
@@ -76,8 +83,11 @@ export async function subscribe(): Promise<{ ok: boolean; error?: string }> {
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey),
       });
-    } catch {
-      return { ok: false, error: "permission_denied" };
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "NotAllowedError") {
+        return { ok: false, error: "permission_denied" };
+      }
+      return { ok: false, error: "subscribe_failed" };
     }
   }
 
