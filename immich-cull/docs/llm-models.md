@@ -34,6 +34,15 @@ Tested 11 variants on 260 photos across 10 diverse batches:
 
 Recommended pair: `gemini-3.1-flash-lite-preview` + `gemini-3-flash-preview` (with thinking LOW). Batches where both agree can be bulk-approved via `POST /api/batches/approve-confident`.
 
+## Auto-cull tier calibration (Facet test set, 149 batches / 1434 photos)
+
+| Tier | Criteria | Wrong-cull | Coverage |
+|---|---|---|---|
+| HIGH | deficit>=2, bottom-half rank, sg>=3 | ~9.4% | 16.1% |
+| STANDARD | stars=0, sg_keeper, sg>=3 | ~22.7% | 39.4% |
+
+Prompt v1 ("balanced, 1-2 keeps per subgroup") halves wrong-culls vs v0. Remaining wrong-culls are mostly different-moment disagreements (LLM picks technical quality, user values storytelling). These numbers are from the Facet test set and need re-validation on DSLR-heavy Immich data.
+
 ## Star mapping (LLM → Immich)
 
 LLM stars are mapped through `mapLlmStarsToWriteback` at write-back time:

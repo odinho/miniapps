@@ -167,10 +167,23 @@ sqlite3 data/state.db "INSERT INTO auto_keep_patterns (pattern, description) VAL
 ## Safety
 
 - Read-only database access — never writes to Immich's PostgreSQL
-- Culled photos will go to Immich trash (30-day recovery) — not yet implemented
 - Undecided images default to keep on approve
 - Undo reverses last approve/skip
 - Manual decisions always override LLM suggestions
+
+### Write-back to Immich
+
+Writes culled photos to Immich trash (30-day recovery), sets star ratings, and tags LLM-rated photos with `ai:rated`. Always dry-run first.
+
+```bash
+# Dry run (see what would change):
+curl -X POST http://localhost:3737/api/immich/writeback \
+  -H "Content-Type: application/json" -d '{"dryRun":true}'
+
+# Execute:
+curl -X POST http://localhost:3737/api/immich/writeback \
+  -H "Content-Type: application/json" -d '{"dryRun":false}'
+```
 
 ## Stack
 
