@@ -894,8 +894,8 @@
   :global(.cell img) { width: 100%; height: 100%; object-fit: contain; display: block; background: #0b0d11; }
   :global(.lbl) { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,.8)); padding: 10px 5px 3px; font-size: 9px; color: #bbb; display: flex; justify-content: space-between; }
   :global(.collapsed-badge) { position: absolute; bottom: 18px; right: 3px; background: rgba(100,120,160,.85); color: white; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; z-index: 1; pointer-events: none; }
-  /* Subgroup rope: connector line in the gap between adjacent group members */
-  :global(.sg-cont)::before { content: ''; position: absolute; top: 50%; left: -6px; width: 6px; height: 2px; background: rgba(255,255,255,.5); transform: translateY(-50%); pointer-events: none; z-index: 3; }
+  /* Subgroup rope: connector between adjacent group members, rendered in grid container */
+  :global(.sg-rope) { position: absolute; background: rgba(255,255,255,.55); border-radius: 2px; pointer-events: none; z-index: 4; }
   :global(.toggle-zone) { position: absolute; top: 0; left: 0; right: 0; height: 20%; min-height: 24px; cursor: pointer; z-index: 2; }
   :global(.bdg) { position: absolute; top: 3px; left: 3px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; color: white; pointer-events: none; }
   :global(.bdg.kb) { background: #4caf50; opacity: 0.75; }

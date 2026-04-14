@@ -34,6 +34,32 @@
   });
 
   $: if (assets) computeLayout();
+
+  // Compute subgroup connectors between adjacent cells in the same subgroup
+  interface Connector { x: number; y: number; w: number; h: number }
+  $: connectors = (() => {
+    const result: Connector[] = [];
+    for (let i = 1; i < assets.length; i++) {
+      const sg = llmMap[assets[i]?.id]?.similaritySubgroupId;
+      const prevSg = llmMap[assets[i-1]?.id]?.similaritySubgroupId;
+      if (!sg || sg !== prevSg) continue;
+      const prev = rects[i-1];
+      const cur = rects[i];
+      if (!prev || !cur) continue;
+      // Check if they're on the same row (y positions similar)
+      if (Math.abs(prev.y - cur.y) > prev.h * 0.5) continue;
+      // Connector: from inside right edge of prev, across gap, into left edge of cur
+      const overlap = 8; // how far into each photo
+      const x = prev.x + prev.w - overlap;
+      const w = (cur.x - prev.x - prev.w) + overlap * 2;
+      const midY = Math.max(prev.y, cur.y);
+      const botY = Math.min(prev.y + prev.h, cur.y + cur.h);
+      const connH = 3;
+      const y = midY + (botY - midY) / 2 - connH / 2;
+      result.push({ x, y, w, h: connH });
+    }
+    return result;
+  })();
 </script>
 
 <div class="jgrid" bind:this={container}>
@@ -49,15 +75,12 @@
     {@const isConfirmed = confirmedIds.has(asset.id)}
     {@const agreement = agreementMap[asset.id]}
     {@const collapsed = collapsedCountMap[asset.id] ?? 0}
-    {@const prevSg = i > 0 ? llmMap[assets[i-1]?.id]?.similaritySubgroupId : null}
-    {@const sgCont = sg && sg === prevSg}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
       class="cell"
       class:keep={isKeep}
       class:cull={isCull}
       class:sel={isSel}
-      class:sg-cont={sgCont}
       style="left:{r.x}px;top:{r.y}px;width:{r.w}px;height:{r.h}px"
       on:click={() => onSelect(i)}
       role="button"
@@ -108,5 +131,8 @@
         <span>{fmt(asset.bytes || 0)}</span>
       </div>
     </div>
+  {/each}
+  {#each connectors as c}
+    <div class="sg-rope" style="left:{c.x}px;top:{c.y}px;width:{c.w}px;height:{c.h}px"></div>
   {/each}
 </div>
