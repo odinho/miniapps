@@ -16,7 +16,7 @@
  * See docs/batch-mode.md for the full workflow.
  */
 import { execSync } from "child_process";
-import { writeFileSync, mkdtempSync } from "fs";
+import { createWriteStream, writeFileSync, mkdtempSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { GoogleGenAI } from "@google/genai";
@@ -59,28 +59,44 @@ async function main() {
   const pending = batches.filter((b) => !b.hasLlmResult).slice(0, count);
   console.log(`Found ${pending.length} pending batches (preparing requests...)`);
 
-  // Prepare JSONL — one request per line
-  const jsonLines: string[] = Array.from({ length: pending.length });
-  let prepped = 0;
-
-  await mapWithConcurrency(pending, concurrent, async (batch, idx) => {
-    const resp = await fetch(`${server}/api/batches/${batch.id}/llm-request`);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${batch.id}`);
-    const { contents, generationConfig } = (await resp.json()) as {
-      contents: unknown[];
-      generationConfig: unknown;
-    };
-    jsonLines[idx] = JSON.stringify({ request: { contents, generationConfig } });
-    prepped++;
-    process.stdout.write(`\r  prepped ${prepped}/${pending.length}`);
-  });
-  process.stdout.write("\n");
-
-  // Write to temp file
+  // Stream JSONL to disk as each request is prepared — avoids keeping all
+  // ~1-2MB request bodies in memory (a full-library run is ~7 GB).
+  // Write order is the order of completion; sidecar records the matching
+  // batchId sequence so result ingestion can map output lines → batch IDs.
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const tmpDir = mkdtempSync(join(tmpdir(), "immich-cull-batch-"));
   const localJsonl = join(tmpDir, `input-${timestamp}.jsonl`);
-  writeFileSync(localJsonl, jsonLines.join("\n") + "\n");
+  const stream = createWriteStream(localJsonl);
+  const orderedBatchIds: string[] = [];
+  let prepped = 0;
+  let failedPrep = 0;
+
+  await mapWithConcurrency(pending, concurrent, async (batch) => {
+    try {
+      const resp = await fetch(`${server}/api/batches/${batch.id}/llm-request`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const { contents, generationConfig } = (await resp.json()) as {
+        contents: unknown[];
+        generationConfig: unknown;
+      };
+      const line = JSON.stringify({ request: { contents, generationConfig } }) + "\n";
+      // stream.write is serialized by the event loop — pushing to orderedBatchIds
+      // immediately before the write call keeps them in lockstep.
+      orderedBatchIds.push(batch.id);
+      await new Promise<void>((resolve, reject) => {
+        stream.write(line, (err) => (err ? reject(err) : resolve()));
+      });
+      prepped++;
+    } catch (err) {
+      failedPrep++;
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`\n  prep failed for ${batch.id}: ${msg}`);
+    }
+    process.stdout.write(`\r  prepped ${prepped}/${pending.length} (fail=${failedPrep})`);
+  });
+  process.stdout.write("\n");
+  await new Promise<void>((resolve) => stream.end(() => resolve()));
+
   const stats = execSync(`wc -c < ${localJsonl}`).toString().trim();
   console.log(`Wrote ${localJsonl} (${(Number(stats) / 1e6).toFixed(1)} MB)`);
 
@@ -111,9 +127,9 @@ async function main() {
     location,
     gcsInput,
     gcsOutputPrefix,
-    batchIds: pending.map((b) => b.id),
+    batchIds: orderedBatchIds,
     submittedAt: new Date().toISOString(),
-    lineCount: pending.length,
+    lineCount: orderedBatchIds.length,
   };
   writeFileSync(sidecarPath, JSON.stringify(sidecar, null, 2));
 
