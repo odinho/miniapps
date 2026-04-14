@@ -2,18 +2,6 @@
 
 const BASE = ""; // same origin
 
-export interface GroupSummary {
-  id: string;
-  index: number;
-  count: number;
-  timeSpanMinutes: number;
-  avgDistance: number;
-  decided: boolean;
-  earliestDate: number;
-  totalBytes: number;
-  assets: AssetSummary[];
-}
-
 export interface AssetSummary {
   id: string;
   filename: string;
@@ -21,16 +9,6 @@ export interface AssetSummary {
   rating: number | null;
   isFavorite: boolean;
   bytes: number;
-}
-
-export interface GroupDetail {
-  id: string;
-  count: number;
-  timeSpanMinutes: number;
-  avgDistance: number;
-  totalBytes: number;
-  decision: { keep: string[]; cull: string[]; skipped: boolean } | null;
-  assets: AssetDetail[];
 }
 
 export interface AssetDetail extends AssetSummary {
@@ -115,35 +93,9 @@ export interface LlmSubgroup {
 }
 
 export interface Stats {
-  totalGroups: number;
-  decided: number;
-  skipped: number;
   photosToKeep: number;
   photosToCull: number;
-  remaining: number;
   cullBytes: number;
-}
-
-export async function fetchGroups(): Promise<GroupSummary[]> {
-  return (await fetch(`${BASE}/api/groups`)).json();
-}
-
-export async function fetchGroup(id: string): Promise<GroupDetail> {
-  return (await fetch(`${BASE}/api/groups/${id}`)).json();
-}
-
-export async function decideGroup(id: string, keep: string[], cull: string[], skipped = false) {
-  return (
-    await fetch(`${BASE}/api/groups/${id}/decide`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ keep, cull, skipped }),
-    })
-  ).json();
-}
-
-export async function undecideGroup(id: string) {
-  return (await fetch(`${BASE}/api/groups/${id}/decide`, { method: "DELETE" })).json();
 }
 
 export async function fetchStats(): Promise<Stats> {

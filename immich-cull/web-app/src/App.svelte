@@ -6,10 +6,10 @@
   import AutoCullReview from './components/AutoCullReview.svelte';
   import StarsReview from './components/StarsReview.svelte';
   import {
-    fetchGroups, fetchGroup, fetchBatches, fetchBatch, fetchStats,
-    decideGroup, undecideGroup, rankBatch, savePhotoDecisions, fetchPhotoDecisions, fmt,
+    fetchBatches, fetchBatch, fetchStats,
+    rankBatch, savePhotoDecisions, fetchPhotoDecisions, fmt,
     autoApproveBatches, revertAutoApprovals, fetchCullComparisons, stagedCull, approveConfidentBatches,
-    type GroupSummary, type GroupDetail, type BatchSummary, type BatchDetail,
+    type BatchSummary, type BatchDetail,
     type LlmImage, type Stats, type AutoCullClassification, type CullComparison,
   } from './lib/api';
   import {
@@ -18,9 +18,9 @@
     type AssetState,
   } from './lib/state';
 
-  type AppMode = 'groups' | 'batches' | 'review' | 'stars';
+  type AppMode = 'batches' | 'review' | 'stars';
 
-  let mode: AppMode = 'batches'; // default to batches (groups empty in API mode)
+  let mode: AppMode = 'batches';
   let starsSummary: Record<number, { count: number; samples: Array<{ id: string; filename: string }> }> = {};
   let starsTotalKept = 0;
   let showPreview = false;
@@ -38,23 +38,17 @@
     { id: 'gemma4:e4b', label: 'gemma4' },
   ];
 
-  let groups: GroupSummary[] = [];
-  let groupIdx = -1;
-  let groupDetail: GroupDetail | null = null;
-
   let batches: BatchSummary[] = [];
   let batchIdx = -1;
   let batchDetail: BatchDetail | null = null;
 
   // Layer 2: manual overrides (only explicit user clicks)
   let manualOverrides: Record<string, AssetState> = {};
-  // Groups mode still uses a flat states map (no LLM layer)
-  let groupStates: Record<string, AssetState> = {};
   let userStars: Record<string, number> = {};
   let stats: Stats | null = null;
   let undoStack: Array<{ mode: AppMode; idx: number; viewId: string; prevStates: Record<string, AssetState>; prevUserStars: Record<string, number>; prevSi: number; prevKeepLevel: number }> = [];
 
-  $: currentAssets = mode === 'groups' ? (groupDetail?.assets ?? []) : (batchDetail?.assets ?? []);
+  $: currentAssets = batchDetail?.assets ?? [];
   $: currentAssetIds = currentAssets.map(a => a.id);
   $: llmMap = buildLlmMap(batchDetail);
   $: allSubgroups = batchDetail?.llm?.similaritySubgroups ?? [];
@@ -63,9 +57,7 @@
   $: llmState = deriveLlmState(batchDetail?.llm ?? null, keepLevel);
 
   // Layer 3: effective state = manual overrides ?? llm state
-  $: states = mode === 'groups'
-    ? groupStates
-    : mergeStates(currentAssetIds, llmState, manualOverrides);
+  $: states = mergeStates(currentAssetIds, llmState, manualOverrides);
 
   // Effective stars: user overrides win over LLM-computed stars
   $: effectiveStarsMap = (() => {
@@ -214,24 +206,16 @@
     }
   }
 
-  $: sidebarAllItems = (mode === 'groups'
-    ? groups.map((g, i) => ({
-        idx: i, active: i === groupIdx, decided: g.decided,
-        label: `${g.count} photos`,
-        sub: `${g.timeSpanMinutes}min · ${fmt(g.totalBytes)}`,
-        date: new Date(g.earliestDate),
-        hasLlm: false, keeps: 0, culls: 0, agreement: null,
-      }))
-    : batches.map((b, i) => ({
-        idx: i, active: i === batchIdx,
-        decided: b.viewStatus === 'reviewed' || b.viewStatus === 'skipped',
-        label: `${b.count} photos`,
-        sub: `${b.source}${b.folderName ? ' ' + b.folderName : ''}`,
-        date: new Date(b.dateRange.start),
-        hasLlm: b.hasLlmResult, keeps: b.keeps, culls: b.culls,
-        agreement: b.agreement,
-      }))
-  ).map(item => ({
+  $: sidebarAllItems = batches.map((b, i) => ({
+    idx: i, active: i === batchIdx,
+    decided: b.viewStatus === 'reviewed' || b.viewStatus === 'skipped',
+    label: `${b.count} photos`,
+    sub: `${b.source}${b.folderName ? ' ' + b.folderName : ''}`,
+    date: new Date(b.dateRange.start),
+    hasLlm: b.hasLlmResult, keeps: b.keeps, culls: b.culls,
+    agreement: b.agreement,
+    visible: false,
+  })).map(item => ({
     ...item,
     visible: !item.decided || recentDoneIdxs.includes(item.idx) || sidebarShowDone,
   })) as SidebarItem[];
@@ -249,17 +233,11 @@
       const id = hash.slice(6);
       const idx = batches.findIndex(b => b.id === id);
       if (idx >= 0) await selectBatch(idx);
-    } else if (hash.startsWith('group/')) {
-      groups = await fetchGroups();
-      mode = 'groups';
-      const idx = parseInt(hash.slice(6));
-      if (!isNaN(idx) && idx < groups.length) await selectGroup(idx);
     } else if (hash === 'review') {
       await switchMode('review');
     } else if (hash === 'stars') {
       await switchMode('stars');
     } else {
-      // Default: load batches (works in both local and API mode)
       await loadBatches();
       if (batches.length) await selectBatch(0);
     }
@@ -273,23 +251,6 @@
     }
     userStars = userStars;
     return saved;
-  }
-
-  async function selectGroup(idx: number) {
-    groupIdx = idx; selectedIdx = 0; showPreview = false;
-    loading = true;
-    groupDetail = await fetchGroup(groups[idx].id);
-    loading = false;
-    // Groups mode: load saved states into groupStates (no LLM layer)
-    const saved = await loadSavedStars(groupDetail?.assets ?? []);
-    groupStates = {};
-    for (const [id, d] of Object.entries(saved)) {
-      if (d.state) groupStates[id] = d.state as AssetState;
-    }
-    for (const a of groupDetail?.assets ?? []) if (!(a.id in groupStates)) groupStates[a.id] = null;
-    groups[idx].decided = (groupDetail as any)?.viewStatus != null;
-    groups = groups;
-    history.replaceState(null, '', `#group/${idx}`);
   }
 
   async function selectBatch(idx: number, opts: { freshLlm?: boolean; model?: string } = {}) {
@@ -391,15 +352,9 @@
     else { selectedIdx = idx; showPreview = false; }
   }
 
-  /** Set state for a photo — writes to the correct layer based on mode */
   function setPhotoState(id: string, state: AssetState) {
-    if (mode === 'groups') {
-      groupStates[id] = state;
-      groupStates = groupStates;
-    } else {
-      manualOverrides[id] = state;
-      manualOverrides = manualOverrides;
-    }
+    manualOverrides[id] = state;
+    manualOverrides = manualOverrides;
     savePhotoDecisions([{ assetId: id, state, userStars: userStars[id] ?? null }]);
   }
 
@@ -414,21 +369,17 @@
   function keepBestCullRest() {
     if (selectedIdx < 0) selectedIdx = 0;
     for (let i = 0; i < currentAssets.length; i++) {
-      const s: AssetState = i === selectedIdx ? 'keep' : 'cull';
-      if (mode === 'groups') groupStates[currentAssets[i].id] = s;
-      else manualOverrides[currentAssets[i].id] = s;
+      manualOverrides[currentAssets[i].id] = i === selectedIdx ? 'keep' : 'cull';
     }
-    if (mode === 'groups') groupStates = groupStates; else manualOverrides = manualOverrides;
+    manualOverrides = manualOverrides;
     saveBatchDecisions();
   }
 
   function keepFirstN(n: number) {
     for (let i = 0; i < currentAssets.length; i++) {
-      const s: AssetState = i < n ? 'keep' : 'cull';
-      if (mode === 'groups') groupStates[currentAssets[i].id] = s;
-      else manualOverrides[currentAssets[i].id] = s;
+      manualOverrides[currentAssets[i].id] = i < n ? 'keep' : 'cull';
     }
-    if (mode === 'groups') groupStates = groupStates; else manualOverrides = manualOverrides;
+    manualOverrides = manualOverrides;
     saveBatchDecisions();
   }
 
@@ -440,32 +391,22 @@
     const prevStates: Record<string, AssetState> = {};
     for (const a of assets) prevStates[a.id] = states[a.id];
 
-    const undoIdx = mode === 'groups' ? groupIdx : batchIdx;
-    const viewId = mode === 'groups' ? groups[groupIdx]?.id : batches[batchIdx]?.id;
+    const undoIdx = batchIdx;
+    const viewId = batches[batchIdx]?.id;
     const prevUserStars: Record<string, number> = {};
     for (const a of assets) if (userStars[a.id] != null) prevUserStars[a.id] = userStars[a.id];
     undoStack = [...undoStack, { mode, idx: undoIdx, viewId: viewId ?? '', prevStates, prevUserStars, prevSi: selectedIdx, prevKeepLevel: keepLevel }];
 
     // Default unmarked photos to 'keep' via manual overrides
     for (const a of assets) {
-      if (!states[a.id]) {
-        if (mode === 'groups') groupStates[a.id] = 'keep';
-        else manualOverrides[a.id] = 'keep';
-      }
+      if (!states[a.id]) manualOverrides[a.id] = 'keep';
     }
-    if (mode === 'groups') groupStates = groupStates; else manualOverrides = manualOverrides;
+    manualOverrides = manualOverrides;
 
     // Save all photo decisions (re-read states after reactive update)
     await saveBatchDecisions();
 
-    if (mode === 'groups' && groupDetail) {
-      await decideGroup(groupDetail.id,
-        assets.filter(a => states[a.id] === 'keep').map(a => a.id),
-        assets.filter(a => states[a.id] === 'cull').map(a => a.id));
-      groups[groupIdx].decided = true; groups = groups;
-      stats = await fetchStats();
-      nextUndecided();
-    } else if (mode === 'batches' && batches[batchIdx]) {
+    if (batches[batchIdx]) {
       await fetch(`/api/view-status/${batches[batchIdx].id}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ viewType: 'batch', status: 'reviewed' }),
@@ -480,17 +421,7 @@
   }
 
   async function skip() {
-    if (mode === 'groups' && groupDetail) {
-      const prevStates: Record<string, AssetState> = {};
-      for (const a of groupDetail.assets) prevStates[a.id] = states[a.id];
-      const prevUserStars: Record<string, number> = {};
-      for (const a of groupDetail.assets) if (userStars[a.id] != null) prevUserStars[a.id] = userStars[a.id];
-      undoStack = [...undoStack, { mode: 'groups', idx: groupIdx, viewId: groupDetail.id, prevStates, prevUserStars, prevSi: selectedIdx, prevKeepLevel: keepLevel }];
-      await decideGroup(groupDetail.id, [], [], true);
-      groups[groupIdx].decided = true; groups = groups;
-      stats = await fetchStats();
-      nextUndecided();
-    } else if (mode === 'batches' && batches[batchIdx]) {
+    if (batches[batchIdx]) {
       await fetch(`/api/view-status/${batches[batchIdx].id}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ viewType: 'batch', status: 'skipped' }),
@@ -504,12 +435,7 @@
     const u = undoStack[undoStack.length - 1];
     undoStack = undoStack.slice(0, -1);
     // Restore local states and stars — clear all then reapply snapshot
-    if (u.mode === 'groups') {
-      for (const id of Object.keys(u.prevStates)) groupStates[id] = u.prevStates[id];
-      groupStates = groupStates;
-    } else {
-      manualOverrides = { ...u.prevStates };
-    }
+    manualOverrides = { ...u.prevStates };
     // Clear stars for all assets in the undone view, then restore from snapshot
     for (const id of Object.keys(u.prevStates)) delete userStars[id];
     for (const [id, s] of Object.entries(u.prevUserStars)) userStars[id] = s;
@@ -520,30 +446,18 @@
     }));
     await savePhotoDecisions(decisions);
 
-    if (u.mode === 'groups') {
-      await undecideGroup(u.viewId);
-      groups[u.idx].decided = false; groups = groups;
-      if (mode !== 'groups') switchMode('groups');
-      await selectGroup(u.idx);
-    } else {
-      // Clear batch view status
-      await fetch(`/api/view-status/${batches[u.idx]?.id}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ viewType: 'batch', status: null }),
-      });
-      if (batches[u.idx]) (batches[u.idx] as any).viewStatus = null;
-      batches = batches;
-      if (mode !== 'batches') switchMode('batches');
-      await selectBatch(u.idx);
-    }
+    // Clear batch view status
+    await fetch(`/api/view-status/${batches[u.idx]?.id}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ viewType: 'batch', status: null }),
+    });
+    if (batches[u.idx]) (batches[u.idx] as any).viewStatus = null;
+    batches = batches;
+    if (mode !== 'batches') switchMode('batches');
+    await selectBatch(u.idx);
     selectedIdx = u.prevSi;
     keepLevel = u.prevKeepLevel;
     stats = await fetchStats();
-  }
-
-  function nextUndecided() {
-    for (let i = groupIdx + 1; i < groups.length; i++) if (!groups[i].decided) { selectGroup(i); return; }
-    for (let i = 0; i < groupIdx; i++) if (!groups[i].decided) { selectGroup(i); return; }
   }
 
   const isBatchDecided = (b: any) => b.viewStatus === 'reviewed' || b.viewStatus === 'skipped';
@@ -623,26 +537,20 @@
     switch (e.key) {
       case 'ArrowRight': case 'd': e.preventDefault(); if (selectedIdx < currentAssets.length - 1) selectedIdx++; break;
       case 'ArrowLeft': case 'g': e.preventDefault(); if (selectedIdx > 0) selectedIdx--; break;
-      case 'ArrowDown': e.preventDefault();
-        if (mode === 'groups' && groupIdx < groups.length - 1) selectGroup(groupIdx + 1);
-        else if (mode === 'batches') nextVisibleBatch(1);
-        break;
-      case 'ArrowUp': e.preventDefault();
-        if (mode === 'groups' && groupIdx > 0) selectGroup(groupIdx - 1);
-        else if (mode === 'batches') nextVisibleBatch(-1);
-        break;
+      case 'ArrowDown': e.preventDefault(); nextVisibleBatch(1); break;
+      case 'ArrowUp': e.preventDefault(); nextVisibleBatch(-1); break;
       case 'Escape': showPreview = false; break;
       case ' ': e.preventDefault(); if (selectedIdx >= 0) showPreview = !showPreview; break;
       case 'k': case 'j': mark('keep'); break;
       case 'K': case 'J':
-        for (const a of currentAssets) { if (mode === 'groups') groupStates[a.id] = 'keep'; else manualOverrides[a.id] = 'keep'; }
-        if (mode === 'groups') groupStates = groupStates; else manualOverrides = manualOverrides;
+        for (const a of currentAssets) manualOverrides[a.id] = 'keep';
+        manualOverrides = manualOverrides;
         saveBatchDecisions();
         break;
       case 'x': case 'f': mark('cull'); break;
       case 'X': case 'F':
-        for (const a of currentAssets) { if (mode === 'groups') groupStates[a.id] = 'cull'; else manualOverrides[a.id] = 'cull'; }
-        if (mode === 'groups') groupStates = groupStates; else manualOverrides = manualOverrides;
+        for (const a of currentAssets) manualOverrides[a.id] = 'cull';
+        manualOverrides = manualOverrides;
         saveBatchDecisions();
         break;
       case 'b': case 'B': keepBestCullRest(); break;
@@ -667,18 +575,15 @@
     <button class="hamburger" on:click={() => sidebarOpen = !sidebarOpen}>☰</button>
     <h1>immich-cull</h1>
     <div class="mode-toggle">
-      <button class:active={mode === 'groups'} on:click={() => switchMode('groups')}>Groups</button>
       <button class:active={mode === 'batches'} on:click={() => switchMode('batches')}>Batches</button>
       <button class:active={mode === 'review'} on:click={() => switchMode('review')}>Auto Review</button>
       <button class:active={mode === 'stars'} on:click={() => switchMode('stars')}>Stars</button>
     </div>
     <div class="stats">
       {#if stats}
-        <span><strong>{stats.decided}</strong>/{stats.totalGroups}</span>
         <span class="good"><strong>{stats.photosToKeep}</strong> keep</span>
         <span class="bad"><strong>{stats.photosToCull}</strong> cull</span>
         <span class="good">save {fmt(stats.cullBytes)}</span>
-        <span><strong>{stats.remaining}</strong> left</span>
       {/if}
     </div>
   </header>
@@ -697,7 +602,7 @@
       {#each sidebarVisible as item (item.idx)}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div class="gi" class:active={item.active} class:decided={item.decided}
-             on:click={() => { sidebarOpen = false; mode === 'groups' ? selectGroup(item.idx) : selectBatch(item.idx); }} role="button" tabindex="-1">
+             on:click={() => { sidebarOpen = false; selectBatch(item.idx); }} role="button" tabindex="-1">
           <div class="t">
             {item.label} · {item.date.toLocaleDateString('no', { day: 'numeric', month: 'short', year: '2-digit' })}
           </div>
@@ -758,7 +663,7 @@
           setPhotoState(asset.id, effective === 'keep' ? 'cull' : 'keep');
         }} />
     {:else}
-      <div class="empty">Select a group or batch</div>
+      <div class="empty">Select a batch</div>
     {/if}
   </div>
 
@@ -841,7 +746,7 @@
       <h3>Navigation</h3>
       <table><tbody>
         <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Previous / next image</td></tr>
-        <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>Previous / next group/batch</td></tr>
+        <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>Previous / next batch</td></tr>
         <tr><td><kbd>Space</kbd></td><td>Toggle preview</td></tr>
         <tr><td><kbd>Esc</kbd></td><td>Close preview</td></tr>
       </tbody></table>

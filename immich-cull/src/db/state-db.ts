@@ -37,10 +37,10 @@ export class StateDb {
           updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
-        -- View completion status (groups + batches)
+        -- View completion status (batches)
         CREATE TABLE IF NOT EXISTS view_status (
           view_id TEXT PRIMARY KEY,
-          view_type TEXT NOT NULL,         -- 'group' | 'batch'
+          view_type TEXT NOT NULL,         -- 'batch'
           status TEXT,                     -- 'reviewed' | 'skipped' | null
           reviewed_at TEXT
         );
@@ -407,8 +407,6 @@ export class StateDb {
     photosKept: number;
     photosCulled: number;
     photosStarred: number;
-    groupsReviewed: number;
-    groupsSkipped: number;
   } {
     const photos = this.db
       .prepare(
@@ -422,23 +420,10 @@ export class StateDb {
       )
       .get() as any;
 
-    const views = this.db
-      .prepare(
-        `
-      SELECT
-        SUM(CASE WHEN status = 'reviewed' THEN 1 ELSE 0 END) as reviewed,
-        SUM(CASE WHEN status = 'skipped' THEN 1 ELSE 0 END) as skipped
-      FROM view_status WHERE view_type = 'group'
-    `,
-      )
-      .get() as any;
-
     return {
       photosKept: photos?.kept ?? 0,
       photosCulled: photos?.culled ?? 0,
       photosStarred: photos?.starred ?? 0,
-      groupsReviewed: views?.reviewed ?? 0,
-      groupsSkipped: views?.skipped ?? 0,
     };
   }
 

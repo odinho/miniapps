@@ -1,20 +1,12 @@
 /**
  * Review server: Fastify API + static file serving for the review UI.
- *
- * Modes:
- *   --local   Use Facet SQLite (default, for development)
- *   --immich  Use Immich PostgreSQL via SSH tunnel
+ * Connects to Immich via REST API (--immich-api).
  */
 import Fastify from "fastify";
 import { resolve, dirname } from "path";
-import { readFileSync, writeFileSync, existsSync, statSync } from "fs";
-import { FacetAdapter } from "./db/facet-adapter.js";
-import { ImmichAdapter } from "./db/immich-adapter.js";
+import { readFileSync, writeFileSync, existsSync } from "fs";
 import { ImmichApiAdapter } from "./db/immich-api-adapter.js";
-import { clusterAssets } from "./clustering/engine.js";
-import { DEFAULT_CLUSTER_CONFIG, PhotoGroup, Asset } from "./shared/types.js";
-import { getImmichDbConfig } from "./shared/config.js";
-import sharp from "sharp";
+import { Asset } from "./shared/types.js";
 import { fileURLToPath } from "url";
 import { StateDb, batchFingerprint } from "./db/state-db.js";
 import { batchBySession, SessionBatch } from "./batching/session-batcher.js";
@@ -33,317 +25,123 @@ function getArg(flag: string, defaultVal: string): string {
   return idx >= 0 && idx + 1 < args.length ? args[idx + 1] : defaultVal;
 }
 
-const useImmich = args.includes("--immich");
-const useImmichApi = args.includes("--immich-api");
 const port = parseInt(getArg("--port", "3000"));
-const sampleSize = parseInt(getArg("--sample", "0"));
-
-const PREVIEW_MAX_PX = 1400;
 
 const app = Fastify({ logger: false, requestTimeout: 300000 }); // 5min for slow local models
 
 // State
-let groups: PhotoGroup[] = [];
 let assetMap = new Map<string, Asset>();
 let fileSizeCache = new Map<string, number>();
 let dimensionCache = new Map<string, { w: number; h: number }>();
 const stateDbPath = getArg("--state-db", resolve(__dirname, "../data/state.db"));
 const stateDb = new StateDb(stateDbPath);
 
-/** Resolve the file path, handling Facet's extension-stripped paths */
-function resolveFilePath(asset: { path: string }): string | null {
-  if (existsSync(asset.path)) return asset.path;
-  for (const ext of [".jpg", ".jpeg", ".JPG", ".JPEG", ".png", ".PNG", ".heic", ".HEIC"]) {
-    if (existsSync(asset.path + ext)) return asset.path + ext;
-  }
-  return null;
-}
-
-/** Get file size in bytes, cached */
+/** Resolve the file path on the local filesystem */
+/** Get file size in bytes */
 function getFileSize(asset: Asset): number {
   if (fileSizeCache.has(asset.id)) return fileSizeCache.get(asset.id)!;
-  // Use Immich-provided file size when available
-  if (asset.fileSize) {
-    fileSizeCache.set(asset.id, asset.fileSize);
-    return asset.fileSize;
-  }
-  const fp = resolveFilePath(asset);
-  if (!fp) return 0;
-  try {
-    const size = statSync(fp).size;
-    fileSizeCache.set(asset.id, size);
-    return size;
-  } catch {
-    return 0;
-  }
+  const size = asset.fileSize ?? 0;
+  fileSizeCache.set(asset.id, size);
+  return size;
 }
 
-/** Get image dimensions (rotated), cached */
-async function getDimensions(asset: Asset): Promise<{ w: number; h: number }> {
+/** Get image dimensions */
+function getDimensions(asset: Asset): { w: number; h: number } {
   if (dimensionCache.has(asset.id)) return dimensionCache.get(asset.id)!;
-  // Use Immich-provided dimensions when available (avoids filesystem access)
-  if (asset.width && asset.height) {
-    const dims = { w: asset.width, h: asset.height };
-    dimensionCache.set(asset.id, dims);
-    return dims;
-  }
-  const fp = resolveFilePath(asset);
-  if (!fp) return { w: 4, h: 3 };
-  try {
-    const meta = await sharp(fp).metadata();
-    let w = meta.width ?? 4;
-    let h = meta.height ?? 3;
-    // EXIF orientations 5-8 involve a 90° rotation, so swap w/h
-    if (meta.orientation && meta.orientation >= 5 && meta.orientation <= 8) {
-      [w, h] = [h, w];
-    }
-    // Scale down to match the preview endpoint's max dimension
-    if (w > PREVIEW_MAX_PX || h > PREVIEW_MAX_PX) {
-      const scale = PREVIEW_MAX_PX / Math.max(w, h);
-      w = Math.round(w * scale);
-      h = Math.round(h * scale);
-    }
-    const dims = { w, h };
-    dimensionCache.set(asset.id, dims);
-    return dims;
-  } catch {
-    return { w: 4, h: 3 };
-  }
+  const dims = { w: asset.width ?? 4, h: asset.height ?? 3 };
+  dimensionCache.set(asset.id, dims);
+  return dims;
 }
 
 let immichApiAdapter: ImmichApiAdapter | null = null;
 
 async function loadData() {
+  const url = process.env.IMMICH_URL;
+  const key = process.env.IMMICH_API_KEY;
+  if (!url || !key) {
+    console.error("IMMICH_URL and IMMICH_API_KEY env vars are required");
+    process.exit(1);
+  }
+  console.log(`Connecting to Immich API at ${url}...`);
+  immichApiAdapter = new ImmichApiAdapter({ serverUrl: url, apiKey: key });
+
+  // Cache asset list to disk — only fetch new/updated assets on subsequent starts
+  const cachePath = resolve(__dirname, "../data/immich-assets-cache.json");
+  let cachedAssets: Asset[] = [];
+  let newestDate: Date | null = null;
   let assets: Asset[] = [];
 
-  if (useImmichApi) {
-    const url = process.env.IMMICH_URL;
-    const key = process.env.IMMICH_API_KEY;
-    if (!url || !key) {
-      console.error("IMMICH_URL and IMMICH_API_KEY required for --immich-api mode");
-      process.exit(1);
-    }
-    console.log(`Connecting to Immich API at ${url}...`);
-    immichApiAdapter = new ImmichApiAdapter({ serverUrl: url, apiKey: key });
-
-    // Cache asset list to disk — only fetch new/updated assets on subsequent starts
-    const cachePath = resolve(__dirname, "../data/immich-assets-cache.json");
-    let cachedAssets: Asset[] = [];
-    let newestDate: Date | null = null;
-
-    if (existsSync(cachePath)) {
-      try {
-        const raw = JSON.parse(readFileSync(cachePath, "utf-8"));
-        cachedAssets = raw.map((a: any) => ({
-          ...a,
-          fileCreatedAt: new Date(a.fileCreatedAt),
-          embedding: new Float32Array(0),
-        }));
-        newestDate = cachedAssets.reduce(
-          (max, a) => (a.fileCreatedAt > max ? a.fileCreatedAt : max),
-          new Date(0),
-        );
-        console.log(
-          `Cache: ${cachedAssets.length} assets (newest: ${newestDate.toISOString().slice(0, 10)})`,
-        );
-      } catch {
-        cachedAssets = [];
-      }
-    }
-
-    if (cachedAssets.length > 0) {
-      // Fetch only assets newer than cache (with 1-day buffer for edge cases)
-      const fetchSince = new Date(newestDate!.getTime() - 86400_000);
-      console.log("Fetching new assets since cache...");
-      const newAssets = await immichApiAdapter.getAssetsByDateRange(fetchSince, new Date(), (n) =>
-        process.stdout.write(`\r  ${n} new...`),
+  if (existsSync(cachePath)) {
+    try {
+      const raw = JSON.parse(readFileSync(cachePath, "utf-8"));
+      cachedAssets = raw.map((a: any) => ({
+        ...a,
+        fileCreatedAt: new Date(a.fileCreatedAt),
+        embedding: new Float32Array(0),
+      }));
+      newestDate = cachedAssets.reduce(
+        (max, a) => (a.fileCreatedAt > max ? a.fileCreatedAt : max),
+        new Date(0),
       );
-      console.log();
-      // Merge: start from cache, add/update with new
-      const merged = new Map(cachedAssets.map((a) => [a.id, a]));
-      let added = 0;
-      for (const a of newAssets) {
-        if (!merged.has(a.id)) added++;
-        merged.set(a.id, a);
-      }
-      assets = [...merged.values()];
-      console.log(`${added} new, ${newAssets.length - added} updated, ${assets.length} total`);
-    } else {
-      const count = await immichApiAdapter.getAssetCount();
-      console.log(`Immich has ${count} images`);
-      console.log("Loading all assets via API...");
-      assets = await immichApiAdapter.getAllAssets((loaded) => {
-        process.stdout.write(`\r  ${loaded} loaded...`);
-      });
-      console.log();
+      console.log(
+        `Cache: ${cachedAssets.length} assets (newest: ${newestDate.toISOString().slice(0, 10)})`,
+      );
+    } catch {
+      cachedAssets = [];
     }
-
-    // Update cache (strip embedding — always empty in API mode)
-    const toCache = assets.map((a) => ({ ...a, embedding: undefined }));
-    writeFileSync(cachePath, JSON.stringify(toCache));
-    console.log(`Cached ${assets.length} assets`);
-  } else if (useImmich) {
-    console.log("Connecting to Immich PostgreSQL...");
-    const adapter = new ImmichAdapter(getImmichDbConfig());
-    const count = await adapter.getAssetCount();
-    console.log(`Immich has ${count} images with embeddings`);
-
-    if (sampleSize > 0) {
-      console.log(`Loading ${sampleSize} most recent...`);
-      assets = await adapter.getSampleAssets(sampleSize);
-    } else {
-      console.log("Loading all assets...");
-      assets = await adapter.getAllAssets((loaded, total) => {
-        process.stdout.write(`\r  ${loaded}/${total}`);
-      });
-      console.log();
-    }
-    await adapter.close();
-  } else {
-    const dbPath = getArg("--db", resolve(__dirname, "../../../facet/photo_scores_pro.db"));
-    console.log(`Loading from Facet DB: ${dbPath}`);
-    const adapter = new FacetAdapter(dbPath);
-    assets = adapter.getAllAssets();
-    adapter.close();
   }
+
+  if (cachedAssets.length > 0) {
+    // Fetch only assets newer than cache (with 1-day buffer for edge cases)
+    const fetchSince = new Date(newestDate!.getTime() - 86400_000);
+    console.log("Fetching new assets since cache...");
+    const newAssets = await immichApiAdapter.getAssetsByDateRange(fetchSince, new Date(), (n) =>
+      process.stdout.write(`\r  ${n} new...`),
+    );
+    console.log();
+    // Merge: start from cache, add/update with new
+    const merged = new Map(cachedAssets.map((a) => [a.id, a]));
+    let added = 0;
+    for (const a of newAssets) {
+      if (!merged.has(a.id)) added++;
+      merged.set(a.id, a);
+    }
+    assets = [...merged.values()];
+    console.log(`${added} new, ${newAssets.length - added} updated, ${assets.length} total`);
+  } else {
+    const count = await immichApiAdapter.getAssetCount();
+    console.log(`Immich has ${count} images`);
+    console.log("Loading all assets via API...");
+    assets = await immichApiAdapter.getAllAssets((loaded) => {
+      process.stdout.write(`\r  ${loaded} loaded...`);
+    });
+    console.log();
+  }
+
+  // Update cache (strip embedding — always empty in API mode)
+  const toCache = assets.map((a) => ({ ...a, embedding: undefined }));
+  writeFileSync(cachePath, JSON.stringify(toCache));
+  console.log(`Cached ${assets.length} assets`);
 
   console.log(`Loaded ${assets.length} assets`);
-
-  // Only cluster if we have CLIP embeddings (local/PG mode)
-  if (!useImmichApi && assets.some((a) => a.embedding.length > 0)) {
-    console.log("Clustering...");
-    const result = clusterAssets(assets, DEFAULT_CLUSTER_CONFIG);
-    groups = result.groups.toSorted((a, b) => {
-      const aTime = Math.min(...a.assets.map((x) => x.asset.fileCreatedAt.getTime()));
-      const bTime = Math.min(...b.assets.map((x) => x.asset.fileCreatedAt.getTime()));
-      return bTime - aTime;
-    });
-    groups = groups.map((g, i) => ({ ...g, id: `group-${i}` }));
-    console.log(`${groups.length} groups found (${result.stats.singletons} singletons)`);
-  } else {
-    console.log("Skipping clustering (no CLIP embeddings in API mode)");
-    groups = [];
-  }
 
   for (const a of assets) assetMap.set(a.id, a);
 }
 
 // === API Routes ===
 
-app.get("/api/groups", async () => {
-  return groups.map((g, i) => ({
-    id: g.id,
-    index: i,
-    count: g.assets.length,
-    timeSpanMinutes: g.timeSpanMinutes,
-    avgDistance: g.avgDistance,
-    decided: stateDb.getViewStatus(g.id) !== null,
-    earliestDate: Math.min(...g.assets.map((a) => a.asset.fileCreatedAt.getTime())),
-    totalBytes: g.assets.reduce((s, a) => s + getFileSize(a.asset), 0),
-    assets: g.assets.map((a) => ({
-      id: a.asset.id,
-      filename: a.asset.filename,
-      date: a.asset.fileCreatedAt.toISOString(),
-      rating: a.asset.rating,
-      isFavorite: a.asset.isFavorite,
-      bytes: getFileSize(a.asset),
-    })),
-  }));
-});
-
-app.get<{ Params: { id: string } }>("/api/groups/:id", async (req) => {
-  const group = groups.find((g) => g.id === req.params.id);
-  if (!group) return { error: "Not found" };
-
-  // Include dimensions for layout computation
-  const assetsWithDims = await Promise.all(
-    group.assets.map(async (a) => {
-      const dims = await getDimensions(a.asset);
-      return {
-        id: a.asset.id,
-        filename: a.asset.filename,
-        path: a.asset.path,
-        date: a.asset.fileCreatedAt.toISOString(),
-        rating: a.asset.rating,
-        isFavorite: a.asset.isFavorite,
-        bytes: getFileSize(a.asset),
-        w: dims.w,
-        h: dims.h,
-      };
-    }),
-  );
-
-  return {
-    id: group.id,
-    count: group.assets.length,
-    timeSpanMinutes: group.timeSpanMinutes,
-    avgDistance: group.avgDistance,
-    totalBytes: group.assets.reduce((s, a) => s + getFileSize(a.asset), 0),
-    viewStatus: stateDb.getViewStatus(group.id),
-    assets: assetsWithDims,
-  };
-});
-
-/** Mark a group as reviewed/skipped */
-app.post<{
-  Params: { id: string };
-  Body: { keep: string[]; cull: string[]; skipped?: boolean };
-}>("/api/groups/:id/decide", async (req) => {
-  const group = groups.find((g) => g.id === req.params.id);
-  if (!group) return { error: "Not found" };
-
-  if (req.body.skipped) {
-    stateDb.setViewStatus(group.id, "group", "skipped");
-  } else {
-    // Save per-photo decisions (preserve existing user_stars)
-    const assetIds = [...req.body.keep, ...req.body.cull];
-    const existing = stateDb.getPhotoDecisions(assetIds);
-    const decisions: Array<{
-      assetId: string;
-      state: string | null;
-      userStars: number | null;
-    }> = [];
-    for (const id of req.body.keep)
-      decisions.push({
-        assetId: id,
-        state: "keep",
-        userStars: existing[id]?.userStars ?? null,
-      });
-    for (const id of req.body.cull)
-      decisions.push({
-        assetId: id,
-        state: "cull",
-        userStars: existing[id]?.userStars ?? null,
-      });
-    stateDb.savePhotoDecisions(decisions);
-    stateDb.setViewStatus(group.id, "group", "reviewed");
-  }
-
-  return { ok: true };
-});
-
-/** Undo a group review */
-app.delete<{ Params: { id: string } }>("/api/groups/:id/decide", async (req) => {
-  stateDb.clearViewStatus(req.params.id);
-  return { ok: true };
-});
-
 app.get("/api/stats", async () => {
   const s = stateDb.getStats();
   return {
-    totalGroups: groups.length,
-    decided: s.groupsReviewed + s.groupsSkipped,
-    skipped: s.groupsSkipped,
     photosToKeep: s.photosKept,
     photosToCull: s.photosCulled,
-    remaining: groups.length - s.groupsReviewed - s.groupsSkipped,
     cullBytes: stateDb
       .getCulledAssetIds()
       .reduce((sum, id) => sum + (assetMap.has(id) ? getFileSize(assetMap.get(id)!) : 0), 0),
   };
 });
 
-/** Preview: auto-rotated, max PREVIEW_MAX_PX */
+/** Preview: proxy thumbnail from Immich */
 app.get<{ Querystring: { id: string } }>("/api/preview", async (req, reply) => {
   const asset = assetMap.get(req.query.id);
   if (!asset) {
@@ -351,43 +149,17 @@ app.get<{ Querystring: { id: string } }>("/api/preview", async (req, reply) => {
     return { error: "Not found" };
   }
 
-  // Immich API mode: proxy thumbnail from Immich
-  if (immichApiAdapter) {
-    try {
-      const buf = await immichApiAdapter.getThumbnail(asset.id, "preview");
-      reply.type("image/jpeg").header("Cache-Control", "public, max-age=3600");
-      return buf;
-    } catch (e: any) {
-      reply.code(500);
-      return { error: e.message };
-    }
-  }
-
-  // Local/PG mode: read from filesystem
-  const fp = resolveFilePath(asset);
-  if (!fp) {
-    reply.code(404);
-    return { error: "File not found" };
-  }
-
   try {
-    const preview = await sharp(fp)
-      .rotate()
-      .resize(PREVIEW_MAX_PX, PREVIEW_MAX_PX, {
-        fit: "inside",
-        withoutEnlargement: true,
-      })
-      .jpeg({ quality: 85 })
-      .toBuffer();
+    const buf = await immichApiAdapter!.getThumbnail(asset.id, "preview");
     reply.type("image/jpeg").header("Cache-Control", "public, max-age=3600");
-    return preview;
+    return buf;
   } catch (e: any) {
     reply.code(500);
     return { error: e.message };
   }
 });
 
-/** Full-size: auto-rotated, original resolution (for preview overlay) */
+/** Full-size original from Immich */
 app.get<{ Querystring: { id: string } }>("/api/full", async (req, reply) => {
   const asset = assetMap.get(req.query.id);
   if (!asset) {
@@ -395,27 +167,10 @@ app.get<{ Querystring: { id: string } }>("/api/full", async (req, reply) => {
     return { error: "Not found" };
   }
 
-  if (immichApiAdapter) {
-    try {
-      const buf = await immichApiAdapter.getOriginal(asset.id);
-      reply.type("image/jpeg").header("Cache-Control", "public, max-age=3600");
-      return buf;
-    } catch (e: any) {
-      reply.code(500);
-      return { error: e.message };
-    }
-  }
-
-  const fp = resolveFilePath(asset);
-  if (!fp) {
-    reply.code(404);
-    return { error: "File not found" };
-  }
-
   try {
-    const full = await sharp(fp).rotate().jpeg({ quality: 90 }).toBuffer();
+    const buf = await immichApiAdapter!.getOriginal(asset.id);
     reply.type("image/jpeg").header("Cache-Control", "public, max-age=3600");
-    return full;
+    return buf;
   } catch (e: any) {
     reply.code(500);
     return { error: e.message };
@@ -708,21 +463,19 @@ app.get<{ Params: { id: string }; Querystring: { model?: string } }>(
         start: batch.dateRange.start.toISOString(),
         end: batch.dateRange.end.toISOString(),
       },
-      assets: await Promise.all(
-        batch.assets.map(async (a) => {
-          const dims = await getDimensions(a);
-          return {
-            id: a.id,
-            filename: a.filename,
-            path: a.path,
-            date: a.fileCreatedAt.toISOString(),
-            rating: a.rating,
-            bytes: getFileSize(a),
-            w: dims.w,
-            h: dims.h,
-          };
-        }),
-      ),
+      assets: batch.assets.map((a) => {
+        const dims = getDimensions(a);
+        return {
+          id: a.id,
+          filename: a.filename,
+          path: a.path,
+          date: a.fileCreatedAt.toISOString(),
+          rating: a.rating,
+          bytes: getFileSize(a),
+          w: dims.w,
+          h: dims.h,
+        };
+      }),
       llm: llmResult,
       llmModels,
       autoCull: acSummary,
@@ -777,17 +530,14 @@ app.post<{ Params: { id: string }; Querystring: { model?: string } }>(
       client = new LlmClient({ ...llmClient.config, model: overrideModel });
     }
 
-    // In Immich API mode, fetch thumbnails over HTTP; otherwise use local filesystem
-    const imageResolver = immichApiAdapter
-      ? async (asset: { path: string; id: string }) => {
-          try {
-            return await immichApiAdapter!.getThumbnail(asset.id, "preview");
-          } catch {
-            console.warn(`  Thumbnail fetch failed for ${asset.id}, using placeholder`);
-            return null;
-          }
-        }
-      : (asset: { path: string; id: string }) => resolveFilePath(asset);
+    const imageResolver = async (asset: { path: string; id: string }) => {
+      try {
+        return await immichApiAdapter!.getThumbnail(asset.id, "preview");
+      } catch {
+        console.warn(`  Thumbnail fetch failed for ${asset.id}, using placeholder`);
+        return null;
+      }
+    };
 
     try {
       const { response, rawJson, inputTokens, outputTokens } = await client.rankBatch(
@@ -836,15 +586,13 @@ app.get<{ Params: { id: string } }>("/api/batches/:id/llm-request", async (req) 
   if (!batch) return { error: "Not found" };
   if (!llmClient) return { error: "No LLM client configured" };
 
-  const imageResolver = immichApiAdapter
-    ? async (asset: { path: string; id: string }) => {
-        try {
-          return await immichApiAdapter!.getThumbnail(asset.id, "preview");
-        } catch {
-          return null;
-        }
-      }
-    : (asset: { path: string; id: string }) => resolveFilePath(asset);
+  const imageResolver = async (asset: { path: string; id: string }) => {
+    try {
+      return await immichApiAdapter!.getThumbnail(asset.id, "preview");
+    } catch {
+      return null;
+    }
+  };
 
   const imageBuffers = await llmClient.prepareImageBuffers(batch, imageResolver);
   const { contents, generationConfig } = llmClient.buildGeminiContents(batch, imageBuffers);
