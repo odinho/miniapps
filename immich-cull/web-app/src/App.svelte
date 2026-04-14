@@ -525,15 +525,17 @@
     await tick(); // ensure $: reactive derivations (states) have run
     // Only save explicit user stars. LLM stars are mapped at writeback time
     // via mapLlmStarsToWriteback (shift-1: LLM 0-2→0, 3→1★, 4→2★, 5→3★)
-    const decisions = batchDetail.assets.map(a => {
-      const explicit = userStars[a.id];
-      return {
-        assetId: a.id,
-        state: states[a.id] ?? 'keep',
-        userStars: explicit ?? null,
-        starSource: explicit != null ? 'user' : undefined,
-      };
-    });
+    const decisions = batchDetail.assets
+      .filter(a => !burstCulledIds.has(a.id) || showBurstCulled) // skip hidden burst-auto-culled
+      .map(a => {
+        const explicit = userStars[a.id];
+        return {
+          assetId: a.id,
+          state: states[a.id] ?? 'keep',
+          userStars: explicit ?? null,
+          starSource: explicit != null ? 'user' : undefined,
+        };
+      });
     await savePhotoDecisions(decisions);
   }
 
