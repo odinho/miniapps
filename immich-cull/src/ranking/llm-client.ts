@@ -241,7 +241,7 @@ export class LlmClient {
         ],
         response_format: { type: "json_object" },
         max_tokens: 16000,
-        temperature: 0.2,
+        temperature: 0,
       };
 
       const resp = await fetch(`${this.config.baseUrl}/chat/completions`, {
@@ -287,7 +287,7 @@ export class LlmClient {
           messages,
           stream: false,
           format: "json",
-          options: { temperature: 0.2, num_predict: 16000, num_ctx: 32768 },
+          options: { temperature: 0, num_predict: 16000, num_ctx: 32768 },
         }),
       });
 
@@ -427,7 +427,7 @@ export class LlmClient {
     return {
       contents: [{ role: "user", parts }],
       generationConfig: {
-        temperature: 0.2,
+        temperature: 0,
         maxOutputTokens: 65000,
         responseMimeType: "application/json",
       },

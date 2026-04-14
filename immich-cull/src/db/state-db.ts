@@ -22,7 +22,9 @@ export class StateDb {
   }
 
   private migrate() {
-    const currentVersion = this.db.pragma("user_version", { simple: true }) as number;
+    const currentVersion = this.db.pragma("user_version", {
+      simple: true,
+    }) as number;
 
     if (currentVersion < 4) {
       this.db.exec(`
@@ -169,12 +171,14 @@ export class StateDb {
 
   savePhotoDecision(assetId: string, state: string | null, userStars: number | null) {
     this.db
-      .prepare(`
+      .prepare(
+        `
       INSERT INTO photo_decisions (asset_id, state, user_stars, updated_at)
       VALUES (?, ?, ?, datetime('now'))
       ON CONFLICT(asset_id) DO UPDATE SET
         state = excluded.state, user_stars = excluded.user_stars, updated_at = datetime('now')
-    `)
+    `,
+      )
       .run(assetId, state, userStars);
   }
 
@@ -226,11 +230,13 @@ export class StateDb {
 
   setViewStatus(viewId: string, viewType: string, status: string) {
     this.db
-      .prepare(`
+      .prepare(
+        `
       INSERT INTO view_status (view_id, view_type, status, reviewed_at)
       VALUES (?, ?, ?, datetime('now'))
       ON CONFLICT(view_id) DO UPDATE SET status = excluded.status, reviewed_at = datetime('now')
-    `)
+    `,
+      )
       .run(viewId, viewType, status);
   }
 
@@ -277,10 +283,12 @@ export class StateDb {
   ): number {
     const cost = (inputTokens / 1e6) * 0.1 + (outputTokens / 1e6) * 0.4;
     const result = this.db
-      .prepare(`
+      .prepare(
+        `
       INSERT INTO llm_batch_runs (batch_id, batch_fingerprint, model, prompt_version, status, response_json, input_tokens, output_tokens, cost_estimate_usd, completed_at)
       VALUES (?, ?, ?, ?, 'completed', ?, ?, ?, ?, datetime('now'))
-    `)
+    `,
+      )
       .run(
         batchId,
         fingerprint,
@@ -343,6 +351,32 @@ export class StateDb {
     return row ? { id: row.id, responseJson: row.responseJson, model: row.model } : null;
   }
 
+  /** Get the latest completed run for each model that has rated this batch */
+  getAllLlmRuns(
+    batchId: string,
+    fingerprint: string,
+  ): Array<{ id: number; responseJson: string; model: string }> {
+    // Latest run per model via GROUP BY on the most-recent id
+    const rows = this.db
+      .prepare(
+        `SELECT r.id, r.response_json as responseJson, r.model
+         FROM llm_batch_runs r
+         INNER JOIN (
+           SELECT model, MAX(id) as max_id
+           FROM llm_batch_runs
+           WHERE batch_id = ? AND batch_fingerprint = ? AND status = 'completed'
+           GROUP BY model
+         ) latest ON r.id = latest.max_id
+         ORDER BY r.model`,
+      )
+      .all(batchId, fingerprint) as Array<{
+      id: number;
+      responseJson: string;
+      model: string;
+    }>;
+    return rows;
+  }
+
   /** Get list of models with completed results for a batch */
   getLlmModels(batchId: string, fingerprint: string): string[] {
     const rows = this.db
@@ -363,22 +397,26 @@ export class StateDb {
     groupsSkipped: number;
   } {
     const photos = this.db
-      .prepare(`
+      .prepare(
+        `
       SELECT
         SUM(CASE WHEN state = 'keep' THEN 1 ELSE 0 END) as kept,
         SUM(CASE WHEN state = 'cull' THEN 1 ELSE 0 END) as culled,
         SUM(CASE WHEN user_stars > 0 THEN 1 ELSE 0 END) as starred
       FROM photo_decisions
-    `)
+    `,
+      )
       .get() as any;
 
     const views = this.db
-      .prepare(`
+      .prepare(
+        `
       SELECT
         SUM(CASE WHEN status = 'reviewed' THEN 1 ELSE 0 END) as reviewed,
         SUM(CASE WHEN status = 'skipped' THEN 1 ELSE 0 END) as skipped
       FROM view_status WHERE view_type = 'group'
-    `)
+    `,
+      )
       .get() as any;
 
     return {
@@ -457,7 +495,10 @@ export class StateDb {
   }
 
   /** Get auto-keep patterns from the DB table. */
-  getAutoKeepPatterns(): Array<{ pattern: string; description: string | null }> {
+  getAutoKeepPatterns(): Array<{
+    pattern: string;
+    description: string | null;
+  }> {
     return this.db.prepare("SELECT pattern, description FROM auto_keep_patterns").all() as Array<{
       pattern: string;
       description: string | null;

@@ -298,12 +298,23 @@ app.post<{
     // Save per-photo decisions (preserve existing user_stars)
     const assetIds = [...req.body.keep, ...req.body.cull];
     const existing = stateDb.getPhotoDecisions(assetIds);
-    const decisions: Array<{ assetId: string; state: string | null; userStars: number | null }> =
-      [];
+    const decisions: Array<{
+      assetId: string;
+      state: string | null;
+      userStars: number | null;
+    }> = [];
     for (const id of req.body.keep)
-      decisions.push({ assetId: id, state: "keep", userStars: existing[id]?.userStars ?? null });
+      decisions.push({
+        assetId: id,
+        state: "keep",
+        userStars: existing[id]?.userStars ?? null,
+      });
     for (const id of req.body.cull)
-      decisions.push({ assetId: id, state: "cull", userStars: existing[id]?.userStars ?? null });
+      decisions.push({
+        assetId: id,
+        state: "cull",
+        userStars: existing[id]?.userStars ?? null,
+      });
     stateDb.savePhotoDecisions(decisions);
     stateDb.setViewStatus(group.id, "group", "reviewed");
   }
@@ -362,7 +373,10 @@ app.get<{ Querystring: { id: string } }>("/api/preview", async (req, reply) => {
   try {
     const preview = await sharp(fp)
       .rotate()
-      .resize(PREVIEW_MAX_PX, PREVIEW_MAX_PX, { fit: "inside", withoutEnlargement: true })
+      .resize(PREVIEW_MAX_PX, PREVIEW_MAX_PX, {
+        fit: "inside",
+        withoutEnlargement: true,
+      })
       .jpeg({ quality: 85 })
       .toBuffer();
     reply.type("image/jpeg").header("Cache-Control", "public, max-age=3600");
@@ -472,7 +486,10 @@ app.get("/api/batches", async () => {
         source: b.source,
         folderName: b.folderName,
         count: b.assets.length,
-        dateRange: { start: b.dateRange.start.toISOString(), end: b.dateRange.end.toISOString() },
+        dateRange: {
+          start: b.dateRange.start.toISOString(),
+          end: b.dateRange.end.toISOString(),
+        },
         hasLlmResult: cached !== null,
         viewStatus: stateDb.getViewStatus(b.id),
         keeps,
@@ -555,7 +572,10 @@ app.post<{ Params: { id: string }; Querystring: { model?: string } }>(
   async (req) => {
     const batch = sessionBatches.find((b) => b.id === req.params.id);
     if (!batch) return { error: "Not found" };
-    if (!llmClient) return { error: "No LLM client configured (need --vertex or OPENROUTER key)" };
+    if (!llmClient)
+      return {
+        error: "No LLM client configured (need --vertex or OPENROUTER key)",
+      };
 
     const overrideModel = req.query.model;
     const fp = batchFingerprint(batch.assets.map((a) => a.id));
@@ -564,7 +584,11 @@ app.post<{ Params: { id: string }; Querystring: { model?: string } }>(
     const usedModel = overrideModel ?? modelArg;
     const cached = stateDb.getLlmRun(batch.id, fp, usedModel);
     if (cached) {
-      return { cached: true, model: usedModel, response: JSON.parse(cached.responseJson) };
+      return {
+        cached: true,
+        model: usedModel,
+        response: JSON.parse(cached.responseJson),
+      };
     }
 
     // Use override model or default — detect Ollama models by name
@@ -607,7 +631,13 @@ app.post<{ Params: { id: string }; Querystring: { model?: string } }>(
       // Store in DB (all runs kept, newest wins)
       stateDb.saveLlmRun(batch.id, fp, usedModel, "v3", rawJson, inputTokens, outputTokens);
 
-      return { cached: false, model: usedModel, response, inputTokens, outputTokens };
+      return {
+        cached: false,
+        model: usedModel,
+        response,
+        inputTokens,
+        outputTokens,
+      };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`  [LLM ${usedModel}] Error: ${msg}`);
@@ -685,13 +715,13 @@ app.post<{
 
 // === View status ===
 
-app.post<{ Params: { id: string }; Body: { viewType: string; status: string } }>(
-  "/api/view-status/:id",
-  async (req) => {
-    stateDb.setViewStatus(req.params.id, req.body.viewType, req.body.status);
-    return { ok: true };
-  },
-);
+app.post<{
+  Params: { id: string };
+  Body: { viewType: string; status: string };
+}>("/api/view-status/:id", async (req) => {
+  stateDb.setViewStatus(req.params.id, req.body.viewType, req.body.status);
+  return { ok: true };
+});
 
 // === Auto-cull endpoints ===
 
@@ -699,7 +729,12 @@ app.post<{ Params: { id: string }; Body: { viewType: string; status: string } }>
 app.post<{
   Body: { batchIds: string[]; model?: string };
 }>("/api/batches/auto-approve", async (req) => {
-  const results: Array<{ batchId: string; approved: number; skipped: number; error?: string }> = [];
+  const results: Array<{
+    batchId: string;
+    approved: number;
+    skipped: number;
+    error?: string;
+  }> = [];
 
   for (const batchId of req.body.batchIds) {
     const batch = sessionBatches.find((b) => b.id === batchId);
@@ -713,13 +748,23 @@ app.post<{
       ? stateDb.getLlmRun(batchId, fp, req.body.model)
       : stateDb.getLlmRun(batchId, fp);
     if (!llmRun) {
-      results.push({ batchId, approved: 0, skipped: 0, error: "no LLM result" });
+      results.push({
+        batchId,
+        approved: 0,
+        skipped: 0,
+        error: "no LLM result",
+      });
       continue;
     }
 
     const summary = getAutoCullSummary(batch, llmRun.id, req.body.model);
     if (!summary) {
-      results.push({ batchId, approved: 0, skipped: 0, error: "classification failed" });
+      results.push({
+        batchId,
+        approved: 0,
+        skipped: 0,
+        error: "classification failed",
+      });
       continue;
     }
 
@@ -727,8 +772,11 @@ app.post<{
     const assetIds = batch.assets.map((a) => a.id);
     const existing = stateDb.getPhotoDecisions(assetIds);
 
-    const decisions: Array<{ assetId: string; state: string | null; userStars: number | null }> =
-      [];
+    const decisions: Array<{
+      assetId: string;
+      state: string | null;
+      userStars: number | null;
+    }> = [];
     let approved = 0;
     let skipped = 0;
 
@@ -781,8 +829,11 @@ app.post<{
     if (!summary) continue;
 
     const existing = stateDb.getPhotoDecisions(batch.assets.map((a) => a.id));
-    const decisions: Array<{ assetId: string; state: string | null; userStars: number | null }> =
-      [];
+    const decisions: Array<{
+      assetId: string;
+      state: string | null;
+      userStars: number | null;
+    }> = [];
     let autoCulled = 0;
     let forReview = 0;
     let skipped = 0;
@@ -811,6 +862,119 @@ app.post<{
 
   return { ok: true, results };
 });
+
+// === Multi-model agreement ===
+
+/**
+ * Compute per-photo agreement across all models that have rated this batch.
+ * Returns each photo with each model's keep/cull decision and a consensus.
+ */
+app.get<{ Params: { id: string }; Querystring: { models?: string } }>(
+  "/api/batches/:id/agreement",
+  async (req) => {
+    const batch = sessionBatches.find((b) => b.id === req.params.id);
+    if (!batch) return { error: "Not found" };
+
+    const fp = batchFingerprint(batch.assets.map((a) => a.id));
+    const allRuns = stateDb.getAllLlmRuns(batch.id, fp);
+
+    // Optionally filter to specific models
+    const filterModels = req.query.models?.split(",");
+    const runs = filterModels
+      ? allRuns.filter((r) => filterModels.some((m) => r.model.includes(m)))
+      : allRuns;
+
+    if (runs.length < 2) {
+      return {
+        error: `Need >=2 model runs, have ${runs.length}`,
+        models: runs.map((r) => r.model),
+      };
+    }
+
+    // Parse each model's keep/cull decisions into a map: assetId → "k"|"c"
+    const modelDecisions = new Map<string, Map<string, string>>();
+    for (const run of runs) {
+      try {
+        const raw = JSON.parse(run.responseJson);
+        const expanded = expandCompactResponse(raw, batch);
+        const decisions = new Map<string, string>();
+        for (const img of expanded.images) {
+          if (img.llmKeepCull) decisions.set(img.imageId, img.llmKeepCull);
+        }
+        modelDecisions.set(run.model, decisions);
+      } catch {
+        /* skip unparseable */
+      }
+    }
+
+    const models = [...modelDecisions.keys()];
+    if (models.length < 2) {
+      return { error: "Need >=2 parseable model runs", models };
+    }
+
+    // Build per-asset agreement
+    const photos: Array<{
+      assetId: string;
+      filename: string;
+      decisions: Record<string, string>;
+      consensus: "keep" | "cull" | "disagree";
+      keepVotes: number;
+      cullVotes: number;
+    }> = [];
+
+    let unanimousKeep = 0,
+      unanimousCull = 0,
+      disagreements = 0;
+
+    for (const asset of batch.assets) {
+      const decisions: Record<string, string> = {};
+      let keepVotes = 0,
+        cullVotes = 0;
+
+      for (const model of models) {
+        const d = modelDecisions.get(model)?.get(asset.id);
+        if (d) {
+          decisions[model] = d;
+          if (d === "keep") keepVotes++;
+          else if (d === "cull") cullVotes++;
+        }
+      }
+
+      const totalVotes = keepVotes + cullVotes;
+      let consensus: "keep" | "cull" | "disagree";
+      if (totalVotes === 0) {
+        consensus = "disagree";
+      } else if (keepVotes === totalVotes) {
+        consensus = "keep";
+        unanimousKeep++;
+      } else if (cullVotes === totalVotes) {
+        consensus = "cull";
+        unanimousCull++;
+      } else {
+        consensus = "disagree";
+        disagreements++;
+      }
+
+      photos.push({
+        assetId: asset.id,
+        filename: asset.filename,
+        decisions,
+        consensus,
+        keepVotes,
+        cullVotes,
+      });
+    }
+
+    return {
+      models,
+      photoCount: batch.assets.length,
+      unanimousKeep,
+      unanimousCull,
+      disagreements,
+      photos,
+    };
+  },
+);
 
 /** Revert all auto-cull decisions (safety valve) */
 app.delete("/api/auto-approve", async () => {
@@ -1025,7 +1189,13 @@ app.get("/api/review-groups", async () => {
 
 /** Save decisions for multiple photos */
 app.post<{
-  Body: { decisions: Array<{ assetId: string; state: string | null; userStars: number | null }> };
+  Body: {
+    decisions: Array<{
+      assetId: string;
+      state: string | null;
+      userStars: number | null;
+    }>;
+  };
 }>("/api/photos/decisions", async (req) => {
   stateDb.savePhotoDecisions(req.body.decisions);
   return { ok: true, count: req.body.decisions.length };
@@ -1044,7 +1214,10 @@ let immichWriteback: ImmichWriteback | null = null;
 const immichUrl = process.env.IMMICH_URL;
 const immichApiKey = process.env.IMMICH_API_KEY;
 if (immichUrl && immichApiKey) {
-  immichWriteback = new ImmichWriteback({ serverUrl: immichUrl, apiKey: immichApiKey });
+  immichWriteback = new ImmichWriteback({
+    serverUrl: immichUrl,
+    apiKey: immichApiKey,
+  });
 }
 
 /** Get star rating summary and sample photos at each star level */
@@ -1082,11 +1255,17 @@ app.get("/api/stars/summary", async () => {
     if (!summary[star]) summary[star] = { count: 0, samples: [] };
     summary[star].count++;
     if (summary[star].samples.length < 20) {
-      summary[star].samples.push({ id: d.assetId, filename: assetLookup.get(d.assetId) ?? "" });
+      summary[star].samples.push({
+        id: d.assetId,
+        filename: assetLookup.get(d.assetId) ?? "",
+      });
     }
   }
 
-  return { summary, totalKept: allDecisions.filter((d) => d.state === "keep").length };
+  return {
+    summary,
+    totalKept: allDecisions.filter((d) => d.state === "keep").length,
+  };
 });
 
 /** Test Immich API connection */
@@ -1110,7 +1289,9 @@ app.post<{
   Body: { dryRun?: boolean };
 }>("/api/immich/writeback", async (req) => {
   if (!immichWriteback) {
-    return { error: "Immich write-back not configured (set IMMICH_URL and IMMICH_API_KEY)" };
+    return {
+      error: "Immich write-back not configured (set IMMICH_URL and IMMICH_API_KEY)",
+    };
   }
 
   const dryRun = req.body.dryRun ?? true;
