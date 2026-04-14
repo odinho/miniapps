@@ -49,24 +49,25 @@
       if (!prev || !cur) continue;
 
       const sameRow = Math.abs(prev.y - cur.y) < prev.h * 0.3;
-      const overlap = 3;
+      const badgeH = 16; // matches .collapsed-badge height (~10px font + 2*2px padding)
+      const edgeIntrude = 5; // border(3) + 2px into photo
 
       if (sameRow) {
-        // Vertical bar in the gap between same-row cells
         const gap = cur.x - (prev.x + prev.w);
-        const x = prev.x + prev.w - overlap;
-        const w = gap + overlap * 2;
-        const connH = Math.min(prev.h, cur.h) * 0.3;
         const midY = (Math.max(prev.y, cur.y) + Math.min(prev.y + prev.h, cur.y + cur.h)) / 2;
-        result.push({ x, y: midY - connH / 2, w, h: connH });
+        if (gap > 1) {
+          // Gap exists: fill only the gap
+          result.push({ x: prev.x + prev.w, y: midY - badgeH / 2, w: gap, h: badgeH });
+        } else {
+          // No gap (touching): intrude over border + 2px into each photo
+          result.push({ x: prev.x + prev.w - edgeIntrude, y: midY - badgeH / 2, w: edgeIntrude * 2, h: badgeH });
+        }
       } else {
-        // Cross-row: centered tabs on right edge of prev + left edge of cur
-        const tabW = 3;
-        const tabH = Math.min(prev.h, cur.h) * 0.3;
+        // Cross-row: tab on right edge of prev + left edge of cur
         // Right edge of prev, vertically centered
-        result.push({ x: prev.x + prev.w - overlap, y: prev.y + (prev.h - tabH) / 2, w: tabW + overlap, h: tabH });
+        result.push({ x: prev.x + prev.w - edgeIntrude, y: prev.y + (prev.h - badgeH) / 2, w: edgeIntrude, h: badgeH });
         // Left edge of cur, vertically centered
-        result.push({ x: cur.x - overlap, y: cur.y + (cur.h - tabH) / 2, w: tabW + overlap, h: tabH });
+        result.push({ x: cur.x, y: cur.y + (cur.h - badgeH) / 2, w: edgeIntrude, h: badgeH });
       }
     }
     return result;
