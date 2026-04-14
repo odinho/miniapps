@@ -52,10 +52,12 @@
   // Collapse burst-auto-culled photos: hide losers, track counts on winners
   $: collapsedCountMap = (() => {
     const m: Record<string, number> = {};
+    // Put badge on the first keeper as it appears in the grid (chronological order)
+    const assetOrder = new Map((batchDetail?.assets ?? []).map((a, i) => [a.id, i]));
     for (const g of batchDetail?.collapsedGroups ?? []) {
-      // Only first keeper shows the badge (connects to rope visually)
       if (g.winnerIds.length > 0) {
-        m[g.winnerIds[0]] = (m[g.winnerIds[0]] ?? 0) + g.losers.length;
+        const firstInGrid = g.winnerIds.toSorted((a, b) => (assetOrder.get(a) ?? 999) - (assetOrder.get(b) ?? 999))[0];
+        m[firstInGrid] = (m[firstInGrid] ?? 0) + g.losers.length;
       }
     }
     return m;
@@ -894,7 +896,7 @@
   :global(.cell.sel) { border-color: #f0a040 !important; box-shadow: 0 0 8px rgba(240,160,64,.5); }
   :global(.cell img) { width: 100%; height: 100%; object-fit: contain; display: block; background: #0b0d11; }
   :global(.lbl) { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,.8)); padding: 10px 5px 3px; font-size: 9px; color: #bbb; display: flex; justify-content: space-between; }
-  :global(.collapsed-badge) { position: absolute; top: 50%; right: 2px; transform: translateY(-50%); background: #fff; color: #1a1a1a; font-size: 10px; font-weight: 700; padding: 2px 4px; z-index: 5; cursor: pointer; }
+  :global(.collapsed-badge) { position: absolute; top: 50%; right: 0; transform: translateY(-50%); background: #fff; color: #1a1a1a; font-size: 10px; font-weight: 700; padding: 2px 4px; z-index: 5; cursor: pointer; }
   /* Subgroup rope: connector between adjacent group members, rendered in grid container */
   :global(.sg-rope) { position: absolute; background: #fff; pointer-events: none; z-index: 4; }
   :global(.toggle-zone) { position: absolute; top: 0; left: 0; right: 0; height: 20%; min-height: 24px; cursor: pointer; z-index: 2; }
