@@ -15,8 +15,7 @@ export function isSupported(): boolean {
   return (
     typeof window !== "undefined" &&
     "serviceWorker" in navigator &&
-    "PushManager" in window &&
-    "Notification" in window
+    "PushManager" in window
   );
 }
 
@@ -27,8 +26,12 @@ async function getRegistration(): Promise<ServiceWorkerRegistration | null> {
 
 export async function getStatus(): Promise<NotificationStatus> {
   if (!isSupported()) return "unsupported";
-  if (Notification.permission === "denied") return "permission-denied";
-  if (Notification.permission === "default") return "permission-default";
+  // Firefox for Android doesn't expose window.Notification — check permission
+  // via pushManager subscription state instead
+  if ("Notification" in window) {
+    if (Notification.permission === "denied") return "permission-denied";
+    if (Notification.permission === "default") return "permission-default";
+  }
   const reg = await getRegistration();
   const sub = await reg?.pushManager.getSubscription();
   return sub ? "subscribed" : "not-subscribed";
@@ -47,8 +50,13 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
 export async function subscribe(): Promise<{ ok: boolean; error?: string }> {
   if (!isSupported()) return { ok: false, error: "unsupported" };
 
-  const permission = await Notification.requestPermission();
-  if (permission !== "granted") return { ok: false, error: "permission_denied" };
+  // Request permission via Notification API if available (desktop browsers).
+  // Firefox for Android doesn't expose window.Notification — permission is
+  // requested implicitly by pushManager.subscribe() below.
+  if ("Notification" in window) {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return { ok: false, error: "permission_denied" };
+  }
 
   const reg = await getRegistration();
   if (!reg) return { ok: false, error: "no_registration" };
@@ -58,13 +66,19 @@ export async function subscribe(): Promise<{ ok: boolean; error?: string }> {
   if (!keyRes.ok) return { ok: false, error: "vapid_key_fetch_failed" };
   const { publicKey } = (await keyRes.json()) as { publicKey: string };
 
-  // Subscribe (or reuse existing subscription)
+  // Subscribe (or reuse existing subscription).
+  // On browsers without window.Notification (e.g. Firefox Android), this
+  // call itself triggers the permission prompt.
   let sub = await reg.pushManager.getSubscription();
   if (!sub) {
-    sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey),
-    });
+    try {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+    } catch {
+      return { ok: false, error: "permission_denied" };
+    }
   }
 
   const subJson = sub.toJSON();
