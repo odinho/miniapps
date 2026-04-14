@@ -451,9 +451,150 @@ function getAutoCullSummary(
   }
 }
 
+// ---------------------------------------------------------------------------
+// Multi-model agreement helpers
+// ---------------------------------------------------------------------------
+
+interface BatchAgreementStats {
+  modelCount: number;
+  unanimousKeep: number;
+  unanimousCull: number;
+  disagreements: number;
+  total: number;
+  agreementPct: number;
+  tier: "full-agreement" | "partial-agreement" | "single-model" | "unrated";
+  /** Per-photo consensus for batch detail view */
+  photos: Array<{ assetId: string; consensus: "keep" | "cull" | "disagree" }>;
+}
+
+const agreementCache = new Map<string, BatchAgreementStats>();
+
+function computeBatchAgreement(batch: SessionBatch): BatchAgreementStats | null {
+  const fp = batchFingerprint(batch.assets.map((a) => a.id));
+  const allRuns = stateDb.getAllLlmRuns(batch.id, fp);
+
+  if (allRuns.length === 0) return null;
+  if (allRuns.length === 1) {
+    return {
+      modelCount: 1,
+      unanimousKeep: 0,
+      unanimousCull: 0,
+      disagreements: 0,
+      total: batch.assets.length,
+      agreementPct: 0,
+      tier: "single-model",
+      photos: [],
+    };
+  }
+
+  // Cache key: sorted run IDs
+  const cacheKey = allRuns
+    .map((r) => r.id)
+    .toSorted()
+    .join(",");
+  if (agreementCache.has(cacheKey)) return agreementCache.get(cacheKey)!;
+
+  // Parse each model's keep/cull decisions
+  const modelDecisions = new Map<string, Map<string, string>>();
+  for (const run of allRuns) {
+    try {
+      const raw = JSON.parse(run.responseJson);
+      const expanded = expandCompactResponse(raw, batch);
+      const decisions = new Map<string, string>();
+      for (const img of expanded.images) {
+        if (img.llmKeepCull) decisions.set(img.imageId, img.llmKeepCull);
+      }
+      modelDecisions.set(run.model, decisions);
+    } catch {
+      /* skip unparseable */
+    }
+  }
+
+  const models = [...modelDecisions.keys()];
+  if (models.length < 2) return null;
+
+  let unanimousKeep = 0;
+  let unanimousCull = 0;
+  let disagreements = 0;
+  const photos: BatchAgreementStats["photos"] = [];
+
+  for (const asset of batch.assets) {
+    let keepVotes = 0;
+    let cullVotes = 0;
+    for (const model of models) {
+      const d = modelDecisions.get(model)?.get(asset.id);
+      if (d === "keep") keepVotes++;
+      else if (d === "cull") cullVotes++;
+    }
+    const totalVotes = keepVotes + cullVotes;
+    let consensus: "keep" | "cull" | "disagree";
+    if (totalVotes > 0 && keepVotes === totalVotes) {
+      consensus = "keep";
+      unanimousKeep++;
+    } else if (totalVotes > 0 && cullVotes === totalVotes) {
+      consensus = "cull";
+      unanimousCull++;
+    } else {
+      consensus = "disagree";
+      disagreements++;
+    }
+    photos.push({ assetId: asset.id, consensus });
+  }
+
+  const total = batch.assets.length;
+  const unanimous = unanimousKeep + unanimousCull;
+  const agreementPct = total > 0 ? Math.round((unanimous / total) * 100) : 0;
+  const tier = disagreements === 0 ? "full-agreement" : "partial-agreement";
+
+  const result: BatchAgreementStats = {
+    modelCount: models.length,
+    unanimousKeep,
+    unanimousCull,
+    disagreements,
+    total,
+    agreementPct,
+    tier,
+    photos,
+  };
+  agreementCache.set(cacheKey, result);
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Auto-mark batch as reviewed when all photos have decisions
+// ---------------------------------------------------------------------------
+
+let assetToBatch: Map<string, string> | null = null;
+
+function getAssetToBatch(): Map<string, string> {
+  if (!assetToBatch) {
+    assetToBatch = new Map();
+    for (const batch of sessionBatches) {
+      for (const asset of batch.assets) {
+        assetToBatch.set(asset.id, batch.id);
+      }
+    }
+  }
+  return assetToBatch;
+}
+
+function checkAndAutoMarkBatch(batchId: string) {
+  const batch = sessionBatches.find((b) => b.id === batchId);
+  if (!batch) return;
+  const currentStatus = stateDb.getViewStatus(batchId);
+  if (currentStatus === "reviewed" || currentStatus === "skipped") return;
+  const assetIds = batch.assets.map((a) => a.id);
+  const decisions = stateDb.getPhotoDecisions(assetIds);
+  const allDecided = assetIds.every((id) => decisions[id]?.state != null);
+  if (allDecided) {
+    stateDb.setViewStatus(batchId, "batch", "reviewed");
+  }
+}
+
 /** List all session batches */
 app.get("/api/batches", async () => {
   const recentlyReviewed = stateDb.getRecentlyReviewed("batch", 3);
+  const modelCounts = stateDb.getBatchModelCounts();
   const items = sessionBatches
     .map((b) => {
       const fp = batchFingerprint(b.assets.map((a) => a.id));
@@ -481,6 +622,10 @@ app.get("/api/batches", async () => {
           // ignore parse errors
         }
       }
+      // Multi-model agreement (fast-path: skip for single-model batches)
+      const mc = modelCounts.get(`${b.id}:${fp}`) ?? 0;
+      const agree = mc >= 2 ? computeBatchAgreement(b) : null;
+
       return {
         id: b.id,
         source: b.source,
@@ -501,13 +646,32 @@ app.get("/api/batches", async () => {
               review: acSummary.review,
             }
           : null,
+        agreement: agree
+          ? {
+              modelCount: agree.modelCount,
+              unanimousKeep: agree.unanimousKeep,
+              unanimousCull: agree.unanimousCull,
+              disagreements: agree.disagreements,
+              agreementPct: agree.agreementPct,
+              tier: agree.tier,
+            }
+          : null,
       };
     })
-    // Sort: LLM-processed first, then by date
+    // Sort: full-agreement first, then partial, then single-model, then unrated
     .toSorted((a: any, b: any) => {
-      if (a.hasLlmResult && !b.hasLlmResult) return -1;
-      if (!a.hasLlmResult && b.hasLlmResult) return 1;
-      return 0; // preserve date order within each group
+      const tierOrder: Record<string, number> = {
+        "full-agreement": 0,
+        "partial-agreement": 1,
+        "single-model": 2,
+        unrated: 3,
+      };
+      const aTier = a.agreement?.tier ?? (a.hasLlmResult ? "single-model" : "unrated");
+      const bTier = b.agreement?.tier ?? (b.hasLlmResult ? "single-model" : "unrated");
+      const aOrd = tierOrder[aTier] ?? 3;
+      const bOrd = tierOrder[bTier] ?? 3;
+      if (aOrd !== bOrd) return aOrd - bOrd;
+      return 0; // preserve date order within tier
     });
   return { batches: items, recentlyReviewed };
 });
@@ -562,6 +726,10 @@ app.get<{ Params: { id: string }; Querystring: { model?: string } }>(
       llm: llmResult,
       llmModels,
       autoCull: acSummary,
+      photoAgreement: (() => {
+        const agree = computeBatchAgreement(batch);
+        return agree && agree.modelCount >= 2 ? agree.photos : null;
+      })(),
     };
   },
 );
@@ -857,6 +1025,7 @@ app.post<{
     if (decisions.length > 0) {
       stateDb.savePhotoDecisions(decisions, "auto-cull", llmRun.id);
     }
+    checkAndAutoMarkBatch(batchId);
     results.push({ batchId, autoCulled, forReview, skipped });
   }
 
@@ -979,6 +1148,69 @@ app.get<{ Params: { id: string }; Querystring: { models?: string } }>(
 /** Revert all auto-cull decisions (safety valve) */
 app.delete("/api/auto-approve", async () => {
   const reverted = stateDb.revertAutoCullDecisions();
+  return { ok: true, reverted };
+});
+
+/** Bulk-approve batches where all models unanimously agree on every photo */
+app.post<{ Body: { dryRun?: boolean } }>("/api/batches/approve-confident", async (req) => {
+  const dryRun = req.body.dryRun ?? false;
+  const results: Array<{ batchId: string; kept: number; culled: number }> = [];
+
+  for (const batch of sessionBatches) {
+    if (stateDb.getViewStatus(batch.id)) continue; // already reviewed/skipped
+    const agree = computeBatchAgreement(batch);
+    if (!agree || agree.tier !== "full-agreement") continue;
+
+    // Use first model's expanded result for the actual keep/cull + stars
+    const fp = batchFingerprint(batch.assets.map((a) => a.id));
+    const allRuns = stateDb.getAllLlmRuns(batch.id, fp);
+    if (!allRuns.length) continue;
+
+    let expanded;
+    try {
+      const raw = JSON.parse(allRuns[0].responseJson);
+      expanded = expandCompactResponse(raw, batch);
+    } catch {
+      continue;
+    }
+
+    // Skip if any existing manual decisions (don't overwrite user work)
+    const existing = stateDb.getPhotoDecisions(batch.assets.map((a) => a.id));
+    if (Object.values(existing).some((d) => d.state != null)) continue;
+
+    const decisions = expanded.images.map((img) => ({
+      assetId: img.imageId,
+      state: img.llmKeepCull ?? "keep",
+      userStars: null as number | null,
+    }));
+
+    let kept = 0;
+    let culled = 0;
+    for (const d of decisions) {
+      if (d.state === "keep") kept++;
+      else culled++;
+    }
+
+    if (!dryRun) {
+      stateDb.savePhotoDecisions(decisions, "consensus", allRuns[0].id);
+      stateDb.setViewStatus(batch.id, "batch", "reviewed");
+    }
+    results.push({ batchId: batch.id, kept, culled });
+  }
+
+  return {
+    ok: true,
+    dryRun,
+    batchCount: results.length,
+    totalKept: results.reduce((s, r) => s + r.kept, 0),
+    totalCulled: results.reduce((s, r) => s + r.culled, 0),
+    results,
+  };
+});
+
+/** Revert consensus-approved decisions (safety valve) */
+app.delete("/api/approve-confident", async () => {
+  const reverted = stateDb.revertConsensusDecisions();
   return { ok: true, reverted };
 });
 
@@ -1198,6 +1430,14 @@ app.post<{
   };
 }>("/api/photos/decisions", async (req) => {
   stateDb.savePhotoDecisions(req.body.decisions);
+  // Auto-mark batches as reviewed if all their photos now have decisions
+  const a2b = getAssetToBatch();
+  const affected = new Set<string>();
+  for (const d of req.body.decisions) {
+    const bid = a2b.get(d.assetId);
+    if (bid) affected.add(bid);
+  }
+  for (const bid of affected) checkAndAutoMarkBatch(bid);
   return { ok: true, count: req.body.decisions.length };
 });
 

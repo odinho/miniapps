@@ -377,6 +377,20 @@ export class StateDb {
     return rows;
   }
 
+  /** Fast batch-level model counts for all batches (single query). */
+  getBatchModelCounts(): Map<string, number> {
+    const rows = this.db
+      .prepare(
+        `SELECT batch_id || ':' || batch_fingerprint as key,
+                COUNT(DISTINCT model) as model_count
+         FROM llm_batch_runs
+         WHERE status = 'completed'
+         GROUP BY batch_id, batch_fingerprint`,
+      )
+      .all() as Array<{ key: string; model_count: number }>;
+    return new Map(rows.map((r) => [r.key, r.model_count]));
+  }
+
   /** Get list of models with completed results for a batch */
   getLlmModels(batchId: string, fingerprint: string): string[] {
     const rows = this.db
@@ -492,6 +506,12 @@ export class StateDb {
   /** When an LLM run is superseded, revert any auto-cull decisions based on it. */
   invalidateAutoDecisionsForRun(llmRunId: number): number {
     return this.revertAutoCullDecisions(llmRunId);
+  }
+
+  /** Revert all consensus-approved decisions */
+  revertConsensusDecisions(): number {
+    const r = this.db.prepare("DELETE FROM photo_decisions WHERE source = 'consensus'").run();
+    return r.changes;
   }
 
   /** Get auto-keep patterns from the DB table. */

@@ -8,7 +8,7 @@
   import {
     fetchGroups, fetchGroup, fetchBatches, fetchBatch, fetchStats,
     decideGroup, undecideGroup, rankBatch, savePhotoDecisions, fetchPhotoDecisions, fmt,
-    autoApproveBatches, revertAutoApprovals, fetchCullComparisons, stagedCull,
+    autoApproveBatches, revertAutoApprovals, fetchCullComparisons, stagedCull, approveConfidentBatches,
     type GroupSummary, type GroupDetail, type BatchSummary, type BatchDetail,
     type LlmImage, type Stats, type AutoCullClassification, type CullComparison,
   } from './lib/api';
@@ -137,6 +137,31 @@
     return m;
   }
 
+  $: agreementMap = buildAgreementMap(batchDetail);
+  function buildAgreementMap(bd: BatchDetail | null): Record<string, 'keep' | 'cull' | 'disagree'> {
+    const m: Record<string, 'keep' | 'cull' | 'disagree'> = {};
+    if (bd?.photoAgreement) {
+      for (const p of bd.photoAgreement) m[p.assetId] = p.consensus;
+    }
+    return m;
+  }
+
+
+  $: confidentUnreviewed = batches.filter(
+    b => b.agreement?.tier === 'full-agreement' && b.viewStatus !== 'reviewed' && b.viewStatus !== 'skipped'
+  ).length;
+
+  async function bulkApproveConfident() {
+    const preview = await approveConfidentBatches(true);
+    if (!preview.batchCount) { alert('No confident batches to approve.'); return; }
+    if (!confirm(`Approve ${preview.batchCount} batches where all models agree?\n\n${preview.totalKept} photos kept, ${preview.totalCulled} photos culled`)) return;
+    const result = await approveConfidentBatches(false);
+    if (result.ok) {
+      const data = await fetchBatches();
+      batches = data.batches;
+      stats = await fetchStats();
+    }
+  }
 
   async function runStagedCull() {
     const allBatchIds = batches.filter(b => b.hasLlmResult && b.viewStatus !== 'reviewed').map(b => b.id);
@@ -173,6 +198,7 @@
     hasLlm: boolean;
     keeps: number;
     culls: number;
+    agreement: BatchSummary['agreement'];
   }
   let recentDoneIdxs: number[] = []; // most recently approved (by approval order)
 
@@ -194,7 +220,7 @@
         label: `${g.count} photos`,
         sub: `${g.timeSpanMinutes}min · ${fmt(g.totalBytes)}`,
         date: new Date(g.earliestDate),
-        hasLlm: false, keeps: 0, culls: 0,
+        hasLlm: false, keeps: 0, culls: 0, agreement: null,
       }))
     : batches.map((b, i) => ({
         idx: i, active: i === batchIdx,
@@ -203,6 +229,7 @@
         sub: `${b.source}${b.folderName ? ' ' + b.folderName : ''}`,
         date: new Date(b.dateRange.start),
         hasLlm: b.hasLlmResult, keeps: b.keeps, culls: b.culls,
+        agreement: b.agreement,
       }))
   ).map(item => ({
     ...item,
@@ -678,6 +705,11 @@
             {item.sub}{#if item.hasLlm}
               · {#if item.keeps || item.culls}<span class="si-keep">{item.keeps}✓</span> <span class="si-cull">{item.culls}✗</span>{/if}
               <span class="si-llm">llm</span>
+              {#if item.agreement?.tier === 'full-agreement'}
+                <span class="si-agree">✓{item.agreement.modelCount}m</span>
+              {:else if item.agreement?.tier === 'partial-agreement'}
+                <span class="si-partial">{item.agreement.disagreements}?</span>
+              {/if}
             {/if}
           </div>
         </div>
@@ -715,7 +747,7 @@
     {:else if loading}
       <div class="empty"><span class="spinner"></span> Loading...</div>
     {:else if currentAssets.length}
-      <PhotoGrid assets={currentAssets} {states} {selectedIdx} {llmMap} {effectiveStarsMap} {autoCullMap}
+      <PhotoGrid assets={currentAssets} {states} {selectedIdx} {llmMap} {effectiveStarsMap} {autoCullMap} {agreementMap}
         confirmedIds={new Set(Object.keys(manualOverrides).filter(id => manualOverrides[id]))}
         userStarsMap={userStars}
         onSelect={onGridSelect}
@@ -770,6 +802,12 @@
             </button>
           {/each}
       </div>
+    {/if}
+    {#if mode === 'batches' && confidentUnreviewed > 0}
+      <button class="bcf" on:click={bulkApproveConfident}
+        title="Auto-approve {confidentUnreviewed} batches where all models agree">
+        Approve {confidentUnreviewed} confident
+      </button>
     {/if}
     <span class="spacer"></span>
     <span class="bmeta">{currentAssets.length} photos</span>
@@ -861,6 +899,8 @@
   .si-done-toggle { position: sticky; top: 0; z-index: 1; background: #0e1014; font-weight: 600; }
   .si-keep { color: #4caf50; } .si-cull { color: #e53935; }
   .si-llm { color: #f0a040; font-size: 10px; font-weight: 600; }
+  .si-agree { color: #4caf50; font-size: 10px; font-weight: 600; }
+  .si-partial { color: #ff9800; font-size: 10px; font-weight: 600; }
 
   .main { min-width: 0; min-height: 0; overflow: hidden; position: relative; }
   .empty { display: flex; align-items: center; justify-content: center; height: 100%; color: #666; }
@@ -870,6 +910,7 @@
   .bar button:hover { opacity: .85; }
   .bk { background: #4caf50; color: white; } .bc { background: #e53935; color: white; }
   .bb { background: #2196F3; color: white; } .ba { background: #f0a040; color: #1a1a1a; font-weight: 700; }
+  .bcf { background: #2e7d32; color: white; font-weight: 600; font-size: 11px; }
   .bs { background: #333; color: #aaa; } .bh { background: none; color: #7a8294; border: 1px solid #2a2e36 !important; padding: 3px 9px; font-size: 12px; }
   .spacer { flex: 1; } .bmeta { font-size: 11px; color: #7a8294; }
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: white; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; }
@@ -903,6 +944,13 @@
   :global(.bdg.kb.confirmed) { opacity: 1; }
   :global(.bdg.cb.confirmed) { opacity: 1; }
   :global(.bdg.acb-hi) { background: #bf360c; font-size: 8px; } :global(.bdg.acb) { background: #e65100; font-size: 8px; }
+  :global(.cell.confident-keep) { border-color: #2e7d32; border-width: 4px; }
+  :global(.cell.confident-cull) { border-color: #c62828; border-width: 4px; }
+  :global(.cell.disputed) { border: 3px dashed #ff9800 !important; }
+  :global(.confidence-bar) { position: absolute; top: 0; left: 0; right: 0; padding: 2px 6px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; z-index: 1; pointer-events: none; }
+  :global(.keep-bar) { background: linear-gradient(rgba(46,125,50,.85), transparent); color: white; }
+  :global(.cull-bar) { background: linear-gradient(rgba(198,40,40,.85), transparent); color: white; }
+  :global(.dispute-badge) { position: absolute; top: 3px; left: 50%; transform: translateX(-50%); background: #ff9800; color: #1a1a1a; font-size: 11px; font-weight: 900; padding: 1px 6px; border-radius: 3px; z-index: 1; pointer-events: none; }
   :global(.st) { position: absolute; top: 22px; right: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; z-index: 1; }
   :global(.llm-star) { position: absolute; top: 3px; right: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; background: rgba(0,0,0,.6); padding: 1px 4px; border-radius: 3px; z-index: 1; }
   :global(.user-star) { position: absolute; top: 3px; right: 3px; font-size: 11px; color: #1a1a1a; text-shadow: none; background: #ffd700; padding: 1px 4px; border-radius: 3px; z-index: 1; font-weight: 700; }

@@ -126,6 +126,9 @@ view_id TEXT PRIMARY KEY, view_type TEXT, status TEXT ('reviewed'|'skipped')
 - Re-run invalidates only the specific model, preserving others
 - All runs kept in DB (superseded, not deleted) for analysis
 
+### Multi-Model Agreement
+When 2+ models have rated a batch, the server computes per-photo consensus (unanimous keep/cull/disagree). Batches are sorted by agreement tier: full-agreement first, then partial, then single-model. The UI shows confidence overlays ("CONFIDENT KEEP/CULL") on photos where all models agree, and "?!" badges where they disagree. Bulk approval of fully-agreed batches is available via `POST /api/batches/approve-confident`.
+
 ## Tooling
 
 - **oxlint** — Linting (correctness, suspicious, perf categories)

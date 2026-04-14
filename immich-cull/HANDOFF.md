@@ -1,3 +1,28 @@
+## Handoff — immich-cull session 2026-04-14
+
+### What happened
+
+Ran comprehensive thinking/temperature experiment (11 variants, 260 photos, 10 batches). Found temp=0 is strictly better. Built multi-model agreement system: sidebar sorts confident batches first, grid shows confidence overlays, bulk-approve button for unanimous batches. Fixed auto-cull split-brain (batches now auto-mark as reviewed when all photos decided).
+
+### Key changes
+- `temperature: 0` applied to all LLM paths (was 0.2)
+- `GET /api/batches` now includes `agreement` stats, sorted by confidence tier
+- `GET /api/batches/:id` includes `photoAgreement` per-photo consensus
+- `POST /api/batches/approve-confident` — bulk-approve unanimous batches (with dry-run)
+- PhotoGrid shows "CONFIDENT KEEP/CULL" gradient overlays + "?!" dispute badges
+- Sidebar shows `✓2m` / `N?` agreement badges
+- `checkAndAutoMarkBatch()` fixes split-brain: marks batch reviewed when all photos decided
+- `scripts/thinking_experiment.ts` — full experiment harness
+- `scripts/claude-oracle.ts` — calibration via `claude -p` CLI
+
+### Next steps
+1. Run 2nd model (`gemini-3-flash-preview`) on batches that already have flash-lite results
+2. Review confident batches in the UI to build trust
+3. Bulk-approve once confident
+4. Try `claude-oracle` on a few batches for frontier-model calibration
+
+---
+
 ## Handoff — immich-cull sessions 2026-04-11 to 2026-04-12
 
 ### What happened

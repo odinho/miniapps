@@ -64,6 +64,14 @@ export interface BatchSummary {
   keeps: number;
   culls: number;
   autoCullStats: { autoCullHigh: number; autoCull: number; review: number } | null;
+  agreement: {
+    modelCount: number;
+    unanimousKeep: number;
+    unanimousCull: number;
+    disagreements: number;
+    agreementPct: number;
+    tier: "full-agreement" | "partial-agreement" | "single-model" | "unrated";
+  } | null;
 }
 
 export interface BatchDetail {
@@ -76,6 +84,7 @@ export interface BatchDetail {
   llm: LlmResult | null;
   llmModels?: string[];
   autoCull: AutoCullSummary | null;
+  photoAgreement: Array<{ assetId: string; consensus: "keep" | "cull" | "disagree" }> | null;
 }
 
 export interface LlmResult {
@@ -199,6 +208,22 @@ export async function autoApproveBatches(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ batchIds, model }),
+    })
+  ).json();
+}
+
+export async function approveConfidentBatches(dryRun = false): Promise<{
+  ok: boolean;
+  dryRun: boolean;
+  batchCount: number;
+  totalKept: number;
+  totalCulled: number;
+}> {
+  return (
+    await fetch(`${BASE}/api/batches/approve-confident`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dryRun }),
     })
   ).json();
 }
