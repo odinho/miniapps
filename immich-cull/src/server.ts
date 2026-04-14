@@ -1034,13 +1034,15 @@ app.post<{ Body: { dryRun?: boolean } }>("/api/batches/burst-auto-cull", async (
     reason: string;
   }> = [];
 
-  // Build consensus keep set from multi-model agreement
+  // Build consensus keep/cull sets from multi-model agreement
   const consensusKeep = new Set<string>();
+  const consensusCull = new Set<string>();
   for (const batch of sessionBatches) {
     const agree = computeBatchAgreement(batch);
     if (agree && agree.modelCount >= 2) {
       for (const p of agree.photos) {
         if (p.consensus === "keep") consensusKeep.add(p.assetId);
+        else if (p.consensus === "cull") consensusCull.add(p.assetId);
       }
     }
   }
@@ -1057,6 +1059,7 @@ app.post<{ Body: { dryRun?: boolean } }>("/api/batches/burst-auto-cull", async (
         expanded.images,
         expanded.similaritySubgroups,
         consensusKeep.size > 0 ? consensusKeep : undefined,
+        consensusCull.size > 0 ? consensusCull : undefined,
       );
 
       if (result.photosAutoCulled > 0) {
@@ -1090,9 +1093,7 @@ app.post<{ Body: { dryRun?: boolean } }>("/api/batches/burst-auto-cull", async (
     });
     const winner = sorted[0];
     for (const loser of sorted.slice(1)) {
-      // Don't override existing manual decisions
-      const existing = stateDb.getPhotoDecisions([loser.id]);
-      if (existing[loser.id]?.state) continue;
+      // saveAutoDecisions handles conflict safety at SQL level
       allCandidates.push({
         batchId: "immich-duplicate",
         assetId: loser.id,
@@ -1104,18 +1105,21 @@ app.post<{ Body: { dryRun?: boolean } }>("/api/batches/burst-auto-cull", async (
   }
 
   if (!dryRun) {
-    // Save in batches by source type
+    // Use INSERT ... ON CONFLICT DO NOTHING — never overwrites existing decisions
     const burstCandidates = allCandidates.filter((c) => c.batchId !== "immich-duplicate");
     const immichCandidates = allCandidates.filter((c) => c.batchId === "immich-duplicate");
+
+    let burstInserted = 0;
+    let immichInserted = 0;
     if (burstCandidates.length > 0) {
-      stateDb.savePhotoDecisions(
-        burstCandidates.map((c) => ({ assetId: c.assetId, state: "cull", userStars: null })),
+      burstInserted = stateDb.saveAutoDecisions(
+        burstCandidates.map((c) => ({ assetId: c.assetId, state: "cull" })),
         "burst-auto-cull",
       );
     }
     if (immichCandidates.length > 0) {
-      stateDb.savePhotoDecisions(
-        immichCandidates.map((c) => ({ assetId: c.assetId, state: "cull", userStars: null })),
+      immichInserted = stateDb.saveAutoDecisions(
+        immichCandidates.map((c) => ({ assetId: c.assetId, state: "cull" })),
         "immich-duplicate",
       );
     }
@@ -1123,6 +1127,9 @@ app.post<{ Body: { dryRun?: boolean } }>("/api/batches/burst-auto-cull", async (
     for (const batch of sessionBatches) {
       checkAndAutoMarkBatch(batch.id);
     }
+    // Report actual inserts (excluding skipped due to existing decisions)
+    totalCandidates = burstInserted;
+    immichCulled = immichInserted;
   }
 
   return {
@@ -1139,6 +1146,19 @@ app.post<{ Body: { dryRun?: boolean } }>("/api/batches/burst-auto-cull", async (
 
 app.delete("/api/batches/burst-auto-cull", async () => {
   const reverted = stateDb.revertBurstAutoCullDecisions();
+  // Clear batch review status for affected batches (they may no longer be fully decided)
+  if (reverted > 0) {
+    for (const batch of sessionBatches) {
+      const status = stateDb.getViewStatus(batch.id);
+      if (status === "reviewed") {
+        // Re-check if still fully decided
+        const assetIds = batch.assets.map((a) => a.id);
+        const decisions = stateDb.getPhotoDecisions(assetIds);
+        const allDecided = assetIds.every((id) => decisions[id]?.state != null);
+        if (!allDecided) stateDb.setViewStatus(batch.id, "batch", null as any);
+      }
+    }
+  }
   return { ok: true, reverted };
 });
 

@@ -207,6 +207,23 @@ export class StateDb {
     })();
   }
 
+  /** Save auto decisions safely — never overwrites existing rows. Returns count inserted. */
+  saveAutoDecisions(decisions: Array<{ assetId: string; state: string }>, source: string): number {
+    const stmt = this.db.prepare(`
+      INSERT INTO photo_decisions (asset_id, state, source, updated_at)
+      VALUES (?, ?, ?, datetime('now'))
+      ON CONFLICT(asset_id) DO NOTHING
+    `);
+    let inserted = 0;
+    this.db.transaction(() => {
+      for (const d of decisions) {
+        const r = stmt.run(d.assetId, d.state, source);
+        if (r.changes > 0) inserted++;
+      }
+    })();
+    return inserted;
+  }
+
   getPhotoDecisions(
     assetIds: string[],
   ): Record<string, { state: string | null; userStars: number | null }> {
