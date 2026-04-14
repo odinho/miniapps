@@ -17,6 +17,7 @@
   export let userStarsMap: Record<string, number | undefined> = {};
   export let onSelect: (idx: number) => void = () => {};
   export let onToggleState: (idx: number) => void = () => {};
+  export let onToggleCollapsed: () => void = () => {};
 
   let container: HTMLDivElement = undefined!; // bind:this
   let rects: Rect[] = [];
@@ -133,7 +134,8 @@
       {/if}
 
       {#if collapsed > 0}
-        <div class="collapsed-badge">+{collapsed}</div>
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="collapsed-badge" role="button" tabindex="-1" on:click|stopPropagation={() => onToggleCollapsed()}>+{collapsed}</div>
       {/if}
 
       <div class="lbl">

@@ -53,9 +53,9 @@
   $: collapsedCountMap = (() => {
     const m: Record<string, number> = {};
     for (const g of batchDetail?.collapsedGroups ?? []) {
-      // Every keeper in the group shows the hidden count
-      for (const wid of g.winnerIds) {
-        m[wid] = (m[wid] ?? 0) + g.losers.length;
+      // Only first keeper shows the badge (connects to rope visually)
+      if (g.winnerIds.length > 0) {
+        m[g.winnerIds[0]] = (m[g.winnerIds[0]] ?? 0) + g.losers.length;
       }
     }
     return m;
@@ -702,6 +702,7 @@
       <PhotoGrid assets={currentAssets} {states} {selectedIdx} {llmMap} {effectiveStarsMap} {autoCullMap} {agreementMap} {collapsedCountMap}
         confirmedIds={new Set(Object.keys(manualOverrides).filter(id => manualOverrides[id]))}
         userStarsMap={userStars}
+        onToggleCollapsed={() => { showBurstCulled = !showBurstCulled; }}
         onSelect={onGridSelect}
         onToggleState={(i) => {
           const asset = currentAssets[i];
@@ -893,9 +894,9 @@
   :global(.cell.sel) { border-color: #f0a040 !important; box-shadow: 0 0 8px rgba(240,160,64,.5); }
   :global(.cell img) { width: 100%; height: 100%; object-fit: contain; display: block; background: #0b0d11; }
   :global(.lbl) { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,.8)); padding: 10px 5px 3px; font-size: 9px; color: #bbb; display: flex; justify-content: space-between; }
-  :global(.collapsed-badge) { position: absolute; bottom: 18px; right: 3px; background: rgba(100,120,160,.85); color: white; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; z-index: 1; pointer-events: none; }
+  :global(.collapsed-badge) { position: absolute; top: 50%; right: 2px; transform: translateY(-50%); background: #fff; color: #1a1a1a; font-size: 10px; font-weight: 700; padding: 2px 4px; z-index: 5; cursor: pointer; }
   /* Subgroup rope: connector between adjacent group members, rendered in grid container */
-  :global(.sg-rope) { position: absolute; background: rgba(255,255,255,.55); border-radius: 2px; pointer-events: none; z-index: 4; }
+  :global(.sg-rope) { position: absolute; background: #fff; pointer-events: none; z-index: 4; }
   :global(.toggle-zone) { position: absolute; top: 0; left: 0; right: 0; height: 20%; min-height: 24px; cursor: pointer; z-index: 2; }
   :global(.bdg) { position: absolute; top: 3px; left: 3px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; color: white; pointer-events: none; }
   :global(.bdg.kb) { background: #4caf50; opacity: 0.75; }
