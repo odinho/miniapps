@@ -49,13 +49,22 @@
     {@const isConfirmed = confirmedIds.has(asset.id)}
     {@const agreement = agreementMap[asset.id]}
     {@const collapsed = collapsedCountMap[asset.id] ?? 0}
+    {@const prevSg = i > 0 ? llmMap[assets[i-1]?.id]?.similaritySubgroupId : null}
+    {@const nextSg = i < assets.length - 1 ? llmMap[assets[i+1]?.id]?.similaritySubgroupId : null}
+    {@const sgStart = sg && sg !== prevSg}
+    {@const sgEnd = sg && sg !== nextSg}
+    {@const sgMid = sg && !sgStart && !sgEnd}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
       class="cell"
       class:keep={isKeep}
       class:cull={isCull}
       class:sel={isSel}
-      style="left:{r.x}px;top:{r.y}px;width:{r.w}px;height:{r.h}px;{sg ? 'outline:2px dashed rgba(240,160,64,.4);outline-offset:-2px' : ''}"
+      class:sg-start={sgStart}
+      class:sg-mid={sgMid}
+      class:sg-end={sgEnd}
+      class:sg-only={sg && sgStart && sgEnd}
+      style="left:{r.x}px;top:{r.y}px;width:{r.w}px;height:{r.h}px"
       on:click={() => onSelect(i)}
       role="button"
       tabindex="-1"

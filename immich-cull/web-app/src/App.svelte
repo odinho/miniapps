@@ -53,7 +53,10 @@
   $: collapsedCountMap = (() => {
     const m: Record<string, number> = {};
     for (const g of batchDetail?.collapsedGroups ?? []) {
-      m[g.winnerId] = (m[g.winnerId] ?? 0) + g.losers.length;
+      // Every keeper in the group shows the hidden count
+      for (const wid of g.winnerIds) {
+        m[wid] = (m[wid] ?? 0) + g.losers.length;
+      }
     }
     return m;
   })();
@@ -891,6 +894,15 @@
   :global(.cell img) { width: 100%; height: 100%; object-fit: contain; display: block; background: #0b0d11; }
   :global(.lbl) { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,.8)); padding: 10px 5px 3px; font-size: 9px; color: #bbb; display: flex; justify-content: space-between; }
   :global(.collapsed-badge) { position: absolute; bottom: 18px; right: 3px; background: rgba(100,120,160,.85); color: white; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; z-index: 1; pointer-events: none; }
+  /* Subgroup rope: thin white line at top connecting group members */
+  :global(.sg-start), :global(.sg-mid), :global(.sg-end) { border-top: 2px solid rgba(255,255,255,.45) !important; }
+  :global(.sg-start) { border-top-left-radius: 6px; }
+  :global(.sg-end) { border-top-right-radius: 6px; }
+  :global(.sg-start.sg-only) { border-top-right-radius: 6px; }
+  /* Extend the line into the gap between cells */
+  :global(.sg-start)::after, :global(.sg-mid)::after { content: ''; position: absolute; top: -2px; right: -5px; width: 5px; height: 2px; background: rgba(255,255,255,.45); }
+  :global(.sg-end)::after { content: none; }
+  :global(.sg-only)::after { content: none; }
   :global(.toggle-zone) { position: absolute; top: 0; left: 0; right: 0; height: 20%; min-height: 24px; cursor: pointer; z-index: 2; }
   :global(.bdg) { position: absolute; top: 3px; left: 3px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; color: white; pointer-events: none; }
   :global(.bdg.kb) { background: #4caf50; opacity: 0.75; }

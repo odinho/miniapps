@@ -68,7 +68,7 @@ export interface BatchDetail {
     unanimous: boolean;
   }> | null;
   collapsedGroups: Array<{
-    winnerId: string;
+    winnerIds: string[];
     losers: string[];
     type: string;
   }>;

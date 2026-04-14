@@ -489,13 +489,13 @@ app.get<{ Params: { id: string }; Querystring: { model?: string } }>(
         return agree && agree.modelCount >= 2 ? agree.photos : null;
       })(),
       collapsedGroups: (() => {
-        // Find burst-auto-culled photos in this batch and group by winner
+        // Find burst-auto-culled photos in this batch and group by keepers
         if (!cached) return [];
         try {
           const raw = JSON.parse(cached.responseJson);
           const expanded = expandCompactResponse(raw, batch);
           const sources = stateDb.getDecisionSources(batch.assets.map((a) => a.id));
-          const groups: Array<{ winnerId: string; losers: string[]; type: string }> = [];
+          const groups: Array<{ winnerIds: string[]; losers: string[]; type: string }> = [];
           for (const sg of expanded.similaritySubgroups) {
             if (sg.subgroupType !== "burst" && sg.subgroupType !== "near_duplicate") continue;
             const burstCulled = sg.cullIds.filter((id) => {
@@ -504,7 +504,7 @@ app.get<{ Params: { id: string }; Querystring: { model?: string } }>(
             });
             if (burstCulled.length > 0 && sg.recommendedKeepIds.length > 0) {
               groups.push({
-                winnerId: sg.recommendedKeepIds[0],
+                winnerIds: sg.recommendedKeepIds,
                 losers: burstCulled,
                 type: sg.subgroupType,
               });
