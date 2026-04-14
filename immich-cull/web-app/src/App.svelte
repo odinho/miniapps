@@ -8,7 +8,7 @@
   import {
     fetchBatches, fetchBatch, fetchStats,
     rankBatch, savePhotoDecisions, fetchPhotoDecisions, fmt,
-    autoApproveBatches, revertAutoApprovals, fetchCullComparisons, stagedCull, approveConfidentBatches,
+    autoApproveBatches, revertAutoApprovals, fetchCullComparisons, stagedCull, approveConfidentBatches, burstAutoCull, revertBurstAutoCull,
     type BatchSummary, type BatchDetail,
     type LlmImage, type Stats, type AutoCullClassification, type CullComparison,
   } from './lib/api';
@@ -48,7 +48,18 @@
   let stats: Stats | null = null;
   let undoStack: Array<{ mode: AppMode; idx: number; viewId: string; prevStates: Record<string, AssetState>; prevUserStars: Record<string, number>; prevSi: number; prevKeepLevel: number }> = [];
 
-  $: currentAssets = batchDetail?.assets ?? [];
+  $: allAssets = batchDetail?.assets ?? [];
+  // Collapse burst-auto-culled photos: hide losers, track counts on winners
+  $: collapsedCountMap = (() => {
+    const m: Record<string, number> = {};
+    for (const g of batchDetail?.collapsedGroups ?? []) {
+      m[g.winnerId] = (m[g.winnerId] ?? 0) + g.losers.length;
+    }
+    return m;
+  })();
+  $: burstCulledIds = new Set((batchDetail?.collapsedGroups ?? []).flatMap(g => g.losers));
+  let showBurstCulled = false;
+  $: currentAssets = showBurstCulled ? allAssets : allAssets.filter(a => !burstCulledIds.has(a.id));
   $: currentAssetIds = currentAssets.map(a => a.id);
   $: llmMap = buildLlmMap(batchDetail);
   $: allSubgroups = batchDetail?.llm?.similaritySubgroups ?? [];
@@ -56,8 +67,20 @@
   // Layer 1: LLM-derived state (pure reactive derivation)
   $: llmState = deriveLlmState(batchDetail?.llm ?? null, keepLevel);
 
-  // Layer 3: effective state = manual overrides ?? llm state
-  $: states = mergeStates(currentAssetIds, llmState, manualOverrides);
+  // Layer 2.5: consensus overrides LLM for undecided photos in manual mode
+  $: consensusOverrides = (() => {
+    const m: Record<string, AssetState> = {};
+    if (activeView !== 'manual') return m;
+    const pa = batchDetail?.photoAgreement;
+    if (!pa) return m;
+    for (const p of pa) {
+      if (p.consensus === 'keep' || p.consensus === 'cull') m[p.assetId] = p.consensus;
+    }
+    return m;
+  })();
+
+  // Layer 3: effective state = manual overrides ?? consensus ?? llm state
+  $: states = mergeStates(currentAssetIds, llmState, manualOverrides, consensusOverrides);
 
   // Effective stars: user overrides win over LLM-computed stars
   $: effectiveStarsMap = (() => {
@@ -129,11 +152,14 @@
     return m;
   }
 
-  $: agreementMap = buildAgreementMap(batchDetail);
-  function buildAgreementMap(bd: BatchDetail | null): Record<string, 'keep' | 'cull' | 'disagree'> {
-    const m: Record<string, 'keep' | 'cull' | 'disagree'> = {};
+  $: agreementMap = buildAgreementMap(batchDetail, manualOverrides);
+  function buildAgreementMap(bd: BatchDetail | null, overrides: Record<string, AssetState>): Record<string, { consensus: 'keep' | 'cull' | 'disagree'; unanimous: boolean }> {
+    const m: Record<string, { consensus: 'keep' | 'cull' | 'disagree'; unanimous: boolean }> = {};
     if (bd?.photoAgreement) {
-      for (const p of bd.photoAgreement) m[p.assetId] = p.consensus;
+      for (const p of bd.photoAgreement) {
+        // Hide agreement info when user has manually overridden
+        if (!overrides[p.assetId]) m[p.assetId] = { consensus: p.consensus, unanimous: p.unanimous };
+      }
     }
     return m;
   }
@@ -594,6 +620,24 @@
   {/if}
   <aside class="sidebar" class:open={sidebarOpen} class:hidden={mode === 'review' || mode === 'stars'}>
     <div class="sidebar-list">
+      <div class="burst-controls">
+        <button class="burst-btn" on:click={async () => {
+          const preview = await burstAutoCull(true);
+          if (!preview.totalAutoCulled) { alert('No burst duplicates found. Run LLM scoring first.'); return; }
+          if (!confirm(`Auto-cull ${preview.totalAutoCulled} burst/duplicate photos from ${preview.burstGroups + preview.immichGroups} groups?\n\n${preview.burstPhotos} from LLM bursts, ${preview.immichPhotos} from Immich duplicates`)) return;
+          await burstAutoCull(false);
+          await loadBatches();
+          if (batchIdx >= 0) await selectBatch(batchIdx);
+          stats = await fetchStats();
+        }}>Burst Auto-Cull</button>
+        <button class="burst-btn burst-undo" on:click={async () => {
+          const r = await revertBurstAutoCull();
+          alert(`Reverted ${r.reverted} burst auto-cull decisions.`);
+          await loadBatches();
+          if (batchIdx >= 0) await selectBatch(batchIdx);
+          stats = await fetchStats();
+        }}>Undo</button>
+      </div>
       {#if sidebarDecidedCount > 3}
         <button class="si-more si-done-toggle" on:click={() => sidebarShowDone = !sidebarShowDone}>
           {sidebarShowDone ? 'Hide' : 'Show all'} {sidebarDecidedCount} done
@@ -652,7 +696,7 @@
     {:else if loading}
       <div class="empty"><span class="spinner"></span> Loading...</div>
     {:else if currentAssets.length}
-      <PhotoGrid assets={currentAssets} {states} {selectedIdx} {llmMap} {effectiveStarsMap} {autoCullMap} {agreementMap}
+      <PhotoGrid assets={currentAssets} {states} {selectedIdx} {llmMap} {effectiveStarsMap} {autoCullMap} {agreementMap} {collapsedCountMap}
         confirmedIds={new Set(Object.keys(manualOverrides).filter(id => manualOverrides[id]))}
         userStarsMap={userStars}
         onSelect={onGridSelect}
@@ -799,6 +843,10 @@
   .gi.decided { opacity: .5; border-left-color: #66bb6a; }
   .gi.decided.active { opacity: 1; border-left-color: #a5d6a7; background: rgba(76,175,80,.15); }
   .gi .t { font-weight: 500; } .gi .m { color: #666; font-size: 11px; }
+  .burst-controls { display: flex; gap: 4px; padding: 4px 6px; border-bottom: 1px solid #1e2028; }
+  .burst-btn { flex: 1; padding: 4px 6px; background: #1c2030; border: 1px solid #2a3040; border-radius: 3px; color: #8090b0; font-size: 10px; cursor: pointer; }
+  .burst-btn:hover { background: #252a3a; color: #b0c0e0; }
+  .burst-undo { flex: 0; color: #666; }
   .si-more { display: block; width: 100%; padding: 6px 8px; background: none; border: none; border-bottom: 1px solid #1e2028; color: #f0a040; font-size: 11px; cursor: pointer; text-align: left; }
   .si-more:hover { background: #1c1f27; }
   .si-done-toggle { position: sticky; top: 0; z-index: 1; background: #0e1014; font-weight: 600; }
@@ -842,6 +890,7 @@
   :global(.cell.sel) { border-color: #f0a040 !important; box-shadow: 0 0 8px rgba(240,160,64,.5); }
   :global(.cell img) { width: 100%; height: 100%; object-fit: contain; display: block; background: #0b0d11; }
   :global(.lbl) { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,.8)); padding: 10px 5px 3px; font-size: 9px; color: #bbb; display: flex; justify-content: space-between; }
+  :global(.collapsed-badge) { position: absolute; bottom: 18px; right: 3px; background: rgba(100,120,160,.85); color: white; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; z-index: 1; pointer-events: none; }
   :global(.toggle-zone) { position: absolute; top: 0; left: 0; right: 0; height: 20%; min-height: 24px; cursor: pointer; z-index: 2; }
   :global(.bdg) { position: absolute; top: 3px; left: 3px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; color: white; pointer-events: none; }
   :global(.bdg.kb) { background: #4caf50; opacity: 0.75; }
@@ -849,13 +898,10 @@
   :global(.bdg.kb.confirmed) { opacity: 1; }
   :global(.bdg.cb.confirmed) { opacity: 1; }
   :global(.bdg.acb-hi) { background: #bf360c; font-size: 8px; } :global(.bdg.acb) { background: #e65100; font-size: 8px; }
-  :global(.cell.confident-keep) { border-color: #2e7d32; border-width: 4px; }
-  :global(.cell.confident-cull) { border-color: #c62828; border-width: 4px; }
-  :global(.cell.disputed) { border: 3px dashed #ff9800 !important; }
-  :global(.confidence-bar) { position: absolute; top: 0; left: 0; right: 0; padding: 2px 6px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; z-index: 1; pointer-events: none; }
-  :global(.keep-bar) { background: linear-gradient(rgba(46,125,50,.85), transparent); color: white; }
-  :global(.cull-bar) { background: linear-gradient(rgba(198,40,40,.85), transparent); color: white; }
-  :global(.dispute-badge) { position: absolute; top: 3px; left: 50%; transform: translateX(-50%); background: #ff9800; color: #1a1a1a; font-size: 11px; font-weight: 900; padding: 1px 6px; border-radius: 3px; z-index: 1; pointer-events: none; }
+  :global(.bdg.agreed) { opacity: 1; }
+  :global(.bdg.has-dispute) { display: flex; align-items: stretch; padding: 0; border-radius: 3px; overflow: hidden; }
+  :global(.bdg.has-dispute > .bdg-state) { padding: 1px 4px; }
+  :global(.bdg.has-dispute > .bdg-dispute) { background: #ff9800; color: #1a1a1a; font-weight: 900; padding: 1px 4px; }
   :global(.st) { position: absolute; top: 22px; right: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; z-index: 1; }
   :global(.llm-star) { position: absolute; top: 3px; right: 3px; font-size: 11px; color: #ffd700; text-shadow: 0 1px 2px #000; background: rgba(0,0,0,.6); padding: 1px 4px; border-radius: 3px; z-index: 1; }
   :global(.user-star) { position: absolute; top: 3px; right: 3px; font-size: 11px; color: #1a1a1a; text-shadow: none; background: #ffd700; padding: 1px 4px; border-radius: 3px; z-index: 1; font-weight: 700; }

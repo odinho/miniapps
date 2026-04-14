@@ -11,7 +11,8 @@
   export let llmMap: Record<string, LlmImage> = {};
   export let effectiveStarsMap: Record<string, number> = {};
   export let autoCullMap: Record<string, AutoCullClassification> = {};
-  export let agreementMap: Record<string, 'keep' | 'cull' | 'disagree'> = {};
+  export let agreementMap: Record<string, { consensus: 'keep' | 'cull' | 'disagree'; unanimous: boolean }> = {};
+  export let collapsedCountMap: Record<string, number> = {};
   export let confirmedIds: Set<string> = new Set();
   export let userStarsMap: Record<string, number | undefined> = {};
   export let onSelect: (idx: number) => void = () => {};
@@ -47,29 +48,19 @@
     {@const effStars = effectiveStarsMap[asset.id] ?? 0}
     {@const isConfirmed = confirmedIds.has(asset.id)}
     {@const agreement = agreementMap[asset.id]}
+    {@const collapsed = collapsedCountMap[asset.id] ?? 0}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
       class="cell"
       class:keep={isKeep}
       class:cull={isCull}
       class:sel={isSel}
-      class:confident-keep={agreement === 'keep'}
-      class:confident-cull={agreement === 'cull'}
-      class:disputed={agreement === 'disagree'}
       style="left:{r.x}px;top:{r.y}px;width:{r.w}px;height:{r.h}px;{sg ? 'outline:2px dashed rgba(240,160,64,.4);outline-offset:-2px' : ''}"
       on:click={() => onSelect(i)}
       role="button"
       tabindex="-1"
     >
       <img src={previewUrl(asset.id)} loading="lazy" alt={asset.filename} />
-
-      {#if agreement === 'keep'}
-        <div class="confidence-bar keep-bar">CONFIDENT KEEP</div>
-      {:else if agreement === 'cull'}
-        <div class="confidence-bar cull-bar">CONFIDENT CULL</div>
-      {:else if agreement === 'disagree'}
-        <div class="dispute-badge">?!</div>
-      {/if}
 
       {#if effStars > 0}
         <div class={userStarsMap[asset.id] != null ? 'user-star' : 'llm-star'}>
@@ -83,9 +74,17 @@
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div class="toggle-zone" role="button" tabindex="-1" on:click|stopPropagation={() => onToggleState(i)}>
         {#if isKeep}
-          <div class="bdg kb" class:confirmed={isConfirmed}>{isConfirmed ? 'KEEP' : 'KEEP?'}</div>
+          {@const unanimous = agreement?.consensus === 'keep' && agreement.unanimous}
+          {@const disputed = agreement?.consensus === 'disagree'}
+          <div class="bdg kb" class:confirmed={isConfirmed} class:agreed={unanimous} class:has-dispute={disputed}>
+            {#if disputed}<span class="bdg-state">KEEP?</span><span class="bdg-dispute">?!</span>{:else}{isConfirmed ? 'KEEP' : unanimous ? 'KEEP \u2713\u2713' : 'KEEP?'}{/if}
+          </div>
         {:else if isCull}
-          <div class="bdg cb" class:confirmed={isConfirmed}>{isConfirmed ? 'CULL' : 'CULL?'}</div>
+          {@const unanimous = agreement?.consensus === 'cull' && agreement.unanimous}
+          {@const disputed = agreement?.consensus === 'disagree'}
+          <div class="bdg cb" class:confirmed={isConfirmed} class:agreed={unanimous} class:has-dispute={disputed}>
+            {#if disputed}<span class="bdg-state">CULL?</span><span class="bdg-dispute">?!</span>{:else}{isConfirmed ? 'CULL' : unanimous ? 'CULL \u2713\u2713' : 'CULL?'}{/if}
+          </div>
         {:else if autoCullMap[asset.id]?.tier === 'auto-cull-high'}
           <div class="bdg acb-hi">AUTO</div>
         {:else if autoCullMap[asset.id]?.tier === 'auto-cull'}
@@ -95,6 +94,10 @@
 
       {#if asset.rating && asset.rating > 0}
         <div class="st">{'★'.repeat(asset.rating)}</div>
+      {/if}
+
+      {#if collapsed > 0}
+        <div class="collapsed-badge">+{collapsed}</div>
       {/if}
 
       <div class="lbl">

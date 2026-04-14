@@ -13,6 +13,7 @@ import { batchBySession, SessionBatch } from "./batching/session-batcher.js";
 import { LlmClient, DEFAULT_LLM_CONFIG, expandCompactResponse } from "./ranking/llm-client.js";
 import { mapLlmStarsToWriteback } from "./ranking/types.js";
 import { classifyBatchForAutoCull, type AutoCullSummary } from "./ranking/auto-cull.js";
+import { classifyBurstAutoCull } from "./ranking/burst-auto-cull.js";
 import { ImmichWriteback } from "./db/immich-writeback.js";
 import { config as loadEnv } from "dotenv";
 loadEnv();
@@ -219,7 +220,7 @@ interface BatchAgreementStats {
   agreementPct: number;
   tier: "full-agreement" | "partial-agreement" | "single-model" | "unrated";
   /** Per-photo consensus for batch detail view */
-  photos: Array<{ assetId: string; consensus: "keep" | "cull" | "disagree" }>;
+  photos: Array<{ assetId: string; consensus: "keep" | "cull" | "disagree"; unanimous: boolean }>;
 }
 
 const agreementCache = new Map<string, BatchAgreementStats>();
@@ -283,22 +284,26 @@ function computeBatchAgreement(batch: SessionBatch): BatchAgreementStats | null 
     }
     const totalVotes = keepVotes + cullVotes;
     let consensus: "keep" | "cull" | "disagree";
-    if (totalVotes > 0 && keepVotes === totalVotes) {
+    let isUnanimous = false;
+    // Majority wins: strict majority (>50%) decides; ties are disagreements
+    if (totalVotes > 0 && keepVotes > cullVotes) {
       consensus = "keep";
+      isUnanimous = cullVotes === 0;
       unanimousKeep++;
-    } else if (totalVotes > 0 && cullVotes === totalVotes) {
+    } else if (totalVotes > 0 && cullVotes > keepVotes) {
       consensus = "cull";
+      isUnanimous = keepVotes === 0;
       unanimousCull++;
     } else {
       consensus = "disagree";
       disagreements++;
     }
-    photos.push({ assetId: asset.id, consensus });
+    photos.push({ assetId: asset.id, consensus, unanimous: isUnanimous });
   }
 
   const total = batch.assets.length;
-  const unanimous = unanimousKeep + unanimousCull;
-  const agreementPct = total > 0 ? Math.round((unanimous / total) * 100) : 0;
+  const agreed = unanimousKeep + unanimousCull;
+  const agreementPct = total > 0 ? Math.round((agreed / total) * 100) : 0;
   const tier = disagreements === 0 ? "full-agreement" : "partial-agreement";
 
   const result: BatchAgreementStats = {
@@ -482,6 +487,33 @@ app.get<{ Params: { id: string }; Querystring: { model?: string } }>(
       photoAgreement: (() => {
         const agree = computeBatchAgreement(batch);
         return agree && agree.modelCount >= 2 ? agree.photos : null;
+      })(),
+      collapsedGroups: (() => {
+        // Find burst-auto-culled photos in this batch and group by winner
+        if (!cached) return [];
+        try {
+          const raw = JSON.parse(cached.responseJson);
+          const expanded = expandCompactResponse(raw, batch);
+          const sources = stateDb.getDecisionSources(batch.assets.map((a) => a.id));
+          const groups: Array<{ winnerId: string; losers: string[]; type: string }> = [];
+          for (const sg of expanded.similaritySubgroups) {
+            if (sg.subgroupType !== "burst" && sg.subgroupType !== "near_duplicate") continue;
+            const burstCulled = sg.cullIds.filter((id) => {
+              const src = sources[id];
+              return src === "burst-auto-cull" || src === "immich-duplicate";
+            });
+            if (burstCulled.length > 0 && sg.recommendedKeepIds.length > 0) {
+              groups.push({
+                winnerId: sg.recommendedKeepIds[0],
+                losers: burstCulled,
+                type: sg.subgroupType,
+              });
+            }
+          }
+          return groups;
+        } catch {
+          return [];
+        }
       })(),
     };
   },
@@ -959,6 +991,154 @@ app.post<{ Body: { dryRun?: boolean } }>("/api/batches/approve-confident", async
 /** Revert consensus-approved decisions (safety valve) */
 app.delete("/api/approve-confident", async () => {
   const reverted = stateDb.revertConsensusDecisions();
+  return { ok: true, reverted };
+});
+
+// ---------------------------------------------------------------------------
+// Burst/duplicate auto-cull
+// ---------------------------------------------------------------------------
+
+/** Build Immich duplicate groups from duplicateId field */
+function buildImmichDuplicateGroups(): Map<string, Asset[]> {
+  const groups = new Map<string, Asset[]>();
+  for (const batch of sessionBatches) {
+    for (const asset of batch.assets) {
+      if (asset.duplicateId) {
+        let g = groups.get(asset.duplicateId);
+        if (!g) {
+          g = [];
+          groups.set(asset.duplicateId, g);
+        }
+        g.push(asset);
+      }
+    }
+  }
+  // Only keep groups with 2+ assets
+  for (const [k, v] of groups) {
+    if (v.length < 2) groups.delete(k);
+  }
+  return groups;
+}
+
+/** Run burst auto-cull across all scored batches */
+app.post<{ Body: { dryRun?: boolean } }>("/api/batches/burst-auto-cull", async (req) => {
+  const dryRun = req.body?.dryRun ?? false;
+  let totalCandidates = 0;
+  let totalGroups = 0;
+  let totalBatches = 0;
+  let totalPhotosInBurstGroups = 0;
+  const allCandidates: Array<{
+    batchId: string;
+    assetId: string;
+    winnerId: string;
+    reason: string;
+  }> = [];
+
+  // Build consensus keep set from multi-model agreement
+  const consensusKeep = new Set<string>();
+  for (const batch of sessionBatches) {
+    const agree = computeBatchAgreement(batch);
+    if (agree && agree.modelCount >= 2) {
+      for (const p of agree.photos) {
+        if (p.consensus === "keep") consensusKeep.add(p.assetId);
+      }
+    }
+  }
+
+  for (const batch of sessionBatches) {
+    const fp = batchFingerprint(batch.assets.map((a) => a.id));
+    const cached = stateDb.getLlmRun(batch.id, fp);
+    if (!cached) continue;
+
+    try {
+      const raw = JSON.parse(cached.responseJson);
+      const expanded = expandCompactResponse(raw, batch);
+      const result = classifyBurstAutoCull(
+        expanded.images,
+        expanded.similaritySubgroups,
+        consensusKeep.size > 0 ? consensusKeep : undefined,
+      );
+
+      if (result.photosAutoCulled > 0) {
+        totalCandidates += result.photosAutoCulled;
+        totalGroups += result.groupsCulled;
+        totalBatches++;
+        totalPhotosInBurstGroups += result.photosInBurstGroups;
+        for (const c of result.candidates) {
+          allCandidates.push({
+            batchId: batch.id,
+            assetId: c.assetId,
+            winnerId: c.winnerId,
+            reason: c.reason,
+          });
+        }
+      }
+    } catch {
+      /* skip unparseable */
+    }
+  }
+
+  // Also handle Immich duplicate groups
+  const immichGroups = buildImmichDuplicateGroups();
+  let immichCulled = 0;
+  for (const [, assets] of immichGroups) {
+    // Pick winner: highest rating, then largest file, then newest
+    const sorted = [...assets].toSorted((a, b) => {
+      if ((a.rating ?? 0) !== (b.rating ?? 0)) return (b.rating ?? 0) - (a.rating ?? 0);
+      if ((a.fileSize ?? 0) !== (b.fileSize ?? 0)) return (b.fileSize ?? 0) - (a.fileSize ?? 0);
+      return b.fileCreatedAt.getTime() - a.fileCreatedAt.getTime();
+    });
+    const winner = sorted[0];
+    for (const loser of sorted.slice(1)) {
+      // Don't override existing manual decisions
+      const existing = stateDb.getPhotoDecisions([loser.id]);
+      if (existing[loser.id]?.state) continue;
+      allCandidates.push({
+        batchId: "immich-duplicate",
+        assetId: loser.id,
+        winnerId: winner.id,
+        reason: `Immich duplicate (${assets.length} photos)`,
+      });
+      immichCulled++;
+    }
+  }
+
+  if (!dryRun) {
+    // Save in batches by source type
+    const burstCandidates = allCandidates.filter((c) => c.batchId !== "immich-duplicate");
+    const immichCandidates = allCandidates.filter((c) => c.batchId === "immich-duplicate");
+    if (burstCandidates.length > 0) {
+      stateDb.savePhotoDecisions(
+        burstCandidates.map((c) => ({ assetId: c.assetId, state: "cull", userStars: null })),
+        "burst-auto-cull",
+      );
+    }
+    if (immichCandidates.length > 0) {
+      stateDb.savePhotoDecisions(
+        immichCandidates.map((c) => ({ assetId: c.assetId, state: "cull", userStars: null })),
+        "immich-duplicate",
+      );
+    }
+    // Auto-mark batches as reviewed if all photos now have decisions
+    for (const batch of sessionBatches) {
+      checkAndAutoMarkBatch(batch.id);
+    }
+  }
+
+  return {
+    ok: true,
+    dryRun,
+    burstGroups: totalGroups,
+    burstPhotos: totalCandidates,
+    burstBatches: totalBatches,
+    immichGroups: immichGroups.size,
+    immichPhotos: immichCulled,
+    totalAutoCulled: totalCandidates + immichCulled,
+  };
+});
+
+app.delete("/api/batches/burst-auto-cull", async () => {
+  const reverted = stateDb.revertBurstAutoCullDecisions();
   return { ok: true, reverted };
 });
 

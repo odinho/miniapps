@@ -499,6 +499,30 @@ export class StateDb {
     return r.changes;
   }
 
+  /** Get the source of decisions for multiple assets */
+  getDecisionSources(assetIds: string[]): Record<string, string | null> {
+    const result: Record<string, string | null> = {};
+    for (let i = 0; i < assetIds.length; i += 500) {
+      const chunk = assetIds.slice(i, i + 500);
+      const placeholders = chunk.map(() => "?").join(",");
+      const rows = this.db
+        .prepare(`SELECT asset_id, source FROM photo_decisions WHERE asset_id IN (${placeholders})`)
+        .all(...chunk) as Array<{ asset_id: string; source: string }>;
+      for (const row of rows) result[row.asset_id] = row.source;
+    }
+    return result;
+  }
+
+  /** Revert all burst/duplicate auto-cull decisions */
+  revertBurstAutoCullDecisions(): number {
+    const r = this.db
+      .prepare(
+        "DELETE FROM photo_decisions WHERE source IN ('burst-auto-cull', 'immich-duplicate')",
+      )
+      .run();
+    return r.changes;
+  }
+
   /** Get auto-keep patterns from the DB table. */
   getAutoKeepPatterns(): Array<{
     pattern: string;

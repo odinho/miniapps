@@ -100,15 +100,16 @@ export function deriveLlmState(
   return out;
 }
 
-/** Merge llmState with manual overrides. Manual wins. */
+/** Merge llmState with consensus and manual overrides. Manual wins, then consensus, then LLM. */
 export function mergeStates(
   assetIds: string[],
   llmState: Record<string, AssetState>,
   manualOverrides: Record<string, AssetState>,
+  consensusOverrides: Record<string, AssetState> = {},
 ): Record<string, AssetState> {
   const out: Record<string, AssetState> = {};
   for (const id of assetIds) {
-    out[id] = manualOverrides[id] ?? llmState[id] ?? null;
+    out[id] = manualOverrides[id] ?? consensusOverrides[id] ?? llmState[id] ?? null;
   }
   return out;
 }

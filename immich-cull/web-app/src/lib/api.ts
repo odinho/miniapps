@@ -62,7 +62,16 @@ export interface BatchDetail {
   llm: LlmResult | null;
   llmModels?: string[];
   autoCull: AutoCullSummary | null;
-  photoAgreement: Array<{ assetId: string; consensus: "keep" | "cull" | "disagree" }> | null;
+  photoAgreement: Array<{
+    assetId: string;
+    consensus: "keep" | "cull" | "disagree";
+    unanimous: boolean;
+  }> | null;
+  collapsedGroups: Array<{
+    winnerId: string;
+    losers: string[];
+    type: string;
+  }>;
 }
 
 export interface LlmResult {
@@ -182,6 +191,29 @@ export async function approveConfidentBatches(dryRun = false): Promise<{
 
 export async function revertAutoApprovals(): Promise<{ ok: boolean; reverted: number }> {
   return (await fetch(`${BASE}/api/auto-approve`, { method: "DELETE" })).json();
+}
+
+export async function burstAutoCull(dryRun = false): Promise<{
+  ok: boolean;
+  dryRun: boolean;
+  burstGroups: number;
+  burstPhotos: number;
+  burstBatches: number;
+  immichGroups: number;
+  immichPhotos: number;
+  totalAutoCulled: number;
+}> {
+  return (
+    await fetch(`${BASE}/api/batches/burst-auto-cull`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dryRun }),
+    })
+  ).json();
+}
+
+export async function revertBurstAutoCull(): Promise<{ ok: boolean; reverted: number }> {
+  return (await fetch(`${BASE}/api/batches/burst-auto-cull`, { method: "DELETE" })).json();
 }
 
 export interface CullComparison {
