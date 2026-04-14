@@ -28,6 +28,16 @@ Read first if the task touches events, projections, API shape, optimistic sync, 
 - [`src/lib/engine/stats.ts`](../src/lib/engine/stats.ts) — stats logic
 - [`src/lib/engine/classification.ts`](../src/lib/engine/classification.ts) — nap/night classification
 
+### Notifications (Web Push)
+
+- [`src/lib/server/webpush.ts`](../src/lib/server/webpush.ts) — VAPID config, send helpers
+- [`src/lib/server/notification-scheduler.ts`](../src/lib/server/notification-scheduler.ts) — trigger logic + fire loop
+- [`src/lib/server/notification-prefs.ts`](../src/lib/server/notification-prefs.ts) — per-trigger opt-in prefs
+- [`src/lib/notifications.ts`](../src/lib/notifications.ts) — client subscribe/unsubscribe, trigger labels
+- [`src/service-worker/index.ts`](../src/service-worker/index.ts) — push event handler
+- [`src/hooks.server.ts`](../src/hooks.server.ts) — starts notification loop on boot
+- See [`docs/notifications-plan.md`](notifications-plan.md) for architecture and trigger details
+
 ### Client state and sync
 
 - [`src/lib/stores/app.svelte.ts`](../src/lib/stores/app.svelte.ts) — main app state
@@ -89,6 +99,16 @@ Check:
 1. route in [`src/routes/api/`](../src/routes/api/)
 2. server state and projection dependencies
 3. integration tests first
+
+### New notification trigger
+
+Touch these in order:
+
+1. Add kind to [`src/lib/server/notification-prefs.ts`](../src/lib/server/notification-prefs.ts) (`NotificationKind`, `DEFAULT_PREFS`, `ALL_KINDS`)
+2. Add trigger logic in [`src/lib/server/notification-scheduler.ts`](../src/lib/server/notification-scheduler.ts) `reconcileNotifications()`
+3. Add Nynorsk label/hint in [`src/lib/notifications.ts`](../src/lib/notifications.ts) `TRIGGER_LABELS`
+4. Unit tests in [`tests/unit/notification-scheduler.unit.ts`](../tests/unit/notification-scheduler.unit.ts)
+5. If new tables: update [`src/lib/server/projections.ts`](../src/lib/server/projections.ts) rebuild cleanup
 
 ## Easy Mistakes To Avoid
 
