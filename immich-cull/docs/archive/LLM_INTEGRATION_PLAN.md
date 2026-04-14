@@ -221,9 +221,7 @@ The LLM should return one group-level object with:
 ### TypeScript types
 
 ```ts
-export type LlmModelName =
-  | "gemini-2.5-flash-lite"
-  | "gemini-3.1-flash-lite";
+export type LlmModelName = "gemini-2.5-flash-lite" | "gemini-3.1-flash-lite";
 
 export type LlmCategory =
   | "portrait"
@@ -392,6 +390,7 @@ This means the LLM can meaningfully distinguish between “keep” (0★) and �
 Existing 1★ is ambiguous — it may mean “not deleted” (old system) or “genuinely good” (new system).
 
 **Heuristic**: check what percentage of photos in the same folder/roll are rated 1★+.
+
 - If ≥80% are rated 1★+: the old 1★ meant “not deleted” → treat as 0★ equivalent, LLM may re-evaluate
 - If <80% are rated: the 1★ was selective → treat as soft floor
 
@@ -413,30 +412,31 @@ finalStars = policyApply(llmSuggestedStars, existingStars, folderContext)
 
 #### Existing rating rules
 
-| Existing | Rule |
-|---|---|
-| 2★+ | Hard floor. Never auto-downgrade. |
-| 1★ in folder with ≥80% rated | Old “not deleted” signal. LLM may re-evaluate freely. |
+| Existing                     | Rule                                                           |
+| ---------------------------- | -------------------------------------------------------------- |
+| 2★+                          | Hard floor. Never auto-downgrade.                              |
+| 1★ in folder with ≥80% rated | Old “not deleted” signal. LLM may re-evaluate freely.          |
 | 1★ in folder with <80% rated | Soft floor. LLM suggestion wins if higher, preserves if lower. |
-| 0★ / unrated | LLM suggestion applies directly. |
+| 0★ / unrated                 | LLM suggestion applies directly.                               |
 
 #### Category-specific defaults
 
-| Category | Default star range | Notes |
-|---|---|---|
-| Portrait, landscape, travel, event | 0-3★ | Full range, aesthetic standards |
-| Document, receipt, whiteboard | 0-1★ | Legibility matters, not beauty. 2★ only if exceptionally useful. |
-| Screenshot, snapchat_save | 0-2★ | Personal value, not quality. Protect if meaningful. |
-| Technical/construction | 0-1★ | Reference value. Keep multiple angles. |
+| Category                           | Default star range | Notes                                                            |
+| ---------------------------------- | ------------------ | ---------------------------------------------------------------- |
+| Portrait, landscape, travel, event | 0-3★               | Full range, aesthetic standards                                  |
+| Document, receipt, whiteboard      | 0-1★               | Legibility matters, not beauty. 2★ only if exceptionally useful. |
+| Screenshot, snapchat_save          | 0-2★               | Personal value, not quality. Protect if meaningful.              |
+| Technical/construction             | 0-1★               | Reference value. Keep multiple angles.                           |
 
 #### When to assign 3★
 
-Require ALL of: rank=1, keepTier=primary, confidence≥0.85, sharpness=high, 
+Require ALL of: rank=1, keepTier=primary, confidence≥0.85, sharpness=high,
 non-utility category, and the group summary says “standout” not “least bad.”
 
 #### 4★ and 5★
 
 Never assigned by the per-group LLM pass. These require cross-library curation:
+
 - 4★: review top 3★ candidates across months/years
 - 5★: manual only
 

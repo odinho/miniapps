@@ -21,12 +21,14 @@ Batch photos into **sessions** — contiguous sequences of photos where the gap 
 **Recommended gap threshold: 4 hours (adaptive)**
 
 Rationale:
+
 - A 4-hour gap cleanly separates morning/afternoon sessions, different outings on the same day, and multi-day trips with overnight gaps.
 - Shorter gaps (1-2h) over-split: lunch breaks, charging pauses, and transit gaps would fragment a single outing.
 - Longer gaps (8h+) under-split: an entire vacation day with multiple distinct activities becomes one unwieldy batch.
 - The DSLR folder structure (e.g., `20030403-Munin`, `20201224-xmas-eve`) already represents exactly this concept. For DSLR photos with folder metadata, the folder IS the batch — no time-gap heuristic needed.
 
 **Adaptive refinement:**
+
 - For photos with DSLR-style folder paths (`YYYYMMDD-name`), use the folder as the batch boundary. This is the strongest signal available and avoids any heuristic.
 - For phone photos in Immich's timeline (no folder structure), use the 4-hour gap.
 - If a 4-hour-gap session exceeds 150 photos, sub-split at the largest internal gap that produces chunks of 50-150. This keeps LLM quality high without arbitrary fixed limits.
@@ -39,16 +41,17 @@ The Gemini context window (1M tokens) easily fits 300+ images at 256 tokens each
 
 **Recommended batch size limits:**
 
-| Batch size | Strategy |
-|---|---|
-| 1-80 photos | Single LLM call. Sweet spot for quality. |
-| 81-150 photos | Single LLM call is acceptable but sub-splitting at natural gaps may improve quality. Monitor output quality in practice. |
-| 150-300 photos | Sub-split at largest internal time gap into chunks of 50-150. |
-| 300+ photos | Rare. Sub-split aggressively. These are likely multi-day vacations without overnight gaps in metadata. |
+| Batch size     | Strategy                                                                                                                 |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| 1-80 photos    | Single LLM call. Sweet spot for quality.                                                                                 |
+| 81-150 photos  | Single LLM call is acceptable but sub-splitting at natural gaps may improve quality. Monitor output quality in practice. |
+| 150-300 photos | Sub-split at largest internal time gap into chunks of 50-150.                                                            |
+| 300+ photos    | Rare. Sub-split aggressively. These are likely multi-day vacations without overnight gaps in metadata.                   |
 
 ### How DSLR folders serve as natural batch boundaries
 
 The user's ~58k DSLR photos are organized in folders like:
+
 - `20030403-Munin` (a specific trip/event)
 - `20201224-xmas-eve` (a specific occasion)
 - `20210815-cabin` (a multi-day stay)
@@ -95,7 +98,7 @@ interface DayBatchResponse {
   batchId: string;
   batchSize: number;
   dateRange: string;
-  batchSummary: string;           // "Christmas Eve 2020 — family dinner, gift opening, kids playing"
+  batchSummary: string; // "Christmas Eve 2020 — family dinner, gift opening, kids playing"
   overallConfidence: number;
 
   // Every photo gets these (the singleton problem is solved)
@@ -111,13 +114,13 @@ interface ImageAssessment {
   categories: LlmCategory[];
   protectFromCull: boolean;
   protectionReason: ProtectionReason;
-  briefNote: string;              // "Sharp portrait, good expression" — short, for UI hover
-  similaritySubgroupId: string | null;  // null = singleton, unique photo
+  briefNote: string; // "Sharp portrait, good expression" — short, for UI hover
+  similaritySubgroupId: string | null; // null = singleton, unique photo
 }
 
 interface SimilaritySubgroup {
   subgroupId: string;
-  imageIds: string[];             // ordered by rank (best first)
+  imageIds: string[]; // ordered by rank (best first)
   subgroupType: "burst" | "near_duplicate" | "same_scene" | "same_subject";
   recommendedKeepCount: number;
   recommendedKeepIds: string[];
@@ -128,6 +131,7 @@ interface SimilaritySubgroup {
 ```
 
 This cleanly separates the two concerns:
+
 - **ImageAssessment**: every photo gets rated and categorized (no more singleton gap)
 - **SimilaritySubgroup**: similar photos get comparative ranking and cull recommendations (the existing workflow's strength)
 
@@ -137,7 +141,7 @@ This cleanly separates the two concerns:
 
 ### Current prompt (similarity-group focused)
 
-The current prompt says: *"You are ranking a small group of visually similar photos for a photo culling workflow."* It assumes the input is a pre-clustered set of similar images and asks for a strict ranking.
+The current prompt says: _"You are ranking a small group of visually similar photos for a photo culling workflow."_ It assumes the input is a pre-clustered set of similar images and asks for a strict ranking.
 
 ### New prompt (day-batch focused)
 
@@ -188,25 +192,25 @@ Now review the attached images and return JSON matching the schema.
 
 ### Key prompt differences from v1
 
-| Aspect | v1 (similarity-group) | v2 (day-batch) |
-|---|---|---|
-| Input framing | "visually similar photos" | "photos from a single session" |
-| Primary task | Strict ranking of similar photos | Individual assessment + similarity detection |
-| Singletons | Never seen by LLM | Always assessed |
-| Star ratings | Suggested as secondary output | Primary output for every photo |
-| Similarity groups | Pre-computed, LLM validates | LLM identifies from scratch |
-| Cull recommendations | Main output | Output for LLM-identified subgroups only |
-| Batch size | 2-20 | 10-150 |
-| Context available | Only similar photos | Full session context |
+| Aspect               | v1 (similarity-group)            | v2 (day-batch)                               |
+| -------------------- | -------------------------------- | -------------------------------------------- |
+| Input framing        | "visually similar photos"        | "photos from a single session"               |
+| Primary task         | Strict ranking of similar photos | Individual assessment + similarity detection |
+| Singletons           | Never seen by LLM                | Always assessed                              |
+| Star ratings         | Suggested as secondary output    | Primary output for every photo               |
+| Similarity groups    | Pre-computed, LLM validates      | LLM identifies from scratch                  |
+| Cull recommendations | Main output                      | Output for LLM-identified subgroups only     |
+| Batch size           | 2-20                             | 10-150                                       |
+| Context available    | Only similar photos              | Full session context                         |
 
 ### Prompt sizing at different batch sizes
 
 | Batch size | Image tokens | Prompt + schema text | Output estimate | Total tokens |
-|---|---|---|---|---|
-| 20 photos | 5,120 | ~2,000 | ~3,000 | ~10,000 |
-| 50 photos | 12,800 | ~2,000 | ~7,000 | ~22,000 |
-| 100 photos | 25,600 | ~2,000 | ~14,000 | ~42,000 |
-| 150 photos | 38,400 | ~2,000 | ~21,000 | ~61,000 |
+| ---------- | ------------ | -------------------- | --------------- | ------------ |
+| 20 photos  | 5,120        | ~2,000               | ~3,000          | ~10,000      |
+| 50 photos  | 12,800       | ~2,000               | ~7,000          | ~22,000      |
+| 100 photos | 25,600       | ~2,000               | ~14,000         | ~42,000      |
+| 150 photos | 38,400       | ~2,000               | ~21,000         | ~61,000      |
 
 All well within the 1M token context. Output token costs are higher per-token than input, but the absolute amounts are modest.
 
@@ -228,38 +232,38 @@ Assume 100k photos produce roughly 2,000-3,000 day-batches (average 33-50 photos
 
 Conservative estimate using 2,500 batches at 40 photos average:
 
-| Component | Calculation | Cost |
-|---|---|---|
-| Image input tokens | 100,000 photos * 256 tokens | 25,600,000 tokens |
-| Prompt text input | 2,500 batches * 2,000 tokens | 5,000,000 tokens |
-| Total input | | 30,600,000 tokens |
-| Input cost | 30.6M / 1M * $0.10 | **$3.06** |
-| Output tokens | ~140 tokens/photo * 100k | 14,000,000 tokens |
-| Output cost | 14M / 1M * $0.40 | **$5.60** |
-| **Total** | | **$8.66** |
+| Component          | Calculation                   | Cost              |
+| ------------------ | ----------------------------- | ----------------- |
+| Image input tokens | 100,000 photos \* 256 tokens  | 25,600,000 tokens |
+| Prompt text input  | 2,500 batches \* 2,000 tokens | 5,000,000 tokens  |
+| Total input        |                               | 30,600,000 tokens |
+| Input cost         | 30.6M / 1M \* $0.10           | **$3.06**         |
+| Output tokens      | ~140 tokens/photo \* 100k     | 14,000,000 tokens |
+| Output cost        | 14M / 1M \* $0.40             | **$5.60**         |
+| **Total**          |                               | **$8.66**         |
 
 ### Current similarity-group approach: comparison
 
 The v1 plan estimated ~5,000 groups covering ~20,000 photos (the 40% that are in groups of 2+). The remaining 60% (singletons) were unprocessed.
 
-| Component | Calculation | Cost |
-|---|---|---|
-| Image input tokens | 20,000 photos * 256 tokens | 5,120,000 tokens |
-| Prompt text input | 5,000 groups * 1,500 tokens | 7,500,000 tokens |
-| Total input | | 12,620,000 tokens |
-| Input cost | 12.62M / 1M * $0.10 | **$1.26** |
-| Output tokens | ~300 tokens/group * 5,000 | 1,500,000 tokens |
-| Output cost | 1.5M / 1M * $0.40 | **$0.60** |
-| **Total for 40% of library** | | **$1.86** |
-| **Projected if covering 100%** | ~$4.65 (extrapolated) | |
+| Component                      | Calculation                  | Cost              |
+| ------------------------------ | ---------------------------- | ----------------- |
+| Image input tokens             | 20,000 photos \* 256 tokens  | 5,120,000 tokens  |
+| Prompt text input              | 5,000 groups \* 1,500 tokens | 7,500,000 tokens  |
+| Total input                    |                              | 12,620,000 tokens |
+| Input cost                     | 12.62M / 1M \* $0.10         | **$1.26**         |
+| Output tokens                  | ~300 tokens/group \* 5,000   | 1,500,000 tokens  |
+| Output cost                    | 1.5M / 1M \* $0.40           | **$0.60**         |
+| **Total for 40% of library**   |                              | **$1.86**         |
+| **Projected if covering 100%** | ~$4.65 (extrapolated)        |                   |
 
 ### Cost comparison summary
 
-| Approach | Photos covered | Total cost (100k library) | Cost per photo |
-|---|---|---|---|
-| v1: similarity groups only | ~40% (20k) | ~$1.86 | $0.000093 |
-| v1 + singleton pass (Phase 5a) | ~100% (100k) | ~$4.65 (estimated) | $0.0000465 |
-| **v2: day-batches** | **100% (100k)** | **~$8.66** | **$0.0000866** |
+| Approach                       | Photos covered  | Total cost (100k library) | Cost per photo |
+| ------------------------------ | --------------- | ------------------------- | -------------- |
+| v1: similarity groups only     | ~40% (20k)      | ~$1.86                    | $0.000093      |
+| v1 + singleton pass (Phase 5a) | ~100% (100k)    | ~$4.65 (estimated)        | $0.0000465     |
+| **v2: day-batches**            | **100% (100k)** | **~$8.66**                | **$0.0000866** |
 
 The day-batch approach costs roughly **$8.66 for the entire 100k library** — about $4-7 more than v1. This is well within the stated budget of $15 for development iteration. In production, this is a one-time cost (with caching for unchanged photos).
 
@@ -268,6 +272,7 @@ The day-batch approach costs roughly **$8.66 for the entire 100k library** — a
 ### Budget for iteration
 
 At ~$9 per full-library pass, the $15 development budget allows:
+
 - 1 full production run
 - Multiple partial runs on sample batches (10-50 batches at ~$0.03 each)
 - A/B prompt comparison on benchmark groups
@@ -282,70 +287,70 @@ This is comfortably affordable.
 
 All 143 decisions were non-skipped (skipped=0), covering 540 total photos.
 
-| Metric | Value |
-|---|---|
-| Total decisions | 143 |
-| Total photos reviewed | 540 |
-| Total kept | 260 (48.1%) |
-| Total culled | 280 (51.9%) |
-| Average group size | 3.78 |
-| Average kept per group | 1.82 |
-| Average culled per group | 1.96 |
+| Metric                   | Value       |
+| ------------------------ | ----------- |
+| Total decisions          | 143         |
+| Total photos reviewed    | 540         |
+| Total kept               | 260 (48.1%) |
+| Total culled             | 280 (51.9%) |
+| Average group size       | 3.78        |
+| Average kept per group   | 1.82        |
+| Average culled per group | 1.96        |
 
 ### Decision type distribution
 
-| Type | Count | % |
-|---|---|---|
-| Balanced (25-75% keep rate) | 104 | 72.7% |
-| Keep All (0% culled) | 17 | 11.9% |
-| Cull All (0% kept) | 11 | 7.7% |
-| Cull Most (<25% kept) | 10 | 7.0% |
-| Keep Most (>75% kept) | 1 | 0.7% |
+| Type                        | Count | %     |
+| --------------------------- | ----- | ----- |
+| Balanced (25-75% keep rate) | 104   | 72.7% |
+| Keep All (0% culled)        | 17    | 11.9% |
+| Cull All (0% kept)          | 11    | 7.7%  |
+| Cull Most (<25% kept)       | 10    | 7.0%  |
+| Keep Most (>75% kept)       | 1     | 0.7%  |
 
 ### Keep rate distribution (histogram)
 
-| Keep % range | Count |
-|---|---|
-| 0% (cull all) | 11 |
-| 1-25% | 10 |
-| 26-50% | 88 |
-| 51-75% | 17 |
-| 100% (keep all) | 17 |
+| Keep % range    | Count |
+| --------------- | ----- |
+| 0% (cull all)   | 11    |
+| 1-25%           | 10    |
+| 26-50%          | 88    |
+| 51-75%          | 17    |
+| 100% (keep all) | 17    |
 
 **The dominant pattern is keeping 26-50% of photos in a group.** 88 out of 143 decisions (61.5%) fell in this range.
 
 ### Breakdown by group size
 
-| Group size | Decisions | Keep-all | Avg cull ratio | Notes |
-|---|---|---|---|---|
-| 2 (pairs) | 74 | 10 (13.5%) | 50.7% | The bulk of decisions. |
-| 3 (triples) | 27 | 2 (7.4%) | 48.1% | |
-| 4 | 12 | 2 (16.7%) | 47.9% | |
-| 5 | 6 | 2 (33.3%) | 40.0% | |
-| 6-8 | 11 | 0 | 55.8% | Larger groups = more culling |
-| 9-12 | 7 | 0 | 61.4% | Significantly more aggressive culling |
-| 13-17 | 5 | 1 | 51.9% | The one keep-all was a 15-photo group |
+| Group size  | Decisions | Keep-all   | Avg cull ratio | Notes                                 |
+| ----------- | --------- | ---------- | -------------- | ------------------------------------- |
+| 2 (pairs)   | 74        | 10 (13.5%) | 50.7%          | The bulk of decisions.                |
+| 3 (triples) | 27        | 2 (7.4%)   | 48.1%          |                                       |
+| 4           | 12        | 2 (16.7%)  | 47.9%          |                                       |
+| 5           | 6         | 2 (33.3%)  | 40.0%          |                                       |
+| 6-8         | 11        | 0          | 55.8%          | Larger groups = more culling          |
+| 9-12        | 7         | 0          | 61.4%          | Significantly more aggressive culling |
+| 13-17       | 5         | 1          | 51.9%          | The one keep-all was a 15-photo group |
 
 ### Pair decisions (group_size=2): detailed
 
 Pairs are 51.7% of all decisions (74/143), so they dominate.
 
-| Decision | Count | % |
-|---|---|---|
-| Keep 1, cull 1 | 53 | 71.6% |
-| Keep both | 10 | 13.5% |
-| Cull both | 11 | 14.9% |
+| Decision       | Count | %     |
+| -------------- | ----- | ----- |
+| Keep 1, cull 1 | 53    | 71.6% |
+| Keep both      | 10    | 13.5% |
+| Cull both      | 11    | 14.9% |
 
 For pairs, the user **most often picks one and culls one** (71.6%). But 13.5% of the time, both photos are worth keeping (different enough), and 14.9% of the time, both are cull-worthy.
 
 ### Triple decisions (group_size=3): detailed
 
-| Decision | Count | % |
-|---|---|---|
-| Keep 1, cull 2 | 14 | 51.9% |
-| Keep 2, cull 1 | 11 | 40.7% |
-| Keep all 3 | 2 | 7.4% |
-| Cull all 3 | 0 | 0% |
+| Decision       | Count | %     |
+| -------------- | ----- | ----- |
+| Keep 1, cull 2 | 14    | 51.9% |
+| Keep 2, cull 1 | 11    | 40.7% |
+| Keep all 3     | 2     | 7.4%  |
+| Cull all 3     | 0     | 0%    |
 
 For triples, the user keeps 1-2 photos and culls the rest. Never culls all three.
 
@@ -386,14 +391,14 @@ Decision speed accelerated dramatically toward the end: the last 40+ pair decisi
 
 The CLIP-based similarity clustering is NOT wasted. It shifts roles:
 
-| Role | v1 (current) | v2 (proposed) |
-|---|---|---|
-| LLM batching unit | Similarity group (2-20 photos) | Day/trip session (10-150 photos) |
-| LLM ranking scope | Within similarity group | Within LLM-identified subgroups |
-| UI grouping for review | Similarity group | Day-batch, with similarity subgroups shown together |
-| Cull recommendation scope | Similarity group = cull scope | LLM-identified subgroup = cull scope |
-| Singleton coverage | None | Full (every photo assessed) |
-| CLIP's role | Define what the LLM sees | Validate LLM's subgroup detection, assist UI layout |
+| Role                      | v1 (current)                   | v2 (proposed)                                       |
+| ------------------------- | ------------------------------ | --------------------------------------------------- |
+| LLM batching unit         | Similarity group (2-20 photos) | Day/trip session (10-150 photos)                    |
+| LLM ranking scope         | Within similarity group        | Within LLM-identified subgroups                     |
+| UI grouping for review    | Similarity group               | Day-batch, with similarity subgroups shown together |
+| Cull recommendation scope | Similarity group = cull scope  | LLM-identified subgroup = cull scope                |
+| Singleton coverage        | None                           | Full (every photo assessed)                         |
+| CLIP's role               | Define what the LLM sees       | Validate LLM's subgroup detection, assist UI layout |
 
 ### Concrete uses for CLIP similarity in v2
 
@@ -442,6 +447,7 @@ The session batcher is simpler than the similarity clusterer — it's just a sor
 ### Migration path
 
 The day-batch approach is a superset of the similarity-group approach:
+
 - Day-batches produce per-image assessments (new capability)
 - Day-batches also produce similarity subgroup rankings (existing capability, now LLM-identified)
 - The UI can show both: day-level context + within-group comparisons

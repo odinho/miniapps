@@ -6,12 +6,13 @@ batches where latency doesn't matter.
 
 ## When to use it
 
-| Mode                   | Throughput    | Latency    | Cost     | Setup         |
-| ---------------------- | ------------- | ---------- | -------- | ------------- |
-| `rank:many` (parallel) | ~1-2 batches/s | same       | standard | none          |
-| `rank:batch:submit`    | 500+ in one go | 30min–2h   | 50% off  | GCS bucket    |
+| Mode                   | Throughput     | Latency  | Cost     | Setup      |
+| ---------------------- | -------------- | -------- | -------- | ---------- |
+| `rank:many` (parallel) | ~1-2 batches/s | same     | standard | none       |
+| `rank:batch:submit`    | 500+ in one go | 30min–2h | 50% off  | GCS bucket |
 
 Rule of thumb:
+
 - **< 100 batches** → `rank:many`
 - **> 500 batches** or re-ranking the whole library → `rank:batch:submit`
 
@@ -46,22 +47,22 @@ npm run rank:batch:status
 
 `rank:batch:submit` flags:
 
-| Flag            | Default                                            |
-| --------------- | -------------------------------------------------- |
-| `--bucket`      | required                                           |
-| `--count N`     | 500 (batches per job)                              |
-| `--concurrent N`| 8 (in-flight request-prep calls to the server)     |
-| `--server URL`  | `http://localhost:3737`                            |
-| `--model`       | default from `DEFAULT_LLM_CONFIG`                  |
-| `--project`     | `tagrdevin`                                        |
-| `--location`    | `us-central1` (batch is regional, not `global`)    |
+| Flag             | Default                                         |
+| ---------------- | ----------------------------------------------- |
+| `--bucket`       | required                                        |
+| `--count N`      | 500 (batches per job)                           |
+| `--concurrent N` | 8 (in-flight request-prep calls to the server)  |
+| `--server URL`   | `http://localhost:3737`                         |
+| `--model`        | default from `DEFAULT_LLM_CONFIG`               |
+| `--project`      | `tagrdevin`                                     |
+| `--location`     | `us-central1` (batch is regional, not `global`) |
 
 `rank:batch:status` flags:
 
-| Flag            | Default                                        |
-| --------------- | ---------------------------------------------- |
-| `--sidecar`     | most recent `/tmp/batch-job-*.json`            |
-| `--server URL`  | `http://localhost:3737`                        |
+| Flag           | Default                             |
+| -------------- | ----------------------------------- |
+| `--sidecar`    | most recent `/tmp/batch-job-*.json` |
+| `--server URL` | `http://localhost:3737`             |
 
 ## How it works internally
 

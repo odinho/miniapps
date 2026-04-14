@@ -9,14 +9,14 @@ The new system reclaims 1★ to mean something positive.
 
 ### Scale
 
-| Stars | Meaning | Approximate count (100k library) |
-|-------|---------|----------------------------------|
-| 0 / unrated | Processed but unremarkable. Safe to keep, no special value. | ~70k |
-| 1★ | Good photo. Stands out from the group, worth noting. | ~15k |
-| 2★ | Share-worthy. Would show to someone interested. | ~5k |
-| 3★ | Best-of-trip/roll. Local standout. | ~1k |
-| 4★ | Print-worthy. Great image + memory combined. Cross-library standout. | ~500 |
-| 5★ | Best of the best. Portfolio/yearly highlight. | ~100 |
+| Stars       | Meaning                                                              | Approximate count (100k library) |
+| ----------- | -------------------------------------------------------------------- | -------------------------------- |
+| 0 / unrated | Processed but unremarkable. Safe to keep, no special value.          | ~70k                             |
+| 1★          | Good photo. Stands out from the group, worth noting.                 | ~15k                             |
+| 2★          | Share-worthy. Would show to someone interested.                      | ~5k                              |
+| 3★          | Best-of-trip/roll. Local standout.                                   | ~1k                              |
+| 4★          | Print-worthy. Great image + memory combined. Cross-library standout. | ~500                             |
+| 5★          | Best of the best. Portfolio/yearly highlight.                        | ~100                             |
 
 ### Key Changes from Old System
 
@@ -30,6 +30,7 @@ The new system reclaims 1★ to mean something positive.
 ### Migration Strategy
 
 For the LLM ranking pass:
+
 - If a folder/roll has ≥80% of photos rated 1★+, treat existing 1★ as "was not deleted" (equivalent to 0★ in new system)
 - If a folder/roll has <80% rated, treat existing 1★ as genuine positive selection (soft floor)
 - 2★+ ratings are always respected as a floor
@@ -39,6 +40,7 @@ For the LLM ranking pass:
 ### What the LLM Should Consider
 
 When suggesting stars:
+
 - **0★**: technically fine but nothing special. Generic, redundant-ish, or purely functional.
 - **1★**: "I'd pick this one out if scrolling through." Good moment, nice light, clear subject, or useful reference.
 - **2★**: "I'd show this to someone." Genuinely good photo worth sharing.

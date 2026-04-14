@@ -5,6 +5,7 @@
 ## Current State (2026-04-06)
 
 Working prototype with:
+
 - Clustering engine (time-bucketed cosine similarity on CLIP embeddings)
 - Two data sources: Facet SQLite (local testing) and Immich PostgreSQL (production)
 - Review UI with justified grid layout, preview mode, keyboard-driven workflow
@@ -38,11 +39,13 @@ The review server currently holds decisions in-memory (lost on restart).
 See [LLM_INTEGRATION_PLAN.md](LLM_INTEGRATION_PLAN.md) and [docs/batching-strategy-v2.md](docs/batching-strategy-v2.md).
 
 **Batching**: day/trip-sized sessions, not similarity groups.
+
 - [ ] Session batcher: 4h time gaps for phone photos, DSLR folder boundaries for organized photos
 - [ ] Sub-split sessions >150 photos at largest internal gap
 - [ ] Target: 10-150 photos per batch, ~2500 batches for 100k photos
 
 **LLM integration** (one call per day-batch):
+
 - [ ] Connect to Gemini 2.5 Flash Lite via `@google/genai`
 - [ ] Every photo gets: star rating (0-3), categories, brief note, protection flags
 - [ ] LLM identifies similarity subgroups within batch + ranks them + recommends keep/cull
@@ -50,6 +53,7 @@ See [LLM_INTEGRATION_PLAN.md](LLM_INTEGRATION_PLAN.md) and [docs/batching-strate
 - [ ] Cost: ~$8.66 for 100k photos (100% coverage)
 
 **UI integration**:
+
 - [ ] Pre-populate keep/cull from LLM's similarity subgroup recommendations
 - [ ] Default workflow: LLM recommends → user hits `A` → next (minimal decisions)
 - [ ] Show LLM briefNote per image on hover
@@ -57,18 +61,21 @@ See [LLM_INTEGRATION_PLAN.md](LLM_INTEGRATION_PLAN.md) and [docs/batching-strate
 - [ ] CLIP similarity groups for UI layout within day-batches
 
 **Auto-approve** (critical for ADD-friendly workflow):
+
 - [ ] High-confidence subgroups auto-approved (pairs: keep-one when clearly better)
 - [ ] Summary of auto-approved decisions for spot-checking
 - [ ] Cuts review workload by 60-80%
 - [ ] Never auto-cull-all groups of 3+ (user never does this)
 
 **Star ratings** (every photo, not just grouped ones):
+
 - [ ] LLM suggests 0-3★ per image (never 4-5★)
 - [ ] Policy layer for existing 1★ ambiguity
 - [ ] 2★+ existing ratings are hard floor
 - [ ] See [STAR_RATING_PHILOSOPHY.md](STAR_RATING_PHILOSOPHY.md)
 
 **Calibration data** (143 manual decisions):
+
 - 48% keep rate overall, LLM should not be aggressive
 - Pairs: default keep-1 (72%), keep-both when distinct (14%)
 - Groups 3+: never cull-all, keep-all 12% of time
@@ -89,7 +96,7 @@ Run before write-back — build against real data, not test set.
 Built against full-library data (not test set).
 
 - [ ] Soft-delete first: mark culled in SQLite, don't move to Immich trash until user finalizes batch
-  (Immich trash expires in 30 days; review might take months)
+      (Immich trash expires in 30 days; review might take months)
 - [ ] Write star ratings via Immich API (`PUT /assets/{id}`)
 - [ ] Finalize batch: move soft-deleted to Immich trash
 - [ ] Write XMP sidecars via `exiftool-vendored`
@@ -148,17 +155,17 @@ The single-file HTML+inline-JS approach is reaching its limits (~700 lines, mixe
 
 ## Clustering Thresholds (all configurable in ClusterConfig)
 
-| Parameter | Default | Purpose |
-|---|---|---|
-| bucketMinutes | 60 | Time window for grouping |
-| bucketStride | 30 | Overlap between buckets |
-| strongEdgeDistance | 0.18 | Cosine distance for "similar scene" |
-| burstEdgeDistance | 0.22 | Looser threshold when time-close |
-| burstTimeMinutes | 5 | Max time delta for burst edges |
-| maxGroupSize | 20 | Split threshold |
-| minGroupSize | 2 | Don't show singletons |
-| temporalGapMinutes | 12 | Split groups at time gaps |
-| topK | 12 | Neighbors to consider per asset |
+| Parameter          | Default | Purpose                             |
+| ------------------ | ------- | ----------------------------------- |
+| bucketMinutes      | 60      | Time window for grouping            |
+| bucketStride       | 30      | Overlap between buckets             |
+| strongEdgeDistance | 0.18    | Cosine distance for "similar scene" |
+| burstEdgeDistance  | 0.22    | Looser threshold when time-close    |
+| burstTimeMinutes   | 5       | Max time delta for burst edges      |
+| maxGroupSize       | 20      | Split threshold                     |
+| minGroupSize       | 2       | Don't show singletons               |
+| temporalGapMinutes | 12      | Split groups at time gaps           |
+| topK               | 12      | Neighbors to consider per asset     |
 
 ## Key Documents
 
@@ -168,13 +175,13 @@ The single-file HTML+inline-JS approach is reaching its limits (~700 lines, mixe
 
 ## Key Risks & Mitigations
 
-| Risk | Mitigation |
-|---|---|
-| LLM systematic aesthetic bias | Random 5% spot-check after auto-approve batches |
-| Clustering groups unrelated photos | groupCoherence field lets LLM flag it |
-| 80% folder heuristic is wrong | Manual folder tagging during onboarding, validate before bulk apply |
-| Immich schema changes on upgrade | Startup health check, schema adapter isolation |
-| Immich trash expires before review done | Soft-delete in SQLite first, finalize batch explicitly |
-| Decision fatigue (5000 groups) | Auto-approve 60-80% of high-confidence groups |
-| Tool abandoned after 3 sessions | Trivial resumption UX, session summaries, progress bars |
-| Singletons never reviewed | Phase 5a: batch by date, lighter LLM pass |
+| Risk                                    | Mitigation                                                          |
+| --------------------------------------- | ------------------------------------------------------------------- |
+| LLM systematic aesthetic bias           | Random 5% spot-check after auto-approve batches                     |
+| Clustering groups unrelated photos      | groupCoherence field lets LLM flag it                               |
+| 80% folder heuristic is wrong           | Manual folder tagging during onboarding, validate before bulk apply |
+| Immich schema changes on upgrade        | Startup health check, schema adapter isolation                      |
+| Immich trash expires before review done | Soft-delete in SQLite first, finalize batch explicitly              |
+| Decision fatigue (5000 groups)          | Auto-approve 60-80% of high-confidence groups                       |
+| Tool abandoned after 3 sessions         | Trivial resumption UX, session summaries, progress bars             |
+| Singletons never reviewed               | Phase 5a: batch by date, lighter LLM pass                           |

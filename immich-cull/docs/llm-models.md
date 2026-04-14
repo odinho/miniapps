@@ -2,12 +2,12 @@
 
 ## Model comparison (measured on 3000+ manually-reviewed photos)
 
-| Model | Agreement | Cost | Speed | Notes |
-|---|---|---|---|---|
-| gemini-3.1-flash-lite-preview | **82%** | $$ | ~5s/batch | Best. Default. Vertex global routing. |
-| gemini-3-flash-preview | 75% | $$$ | ~8s/batch | Better than 2.5 but expensive |
-| gemini-2.5-flash-lite | 67% | $ | ~3s/batch | Cheapest cloud option |
-| gemma4:e4b (Ollama) | 58% | Free | ~70s/batch | Not competitive for this task |
+| Model                         | Agreement | Cost | Speed      | Notes                                 |
+| ----------------------------- | --------- | ---- | ---------- | ------------------------------------- |
+| gemini-3.1-flash-lite-preview | **82%**   | $$   | ~5s/batch  | Best. Default. Vertex global routing. |
+| gemini-3-flash-preview        | 75%       | $$$  | ~8s/batch  | Better than 2.5 but expensive         |
+| gemini-2.5-flash-lite         | 67%       | $    | ~3s/batch  | Cheapest cloud option                 |
+| gemma4:e4b (Ollama)           | 58%       | Free | ~70s/batch | Not competitive for this task         |
 
 ## Key findings
 
@@ -25,21 +25,21 @@
 
 Tested 11 variants on 260 photos across 10 diverse batches:
 
-| Variant | Agree% | WrongCull% | Best for |
-|---|---|---|---|
-| 31flashlite_temp0 | 71.2% | 9.6% | Overall accuracy, speed |
-| 3flash_think_low | 69.9% | 3.8% | Safety (fewest wrong culls) |
-| 31flashlite_think_low | 71.9% | 10.8% | Slightly better agree%, more wrong culls |
-| 3flash_think_high | 63.7% | 10.5% | Not recommended (overthinks) |
+| Variant               | Agree% | WrongCull% | Best for                                 |
+| --------------------- | ------ | ---------- | ---------------------------------------- |
+| 31flashlite_temp0     | 71.2%  | 9.6%       | Overall accuracy, speed                  |
+| 3flash_think_low      | 69.9%  | 3.8%       | Safety (fewest wrong culls)              |
+| 31flashlite_think_low | 71.9%  | 10.8%      | Slightly better agree%, more wrong culls |
+| 3flash_think_high     | 63.7%  | 10.5%      | Not recommended (overthinks)             |
 
 Recommended pair: `gemini-3.1-flash-lite-preview` + `gemini-3-flash-preview` (with thinking LOW). Batches where both agree can be bulk-approved via `POST /api/batches/approve-confident`.
 
 ## Auto-cull tier calibration (Facet test set, 149 batches / 1434 photos)
 
-| Tier | Criteria | Wrong-cull | Coverage |
-|---|---|---|---|
-| HIGH | deficit>=2, bottom-half rank, sg>=3 | ~9.4% | 16.1% |
-| STANDARD | stars=0, sg_keeper, sg>=3 | ~22.7% | 39.4% |
+| Tier     | Criteria                            | Wrong-cull | Coverage |
+| -------- | ----------------------------------- | ---------- | -------- |
+| HIGH     | deficit>=2, bottom-half rank, sg>=3 | ~9.4%      | 16.1%    |
+| STANDARD | stars=0, sg_keeper, sg>=3           | ~22.7%     | 39.4%    |
 
 Prompt v1 ("balanced, 1-2 keeps per subgroup") halves wrong-culls vs v0. Remaining wrong-culls are mostly different-moment disagreements (LLM picks technical quality, user values storytelling). These numbers are from the Facet test set and need re-validation on DSLR-heavy Immich data.
 
@@ -47,11 +47,11 @@ Prompt v1 ("balanced, 1-2 keeps per subgroup") halves wrong-culls vs v0. Remaini
 
 LLM stars are mapped through `mapLlmStarsToWriteback` at write-back time:
 
-| LLM stars | Immich stars | Meaning | Distribution |
-|---|---|---|---|
-| 0-1 | 0 | Unstarred | ~72% |
-| 2 | 1 | Good photo | ~20% |
-| 3 | 2 | Share-worthy | ~7% |
-| 4-5 | 3 | Exceptional | ~0.5% |
+| LLM stars | Immich stars | Meaning      | Distribution |
+| --------- | ------------ | ------------ | ------------ |
+| 0-1       | 0            | Unstarred    | ~72%         |
+| 2         | 1            | Good photo   | ~20%         |
+| 3         | 2            | Share-worthy | ~7%          |
+| 4-5       | 3            | Exceptional  | ~0.5%        |
 
 User star overrides are written directly (no mapping).

@@ -7,6 +7,7 @@ AI-assisted photo culling tool for large personal photo libraries. Groups simila
 Managing 100k+ family photos is overwhelming. Every phone burst creates 5-15 near-identical shots. The good photo is somewhere in there, but finding it means looking at every single one. Most photo management tools help you browse — none help you decide what to keep.
 
 immich-cull solves the decision problem:
+
 1. **Groups** similar photos automatically (CLIP similarity + time proximity)
 2. **LLM ranks** each group — best expressions, sharpest focus, most interesting moment
 3. **You review** with a fast UI — the LLM's suggestions are a starting point, not a verdict
@@ -77,31 +78,31 @@ npx tsx src/server.ts --local --vertex --model=gemini-3.1-flash-lite-preview --p
 
 ## Keyboard Shortcuts
 
-| Key | Action |
-|-----|--------|
-| `←` `→` | Navigate images |
-| `↑` `↓` | Navigate groups/batches |
-| `K` | Keep selected |
-| `X` | Cull selected |
-| `B` | Keep selected, cull rest |
-| `A` / `Enter` | Approve & next undecided |
-| `S` | Skip |
-| `Backspace` | Undo |
-| `Space` | Toggle preview |
-| `r` | Re-run current model |
-| `Shift+R` | Cycle models (manual → 2.5-lite → 3.1-lite → ...) |
-| `−` `+` | Adjust keep level within subgroups |
-| `0`–`5` | Set star rating |
-| `?` | Help |
+| Key           | Action                                            |
+| ------------- | ------------------------------------------------- |
+| `←` `→`       | Navigate images                                   |
+| `↑` `↓`       | Navigate groups/batches                           |
+| `K`           | Keep selected                                     |
+| `X`           | Cull selected                                     |
+| `B`           | Keep selected, cull rest                          |
+| `A` / `Enter` | Approve & next undecided                          |
+| `S`           | Skip                                              |
+| `Backspace`   | Undo                                              |
+| `Space`       | Toggle preview                                    |
+| `r`           | Re-run current model                              |
+| `Shift+R`     | Cycle models (manual → 2.5-lite → 3.1-lite → ...) |
+| `−` `+`       | Adjust keep level within subgroups                |
+| `0`–`5`       | Set star rating                                   |
+| `?`           | Help                                              |
 
 ## LLM Models
 
-| Model | Agreement | Cost | Speed | Notes |
-|-------|-----------|------|-------|-------|
-| gemini-3.1-flash-lite | **82%** | $$ | ~5s/batch | **Default**, best accuracy |
-| gemini-2.5-flash-lite | 67% | $ | ~3s/batch | Cheapest cloud |
-| gemini-3-flash | 75% | $$$ | ~8s/batch | Good but expensive |
-| gemma4:e4b (local) | 58% | Free | ~70s/batch | Ollama, no cloud needed |
+| Model                 | Agreement | Cost | Speed      | Notes                      |
+| --------------------- | --------- | ---- | ---------- | -------------------------- |
+| gemini-3.1-flash-lite | **82%**   | $$   | ~5s/batch  | **Default**, best accuracy |
+| gemini-2.5-flash-lite | 67%       | $    | ~3s/batch  | Cheapest cloud             |
+| gemini-3-flash        | 75%       | $$$  | ~8s/batch  | Good but expensive         |
+| gemma4:e4b (local)    | 58%       | Free | ~70s/batch | Ollama, no cloud needed    |
 
 Agreement rates measured against manual decisions on 3000+ photos.
 
@@ -130,6 +131,7 @@ npm run test          # vitest
 See [docs/architecture.md](docs/architecture.md) for the full picture.
 
 **Key design decisions:**
+
 - Per-photo decisions as single source of truth (not per-group)
 - 3-layer state model: LLM state → manual overrides → effective state
 - LLM results cached per-model in SQLite — switch between models instantly
