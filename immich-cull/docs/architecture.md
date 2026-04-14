@@ -4,8 +4,8 @@
 
 ```
 ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│  Data Source  │────▶│   Backend    │◀───▶│   Frontend   │
-│  Facet/Immich │     │  Fastify API │     │  Svelte 5    │
+│  Immich API  │────▶│   Backend    │◀───▶│   Frontend   │
+│  REST API    │     │  Fastify API │     │  Svelte 5    │
 └──────────────┘     └──────┬───────┘     └──────────────┘
                             │
                      ┌──────┴───────┐
@@ -21,24 +21,17 @@
 
 ## Data Flow
 
-1. **Assets** load from Facet SQLite (local testing) or Immich PostgreSQL (production)
-2. **Clustering engine** groups photos by time + CLIP embedding similarity
-3. **Session batcher** organizes into day/trip batches (4h gaps, min 3 photos)
-4. **LLM client** sends batch images + prompt, gets back per-image assessments
-5. **State DB** persists decisions, LLM results, view status
-6. **Frontend** renders grid, manages 3-layer state, handles user interaction
+1. **Assets** load from Immich REST API (cached to disk for fast restarts)
+2. **Session batcher** organizes into day/trip batches (4h gaps, min 3 photos)
+3. **LLM client** sends batch images + prompt, gets back per-image assessments
+4. **State DB** persists decisions, LLM results, view status
+5. **Frontend** renders grid, manages 3-layer state, handles user interaction
 
 ## Backend (src/)
 
 ### Server (`server.ts`)
 
-Fastify HTTP API. Serves batch/group endpoints, proxies LLM calls, manages state.
-
-### Clustering (`clustering/`)
-
-- `engine.ts` — Time-bucketed cosine similarity clustering. Groups photos within 60-min windows using CLIP embeddings.
-- `union-find.ts` — Disjoint set for efficient cluster merging
-- `cosine.ts` — Cosine similarity computation
+Fastify HTTP API. Serves batch endpoints, proxies LLM calls, manages state. Connects to Immich via REST API using `IMMICH_URL` and `IMMICH_API_KEY` env vars.
 
 ### Batching (`batching/session-batcher.ts`)
 
@@ -53,8 +46,8 @@ Groups photos into review sessions: 4h time gaps for phone photos, folder bounda
 ### Data Adapters (`db/`)
 
 - `state-db.ts` — SQLite for tool state (decisions, LLM runs, view status). Schema versioned.
-- `facet-adapter.ts` — Reads from Facet's photo_scores_pro.db
-- `immich-adapter.ts` — Reads from Immich PostgreSQL via SSH tunnel
+- `immich-api-adapter.ts` — Reads assets and thumbnails from Immich REST API
+- `immich-writeback.ts` — Writes decisions back to Immich (trash, stars, tags)
 
 ## Frontend (web-app/src/)
 
@@ -115,7 +108,7 @@ input_tokens INTEGER, output_tokens INTEGER, cost_estimate_usd REAL
 
 ### view_status
 
-Tracks which batches/groups have been reviewed.
+Tracks which batches have been reviewed.
 
 ```sql
 view_id TEXT PRIMARY KEY, view_type TEXT, status TEXT ('reviewed'|'skipped')

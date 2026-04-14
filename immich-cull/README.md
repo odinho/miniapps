@@ -1,6 +1,6 @@
 # immich-cull
 
-AI-assisted photo culling tool for large personal photo libraries. Groups similar photos using CLIP embeddings, ranks them with multimodal LLMs, and presents a keyboard/touch review UI for fast keep/cull decisions.
+AI-assisted photo culling tool for Immich. Organizes photos into session batches, ranks them with multimodal LLMs, and presents a keyboard/touch review UI for fast keep/cull decisions.
 
 ## Why
 
@@ -8,8 +8,8 @@ Managing 100k+ family photos is overwhelming. Every phone burst creates 5-15 nea
 
 immich-cull solves the decision problem:
 
-1. **Groups** similar photos automatically (CLIP similarity + time proximity)
-2. **LLM ranks** each group — best expressions, sharpest focus, most interesting moment
+1. **Batches** photos by day/trip sessions automatically
+2. **LLM ranks** each batch — best expressions, sharpest focus, most interesting moment
 3. **You review** with a fast UI — the LLM's suggestions are a starting point, not a verdict
 
 The goal is to reduce 100k photos to a curated library where filtering by stars actually works — no more 7 identical shots all rated the same.
@@ -17,18 +17,16 @@ The goal is to reduce 100k photos to a curated library where filtering by stars 
 ## How It Works
 
 ```
-Photos (Immich/local) → CLIP Clustering → Session Batching → LLM Ranking → Review UI → Decisions
+Immich API → Session Batching → LLM Ranking → Review UI → Decisions → Immich Write-back
 ```
 
-1. **Clustering**: Groups photos by time proximity + CLIP embedding cosine similarity. Finds bursts, duplicates, and same-scene sequences.
+1. **Session Batching**: Organizes photos into day/trip sessions (4h time gaps). Each batch is one LLM call.
 
-2. **Session Batching**: Organizes photos into day/trip sessions (4h time gaps). Each batch is one LLM call.
+2. **LLM Ranking**: Multimodal LLM (Gemini or local Gemma4) assesses every photo — star rating, category, brief description, keep/cull recommendation, similarity subgroups with quality ranking.
 
-3. **LLM Ranking**: Multimodal LLM (Gemini or local Gemma4) assesses every photo — star rating, category, brief description, keep/cull recommendation, similarity subgroups with quality ranking.
+3. **Review UI**: Svelte web app with justified grid, fullscreen preview, keyboard shortcuts, swipe on mobile. Model comparison: switch between different LLM results instantly.
 
-4. **Review UI**: Svelte web app with justified grid, fullscreen preview, keyboard shortcuts, swipe on mobile. Model comparison: switch between different LLM results instantly.
-
-5. **Decisions**: Per-photo keep/cull persisted in SQLite. Manual overrides always win over LLM suggestions.
+4. **Decisions**: Per-photo keep/cull persisted in SQLite. Manual overrides always win over LLM suggestions.
 
 ## Quick Start
 
@@ -37,8 +35,11 @@ cd immich-cull
 npm install
 cd web-app && npm install && cd ..
 
-# Start backend (local test data + Vertex AI)
-npx tsx src/server.ts --local --vertex --port 3737
+# Set IMMICH_URL and IMMICH_API_KEY in .env
+cp .env.example .env
+
+# Start backend (Vertex AI for LLM)
+npm start
 
 # Start frontend dev server
 cd web-app && npm run dev -- --host
@@ -46,32 +47,14 @@ cd web-app && npm run dev -- --host
 # Open http://localhost:5173
 ```
 
-### With Immich (API mode, recommended)
-
-```bash
-# Set IMMICH_URL and IMMICH_API_KEY in .env
-cp .env.example .env
-
-npx tsx src/server.ts --immich-api --vertex --port 3737
-```
-
-### With Immich (PostgreSQL mode)
-
-```bash
-# SSH tunnel to Immich PostgreSQL (needed for CLIP embeddings)
-ssh -f -N -L 15432:<postgres-container-ip>:5432 user@immich-host
-
-npx tsx src/server.ts --immich --vertex --port 3737
-```
-
 ### Model Selection
 
 ```bash
 # Default (cheapest)
-npx tsx src/server.ts --local --vertex --port 3737
+npm start
 
 # Better model
-npx tsx src/server.ts --local --vertex --model=gemini-3.1-flash-lite-preview --port 3737
+npx tsx src/server.ts --vertex --model=gemini-3.1-flash-lite-preview --port 3737
 
 # In the UI: click model buttons to switch, Shift+R to cycle
 ```
@@ -81,7 +64,7 @@ npx tsx src/server.ts --local --vertex --model=gemini-3.1-flash-lite-preview --p
 | Key           | Action                                            |
 | ------------- | ------------------------------------------------- |
 | `←` `→`       | Navigate images                                   |
-| `↑` `↓`       | Navigate groups/batches                           |
+| `↑` `↓`       | Navigate batches                                  |
 | `K`           | Keep selected                                     |
 | `X`           | Cull selected                                     |
 | `B`           | Keep selected, cull rest                          |
@@ -132,17 +115,11 @@ See [docs/architecture.md](docs/architecture.md) for the full picture.
 
 **Key design decisions:**
 
-- Per-photo decisions as single source of truth (not per-group)
+- Per-photo decisions as single source of truth (not per-batch)
 - 3-layer state model: LLM state → manual overrides → effective state
 - LLM results cached per-model in SQLite — switch between models instantly
 - All LLM runs preserved (superseded, not deleted) for analysis
 - Subgroup star assignment: primary keeper gets max stars, others get 0
-
-## Data Sources
-
-- **Facet SQLite**: Local testing with CLIP ViT-L-14 embeddings (768-dim)
-- **Immich API**: Production mode via REST API — no tunnel needed, no CLIP
-- **Immich PostgreSQL**: Direct DB access with CLIP ViT-B-32 embeddings (512-dim), read-only
 
 ## Bulk LLM processing
 
@@ -168,7 +145,7 @@ sqlite3 data/state.db "INSERT INTO auto_keep_patterns (pattern, description) VAL
 
 ## Safety
 
-- Read-only database access — never writes to Immich's PostgreSQL
+- Read-only Immich access (only reads via REST API)
 - Undecided images default to keep on approve
 - Undo reverses last approve/skip
 - Manual decisions always override LLM suggestions
