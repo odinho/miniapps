@@ -5,6 +5,7 @@
   import InfoPanel from './components/InfoPanel.svelte';
   import AutoCullReview from './components/AutoCullReview.svelte';
   import StarsReview from './components/StarsReview.svelte';
+  import BurstInspect from './components/BurstInspect.svelte';
   import {
     fetchBatches, fetchBatch, fetchStats,
     rankBatch, savePhotoDecisions, fetchPhotoDecisions, fmt,
@@ -18,7 +19,7 @@
     type AssetState,
   } from './lib/state';
 
-  type AppMode = 'batches' | 'review' | 'stars';
+  type AppMode = 'batches' | 'review' | 'stars' | 'burst';
 
   let mode: AppMode = 'batches';
   let starsSummary: Record<number, { count: number; samples: Array<{ id: string; filename: string }> }> = {};
@@ -563,7 +564,7 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (mode === 'review' || mode === 'stars') return; // these modes handle their own keys
+    if (mode === 'review' || mode === 'stars' || mode === 'burst') return; // these modes handle their own keys
     if (helpOpen) { if (e.key === 'Escape' || e.key === '?') helpOpen = false; return; }
     if (!currentAssets.length) return;
     const shift = e.shiftKey;
@@ -610,6 +611,7 @@
     <div class="mode-toggle">
       <button class:active={mode === 'batches'} on:click={() => switchMode('batches')}>Batches</button>
       <button class:active={mode === 'review'} on:click={() => switchMode('review')}>Auto Review</button>
+      <button class:active={mode === 'burst'} on:click={() => switchMode('burst')}>Burst Inspect</button>
       <button class:active={mode === 'stars'} on:click={() => switchMode('stars')}>Stars</button>
     </div>
     <div class="stats">
@@ -625,7 +627,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div class="sidebar-backdrop" role="button" tabindex="-1" on:click={() => sidebarOpen = false}></div>
   {/if}
-  <aside class="sidebar" class:open={sidebarOpen} class:hidden={mode === 'review' || mode === 'stars'}>
+  <aside class="sidebar" class:open={sidebarOpen} class:hidden={mode === 'review' || mode === 'stars' || mode === 'burst'}>
     <div class="sidebar-list">
       <div class="burst-controls">
         <button class="burst-btn" on:click={async () => {
@@ -700,6 +702,13 @@
       }} />
     {:else if mode === 'stars'}
       <StarsReview summary={starsSummary} totalKept={starsTotalKept} />
+    {:else if mode === 'burst'}
+      <BurstInspect onGoToBatch={async (id) => {
+        mode = 'batches';
+        if (!batches.length) await loadBatches();
+        const idx = batches.findIndex(b => b.id === id);
+        if (idx >= 0) await selectBatch(idx);
+      }} />
     {:else if loading}
       <div class="empty"><span class="spinner"></span> Loading...</div>
     {:else if currentAssets.length}
@@ -719,7 +728,7 @@
     {/if}
   </div>
 
-  <footer class="bar" class:hidden={mode === 'review' || mode === 'stars'}>
+  <footer class="bar" class:hidden={mode === 'review' || mode === 'stars' || mode === 'burst'}>
     <button class="bk" on:click={() => mark('keep')}>Keep</button>
     <button class="bc" on:click={() => mark('cull')}>Cull</button>
     <button class="bb" on:click={keepBestCullRest}>Best + Cull Rest</button>

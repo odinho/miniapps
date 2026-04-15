@@ -143,15 +143,16 @@ app.get("/api/stats", async () => {
 });
 
 /** Preview: proxy thumbnail from Immich */
-app.get<{ Querystring: { id: string } }>("/api/preview", async (req, reply) => {
+app.get<{ Querystring: { id: string; size?: string } }>("/api/preview", async (req, reply) => {
   const asset = assetMap.get(req.query.id);
   if (!asset) {
     reply.code(404);
     return { error: "Not found" };
   }
 
+  const size = req.query.size === "thumbnail" ? "thumbnail" : "preview";
   try {
-    const buf = await immichApiAdapter!.getThumbnail(asset.id, "preview");
+    const buf = await immichApiAdapter!.getThumbnail(asset.id, size);
     reply.type("image/jpeg").header("Cache-Control", "public, max-age=3600");
     return buf;
   } catch (e: any) {
@@ -1142,6 +1143,59 @@ app.post<{ Body: { dryRun?: boolean } }>("/api/batches/burst-auto-cull", async (
     immichPhotos: immichCulled,
     totalAutoCulled: totalCandidates + immichCulled,
   };
+});
+
+/** List all burst/near-duplicate subgroups across all batches (for inspector UI) */
+app.get("/api/burst-groups", async () => {
+  const rows: Array<{
+    batchId: string;
+    batchDate: string;
+    subgroupId: string;
+    subgroupType: string;
+    rationale: string;
+    summary: string;
+    keeperIds: string[];
+    loserIds: string[];
+    autoCulledIds: string[];
+  }> = [];
+
+  for (const batch of sessionBatches) {
+    const fp = batchFingerprint(batch.assets.map((a) => a.id));
+    const cached = stateDb.getLlmRun(batch.id, fp);
+    if (!cached) continue;
+
+    try {
+      const raw = JSON.parse(cached.responseJson);
+      const expanded = expandCompactResponse(raw, batch);
+      const assetIds = batch.assets.map((a) => a.id);
+      const sources = stateDb.getDecisionSources(assetIds);
+
+      for (const sg of expanded.similaritySubgroups) {
+        if (sg.subgroupType !== "burst" && sg.subgroupType !== "near_duplicate") continue;
+        const autoCulledIds = sg.cullIds.filter((id) => {
+          const src = sources[id];
+          return src === "burst-auto-cull" || src === "immich-duplicate";
+        });
+        rows.push({
+          batchId: batch.id,
+          batchDate: batch.dateRange.start.toISOString(),
+          subgroupId: sg.subgroupId,
+          subgroupType: sg.subgroupType,
+          rationale: sg.rationale ?? "",
+          summary: expanded.batchSummary ?? "",
+          keeperIds: sg.recommendedKeepIds,
+          loserIds: sg.cullIds,
+          autoCulledIds,
+        });
+      }
+    } catch {
+      /* skip unparseable */
+    }
+  }
+
+  // Sort newest first
+  const sorted = rows.toSorted((a, b) => b.batchDate.localeCompare(a.batchDate));
+  return { groups: sorted };
 });
 
 app.delete("/api/batches/burst-auto-cull", async () => {

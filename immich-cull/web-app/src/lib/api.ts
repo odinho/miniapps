@@ -216,6 +216,26 @@ export async function revertBurstAutoCull(): Promise<{ ok: boolean; reverted: nu
   return (await fetch(`${BASE}/api/batches/burst-auto-cull`, { method: "DELETE" })).json();
 }
 
+export interface BurstGroupRow {
+  batchId: string;
+  batchDate: string;
+  subgroupId: string;
+  subgroupType: string;
+  rationale: string;
+  summary: string;
+  keeperIds: string[];
+  loserIds: string[];
+  autoCulledIds: string[];
+}
+
+export async function fetchBurstGroups(): Promise<{ groups: BurstGroupRow[] }> {
+  return (await fetch(`${BASE}/api/burst-groups`)).json();
+}
+
+export function thumbUrl(id: string): string {
+  return `${BASE}/api/preview?id=${encodeURIComponent(id)}&size=thumbnail`;
+}
+
 export interface CullComparison {
   cullId: string;
   cullFilename: string;
