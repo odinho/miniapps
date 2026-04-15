@@ -1150,19 +1150,23 @@ app.get("/api/burst-groups", async () => {
   const rows: Array<{
     batchId: string;
     batchDate: string;
+    batchReviewed: boolean;
     subgroupId: string;
     subgroupType: string;
     rationale: string;
     summary: string;
     keeperIds: string[];
-    loserIds: string[];
-    autoCulledIds: string[];
+    recommendedCullIds: string[]; // LLM cull but NOT auto-culled
+    autoCulledIds: string[]; // actually auto-applied
   }> = [];
 
   for (const batch of sessionBatches) {
     const fp = batchFingerprint(batch.assets.map((a) => a.id));
     const cached = stateDb.getLlmRun(batch.id, fp);
     if (!cached) continue;
+
+    const viewStatus = stateDb.getViewStatus(batch.id);
+    const batchReviewed = viewStatus === "reviewed";
 
     try {
       const raw = JSON.parse(cached.responseJson);
@@ -1172,19 +1176,26 @@ app.get("/api/burst-groups", async () => {
 
       for (const sg of expanded.similaritySubgroups) {
         if (sg.subgroupType !== "burst" && sg.subgroupType !== "near_duplicate") continue;
-        const autoCulledIds = sg.cullIds.filter((id) => {
+        const autoCulledIds: string[] = [];
+        const recommendedCullIds: string[] = [];
+        for (const id of sg.cullIds) {
           const src = sources[id];
-          return src === "burst-auto-cull" || src === "immich-duplicate";
-        });
+          if (src === "burst-auto-cull" || src === "immich-duplicate") {
+            autoCulledIds.push(id);
+          } else {
+            recommendedCullIds.push(id);
+          }
+        }
         rows.push({
           batchId: batch.id,
           batchDate: batch.dateRange.start.toISOString(),
+          batchReviewed,
           subgroupId: sg.subgroupId,
           subgroupType: sg.subgroupType,
           rationale: sg.rationale ?? "",
           summary: expanded.batchSummary ?? "",
           keeperIds: sg.recommendedKeepIds,
-          loserIds: sg.cullIds,
+          recommendedCullIds,
           autoCulledIds,
         });
       }

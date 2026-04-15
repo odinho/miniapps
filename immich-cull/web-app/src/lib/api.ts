@@ -219,12 +219,13 @@ export async function revertBurstAutoCull(): Promise<{ ok: boolean; reverted: nu
 export interface BurstGroupRow {
   batchId: string;
   batchDate: string;
+  batchReviewed: boolean;
   subgroupId: string;
   subgroupType: string;
   rationale: string;
   summary: string;
   keeperIds: string[];
-  loserIds: string[];
+  recommendedCullIds: string[];
   autoCulledIds: string[];
 }
 

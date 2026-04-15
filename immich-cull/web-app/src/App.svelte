@@ -256,8 +256,28 @@
   $: sidebarDecidedCount = sidebarAllItems.filter(i => i.decided).length;
   $: sidebarHasMore = sidebarAllItems.filter(i => i.visible).length > sidebarLimit;
 
+  async function handleHash() {
+    const hash = location.hash.slice(1);
+    if (hash.startsWith('batch/')) {
+      const id = hash.slice(6);
+      if (!batches.length) await loadBatches();
+      const idx = batches.findIndex(b => b.id === id);
+      if (idx >= 0 && (mode !== 'batches' || batchIdx !== idx)) {
+        mode = 'batches';
+        await selectBatch(idx);
+      }
+    } else if (hash === 'burst' && mode !== 'burst') {
+      mode = 'burst';
+    } else if (hash === 'review' && mode !== 'review') {
+      await switchMode('review');
+    } else if (hash === 'stars' && mode !== 'stars') {
+      await switchMode('stars');
+    }
+  }
+
   onMount(async () => {
     stats = await fetchStats();
+    window.addEventListener('popstate', handleHash);
     const hash = location.hash.slice(1);
     if (hash.startsWith('batch/')) {
       mode = 'batches';
@@ -269,6 +289,8 @@
       await switchMode('review');
     } else if (hash === 'stars') {
       await switchMode('stars');
+    } else if (hash === 'burst') {
+      await switchMode('burst');
     } else {
       await loadBatches();
       if (batches.length) await selectBatch(0);
@@ -369,6 +391,7 @@
     mode = m; showPreview = false; selectedIdx = 0;
     if (m === 'review') location.hash = 'review';
     else if (m === 'stars') location.hash = 'stars';
+    else if (m === 'burst') location.hash = 'burst';
     if (m === 'batches' && !batches.length) loadBatches().then(() => { if (batches.length) selectBatch(0); });
     if (m === 'review' && !batches.length) await loadBatches();
     if (m === 'stars') {
@@ -704,6 +727,8 @@
       <StarsReview summary={starsSummary} totalKept={starsTotalKept} />
     {:else if mode === 'burst'}
       <BurstInspect onGoToBatch={async (id) => {
+        // Push current burst URL onto history so back returns here
+        history.pushState(null, '', `#burst`);
         mode = 'batches';
         if (!batches.length) await loadBatches();
         const idx = batches.findIndex(b => b.id === id);
