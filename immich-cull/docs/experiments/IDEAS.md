@@ -66,9 +66,16 @@ When you finish something, move it to a `## Completed` section at the bottom wit
 - **Status**: Not started. Worth checking monthly as models are quantized.
 
 ### [ ] Face-coverage as explicit LLM signal
-- **Motivation**: User notes repeatedly mention missing faces: "missing the grandparents!", "either 2 or 5 would be good to have in addition", "I'd keep no 4 too, the wide angle shot showing more of the room". The priority is clearly people, and coverage of different people matters.
-- **Sketch**: Use Immich's face-detection data (already on every asset) to tell the LLM which faces appear in which photo. Prompt: "Image 0: faces=[Alice, Bob], Image 1: faces=[Alice, Bob, Carol]" — then tell it to bias toward keeping frames that together cover more distinct people.
-- **Status**: Not started. Will likely have the biggest single-lever impact on user satisfaction.
+- **Motivation**: User notes repeatedly mention missing faces: "missing the grandparents!", "either 2 or 5 would be good to have in addition", "I'd keep no 4 too, the wide angle shot showing more of the room, and her having a different expression". The priority is clearly people, and coverage of different people matters.
+- **Sketch**: Use Immich's face-detection data (already on every asset) to tell the LLM which faces appear in which photo. Prompt line per image: `"Image 0: faces=[Alice, Bob]"` → `"Image 1: faces=[Alice, Bob, Carol]"`. Then bias the prompt toward keeping frames that together cover more distinct people.
+- **Data availability (verified 2026-04-20)**: Immich's `/api/assets/:id` response includes a `people` array with `{id, name, faces:[{boundingBox}]}`. Example asset returned `[{name: 'Skjalg', ...}]`. Named people are identified by ML. Data is immediately usable — no new ML pipeline required.
+- **Implementation path**:
+  1. Extend `ImmichApiAdapter` with `getPeopleForAssets(ids)` that batches the `/api/assets/:id` calls (or look for a bulk endpoint).
+  2. Cache results (asset↔person is slow-changing).
+  3. Add `peopleByAsset: Record<assetId, string[]>` to the `buildPrompt` input. Render into the per-image meta line: `{i, f, t, p: ['Skjalg', 'Halldis']}`.
+  4. Append one line to the prompt body: *"If an extra keeper shows a named person the first keeper misses, that alone justifies a second keep."*
+  5. Run the validator (`scripts/validate_prod_prompt_change.ts`) on 10 real batches, diff subgroup keeps + check whether the 6 drops from the "keep 2 default" change stop happening.
+- **Status**: Not started. Highest expected impact among remaining items; implementation is straightforward because data is already there.
 
 ---
 

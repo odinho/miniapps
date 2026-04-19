@@ -1,6 +1,21 @@
 # Graded-experiment analysis — 2026-04-20
 
-**Tl;dr.** Binary user-match was misleading. When the user actually grades the picks on a 5-level severity scale, **gemma4:31b, qwen3.6-MoE, and gemini-3.1-flash-lite are statistically indistinguishable** (avg severity 0.50–0.55, i.e. between "perfect" and "fine"). The weak variant is `gemma4:e4b` (0.97). And every single keep-bias grade was "too few" or "right" — **zero** "too many". The user consistently wants more keepers than any model produces. Prompt v2 (a "keep 2 by default" rewrite) is being tested overnight; early signs show it changes keep counts as intended.
+**Morning briefing (the user reads this, skips the rest if pressed for time).**
+
+The overnight session did four things in order:
+
+1. **Analysis of your grades** (63 Stage A + 15 Stage B4 pick-bundles). Binary user-match was misleading — on severity, `gemma4:31b`, `qwen3.6-MoE`, and `gemini-3.1-flash-lite` are statistically indistinguishable (0.50–0.55, between "perfect" and "fine"). Only `gemma4:e4b` is actually worse (0.97). Every single keep-bias grade was "too few" or "right" — **zero** "too many". The keep-bias is the biggest single signal in the dataset.
+2. **Prompt v2 experiment** (same 30 groups, keep-more prompt, qwen_terse + 31flashlite). Both variants jumped from 77–83% user-match to **93% user-match** with the new prompt. Local qwen now ties cloud gemini. Detail in `## Prompt v2 results` below.
+3. **Production prompt fix shipped** (`src/ranking/prompt.ts`, lines 51 and 89). 10-batch validation on real DB data: +22% aggregate keep rate. 6 drops vs 18 adds — net positive direction. **Re-rank at leisure to re-process your 72k photo backlog with the new default.** Or keep existing LLM results until you've spot-checked — the code change only affects future ranking runs.
+4. **Burst-quality classifier**: flagged 425 "pseudo-burst" subgroups in your review queue (2.6% of the queue, 1030 photos). All 100% screenshots (306 Snapchat, 33 Firefox, smaller tails). Ran cheap heuristic across all 5604 batches. Raw in `data/experiments/2026-04-20-burst-quality-scores.json`.
+
+**Files to read in order**: this report → `IDEAS.md` (backlog with statuses) → `2026-04-19-qwen-gemma-overnight.md` (the earlier writeup).
+
+**What I did NOT do**: modify auto-cull decisions, re-rank batches, or change anything that affects existing state.db records. Only the prompt text and new analysis artifacts were changed. Everything is committable-and-revertable.
+
+---
+
+**Tl;dr (from before overnight).** Binary user-match was misleading. When the user actually grades the picks on a 5-level severity scale, **gemma4:31b, qwen3.6-MoE, and gemini-3.1-flash-lite are statistically indistinguishable** (avg severity 0.50–0.55, i.e. between "perfect" and "fine"). The weak variant is `gemma4:e4b` (0.97). And every single keep-bias grade was "too few" or "right" — **zero** "too many". The user consistently wants more keepers than any model produces.
 
 ## What changed in how we score
 
