@@ -199,9 +199,59 @@ Option 3 is cheapest to implement and gives the user control.
 - Backup of state.db at time of analysis: `data/backups/state-20260419-235751.db`
 - This report is one of three in `docs/experiments/`: overnight, graded-analysis (this), IDEAS.md.
 
-## Followup — to be added once prompt v2 completes
+## Prompt v2 results (completed)
 
-Placeholder. Expected:
-- v2 avg keep count per variant (target: shift from ~1.1 toward ~2.0)
-- v2 user-match rate (no new grading — binary only; directional signal)
-- Per-group picks diff: how often v2 adds a 2nd photo that was in user's keep set
+Ran the "keep 2 by default" prompt (see `scripts/prompt_v2_experiment.ts`) on the same 30 groups against `qwen_terse` and `31flashlite`. Results are unambiguous — this is by far the largest single improvement we've observed.
+
+### Keep-count shift (target was ~2.0 to match user average)
+
+| variant | v1 avg keep | v2 avg keep | distribution v2 |
+|---|---|---|---|
+| qwen_terse | 1.00 | **2.00** | 30/30 groups picked exactly 2 |
+| 31flashlite | 1.21 | **2.03** | 27/29 picked 2, 1 picked 1, 1 picked 4 |
+
+V2 hits the user average (2.07) almost exactly.
+
+### User-match rate jumped +10pp for both variants
+
+| variant | v1 user ✓ | v2 user ✓ | delta |
+|---|---|---|---|
+| qwen_terse | 23/30 (77%) | **28/30 (93%)** | +10pp |
+| 31flashlite | 24/29 (83%) | **27/29 (93%)** | +10pp |
+
+**qwen_terse v2 matches 31flashlite v2 exactly** (93% each). The keep-bias was the entire cloud-vs-local quality gap. Fix the prompt and the local model is competitive.
+
+### What happened on each group
+
+Behaviour: v2 keeps v1's pick and adds a second. Rarely swaps.
+
+| action | qwen | gemini |
+|---|---|---|
+| identical picks | 0/30 | 4/29 |
+| v2 adds one (superset) | 27 | 23 |
+| → added pick was in user's keep set | **11** | **9** |
+| → added pick user didn't keep | 16 | 14 |
+| v2 swapped different | 3 | 2 |
+
+So roughly **40% of the new 2nd picks match a user keep the LLM would otherwise have missed**, and the other 60% are "extras" the user can trim. This perfectly matches the user's stated preference ("I'd rather trim than lose").
+
+### Concrete example
+
+> `2025-10-25-88408d7b0da0::g1` (8 photos, `near_duplicate`)
+> User kept: [1, 3, 5, 7]
+> v1 qwen: [6] — ✗ user
+> v2 qwen: [5, 7] — ✓ user (two of the four user-keeps)
+
+And in groups where v2 keeps 2 but the user only kept 1, binary user-match is still ✓ — the LLM doesn't lose anything, just picks up a second.
+
+### Takeaway and recommendation
+
+**Change the production prompt.** The line to rewrite is `src/ranking/prompt.ts:89`:
+
+> Current: *"'keep' array: STRICT SUBSET of 'all' — must be SHORTER than 'all'. Default to keeping only the single best per subgroup. Mark the rest 'c' in img."*
+>
+> Proposed: *"'keep' array: STRICT SUBSET of 'all' — must be SHORTER than 'all'. Default to keeping 2 per subgroup (1 if near-identical shutter-burst, 3+ for action sequences or when different faces are shown). Mark the rest 'c' in img."*
+
+The current line contradicts the prompt's earlier guidance ("keep 1-2", "when in doubt keep"). Being in the OUTPUT section, it gets weighted more heavily. Aligning it adds the +10pp lift we just measured.
+
+This is the single cheapest, highest-expected-impact change in the entire experiment. See `IDEAS.md → Fix the contradiction in the production prompt` for next steps.

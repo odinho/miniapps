@@ -86,7 +86,7 @@ OUTPUT — compact JSON, indices 0..N-1 ONLY. Do NOT invent extra indices.
 }
 img tuple: [index, stars, "category", "note", subgroupId or null, "k" for keep or "c" for cull].
 Category codes: por grp sel lan tra evt pet act doc rec wb ss snap tech veh food meme oth
-"all" array: integers ordered best-first. "keep" array: STRICT SUBSET of "all" — must be SHORTER than "all". Default to keeping only the single best per subgroup. Mark the rest "c" in img.
+"all" array: integers ordered best-first. "keep" array: STRICT SUBSET of "all" — must be SHORTER than "all". Default to keeping 2 per subgroup (1 if near-identical shutter-burst, 3+ for action sequences or when the extra keeper shows a face or moment the first doesn't). Mark the rest "c" in img.
 
 Example for 5 images (2 are similar):
 {"sum":"Family at park with dog","img":[[0,2,"grp","Family on bench, smiling","g1","k"],[1,1,"grp","Family on bench, eyes closed","g1","c"],[2,0,"pet","Dog sniffing grass",null,"c"],[3,3,"por","Child laughing close-up",null,"k"],[4,0,"ss","Screenshot of map",null,"c"]],"sg":[{"id":"g1","type":"dup","all":[0,1],"keep":[0],"why":"Better expressions, eyes open"}]}`;
