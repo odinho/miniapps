@@ -157,6 +157,38 @@ Each pattern is a candidate lever — the face-coverage signal in particular is 
 
 Face-coverage as explicit LLM signal. Immich has face detection on every asset. Passing "Image 0: faces=[A, B], Image 1: faces=[A, B, C]" to the LLM directly addresses the dominant user-note pattern ("missing the grandparents!", "Halldis face is actually in no 4"). Details in `IDEAS.md`.
 
+## Bonus: burst-quality classifier ran tonight
+
+Motivated by the "bad burst" finding above, I wrote a cheap heuristic classifier (`scripts/burst_quality_classifier.ts`) and ran it on all 16,142 subgroups with LLM results in the state DB.
+
+**Result: 425 pseudo-burst subgroups flagged (2.6% of queue, 1,030 photos total).** All of them 100% screenshots by filename.
+
+App breakdown:
+
+| app | subgroups |
+|---|---|
+| Snapchat | 306 |
+| Firefox | 33 |
+| Telegram | 3 |
+| Napper | 3 |
+| Tapo | 2 |
+| Slack | 2 |
+| Settings / Spond / Claude / Vipps / Discord / etc | 1 each |
+
+Group size is mostly small (300 pairs, 90 triples) but time spreads vary from seconds to hours — these are being grouped by the clock alone. The server already has a `Snapchat/Snapchat-*` auto-filter, but it doesn't catch screenshots IN other apps (Screenshot_20260408_064853_Firefox.jpg is the pattern).
+
+All scores saved to `data/experiments/2026-04-20-burst-quality-scores.json`.
+
+### Recommended integration
+
+Short version: add this as a pre-LLM filter in the auto-cull pipeline. Three options (see `IDEAS.md → Real-burst vs "pseudo-burst" classifier`):
+
+1. **Auto-cull all flagged** — assumes all screenshots are ephemeral. User comment suggests some are worth keeping ("like a recipe or something cool happening").
+2. **Route to manual review with no LLM pick** — safer; user eyeballs and mass-deletes by pattern.
+3. **Add a new auto-keep-pattern rule** per app: "keep everything from /Snapchat/, cull everything named Screenshot_*_Firefox.jpg" — probably the most maintainable, user toggles per app.
+
+Option 3 is cheapest to implement and gives the user control.
+
 ## Raw data and scripts
 
 - Source experiments: `data/experiments/2026-04-19-stageA.json`, `.../-stageB4.json`
