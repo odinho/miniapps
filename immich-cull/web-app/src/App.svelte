@@ -6,6 +6,7 @@
   import AutoCullReview from './components/AutoCullReview.svelte';
   import StarsReview from './components/StarsReview.svelte';
   import BurstInspect from './components/BurstInspect.svelte';
+  import ExperimentGrader from './components/ExperimentGrader.svelte';
   import {
     fetchBatches, fetchBatch, fetchStats,
     rankBatch, savePhotoDecisions, fetchPhotoDecisions, fmt,
@@ -19,7 +20,7 @@
     type AssetState,
   } from './lib/state';
 
-  type AppMode = 'batches' | 'review' | 'stars' | 'burst';
+  type AppMode = 'batches' | 'review' | 'stars' | 'burst' | 'experiment';
 
   let mode: AppMode = 'batches';
   let starsSummary: Record<number, { count: number; samples: Array<{ id: string; filename: string }> }> = {};
@@ -272,12 +273,32 @@
       await switchMode('review');
     } else if (hash === 'stars' && mode !== 'stars') {
       await switchMode('stars');
+    } else if (hash.startsWith('experiment') && mode !== 'experiment') {
+      await switchMode('experiment');
     }
   }
 
   onMount(async () => {
     stats = await fetchStats();
     window.addEventListener('popstate', handleHash);
+
+    // Keep --header-h / --bar-h in sync with actual rendered heights so they
+    // respect text zoom. Overlays anchor to these vars.
+    const app = document.querySelector('.app') as HTMLElement | null;
+    const header = document.querySelector('.app > .header') as HTMLElement | null;
+    const bar = document.querySelector('.app > .bar') as HTMLElement | null;
+    if (app) {
+      const sync = () => {
+        if (header) app.style.setProperty('--header-h', `${Math.ceil(header.getBoundingClientRect().height)}px`);
+        if (bar && !bar.classList.contains('hidden')) {
+          app.style.setProperty('--bar-h', `${Math.ceil(bar.getBoundingClientRect().height)}px`);
+        }
+      };
+      sync();
+      const ro = new ResizeObserver(sync);
+      if (header) ro.observe(header);
+      if (bar) ro.observe(bar);
+    }
     const hash = location.hash.slice(1);
     if (hash.startsWith('batch/')) {
       mode = 'batches';
@@ -291,6 +312,8 @@
       await switchMode('stars');
     } else if (hash === 'burst') {
       await switchMode('burst');
+    } else if (hash.startsWith('experiment')) {
+      await switchMode('experiment');
     } else {
       await loadBatches();
       if (batches.length) await selectBatch(0);
@@ -392,6 +415,7 @@
     if (m === 'review') location.hash = 'review';
     else if (m === 'stars') location.hash = 'stars';
     else if (m === 'burst') location.hash = 'burst';
+    else if (m === 'experiment') location.hash = 'experiment';
     if (m === 'batches' && !batches.length) loadBatches().then(() => { if (batches.length) selectBatch(0); });
     if (m === 'review' && !batches.length) await loadBatches();
     if (m === 'stars') {
@@ -587,7 +611,7 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (mode === 'review' || mode === 'stars' || mode === 'burst') return; // these modes handle their own keys
+    if (mode === 'review' || mode === 'stars' || mode === 'burst' || mode === 'experiment') return; // these modes handle their own keys
     if (helpOpen) { if (e.key === 'Escape' || e.key === '?') helpOpen = false; return; }
     if (!currentAssets.length) return;
     const shift = e.shiftKey;
@@ -636,6 +660,7 @@
       <button class:active={mode === 'review'} on:click={() => switchMode('review')}>Auto Review</button>
       <button class:active={mode === 'burst'} on:click={() => switchMode('burst')}>Burst Inspect</button>
       <button class:active={mode === 'stars'} on:click={() => switchMode('stars')}>Stars</button>
+      <button class:active={mode === 'experiment'} on:click={() => switchMode('experiment')}>Grade Experiment</button>
     </div>
     <div class="stats">
       {#if stats}
@@ -650,7 +675,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div class="sidebar-backdrop" role="button" tabindex="-1" on:click={() => sidebarOpen = false}></div>
   {/if}
-  <aside class="sidebar" class:open={sidebarOpen} class:hidden={mode === 'review' || mode === 'stars' || mode === 'burst'}>
+  <aside class="sidebar" class:open={sidebarOpen} class:hidden={mode === 'review' || mode === 'stars' || mode === 'burst' || mode === 'experiment'}>
     <div class="sidebar-list">
       <div class="burst-controls">
         <button class="burst-btn" on:click={async () => {
@@ -734,6 +759,8 @@
         const idx = batches.findIndex(b => b.id === id);
         if (idx >= 0) await selectBatch(idx);
       }} />
+    {:else if mode === 'experiment'}
+      <ExperimentGrader />
     {:else if loading}
       <div class="empty"><span class="spinner"></span> Loading...</div>
     {:else if currentAssets.length}
@@ -753,7 +780,7 @@
     {/if}
   </div>
 
-  <footer class="bar" class:hidden={mode === 'review' || mode === 'stars' || mode === 'burst'}>
+  <footer class="bar" class:hidden={mode === 'review' || mode === 'stars' || mode === 'burst' || mode === 'experiment'}>
     <button class="bk" on:click={() => mark('keep')}>Keep</button>
     <button class="bc" on:click={() => mark('cull')}>Cull</button>
     <button class="bb" on:click={keepBestCullRest}>Best + Cull Rest</button>
@@ -867,7 +894,14 @@
   :global(html, body) { height: 100%; overflow: hidden; }
   :global(body) { font: 13px/1.4 system-ui, sans-serif; color: #e0e4ea; background: #0e1014; }
 
-  .app { display: grid; grid-template-columns: 200px minmax(0, 1fr); grid-template-rows: 34px minmax(0, 1fr) 40px; height: 100dvh; }
+  .app {
+    --header-h: 34px;
+    --bar-h: 40px;
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    grid-template-rows: minmax(var(--header-h), auto) minmax(0, 1fr) minmax(var(--bar-h), auto);
+    height: 100dvh;
+  }
   .header { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 0 14px; border-bottom: 1px solid #2a2e36; background: #111319; }
   .header h1 { font-size: 14px; font-weight: 600; color: #f0a040; }
   .mode-toggle { display: flex; gap: 2px; }
@@ -951,7 +985,7 @@
   :global(.user-star) { position: absolute; top: 3px; right: 3px; font-size: 11px; color: #1a1a1a; text-shadow: none; background: #ffd700; padding: 1px 4px; border-radius: 3px; z-index: 1; font-weight: 700; }
   :global(.llm-note) { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 9px; color: #ddd; text-shadow: 0 1px 2px #000; }
 
-  :global(.preview-ov) { position: fixed; top: 34px; left: 200px; right: 0; bottom: 40px; background: #090b0f; z-index: 50; display: flex; flex-direction: column; }
+  :global(.preview-ov) { position: fixed; top: var(--header-h, 34px); left: 200px; right: 0; bottom: var(--bar-h, 40px); background: #090b0f; z-index: 50; display: flex; flex-direction: column; }
   :global(.pv-strip) { display: flex; gap: 3px; padding: 3px; overflow-x: auto; background: #111319; border-bottom: 1px solid #2a2e36; flex-shrink: 0; align-items: center; height: 76px; }
   :global(.pvt) { flex-shrink: 0; cursor: pointer; border: 2px solid transparent; border-radius: 3px; overflow: hidden; height: 66px; }
   :global(.pvt.active) { border-color: #f0a040 !important; }
@@ -982,15 +1016,15 @@
 
   /* Mobile: sidebar as drawer overlay */
   @media (max-width: 768px) {
-    .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: 34px minmax(0, 1fr) auto; }
+    .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(var(--header-h), auto) minmax(0, 1fr) auto; }
     .hamburger { display: block; }
     .sidebar {
-      position: fixed; top: 34px; left: -280px; bottom: 0; width: 280px;
+      position: fixed; top: var(--header-h, 34px); left: -280px; bottom: 0; width: 280px;
       z-index: 100; transition: left .2s ease;
     }
     .sidebar.open { left: 0; }
-    .sidebar-backdrop { display: block; position: fixed; inset: 0; top: 34px; background: rgba(0,0,0,.5); z-index: 99; }
-    .bar { grid-column: 1; gap: 4px; padding: 4px 6px; flex-wrap: wrap; height: auto; min-height: 40px; }
+    .sidebar-backdrop { display: block; position: fixed; inset: 0; top: var(--header-h, 34px); background: rgba(0,0,0,.5); z-index: 99; }
+    .bar { grid-column: 1; gap: 4px; padding: 4px 6px; flex-wrap: wrap; height: auto; min-height: var(--bar-h, 40px); }
     .bar button { padding: 4px 8px; font-size: 11px; }
     .keep-level { order: 10; } /* push ± to second row via wrap */
     .kl-btn { width: 32px; height: 32px; } /* bigger touch targets */

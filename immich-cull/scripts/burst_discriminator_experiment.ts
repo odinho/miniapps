@@ -25,6 +25,13 @@ import Database from "better-sqlite3";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { writeFileSync } from "fs";
+import { Agent, setGlobalDispatcher } from "undici";
+
+// Disable undici's default 300s headers timeout — slow CPU-bound Ollama generations
+// routinely take longer to emit first bytes (vision preprocessing + prompt eval).
+setGlobalDispatcher(
+  new Agent({ headersTimeout: 0, bodyTimeout: 0, connectTimeout: 30000 }),
+);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -39,6 +46,8 @@ const server = getArg("--server", "http://localhost:3737").replace(/\/$/, "");
 const OLLAMA_URL = getArg("--ollama", "http://localhost:11434");
 const skipOllama = args.includes("--skip-ollama");
 const skipGemini = args.includes("--skip-gemini");
+const onlyList = getArg("--only", ""); // comma-separated variant names to keep
+const previewPx = parseInt(getArg("--preview", "1200"), 10);
 
 // ---------------------------------------------------------------------------
 // Focused burst-picking prompt
@@ -60,6 +69,14 @@ Return JSON:
 
 If 2 photos are worth keeping (genuinely different moment/expression), return up to 2 in "best".
 Indices are 0-based matching the image order shown.`;
+
+// Terser prompt variant — tests whether less framing helps or hurts accuracy
+const BURST_PROMPT_TERSE = `Pick the best family photo(s) from this burst. Faces/expressions matter most, then sharpness, composition, moment.
+
+Return JSON only:
+{"best": [index_or_indices], "reason": "brief why", "ranking": [best_to_worst]}
+
+Indices 0-based. Keep 1 unless two frames capture distinctly different moments.`;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -83,6 +100,9 @@ interface Variant {
   model: string;
   temperature: number;
   thinkingLevel?: string;
+  think?: boolean; // ollama: enable/disable thinking for models that support it
+  numPredict?: number;
+  promptOverride?: string;
 }
 
 interface VariantResult {
@@ -130,29 +150,54 @@ if (!skipOllama) {
     model: "gemma4:e4b",
     temperature: 0,
   });
+  VARIANTS.push({
+    name: "gemma4_31b",
+    provider: "ollama",
+    model: "gemma4:31b",
+    temperature: 0,
+  });
+  VARIANTS.push({
+    name: "qwen36_a3b_nothink",
+    provider: "ollama",
+    model: "qwen3.6:35b-a3b",
+    temperature: 0,
+    think: false,
+  });
+  VARIANTS.push({
+    name: "qwen36_a3b_think",
+    provider: "ollama",
+    model: "qwen3.6:35b-a3b",
+    temperature: 0,
+    think: true,
+    numPredict: 4000,
+  });
+  VARIANTS.push({
+    name: "qwen36_a3b_terse",
+    provider: "ollama",
+    model: "qwen3.6:35b-a3b",
+    temperature: 0,
+    think: false,
+    promptOverride: BURST_PROMPT_TERSE,
+  });
 }
 
 if (!skipGemini) {
   VARIANTS.push(
-    {
-      name: "25flashlite",
-      provider: "vertexai",
-      model: "gemini-2.5-flash-lite",
-      temperature: 0,
-    },
     {
       name: "31flashlite",
       provider: "vertexai",
       model: "gemini-3.1-flash-lite-preview",
       temperature: 0,
     },
-    {
-      name: "3flash",
-      provider: "vertexai",
-      model: "gemini-3-flash-preview",
-      temperature: 0,
-    },
   );
+}
+
+// Apply --only filter if specified
+if (onlyList) {
+  const keep = new Set(onlyList.split(",").map((s) => s.trim()));
+  for (let i = VARIANTS.length - 1; i >= 0; i--) {
+    if (!keep.has(VARIANTS[i].name)) VARIANTS.splice(i, 1);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -167,43 +212,71 @@ async function runOllama(
   const userPrompt = `${filenames.length} photos from a burst. Pick the best.\n\n` +
     filenames.map((f, i) => `Image ${i}: ${f}`).join("\n");
 
+  const sys = variant.promptOverride ?? BURST_PROMPT;
   const body: any = {
     model: variant.model,
     messages: [
-      { role: "system", content: BURST_PROMPT },
+      { role: "system", content: sys },
       {
         role: "user",
         content: userPrompt,
         images: imagesB64,
       },
     ],
-    stream: false,
+    stream: true, // avoid undici's 300s headersTimeout on slow CPU-bound generations
     format: "json",
+    keep_alive: "30m",
     options: {
       temperature: variant.temperature,
-      num_predict: 2000,
+      num_predict: variant.numPredict ?? 2000,
       num_ctx: 32768,
     },
   };
+  if (variant.think !== undefined) {
+    body.think = variant.think;
+  }
 
   const resp = await fetch(`${OLLAMA_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(300000),
+    signal: AbortSignal.timeout(1800000),
   });
 
-  if (!resp.ok) {
-    const err = await resp.text();
+  if (!resp.ok || !resp.body) {
+    const err = resp.body ? await resp.text() : "no body";
     throw new Error(`Ollama error ${resp.status}: ${err.slice(0, 200)}`);
   }
 
-  const result = (await resp.json()) as any;
-  return {
-    raw: result.message?.content ?? "",
-    tokensIn: result.prompt_eval_count ?? 0,
-    tokensOut: result.eval_count ?? 0,
-  };
+  // Concatenate streamed NDJSON chunks
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  let content = "";
+  let promptEvalCount = 0;
+  let evalCount = 0;
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let nl;
+    while ((nl = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (!line) continue;
+      try {
+        const j = JSON.parse(line);
+        if (j.message?.content) content += j.message.content;
+        if (j.done) {
+          promptEvalCount = j.prompt_eval_count ?? promptEvalCount;
+          evalCount = j.eval_count ?? evalCount;
+        }
+      } catch {
+        // ignore parse errors on partial lines
+      }
+    }
+  }
+  return { raw: content, tokensIn: promptEvalCount, tokensOut: evalCount };
 }
 
 async function runGemini(
@@ -337,13 +410,21 @@ async function findBurstGroups(
 // ---------------------------------------------------------------------------
 
 function parseResponse(raw: string, n: number): { best: number[]; ranking: number[]; reason: string } {
+  // Strip any <think>...</think> blocks (qwen thinking models leak these)
+  const stripped = raw.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
   let parsed: any;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(stripped);
   } catch {
-    const m = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (m) parsed = JSON.parse(m[1]);
-    else throw new Error("JSON parse failed");
+    const m = stripped.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (m) {
+      parsed = JSON.parse(m[1]);
+    } else {
+      // Last resort: find first {...} JSON object
+      const obj = stripped.match(/\{[\s\S]*\}/);
+      if (obj) parsed = JSON.parse(obj[0]);
+      else throw new Error("JSON parse failed");
+    }
   }
 
   const best = Array.isArray(parsed.best) ? parsed.best.filter((i: any) => typeof i === "number" && i >= 0 && i < n) : [];
@@ -392,7 +473,7 @@ async function main() {
     const imagesB64: string[] = [];
     for (const id of group.assetIds) {
       try {
-        imagesB64.push(await getImageBase64(id, 1200));
+        imagesB64.push(await getImageBase64(id, previewPx));
       } catch {
         imagesB64.push("");
       }
@@ -493,6 +574,17 @@ async function main() {
 
     allResults.push({ group, variants: variantResults });
     console.log();
+
+    // Write intermediate snapshot after each group so we don't lose data on crash
+    const snapshotPath = `/tmp/burst-discriminator-snapshot.json`;
+    writeFileSync(snapshotPath, JSON.stringify({
+      timestamp: new Date().toISOString(),
+      completedGroups: allResults.length,
+      targetGroups: groups.length,
+      variants: VARIANTS.map((v) => v.name),
+      stats,
+      results: allResults,
+    }, null, 2));
   }
 
   // ---------------------------------------------------------------------------

@@ -1609,6 +1609,84 @@ app.post<{
   };
 });
 
+// === Experiment grading endpoints ===
+// Reads experiment JSON from data/experiments/<id>.json (output from scripts/burst_discriminator_experiment.ts)
+// Stores grades as a sidecar at data/experiments/<id>-grades.json
+import { readdirSync } from "fs";
+
+const experimentsDir = resolve(__dirname, "../data/experiments");
+
+app.get<{ Querystring: { ids: string } }>("/api/assets/details", async (req) => {
+  const ids = (req.query.ids ?? "").split(",").filter(Boolean);
+  const details = ids
+    .map((id) => {
+      const a = assetMap.get(id);
+      if (!a) return null;
+      return {
+        id: a.id,
+        filename: a.filename,
+        path: a.path,
+        date: a.fileCreatedAt.toISOString(),
+        rating: a.rating,
+        isFavorite: a.isFavorite,
+        bytes: a.fileSize ?? 0,
+        w: a.width ?? 0,
+        h: a.height ?? 0,
+      };
+    })
+    .filter((d) => d !== null);
+  return { assets: details };
+});
+
+app.get("/api/experiments", async () => {
+  if (!existsSync(experimentsDir)) return { experiments: [] };
+  const files = readdirSync(experimentsDir)
+    .filter((f) => f.endsWith(".json") && !f.endsWith("-grades.json"))
+    .toSorted()
+    .toReversed();
+  return { experiments: files.map((f) => ({ id: f.replace(/\.json$/, "") })) };
+});
+
+app.get<{ Params: { id: string } }>("/api/experiments/:id", async (req, reply) => {
+  const expPath = resolve(experimentsDir, `${req.params.id}.json`);
+  const gradesPath = resolve(experimentsDir, `${req.params.id}-grades.json`);
+  if (!existsSync(expPath)) {
+    reply.code(404);
+    return { error: "Experiment not found" };
+  }
+  const experiment = JSON.parse(readFileSync(expPath, "utf-8"));
+  const grades = existsSync(gradesPath) ? JSON.parse(readFileSync(gradesPath, "utf-8")) : {};
+  return { experiment, grades };
+});
+
+app.post<{
+  Params: { id: string };
+  Body: { key: string; severity?: number | null; keepBias?: number | null; note?: string };
+}>("/api/experiments/:id/grade", async (req, _reply) => {
+  const gradesPath = resolve(experimentsDir, `${req.params.id}-grades.json`);
+  const grades: Record<string, any> = existsSync(gradesPath)
+    ? JSON.parse(readFileSync(gradesPath, "utf-8"))
+    : {};
+  grades[req.body.key] = {
+    severity: req.body.severity ?? null,
+    keepBias: req.body.keepBias ?? null,
+    note: req.body.note ?? "",
+    updatedAt: new Date().toISOString(),
+  };
+  writeFileSync(gradesPath, JSON.stringify(grades, null, 2));
+  return { ok: true };
+});
+
+// Replace the full grades file (used for migrations)
+app.put<{
+  Params: { id: string };
+  Body: { grades: Record<string, unknown> };
+}>("/api/experiments/:id/grades", async (req, _reply) => {
+  const gradesPath = resolve(experimentsDir, `${req.params.id}-grades.json`);
+  writeFileSync(gradesPath, JSON.stringify(req.body.grades, null, 2));
+  return { ok: true };
+});
+
 app.get("/", async (_, reply) => {
   reply.type("text/html");
   return readFileSync(resolve(__dirname, "../web/index.html"), "utf-8");
