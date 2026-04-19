@@ -65,7 +65,15 @@ When you finish something, move it to a `## Completed` section at the bottom wit
 - **Sketch**: Check if unsloth has `Qwen3.6-35B-A3B` on HF yet. Import to Ollama via Modelfile. Re-run benchmark.
 - **Status**: Not started. Worth checking monthly as models are quantized.
 
-### [ ] Face-coverage as explicit LLM signal
+### [~] Face-coverage as explicit LLM signal (first try worse than v2)
+- **2026-04-20 result**: Ran a face-aware prompt on the same 30 groups with qwen_terse, passing `faces=[name,...]` metadata from Immich's `/api/assets/:id` response. **User-match: 25/30 (83%) — 10pp WORSE than v2's 28/30 (93%) on the same groups.** Keep count was similar (1.93 vs 2.00 for v2).
+- **Why it under-performed**: The prompt instruction "Default: keep 2 photos that together cover the most distinct people" pushed the model toward coverage at the expense of quality. Two observed failure modes:
+  1. When the same faces appear in every photo, the model collapsed to 1 pick (perceived no coverage benefit), missing user's preference for 2.
+  2. When faces differed, the model chose less-sharp photos to get coverage rather than the sharpest of each face group.
+  Of 20 groups where face pick differed from v2: face added a user-kept index 5 times but DROPPED a user-kept index 11 times.
+- **Raw data**: `data/experiments/2026-04-20-face-coverage.json`, analysis: `scripts/compare_face_vs_v2.py`.
+- **Next attempt**: use faces as a tie-breaker, not primary driver. Revised prompt language to try: *"Priorities: sharpness > expression > composition > moment. If picking 2, prefer a combination whose faces differ (see metadata) over a combination where both keepers show only overlapping people — but do NOT trade sharpness for face diversity."* Basically keep v2's quality priority and use faces only when quality is roughly equal.
+- **Status**: First attempt committed as negative result. Worth retrying once v2 is shipped.
 - **Motivation**: User notes repeatedly mention missing faces: "missing the grandparents!", "either 2 or 5 would be good to have in addition", "I'd keep no 4 too, the wide angle shot showing more of the room, and her having a different expression". The priority is clearly people, and coverage of different people matters.
 - **Sketch**: Use Immich's face-detection data (already on every asset) to tell the LLM which faces appear in which photo. Prompt line per image: `"Image 0: faces=[Alice, Bob]"` → `"Image 1: faces=[Alice, Bob, Carol]"`. Then bias the prompt toward keeping frames that together cover more distinct people.
 - **Data availability (verified 2026-04-20)**: Immich's `/api/assets/:id` response includes a `people` array with `{id, name, faces:[{boundingBox}]}`. Example asset returned `[{name: 'Skjalg', ...}]`. Named people are identified by ML. Data is immediately usable — no new ML pipeline required.
