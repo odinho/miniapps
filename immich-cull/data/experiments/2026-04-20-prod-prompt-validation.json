@@ -1,0 +1,551 @@
+{
+  "count": 10,
+  "results": [
+    {
+      "batchId": "2005-08-09-2d96ec6aa150",
+      "n": 3,
+      "oldKeepCount": 0,
+      "newKeepCount": 0,
+      "oldPicks": [],
+      "newPicks": [],
+      "onlyOld": [],
+      "onlyNew": [],
+      "oldSg": {
+        "g1": []
+      },
+      "newSg": {
+        "g1": []
+      },
+      "elapsed": 2.956,
+      "newRaw": "{\n  \"sum\": \"Three blurry, overexposed technical test shots of an indoor space.\",\n  \"img\": [\n    [0, 0, \"doc\", \"Overexposed ceiling lights\", \"g1\", \"c\"],\n    [1, 0, \"doc\", \"Dark floor with equipment\", \"g1\", \"c\"],\n    [2, 0, \"doc\", \"Blown out interior scene\", \"g1\", \"c\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"scene\",\n      \"all\": [0, 1, 2],\n      \"keep\": [],\n      \"why\": \"All images are technically flawed, blurry, or severely overexposed.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2013-03-03-7c4e4b0c5637",
+      "n": 1,
+      "oldKeepCount": 1,
+      "newKeepCount": 1,
+      "oldPicks": [
+        0
+      ],
+      "newPicks": [
+        0
+      ],
+      "onlyOld": [],
+      "onlyNew": [],
+      "oldSg": {},
+      "newSg": {},
+      "elapsed": 2.012,
+      "newRaw": "{\n  \"sum\": \"A woman wearing 50th birthday glasses at an event.\",\n  \"img\": [\n    [0, 2, \"por\", \"Woman wearing 50 glasses\", null, \"k\"]\n  ],\n  \"sg\": []\n}"
+    },
+    {
+      "batchId": "2006-05-14-6b1da9376157",
+      "n": 28,
+      "oldKeepCount": 7,
+      "newKeepCount": 13,
+      "oldPicks": [
+        0,
+        2,
+        6,
+        10,
+        14,
+        17,
+        21
+      ],
+      "newPicks": [
+        0,
+        2,
+        3,
+        4,
+        6,
+        8,
+        10,
+        11,
+        14,
+        16,
+        18,
+        21,
+        23
+      ],
+      "onlyOld": [
+        17
+      ],
+      "onlyNew": [
+        3,
+        4,
+        8,
+        11,
+        16,
+        18,
+        23
+      ],
+      "oldSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          2
+        ],
+        "g3": [
+          6
+        ],
+        "g4": [
+          11
+        ],
+        "g5": [
+          16
+        ],
+        "g6": [
+          20
+        ],
+        "g7": [
+          21
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          2
+        ],
+        "g3": [
+          3,
+          4
+        ],
+        "g4": [
+          6,
+          8
+        ],
+        "g5": [
+          10,
+          11
+        ],
+        "g6": [
+          14,
+          16
+        ],
+        "g7": [
+          18
+        ],
+        "g8": [
+          21,
+          23
+        ]
+      },
+      "elapsed": 8.045,
+      "newRaw": "{\n  \"sum\": \"A behind-the-scenes look at a family video production session.\",\n  \"img\": [\n    [0, 1, \"por\", \"Man playing piano, side view\", \"g1\", \"k\"],\n    [1, 1, \"por\", \"Man playing piano, close-up\", \"g1\", \"c\"],\n    [2, 2, \"grp\", \"Two women talking on deck\", \"g2\", \"k\"],\n    [3, 1, \"grp\", \"Woman smoking, indoor setting\", \"g3\", \"k\"],\n    [4, 2, \"grp\", \"Two women talking, smiling\", \"g3\", \"k\"],\n    [5, 1, \"grp\", \"Woman smoking, looking away\", \"g3\", \"c\"],\n    [6, 1, \"por\", \"Man wearing headphones\", \"g4\", \"k\"],\n    [7, 1, \"evt\", \"Filming scene, wide shot\", \"g4\", \"c\"],\n    [8, 2, \"evt\", \"Man adjusting audio equipment\", \"g4\", \"k\"],\n    [9, 1, \"evt\", \"Filming scene, over shoulder\", \"g4\", \"c\"],\n    [10, 1, \"por\", \"Young woman looking down\", \"g5\", \"k\"],\n    [11, 2, \"por\", \"Young woman smiling at camera\", \"g5\", \"k\"],\n    [12, 1, \"por\", \"Woman smoking, thoughtful expression\", \"g3\", \"c\"],\n    [13, 1, \"grp\", \"Two women in conversation\", \"g3\", \"c\"],\n    [14, 1, \"por\", \"Young woman sitting on floor\", \"g6\", \"k\"],\n    [15, 1, \"por\", \"Young woman, close-up on floor\", \"g6\", \"c\"],\n    [16, 2, \"por\", \"Young woman, pensive expression\", \"g6\", \"k\"],\n    [17, 1, \"evt\", \"Filming young woman on floor\", \"g6\", \"c\"],\n    [18, 1, \"evt\", \"Two women standing in doorway\", \"g7\", \"k\"],\n    [19, 1, \"evt\", \"Filming young woman on floor\", \"g6\", \"c\"],\n    [20, 1, \"por\", \"Young woman, pensive on floor\", \"g6\", \"c\"],\n    [21, 2, \"evt\", \"Young woman drawing on bed\", \"g8\", \"k\"],\n    [22, 1, \"evt\", \"Young woman, close-up drawing\", \"g8\", \"c\"],\n    [23, 2, \"evt\", \"Young woman showing sketch\", \"g8\", \"k\"],\n    [24, 1, \"evt\", \"Young woman drawing, focused\", \"g8\", \"c\"],\n    [25, 0, \"evt\", \"Young woman, motion blur\", \"g8\", \"c\"],\n    [26, 1, \"evt\", \"Filming young woman on bed\", \"g8\", \"c\"],\n    [27, 1, \"evt\", \"Wide shot of filming setup\", \"g8\", \"c\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"dup\",\n      \"all\": [0, 1],\n      \"keep\": [0],\n      \"why\": \"Better composition and framing of the subject.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"scene\",\n      \"all\": [2],\n      \"keep\": [2],\n      \"why\": \"Distinct outdoor conversation moment.\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"scene\",\n      \"all\": [4, 3, 5, 12, 13],\n      \"keep\": [4, 3],\n      \"why\": \"Best expressions and interaction between the two women.\"\n    },\n    {\n      \"id\": \"g4\",\n      \"type\": \"scene\",\n      \"all\": [8, 6, 7, 9],\n      \"keep\": [8, 6],\n      \"why\": \"Captures the technical setup and the man's focus.\"\n    },\n    {\n      \"id\": \"g5\",\n      \"type\": \"dup\",\n      \"all\": [11, 10],\n      \"keep\": [11, 10],\n      \"why\": \"Both show different, natural expressions.\"\n    },\n    {\n      \"id\": \"g6\",\n      \"type\": \"scene\",\n      \"all\": [16, 14, 15, 17, 19, 20],\n      \"keep\": [16, 14],\n      \"why\": \"Best pensive expressions of the subject.\"\n    },\n    {\n      \"id\": \"g7\",\n      \"type\": \"scene\",\n      \"all\": [18],\n      \"keep\": [18],\n      \"why\": \"Unique moment of the two women in the doorway.\"\n    },\n    {\n      \"id\": \"g8\",\n      \"type\": \"scene\",\n      \"all\": [21, 23, 22, 24, 25, 26, 27],\n      \"keep\": [21, 23],\n      \"why\": \"Captures the drawing activity and the reveal of the sketch.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2007-07-15-00785b9a7670",
+      "n": 8,
+      "oldKeepCount": 4,
+      "newKeepCount": 4,
+      "oldPicks": [
+        1,
+        2,
+        4,
+        6
+      ],
+      "newPicks": [
+        0,
+        2,
+        4,
+        6
+      ],
+      "onlyOld": [
+        1
+      ],
+      "onlyNew": [
+        0
+      ],
+      "oldSg": {
+        "g1": [
+          1
+        ],
+        "g2": [
+          2
+        ],
+        "g3": [
+          4
+        ],
+        "g4": [
+          6
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          2
+        ],
+        "g3": [
+          4
+        ],
+        "g4": [
+          6
+        ]
+      },
+      "elapsed": 3.334,
+      "newRaw": "{\n  \"sum\": \"A collection of candid party moments and table details.\",\n  \"img\": [\n    [0, 1, \"por\", \"Young man holding flag\", \"g1\", \"k\"],\n    [1, 0, \"por\", \"Young man holding flag\", \"g1\", \"c\"],\n    [2, 2, \"grp\", \"Group singing or performing\", \"g2\", \"k\"],\n    [3, 1, \"grp\", \"Group singing or performing\", \"g2\", \"c\"],\n    [4, 1, \"por\", \"Young man looking down\", \"g3\", \"k\"],\n    [5, 0, \"por\", \"Young man looking down\", \"g3\", \"c\"],\n    [6, 1, \"rec\", \"Used candles on plate\", \"g4\", \"k\"],\n    [7, 0, \"rec\", \"Used candles on plate\", \"g4\", \"c\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"dup\",\n      \"all\": [0, 1],\n      \"keep\": [0],\n      \"why\": \"Better framing and focus on the subject.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"dup\",\n      \"all\": [2, 3],\n      \"keep\": [2],\n      \"why\": \"Clearer expressions and better composition.\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"dup\",\n      \"all\": [4, 5],\n      \"keep\": [4],\n      \"why\": \"Better lighting and subject clarity.\"\n    },\n    {\n      \"id\": \"g4\",\n      \"type\": \"dup\",\n      \"all\": [6, 7],\n      \"keep\": [6],\n      \"why\": \"Near-identical shots, keeping the sharper one.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2023-11-18-efa5ee601b78",
+      "n": 28,
+      "oldKeepCount": 14,
+      "newKeepCount": 14,
+      "oldPicks": [
+        0,
+        2,
+        4,
+        7,
+        10,
+        14,
+        17,
+        18,
+        20,
+        21,
+        22,
+        24,
+        26,
+        27
+      ],
+      "newPicks": [
+        0,
+        2,
+        4,
+        7,
+        10,
+        13,
+        14,
+        17,
+        18,
+        21,
+        22,
+        24,
+        26,
+        27
+      ],
+      "onlyOld": [
+        20
+      ],
+      "onlyNew": [
+        13
+      ],
+      "oldSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          2,
+          4
+        ],
+        "g3": [
+          7,
+          10
+        ],
+        "g4": [
+          14
+        ],
+        "g5": [
+          17,
+          18
+        ],
+        "g6": [
+          24
+        ],
+        "g7": [
+          26,
+          27
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          2,
+          4
+        ],
+        "g3": [
+          10,
+          13
+        ],
+        "g4": [
+          14
+        ],
+        "g5": [
+          17,
+          18
+        ],
+        "g6": [
+          22
+        ],
+        "g7": [
+          24
+        ]
+      },
+      "elapsed": 14.175,
+      "newRaw": "{\n  \"sum\": \"A family day out at a pony farm followed by indoor play and home activities.\",\n  \"img\": [\n    [0, 1, \"grp\", \"Group petting the pony\", \"g1\", \"k\"],\n    [1, 1, \"grp\", \"Group petting the pony\", \"g1\", \"c\"],\n    [2, 1, \"grp\", \"Children drawing at table\", \"g2\", \"k\"],\n    [3, 1, \"grp\", \"Children drawing at table\", \"g2\", \"c\"],\n    [4, 2, \"grp\", \"Close-up of children drawing\", \"g2\", \"k\"],\n    [5, 1, \"grp\", \"Children drawing at table\", \"g2\", \"c\"],\n    [6, 1, \"grp\", \"Overhead view of drawing\", \"g2\", \"c\"],\n    [7, 1, \"grp\", \"Looking at ponies over fence\", \"g3\", \"k\"],\n    [8, 1, \"grp\", \"Looking at ponies over fence\", \"g3\", \"c\"],\n    [9, 1, \"grp\", \"Looking at ponies over fence\", \"g3\", \"c\"],\n    [10, 2, \"grp\", \"Child standing on step to see\", \"g3\", \"k\"],\n    [11, 1, \"grp\", \"Petting pony over fence\", \"g3\", \"c\"],\n    [12, 1, \"grp\", \"Petting pony over fence\", \"g3\", \"c\"],\n    [13, 2, \"grp\", \"Family at pony enclosure\", \"g3\", \"k\"],\n    [14, 1, \"act\", \"Child sitting on old tractor\", \"g4\", \"k\"],\n    [15, 1, \"act\", \"Child sitting on old tractor\", \"g4\", \"c\"],\n    [16, 1, \"act\", \"Child sitting on old tractor\", \"g4\", \"c\"],\n    [17, 1, \"por\", \"Mother holding child\", \"g5\", \"k\"],\n    [18, 2, \"por\", \"Mother and child laughing\", \"g5\", \"k\"],\n    [19, 1, \"por\", \"Mother holding child\", \"g5\", \"c\"],\n    [20, 1, \"snap\", \"Child on tractor\", \"g4\", \"c\"],\n    [21, 1, \"snap\", \"Child playing in ball pit\", null, \"k\"],\n    [22, 1, \"snap\", \"Child running in play area\", \"g6\", \"k\"],\n    [23, 1, \"snap\", \"Child running in play area\", \"g6\", \"c\"],\n    [24, 1, \"act\", \"Child playing on stairs\", \"g7\", \"k\"],\n    [25, 1, \"act\", \"Child playing on stairs\", \"g7\", \"c\"],\n    [26, 1, \"snap\", \"Child doing a puzzle\", null, \"k\"],\n    [27, 1, \"snap\", \"Man giving thumbs up\", null, \"k\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"scene\",\n      \"all\": [0, 1],\n      \"keep\": [0],\n      \"why\": \"Best group composition.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"scene\",\n      \"all\": [4, 2, 3, 5, 6],\n      \"keep\": [4, 2],\n      \"why\": \"Captures the drawing activity well.\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"scene\",\n      \"all\": [10, 13, 7, 8, 9, 11, 12],\n      \"keep\": [10, 13],\n      \"why\": \"Shows the interaction with ponies.\"\n    },\n    {\n      \"id\": \"g4\",\n      \"type\": \"scene\",\n      \"all\": [14, 15, 16, 20],\n      \"keep\": [14],\n      \"why\": \"Best angle of child on tractor.\"\n    },\n    {\n      \"id\": \"g5\",\n      \"type\": \"scene\",\n      \"all\": [18, 17, 19],\n      \"keep\": [18, 17],\n      \"why\": \"Captures genuine laughter.\"\n    },\n    {\n      \"id\": \"g6\",\n      \"type\": \"scene\",\n      \"all\": [22, 23],\n      \"keep\": [22],\n      \"why\": \"Clear shot of child running.\"\n    },\n    {\n      \"id\": \"g7\",\n      \"type\": \"scene\",\n      \"all\": [24, 25],\n      \"keep\": [24],\n      \"why\": \"Best view of child on stairs.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2009-07-01-5c67f340b398",
+      "n": 21,
+      "oldKeepCount": 7,
+      "newKeepCount": 10,
+      "oldPicks": [
+        0,
+        4,
+        7,
+        14,
+        15,
+        17,
+        19
+      ],
+      "newPicks": [
+        0,
+        4,
+        5,
+        9,
+        11,
+        14,
+        15,
+        17,
+        18,
+        20
+      ],
+      "onlyOld": [
+        7,
+        19
+      ],
+      "onlyNew": [
+        5,
+        9,
+        11,
+        18,
+        20
+      ],
+      "oldSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          4
+        ],
+        "g3": [
+          7
+        ],
+        "g4": [
+          15
+        ],
+        "g5": [
+          19
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0,
+          4
+        ],
+        "g2": [
+          5,
+          9
+        ],
+        "g3": [
+          11
+        ],
+        "g4": [
+          15
+        ],
+        "g5": [
+          18,
+          20
+        ]
+      },
+      "elapsed": 6.507,
+      "newRaw": "{\n  \"sum\": \"A series of tandem skydive landing photos and portraits of the participants.\",\n  \"img\": [\n    [0, 2, \"act\", \"Tandem skydivers descending\", \"g1\", \"k\"],\n    [1, 1, \"act\", \"Skydivers approaching ground\", \"g1\", \"c\"],\n    [2, 1, \"act\", \"Skydivers in mid-air\", \"g1\", \"c\"],\n    [3, 1, \"act\", \"Skydivers descending over field\", \"g1\", \"c\"],\n    [4, 2, \"act\", \"Skydivers with red canopy\", \"g1\", \"k\"],\n    [5, 3, \"por\", \"Close-up of tandem pair\", \"g2\", \"k\"],\n    [6, 1, \"por\", \"Tandem pair with flag\", \"g2\", \"c\"],\n    [7, 2, \"por\", \"Tandem pair side profile\", \"g2\", \"c\"],\n    [8, 2, \"por\", \"Tandem pair descending\", \"g2\", \"c\"],\n    [9, 2, \"por\", \"Tandem pair looking ahead\", \"g2\", \"k\"],\n    [10, 1, \"act\", \"Tandem pair landing approach\", \"g3\", \"c\"],\n    [11, 2, \"act\", \"Tandem pair landing with instructor\", \"g3\", \"k\"],\n    [12, 1, \"act\", \"Tandem pair touching down\", \"g3\", \"c\"],\n    [13, 1, \"act\", \"Tandem pair on ground\", \"g3\", \"c\"],\n    [14, 0, \"pet\", \"Small dog in grass\", null, \"k\"],\n    [15, 1, \"act\", \"Skydiver landing in field\", \"g4\", \"k\"],\n    [16, 1, \"act\", \"Skydiver landing, side view\", \"g4\", \"c\"],\n    [17, 2, \"por\", \"Skydiver in gear, portrait\", null, \"k\"],\n    [18, 2, \"por\", \"Woman waving, smiling\", \"g5\", \"k\"],\n    [19, 1, \"por\", \"Woman waving, eyes closed\", \"g5\", \"c\"],\n    [20, 2, \"por\", \"Woman waving, happy expression\", \"g5\", \"k\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"burst\",\n      \"all\": [4, 0, 1, 2, 3],\n      \"keep\": [4, 0],\n      \"why\": \"Best views of the canopy and descent.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"burst\",\n      \"all\": [5, 7, 8, 9, 6],\n      \"keep\": [5, 9],\n      \"why\": \"Best facial expressions and clarity.\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"burst\",\n      \"all\": [11, 10, 12, 13],\n      \"keep\": [11],\n      \"why\": \"Best capture of the landing moment.\"\n    },\n    {\n      \"id\": \"g4\",\n      \"type\": \"burst\",\n      \"all\": [15, 16],\n      \"keep\": [15],\n      \"why\": \"Clearer shot of the landing.\"\n    },\n    {\n      \"id\": \"g5\",\n      \"type\": \"burst\",\n      \"all\": [20, 18, 19],\n      \"keep\": [20, 18],\n      \"why\": \"Good candid expressions while waving.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2025-08-09-28c645f09d0a",
+      "n": 27,
+      "oldKeepCount": 12,
+      "newKeepCount": 14,
+      "oldPicks": [
+        0,
+        2,
+        3,
+        5,
+        7,
+        10,
+        15,
+        17,
+        19,
+        20,
+        24,
+        26
+      ],
+      "newPicks": [
+        0,
+        2,
+        3,
+        4,
+        5,
+        7,
+        8,
+        10,
+        11,
+        15,
+        17,
+        20,
+        24,
+        26
+      ],
+      "onlyOld": [
+        19
+      ],
+      "onlyNew": [
+        4,
+        8,
+        11
+      ],
+      "oldSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          3
+        ],
+        "g3": [
+          10
+        ],
+        "g4": [
+          13
+        ],
+        "g5": [
+          15
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          5
+        ],
+        "g3": [
+          8,
+          10
+        ],
+        "g4": [
+          11
+        ]
+      },
+      "elapsed": 13.108,
+      "newRaw": "{\n  \"sum\": \"A collection of family moments, including a child with a cat, dinosaur fun, and home life.\",\n  \"img\": [\n    [0, 3, \"por\", \"Child hugging grey cat\", \"g1\", \"k\"],\n    [1, 2, \"por\", \"Child hugging grey cat\", \"g1\", \"c\"],\n    [2, 1, \"snap\", \"Children dancing at event\", null, \"k\"],\n    [3, 1, \"snap\", \"Dinosaur running on lawn\", null, \"k\"],\n    [4, 1, \"snap\", \"Dinosaur visiting through door\", null, \"k\"],\n    [5, 2, \"por\", \"Father holding baby\", \"g2\", \"k\"],\n    [6, 0, \"rec\", \"Empty baby swing\", null, \"c\"],\n    [7, 2, \"por\", \"Woman knitting on sofa\", null, \"k\"],\n    [8, 0, \"rec\", \"Toy basket and doll\", \"g3\", \"k\"],\n    [9, 0, \"rec\", \"Toys on rug with cat\", \"g3\", \"c\"],\n    [10, 1, \"pet\", \"Grey cat on rug\", \"g3\", \"k\"],\n    [11, 0, \"rec\", \"Cat sticker detail\", \"g4\", \"k\"],\n    [12, 0, \"rec\", \"Mermaid puzzle piece\", null, \"c\"],\n    [13, 0, \"rec\", \"Laptop with cat sticker\", \"g4\", \"c\"],\n    [14, 0, \"rec\", \"Round rug on floor\", null, \"c\"],\n    [15, 1, \"rec\", \"Child's drawing of cat\", null, \"k\"],\n    [16, 0, \"rec\", \"Bee bead craft\", null, \"c\"],\n    [17, 1, \"rec\", \"White plush cat toy\", null, \"k\"],\n    [18, 0, \"rec\", \"Pile of toys\", \"g3\", \"c\"],\n    [19, 2, \"por\", \"Father holding baby\", \"g2\", \"c\"],\n    [20, 2, \"por\", \"Woman smiling on sofa\", null, \"k\"],\n    [21, 0, \"rec\", \"Close-up of dress fabric\", null, \"c\"],\n    [22, 0, \"rec\", \"Close-up of plush toy\", null, \"c\"],\n    [23, 0, \"rec\", \"Kitchen counter detail\", null, \"c\"],\n    [24, 1, \"doc\", \"Zootopia pin on diploma\", null, \"k\"],\n    [25, 0, \"rec\", \"Two small stones\", null, \"c\"],\n    [26, 1, \"rec\", \"Three plush toys\", null, \"k\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"dup\",\n      \"all\": [0, 1],\n      \"keep\": [0],\n      \"why\": \"Better focus and expression.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"dup\",\n      \"all\": [5, 19],\n      \"keep\": [5],\n      \"why\": \"Clearer view of the moment.\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"scene\",\n      \"all\": [10, 8, 9, 18],\n      \"keep\": [10, 8],\n      \"why\": \"Cat and toy storage context.\"\n    },\n    {\n      \"id\": \"g4\",\n      \"type\": \"dup\",\n      \"all\": [11, 13],\n      \"keep\": [11],\n      \"why\": \"Clearer shot of the sticker.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2006-06-24-daebf09a2199",
+      "n": 1,
+      "oldKeepCount": 1,
+      "newKeepCount": 1,
+      "oldPicks": [
+        0
+      ],
+      "newPicks": [
+        0
+      ],
+      "onlyOld": [],
+      "onlyNew": [],
+      "oldSg": {},
+      "newSg": {},
+      "elapsed": 2.839,
+      "newRaw": "{\n  \"sum\": \"A man and a child exploring a large outdoor artillery piece.\",\n  \"img\": [\n    [0, 2, \"act\", \"Man and child on artillery\", null, \"k\"]\n  ],\n  \"sg\": []\n}"
+    },
+    {
+      "batchId": "2020-08-23-76a296ee37ad",
+      "n": 15,
+      "oldKeepCount": 7,
+      "newKeepCount": 8,
+      "oldPicks": [
+        0,
+        3,
+        4,
+        6,
+        7,
+        9,
+        12
+      ],
+      "newPicks": [
+        0,
+        3,
+        4,
+        6,
+        7,
+        8,
+        9,
+        12
+      ],
+      "onlyOld": [],
+      "onlyNew": [
+        8
+      ],
+      "oldSg": {
+        "g1": [
+          0,
+          3
+        ],
+        "g2": [
+          4,
+          6
+        ],
+        "g3": [
+          7
+        ],
+        "g4": [
+          9
+        ],
+        "g5": [
+          12
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0,
+          3
+        ],
+        "g2": [
+          4,
+          6
+        ],
+        "g3": [
+          7,
+          8
+        ],
+        "g4": [
+          9,
+          12
+        ]
+      },
+      "elapsed": 6.159,
+      "newRaw": "{\n  \"sum\": \"Family kayaking trip on a sunny river.\",\n  \"img\": [\n    [0, 1, \"act\", \"Kayaker on river, ducks\", \"g1\", \"k\"],\n    [1, 0, \"act\", \"Kayaker on river, distant\", \"g1\", \"c\"],\n    [2, 0, \"act\", \"Kayaker on river, further\", \"g1\", \"c\"],\n    [3, 1, \"act\", \"Kayaker on river, closer\", \"g1\", \"k\"],\n    [4, 1, \"act\", \"Kayaker passing greenhouse wall\", \"g2\", \"k\"],\n    [5, 0, \"act\", \"Kayaker passing greenhouse, wide\", \"g2\", \"c\"],\n    [6, 1, \"act\", \"Kayaker passing stone wall\", \"g2\", \"k\"],\n    [7, 3, \"grp\", \"Family in canoe, paddling\", \"g3\", \"k\"],\n    [8, 2, \"grp\", \"Family canoe and kayak\", \"g3\", \"k\"],\n    [9, 1, \"act\", \"Kayaker paddling, sun flare\", \"g4\", \"k\"],\n    [10, 0, \"act\", \"Kayaker paddling, sun flare\", \"g4\", \"c\"],\n    [11, 0, \"act\", \"Kayaker paddling, sun flare\", \"g4\", \"c\"],\n    [12, 1, \"act\", \"Kayaker paddling, back view\", \"g4\", \"k\"],\n    [13, 0, \"act\", \"Kayaker paddling, back view\", \"g4\", \"c\"],\n    [14, 0, \"act\", \"Kayaker paddling, back view\", \"g4\", \"c\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"burst\",\n      \"all\": [3, 0, 1, 2],\n      \"keep\": [3, 0],\n      \"why\": \"Best framing and clear view of kayaker.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"scene\",\n      \"all\": [6, 4, 5],\n      \"keep\": [6, 4],\n      \"why\": \"Good composition showing the greenhouse and wall.\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"scene\",\n      \"all\": [7, 8],\n      \"keep\": [7, 8],\n      \"why\": \"Distinct shots of the family in the canoe.\"\n    },\n    {\n      \"id\": \"g4\",\n      \"type\": \"burst\",\n      \"all\": [12, 9, 10, 11, 13, 14],\n      \"keep\": [12, 9],\n      \"why\": \"Best lighting and framing of the kayaker.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2013-10-06-23621b2848d0",
+      "n": 1,
+      "oldKeepCount": 1,
+      "newKeepCount": 1,
+      "oldPicks": [
+        0
+      ],
+      "newPicks": [
+        0
+      ],
+      "onlyOld": [],
+      "onlyNew": [],
+      "oldSg": {},
+      "newSg": {},
+      "elapsed": 2.151,
+      "newRaw": "{\n  \"sum\": \"A public event at Det Norske Teatret with a speaker and audience.\",\n  \"img\": [\n    [0, 2, \"evt\", \"Speaker addressing crowd at theater\", null, \"k\"]\n  ],\n  \"sg\": []\n}"
+    }
+  ]
+}

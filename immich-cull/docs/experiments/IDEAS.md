@@ -8,11 +8,12 @@ When you finish something, move it to a `## Completed` section at the bottom wit
 
 ## Near-term, high-signal
 
-### [ ] Fix the contradiction in the production prompt (`src/ranking/prompt.ts:89`)
-- **Motivation**: Line 89 of the production prompt says: *"Default to keeping only the single best per subgroup. Mark the rest 'c' in img."* This directly contradicts earlier guidance in the same prompt: *"Default to keeping 1-2 photos per subgroup. For subgroups of 5+, keep 2-3"* and *"When in doubt, keep — the user prefers having too many photos over losing a good one."*. LLMs weight the OUTPUT-section instruction more heavily because it's close to the response they're producing. That's almost certainly why the prod model keeps ~1.2/group on burst subgroups when the user wants ~2.0.
-- **Sketch**: Rewrite line 89 to match the earlier guidance: *"'keep' array: STRICT SUBSET of 'all' — must be SHORTER than 'all'. Default to keeping 2 per subgroup (1 if near-identical shutter-burst, 3+ for action sequences or when different faces are shown). Mark the rest 'c' in img."*
-- **Validate**: Re-rank ~5 existing batches (from state.db) with the new prompt and diff against current keeps. Check whether keep-count increases toward 2.0 without introducing new bad picks.
-- **Status**: Identified; not yet implemented. This is the single cheapest and highest-expected-impact change in this backlog.
+### [~] Fix the contradiction in the production prompt (`src/ranking/prompt.ts:89`) — PARTIAL
+- **Motivation**: Line 89 of the production prompt said: *"Default to keeping only the single best per subgroup. Mark the rest 'c' in img."* This contradicted earlier guidance ("keep 1-2", "when in doubt keep"). LLMs weight OUTPUT-section instructions heavily; this was almost certainly why prod kept ~1.2/subgroup when user wants ~2.0.
+- **Done**: Changed line 89 to *"Default to keeping 2 per subgroup (1 if near-identical shutter-burst, 3+ for action sequences or when the extra keeper shows a face or moment the first doesn't)."*
+- **Burst-discriminator experiment**: +10pp user-match for both qwen_terse and 31flashlite (77→93%, 83→93%) with keep count moving 1.0→2.0.
+- **Prod validation (8 random batches, 124 photos total)**: aggregate keep went 44.4%→46.8% (+5.5%), subgroup avg-keep moved from 1.3 to 1.3–1.5 range. **Smaller shift than the burst-discriminator experiment** because the prod prompt has many other instructions (line 51 "keep 1-2", line 47 "50-60% overall", etc.) competing for interpretation. Raw data: `data/experiments/2026-04-20-prod-prompt-validation.json`.
+- **Next step to complete this item**: Line 51 currently says *"Default to keeping 1-2 photos per subgroup."* Consider updating to *"Default to keeping 2 photos per subgroup."* to reinforce the new default. Re-run validation script and measure subgroup avg-keep shift.
 
 ### [ ] Prompt v2: "keep 2 by default, 1 only if near-identical"
 - **Motivation**: The graded-data analysis (2026-04-19) found that user keeps ~2.07 photos/group; all tested LLMs keep 1.0–1.2. Every keep-bias grade was "too few" or "right" — literally zero "too many". Prompt language "keep up to 2 if genuinely different" is parsed too conservatively.

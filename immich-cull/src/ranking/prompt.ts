@@ -48,8 +48,8 @@ Aim to keep roughly 50-60% on average. When in doubt, keep — the user prefers 
 A batch of 10 near-identical bursts might keep 2-3 (20-30%), a batch of diverse moments might keep 80%.
 
 Subgroups — balanced:
-- Default to keeping 1-2 photos per subgroup. For subgroups of 5+, keep 2-3.
-- Keep a second photo if it shows: a different expression, a different stage of the action, different framing, or captures a genuinely distinct moment.
+- Default to keeping 2 photos per subgroup (different enough expression, action stage, or framing to complement each other). Keep 1 only if photos are near-identical shutter-bursts. For subgroups of 5+, keep 2-3.
+- A second photo is justified if it shows: a different expression, a different stage of the action, different framing, a face/subject the first keeper misses, or captures a genuinely distinct moment.
 - Action sequences (running, playing, interacting): keep 2-3 frames showing different stages of the action.
 - Same-scene landscapes/environments: if the user took multiple shots, keep 2-3 variants unless they are truly identical.
 
