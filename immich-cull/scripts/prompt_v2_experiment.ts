@@ -35,10 +35,17 @@ function getArg(flag: string, def: string): string {
 }
 const server = getArg("--server", "http://localhost:3737").replace(/\/$/, "");
 const OLLAMA_URL = getArg("--ollama", "http://localhost:11434");
-const SOURCE_EXP = resolve(__dirname, "../data/experiments/2026-04-19-stageA.json");
+const SOURCE_EXP = resolve(
+  __dirname,
+  process.argv.includes("--only-gemma31b")
+    ? "../data/experiments/2026-04-19-stageB4.json"
+    : "../data/experiments/2026-04-19-stageA.json",
+);
 const OUT_PATH = resolve(
   __dirname,
-  "../data/experiments/2026-04-20-promptv2.json",
+  process.argv.includes("--only-gemma31b")
+    ? "../data/experiments/2026-04-20-promptv2-gemma31b.json"
+    : "../data/experiments/2026-04-20-promptv2.json",
 );
 
 // --- Prompt v2 ---
@@ -70,14 +77,18 @@ interface Variant {
   model: string;
 }
 
-const VARIANTS: Variant[] = [
-  { name: "qwen36_a3b_terse_v2", provider: "ollama", model: "qwen3.6:35b-a3b" },
-  {
-    name: "31flashlite_v2",
-    provider: "vertexai",
-    model: "gemini-3.1-flash-lite-preview",
-  },
-];
+const onlyGemma = process.argv.includes("--only-gemma31b");
+
+const VARIANTS: Variant[] = onlyGemma
+  ? [{ name: "gemma4_31b_v2", provider: "ollama", model: "gemma4:31b" }]
+  : [
+      { name: "qwen36_a3b_terse_v2", provider: "ollama", model: "qwen3.6:35b-a3b" },
+      {
+        name: "31flashlite_v2",
+        provider: "vertexai",
+        model: "gemini-3.1-flash-lite-preview",
+      },
+    ];
 
 async function fetchJson(url: string): Promise<any> {
   const resp = await fetch(url, { signal: AbortSignal.timeout(30_000) });
