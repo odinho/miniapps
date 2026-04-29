@@ -76,6 +76,7 @@ export function backtest(
   birthdate: string,
   options?: {
     lookbackDays?: number;
+    extendedLookbackDays?: number;
     predict?: NapPredictor;
     predictBedtime?: BedtimePredictor;
     predictWakeTime?: WakeTimePredictor;
@@ -85,6 +86,10 @@ export function backtest(
   },
 ): BacktestResult {
   const lookback = options?.lookbackDays ?? 7;
+  // Mirrors prod: server/state.ts feeds a 21-day window through buildContext as
+  // `extendedSleeps` so the cut-short censor's self-wake median has enough
+  // signal even when the 7-day window is sparse.
+  const extendedLookback = options?.extendedLookbackDays ?? 21;
   const predict = options?.predict ?? predictDayNaps;
   const bedtimePredict = options?.predictBedtime ?? recommendBedtime;
   const wakePredict = options?.predictWakeTime ?? predictNightEndTime;
@@ -97,10 +102,15 @@ export function backtest(
   for (let i = 0; i < days.length; i++) {
     const day = days[i];
 
-    // Collect recent sleeps from prior days (lookback window)
+    // Collect recent sleeps from prior days (lookback window). No leakage:
+    // each window slices [max(0, i - N), i) — strictly prior days.
     const recentSleeps: SleepEntry[] = [];
     for (let j = Math.max(0, i - lookback); j < i; j++) {
       recentSleeps.push(...days[j].sleeps.filter((s) => s.end_time));
+    }
+    const extendedSleeps: SleepEntry[] = [];
+    for (let j = Math.max(0, i - extendedLookback); j < i; j++) {
+      extendedSleeps.push(...days[j].sleeps.filter((s) => s.end_time));
     }
 
     // Need at least 1 prior day to have any learning signal
@@ -113,6 +123,7 @@ export function backtest(
       tz,
       customNapCount,
       recentSleeps,
+      extendedSleeps,
       features,
     };
 
