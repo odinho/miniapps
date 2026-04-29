@@ -195,12 +195,36 @@ function getNapDurationStats(
     return { sd: ageMonths < 6 ? 20 : 15 };
   }
 
-  const durations = recentSleeps
-    .filter((s) => s.type === "nap" && s.end_time)
+  // Compute self-wake median to drop obvious cut-shorts before measuring SD.
+  // A 41-min "door opened" wake doesn't reflect natural variability — it's
+  // noise that inflates the confidence band and makes the UI look more
+  // uncertain than the engine actually is.
+  const naps = recentSleeps.filter((s) => s.type === "nap" && s.end_time);
+  const selfDurs = naps
+    .filter((s) => s.woke_by === "self")
     .map((s) => (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60_000)
     .filter((d) => d >= 10 && d <= 180);
 
-  return { sd: durations.length >= 3 ? sd(durations) : ageMonths < 6 ? 20 : 15 };
+  let median: number | null = null;
+  if (selfDurs.length >= 3) {
+    const sorted = selfDurs.toSorted((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+
+  const durations = naps
+    .filter((s) => {
+      if (median === null || s.woke_by !== "woken") return true;
+      const dur = (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60_000;
+      return dur >= median;
+    })
+    .map((s) => (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60_000)
+    .filter((d) => d >= 10 && d <= 180);
+
+  if (durations.length < 3) return { sd: ageMonths < 6 ? 20 : 15 };
+  // Floor the SD so a perfectly consistent baby doesn't get an absurdly tight
+  // confidence interval (the model still has its own irreducible error).
+  return { sd: Math.max(MIN_SD_MINUTES, sd(durations)) };
 }
 
 // ─── Math ────────────────────────────────────────────────────────────────────
