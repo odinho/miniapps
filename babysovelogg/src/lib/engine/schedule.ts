@@ -513,6 +513,10 @@ function getPositionalNapDurations(ctx: BabyContext): number[] {
   if (ctx.recentSleeps.length < 4) return [];
 
   const cache = getCache(ctx);
+  // Cut-shorts pollute positional learning the same way they pollute the
+  // global learned mean — a parent-cut 41 min "1st nap" makes the planner
+  // schedule a 41 min nap into the future. Drop them here too.
+  const censored = new Set(censorCutShortNaps(cache.naps));
   const dursByPosition = new Map<number, number[]>();
 
   for (const [dayKey, daySleeps] of cache.byDay) {
@@ -520,6 +524,7 @@ function getPositionalNapDurations(ctx: BabyContext): number[] {
     let napIdx = 0;
     for (const s of daySleeps) {
       if (s.type !== "nap") continue;
+      if (!censored.has(s)) { napIdx++; continue; }
       const dur = (s.endMs - s.startMs) / 60_000;
       if (dur >= 10 && dur <= 180) {
         if (!dursByPosition.has(napIdx)) dursByPosition.set(napIdx, []);
@@ -964,7 +969,11 @@ function clamp(value: number, min: number, max: number): number {
  */
 export function estimateSleepCycleFromData(ctx: BabyContext): number {
   const cache = getCache(ctx);
-  const naps = cache.naps.filter((s) => cache.daysWithNight.has(s.localDate));
+  // Same censoring story as duration learning: a 41 min cut-short isn't a
+  // cycle-boundary signal, it's a door opening. Drop those before fitting.
+  const naps = censorCutShortNaps(
+    cache.naps.filter((s) => cache.daysWithNight.has(s.localDate)),
+  );
   if (naps.length < 5) return getSleepCycleMinutes(ctx.ageMonths);
 
   const durations = naps

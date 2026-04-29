@@ -173,7 +173,9 @@ describe('buildSleepInfoRows', () => {
 		expect(rows[0].value).toContain('14t');
 		expect(rows[3].value).toContain('10t');
 		expect(rows[2].value).toContain('2 ×');
-		expect(rows[1].value).toContain('12.5t');
+		// Nap norm comes from SHINE 9mo daytime (~133 min) / 2 = ~67 min/nap.
+		// Night fills the remaining ~11.8h.
+		expect(rows[1].value).toContain('11.8t');
 	});
 
 	it('24h budget adds up for 1-month-old', () => {

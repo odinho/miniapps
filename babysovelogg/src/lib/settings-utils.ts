@@ -5,6 +5,7 @@ import {
 	SLEEP_NEEDS,
 	findByAge,
 	getExpectedNapCount,
+	shineDaytimeSleepMinutes,
 	type PredictedNap,
 } from './engine/schedule.js';
 import type { SleepEntry } from './types.js';
@@ -145,7 +146,7 @@ export function buildSleepInfoRows(ageMonths: number): SleepInfoRow[] {
 	const napCount = naps.naps;
 	const totalSleepH = sleepNeed.totalHours;
 	const totalAwakeH = 24 - totalSleepH;
-	const napDurMin = ageMonths < 6 ? 60 : ageMonths < 12 ? 45 : 30;
+	const napDurMin = Math.max(20, Math.round(shineDaytimeSleepMinutes(ageMonths) / Math.max(1, napCount)));
 	const totalNapH = Math.round(napCount * napDurMin / 60 * 10) / 10;
 	const nightH = Math.round((totalSleepH - totalNapH) * 10) / 10;
 	const numWindows = napCount + 1;
@@ -176,8 +177,9 @@ export function buildNormBudget(ageMonths: number, napCount: number): NormBudget
 	const ww = findByAge(WAKE_WINDOWS, ageMonths);
 	const norms = findByAge(NAP_COUNTS, ageMonths);
 
-	const baseNapDurMin = ageMonths < 6 ? 60 : ageMonths < 12 ? 45 : 30;
-	const napDurMin = Math.round(baseNapDurMin * norms.naps / napCount);
+	// Use SHINE total daytime sleep / actual nap count, so the norms displayed
+	// to the user agree with the engine's prior for the same age + napCount.
+	const napDurMin = Math.max(20, Math.round(shineDaytimeSleepMinutes(ageMonths) / Math.max(1, napCount)));
 
 	// Wake windows scale with nap count: fewer naps → wider windows
 	const wwScale = (norms.naps + 1) / (napCount + 1);
