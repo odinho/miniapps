@@ -389,6 +389,35 @@ describe("extended-window self-median", () => {
     expect(withExtLearned).toBeGreaterThanOrEqual(100);
   });
 
+  it("censors via the transition-filtered positional branch too", () => {
+    // Mid-transition: 5 recent 1-nap days + 16 older 2-nap days. The positional
+    // engine routes through `getPositionalDataForNapCount` here because nap
+    // counts are mixed. That branch used to bypass `censorCutShortNaps` — make
+    // sure a cut-short on a current-regime day does NOT pull positional[0] down.
+    const matchingDays1Nap: NapSpec[] = [
+      { d: 23, h: 7, dur: 110, wokeBy: "self" },
+      { d: 24, h: 7, dur: 120, wokeBy: "self" },
+      { d: 25, h: 7, dur: 100, wokeBy: "self" },
+      { d: 26, h: 7, dur: 115, wokeBy: "self" },
+      { d: 28, h: 7, dur:  41, wokeBy: "woken" }, // cut short — should not fall through
+    ];
+    const old2NapDays: NapSpec[] = [...Array(16)].flatMap((_, i) => [
+      { d: 1 + i, h:  9, dur: 55, wokeBy: "self" as const },
+      { d: 1 + i, h: 14, dur: 50, wokeBy: "self" as const },
+    ]);
+
+    const ctxWithExt = scenario({ ageMonths: 10, naps: matchingDays1Nap });
+    ctxWithExt.extendedSleeps = scenario({ ageMonths: 10, naps: [...old2NapDays, ...matchingDays1Nap] }).recentSleeps;
+
+    const naps = predictDayNaps(ts(29, 6, 0), ctxWithExt);
+    expect(naps.length).toBe(1);
+    const napMin = (new Date(naps[0].endTime).getTime() - new Date(naps[0].startTime).getTime()) / 60_000;
+    // If the cut-short leaked through, the prediction would collapse below 80.
+    // With censoring applied, the planner should keep it close to the natural
+    // distribution (~100-115 min).
+    expect(napMin).toBeGreaterThan(95);
+  });
+
   it("falls back to the per-call median when extendedSleeps is undefined", () => {
     // Pin: the new optional field can't change behavior for callers that
     // don't populate it (the entire backtest harness today, plus older

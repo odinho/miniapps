@@ -460,6 +460,14 @@ function getPositionalDataForNapCount(
   const gapsByPos = new Map<number, number[]>();
   const dursByPos = new Map<number, number[]>();
 
+  // Build the censored set up front (same rule as getPositionalNapDurations)
+  // so this transition-filtered branch doesn't silently learn from cut-shorts.
+  const matchingNaps = cache.naps.filter((s) =>
+    cache.daysWithNight.has(s.localDate)
+    && cache.napCountByDay.get(s.localDate) === targetNapCount,
+  );
+  const censoredMatching = new Set(censorCutShortNaps(matchingNaps, getExtendedSelfMedianMin(ctx)));
+
   for (const dayKey of matchingDayKeys) {
     const daySleeps = cache.byDay.get(dayKey)!;
 
@@ -474,9 +482,11 @@ function getPositionalDataForNapCount(
       napPos++;
     }
 
-    // Collect durations
+    // Collect durations (skipping censored cut-shorts; position index is
+    // preserved across drops to keep 1st-vs-2nd alignment).
     const dayNaps = daySleeps.filter((s) => s.type === "nap");
     for (let i = 0; i < dayNaps.length; i++) {
+      if (!censoredMatching.has(dayNaps[i])) continue;
       const dur = (dayNaps[i].endMs - dayNaps[i].startMs) / 60_000;
       if (dur >= 10 && dur <= 180) {
         if (!dursByPos.has(i)) dursByPos.set(i, []);
