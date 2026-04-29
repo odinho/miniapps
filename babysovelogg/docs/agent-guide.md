@@ -36,7 +36,7 @@ Read first if the task touches events, projections, API shape, optimistic sync, 
 - [`src/lib/notifications.ts`](../src/lib/notifications.ts) — client subscribe/unsubscribe, trigger labels
 - [`src/service-worker/index.ts`](../src/service-worker/index.ts) — push event handler
 - [`src/hooks.server.ts`](../src/hooks.server.ts) — starts notification loop on boot
-- See [`docs/notifications-plan.md`](notifications-plan.md) for architecture and trigger details
+- See [`docs/archive/notifications-implementation.md`](archive/notifications-implementation.md) for architecture and trigger details
 
 ### Client state and sync
 
@@ -86,11 +86,12 @@ Check:
 
 Check:
 
-1. [`src/lib/engine/schedule.ts`](../src/lib/engine/schedule.ts)
-2. [`src/lib/engine/constants.ts`](../src/lib/engine/constants.ts)
+1. [`src/lib/engine/schedule.ts`](../src/lib/engine/schedule.ts) — start with the function that owns the behavior (`predictNapEndTime`, `getLearnedNapDuration`, `predictDayNaps`, etc.)
+2. [`src/lib/engine/constants.ts`](../src/lib/engine/constants.ts) and [`src/lib/data/`](../src/lib/data/) — age priors are SHINE 2021 / Galland 2012 derived; if you find yourself adding hardcoded age ladders, check these first
 3. fixtures in [`tests/fixtures/`](../tests/fixtures/)
-4. unit tests in [`tests/unit/`](../tests/unit/)
-5. integration or E2E coverage if user-visible behavior changes
+4. unit tests in [`tests/unit/`](../tests/unit/) — `learned-duration-scenarios.unit.ts` is the table-style behavior log; `schedule.unit.ts` and `duration-prediction.unit.ts` cover the rest
+5. when learned-data semantics change, also check `getPositionalNapDurations`, `estimateSleepCycleFromData`, and `confidence.ts` — anything that consumes nap durations should respect the same data-quality filters (e.g. `censorCutShortNaps`)
+6. integration or E2E coverage if user-visible behavior changes
 
 ### API endpoint change
 
