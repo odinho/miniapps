@@ -70,6 +70,13 @@ export interface SleepEntry {
   end_time: string | null;
   type: "nap" | "night";
   pauses?: SleepPause[];
+  /**
+   * How the sleep ended, if recorded. "self" = baby woke naturally,
+   * "woken" = parent ended the sleep. The engine uses this to right-censor
+   * short parent-ended naps — they're a lower bound on natural duration,
+   * not a sample of it. Optional: not all rows have this populated.
+   */
+  woke_by?: "self" | "woken" | null;
 }
 
 export interface SleepPause {

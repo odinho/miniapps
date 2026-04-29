@@ -23,6 +23,11 @@ function sleep(start: string, end: string, type: "nap" | "night" = "nap"): Sleep
   return { start_time: start, end_time: end, type };
 }
 
+/** Like `sleep`, but with a wake reason recorded. */
+function napWith(start: string, end: string, wokeBy: "self" | "woken"): SleepEntry {
+  return { start_time: start, end_time: end, type: "nap", woke_by: wokeBy };
+}
+
 /** Make an ISO timestamp for a given hour:minute on 2026-03-26 (UTC). */
 function t(hour: number, min = 0): string {
   return `2026-03-26T${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}:00.000Z`;
@@ -396,5 +401,92 @@ describe("getLearnedNapDuration: nap-count-aware default", () => {
 
     const learned = getLearnedNapDuration(halldisCtx);
     expect(learned).toBeGreaterThan(95);
+  });
+});
+
+// ─── right-censoring of cut-short woken naps ────────────────────────────────
+//
+// "woke_by='woken'" means the parent ended the sleep, not the baby. If the
+// nap was clearly cut short (below the baby's own self-wake median) the
+// observation is a *lower bound* on natural duration, not a sample of it —
+// treating it as a sample shrinks the learned mean. We drop those, but keep
+// long parent-ended naps because they were probably done anyway.
+
+describe("getLearnedNapDuration: right-censors cut-short parent-ended naps", () => {
+  /** 7 days of one-nap-per-day with given (duration, woke_by) for each day. */
+  function napCtx(rows: Array<{ dur: number; wokeBy: "self" | "woken" }>): BabyContext {
+    const sleeps: SleepEntry[] = [];
+    rows.forEach((r, i) => {
+      const d = 19 + i;
+      const startH = 8;
+      const endH = startH + Math.floor(r.dur / 60);
+      const endM = r.dur % 60;
+      sleeps.push(napWith(day(d, startH, 0), day(d, endH, endM), r.wokeBy));
+      sleeps.push(sleep(day(d, 19, 0), day(d + 1, 6, 0), "night"));
+    });
+    const c = ctx(10, sleeps);
+    c.customNapCount = 1;
+    return c;
+  }
+
+  it("drops short cut-short naps and lifts the learned duration", () => {
+    // Halldis-shaped: 4 self-wakes around 100-125 min, mixed with two
+    // obvious cut-shorts at 41 and 48 min (both < the self-wake median).
+    const censored = napCtx([
+      { dur: 125, wokeBy: "self" },
+      { dur: 110, wokeBy: "self" },
+      { dur: 41,  wokeBy: "woken" },  // cut short
+      { dur: 100, wokeBy: "self" },
+      { dur: 48,  wokeBy: "woken" },  // cut short
+      { dur: 99,  wokeBy: "self" },
+      { dur: 104, wokeBy: "woken" },  // long, kept
+    ]);
+    // Same data with woke_by stripped — the cut-shorts contaminate the mean.
+    const uncensored = napCtx([
+      { dur: 125, wokeBy: "self" },
+      { dur: 110, wokeBy: "self" },
+      { dur: 41,  wokeBy: "self" },
+      { dur: 100, wokeBy: "self" },
+      { dur: 48,  wokeBy: "self" },
+      { dur: 99,  wokeBy: "self" },
+      { dur: 104, wokeBy: "self" },
+    ]);
+
+    expect(getLearnedNapDuration(censored)).toBeGreaterThan(getLearnedNapDuration(uncensored));
+  });
+
+  it("keeps long parent-ended naps (≥ self-median)", () => {
+    // 5 self-wakes around 100, plus one 120-min "woken" nap.
+    // Self-median = 100. The 120-min woken nap should be kept, so the
+    // learned average should exceed 100 (the self-only mean).
+    const withLongWoken = napCtx([
+      { dur: 100, wokeBy: "self" },
+      { dur:  98, wokeBy: "self" },
+      { dur: 102, wokeBy: "self" },
+      { dur: 100, wokeBy: "self" },
+      { dur: 100, wokeBy: "self" },
+      { dur: 120, wokeBy: "woken" },  // long, should NOT be censored
+    ]);
+
+    expect(getLearnedNapDuration(withLongWoken)).toBeGreaterThan(102);
+  });
+
+  it("does not filter when there are too few self-wakes for a stable median", () => {
+    // Only 2 self-wakes — fewer than the 3 needed for a stable median. The
+    // censor should bow out and behave identically to having no woke_by data.
+    const withFlag = napCtx([
+      { dur: 110, wokeBy: "self" },
+      { dur:  90, wokeBy: "self" },
+      { dur:  40, wokeBy: "woken" },  // would be censored if median were stable
+      { dur:  50, wokeBy: "woken" },
+    ]);
+    // Same data but with no woke_by attached — wraps everything as plain
+    // sleep entries so the engine has no flag to act on.
+    const stripped = ctx(10, withFlag.recentSleeps.map((s) => ({
+      start_time: s.start_time, end_time: s.end_time, type: s.type,
+    })));
+    stripped.customNapCount = 1;
+
+    expect(getLearnedNapDuration(withFlag)).toBe(getLearnedNapDuration(stripped));
   });
 });

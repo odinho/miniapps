@@ -131,10 +131,10 @@ async function loadFromDb(dbPath: string, tz: string): Promise<DayRecord[]> {
   const db = new Database(dbPath, { readonly: true });
 
   const sleeps = db.prepare(`
-    SELECT start_time, end_time, type
+    SELECT start_time, end_time, type, woke_by
     FROM sleep_log WHERE deleted = 0
     ORDER BY start_time
-  `).all() as { start_time: string; end_time: string | null; type: string }[];
+  `).all() as { start_time: string; end_time: string | null; type: string; woke_by: string | null }[];
 
   const dayStarts = db.prepare(`
     SELECT date, wake_time FROM day_start ORDER BY date
@@ -173,6 +173,7 @@ async function loadFromDb(dbPath: string, tz: string): Promise<DayRecord[]> {
           start_time: s.start_time,
           end_time: s.end_time!,
           type: s.type as "nap" | "night",
+          woke_by: s.woke_by === "self" || s.woke_by === "woken" ? s.woke_by : null,
         })),
     });
   }

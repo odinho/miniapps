@@ -25,6 +25,8 @@ interface CachedSleep {
   endMs: number;
   type: "nap" | "night";
   localDate: string;
+  /** Captured wake reason (or null). Drives right-censoring of cut-short naps. */
+  wokeBy: "self" | "woken" | null;
 }
 
 interface SleepCache {
@@ -56,6 +58,7 @@ function buildCache(ctx: BabyContext): SleepCache {
       endMs: new Date(s.end_time).getTime(),
       type: s.type,
       localDate: localDate(s.start_time, ctx.tz),
+      wokeBy: s.woke_by ?? null,
     });
   }
 
@@ -684,6 +687,36 @@ function defaultNapDurationPrior(ctx: BabyContext): number {
   return clamp(Math.round(totalDaytime / napCount), 20, 180);
 }
 
+/**
+ * Drop parent-ended naps that look obviously cut short — i.e. shorter than the
+ * baby's own self-wake median. The truth they reveal is "natural duration ≥
+ * observed", not a sample of natural duration; treating them as samples shrinks
+ * the learned mean. Long parent-ended naps (≥ self-median) are kept: they're
+ * naps the baby was probably done with anyway.
+ *
+ * If there are too few self-wake samples to compute a stable median (< 3), we
+ * skip filtering — using noisy real data beats falling back to the prior with
+ * no samples at all.
+ */
+function censorCutShortNaps(naps: CachedSleep[]): CachedSleep[] {
+  const selfDurs = naps
+    .filter((s) => s.wokeBy === "self")
+    .map((s) => (s.endMs - s.startMs) / 60_000);
+  if (selfDurs.length < 3) return naps;
+
+  const sorted = selfDurs.toSorted((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const selfMedian = sorted.length % 2
+    ? sorted[mid]
+    : (sorted[mid - 1] + sorted[mid]) / 2;
+
+  return naps.filter((s) => {
+    if (s.wokeBy !== "woken") return true;
+    const dur = (s.endMs - s.startMs) / 60_000;
+    return dur >= selfMedian;
+  });
+}
+
 /** Learn average nap duration from recent completed naps, fallback to age-based defaults. */
 export function getLearnedNapDuration(ctx: BabyContext): number {
   const defaultDuration = defaultNapDurationPrior(ctx);
@@ -693,18 +726,20 @@ export function getLearnedNapDuration(ctx: BabyContext): number {
 
   // Only learn from naps on complete days (have a night entry).
   // Naps from incomplete days may include misclassified overnight fragments.
+  // Then drop obvious cut-shorts (parent-ended below self-wake median).
   const completeNaps = cache.naps.filter((s) => cache.daysWithNight.has(s.localDate));
+  const learnable = censorCutShortNaps(completeNaps);
 
   if (feat(ctx, "weightedRecency")) {
-    const samples = collectWeightedDurationsFromCache(completeNaps, 10, 180);
+    const samples = collectWeightedDurationsFromCache(learnable, 10, 180);
     if (samples.length < 3) return defaultDuration;
     const learned = weightedTrimmedMean(samples);
     return Math.round(blendEstimate(defaultDuration, learned, samples.length, 3, 8));
   }
 
   // Simple average fallback
-  if (completeNaps.length < 3) return defaultDuration;
-  const durations = completeNaps
+  if (learnable.length < 3) return defaultDuration;
+  const durations = learnable
     .map((s) => (s.endMs - s.startMs) / 60000)
     .filter((d) => d >= 10 && d <= 180);
   if (durations.length < 3) return defaultDuration;

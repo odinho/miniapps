@@ -43,7 +43,13 @@ export interface DayData {
 }
 
 function toSleepEntry(s: SleepLogRow): SleepEntry {
-  return { start_time: s.start_time, end_time: s.end_time, type: s.type as SleepEntry["type"] };
+  const wokeBy = s.woke_by === "self" || s.woke_by === "woken" ? s.woke_by : null;
+  return {
+    start_time: s.start_time,
+    end_time: s.end_time,
+    type: s.type as SleepEntry["type"],
+    woke_by: wokeBy,
+  };
 }
 
 /** Build a BabyContext from a Baby record and recent sleep data. */
