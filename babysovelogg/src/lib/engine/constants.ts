@@ -74,6 +74,10 @@ export function findByAge<T extends { minMonths: number; maxMonths: number }>(
   ranges: T[],
   ageMonths: number,
 ): T {
+  // Negative ageMonths can leak in from direct callers (tests, scripts) that
+  // skip `calculateAgeMonths`'s clamp. Treat them as the youngest bracket
+  // rather than falling through to the oldest one.
+  if (ageMonths < ranges[0].minMonths) return ranges[0];
   const match = ranges.find((r) => ageMonths >= r.minMonths && ageMonths < r.maxMonths);
   // Fallback to last range if older than defined
   return match ?? ranges[ranges.length - 1];

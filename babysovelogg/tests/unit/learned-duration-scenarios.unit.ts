@@ -17,6 +17,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   getLearnedNapDuration,
+  predictDayNaps,
   predictNapEndTime,
 } from "$lib/engine/schedule.js";
 import type { SleepEntry, BabyContext } from "$lib/types.js";
@@ -229,5 +230,103 @@ describe("learned nap duration: scenario table", () => {
     });
 
     expect(getLearnedNapDuration(labelled)).toBeGreaterThan(getLearnedNapDuration(unlabelled));
+  });
+});
+
+// ─── predictDayNaps with cut-shorts: positional path ───────────────────────
+//
+// Even after fix B, the day-ahead planner reads `getPositionalNapDurations`
+// for the 1st-vs-2nd nap split. If that path doesn't censor cut-shorts, the
+// home screen could show "active nap ends ~11:18" (correct) while still
+// planning a 41-min "1st nap" tomorrow from the same polluted data. The fix
+// applies censoring to both paths; this test pins the expected day-ahead
+// behavior so it can't silently regress.
+
+describe("predictDayNaps respects censoring", () => {
+  it("plans a sensible 1st nap for the Halldis-shaped 1-nap baby", () => {
+    // 5 self-wakes (so the censor engages) + 3 cut-shorts. With censoring,
+    // the planner sees only the long naps and predicts a long 1st nap.
+    const ctx = scenario({
+      ageMonths: 10, customNapCount: 1,
+      naps: [
+        { d: 19, h: 7, dur: 110, wokeBy: "self" },
+        { d: 20, h: 7, dur: 120, wokeBy: "self" },
+        { d: 21, h: 7, dur: 100, wokeBy: "self" },
+        { d: 23, h: 7, dur: 125, wokeBy: "self" },
+        { d: 24, h: 8, dur:  41, wokeBy: "woken" },
+        { d: 25, h: 8, dur: 120, wokeBy: "woken" },
+        { d: 26, h: 8, dur:  48, wokeBy: "woken" },
+        { d: 27, h: 7, dur:  99, wokeBy: "self" },
+        { d: 28, h: 7, dur: 104, wokeBy: "woken" },
+      ],
+    });
+
+    const naps = predictDayNaps(ts(29, 6, 0), ctx);
+    expect(naps.length).toBe(1);
+    const napMin = (new Date(naps[0].endTime).getTime() - new Date(naps[0].startTime).getTime()) / 60_000;
+    expect(napMin).toBeGreaterThan(90);
+  });
+});
+
+// ─── edge-age safety ───────────────────────────────────────────────────────
+//
+// Direct callers (tests, scripts, future ports) can pass odd ageMonths
+// values. The engine's normal app path goes through `calculateAgeMonths`
+// which clamps to ≥ 0, but `getLearnedNapDuration` is also exposed as a
+// pure function. Pin that the prior stays in a sane range across edges.
+
+describe("getLearnedNapDuration: edge ages", () => {
+  it("ageMonths = 0 returns the newborn-shape prior", () => {
+    const c = scenario({ ageMonths: 0, naps: [] });
+    const learned = getLearnedNapDuration(c);
+    expect(learned).toBeGreaterThanOrEqual(20);
+    expect(learned).toBeLessThanOrEqual(180);
+  });
+
+  it("negative ageMonths is treated as the youngest bracket, not the oldest", () => {
+    // Without findByAge clamping, ageMonths=-1 fell through to the 18-24mo
+    // bracket and produced a 1-nap × 212 min ≈ 180 min prior — wildly wrong
+    // for a not-yet-born baby. Should now resolve to the high-nap-count,
+    // young-baby prior.
+    const negCtx = scenario({ ageMonths: -1, naps: [] });
+    const newborn = scenario({ ageMonths: 0, naps: [] });
+
+    expect(getLearnedNapDuration(negCtx)).toBe(getLearnedNapDuration(newborn));
+  });
+
+  it("very old ageMonths clamps to the oldest documented bracket", () => {
+    const c = scenario({ ageMonths: 60, naps: [] });
+    expect(getLearnedNapDuration(c)).toBeGreaterThanOrEqual(20);
+    expect(getLearnedNapDuration(c)).toBeLessThanOrEqual(180);
+  });
+});
+
+// ─── blend curve invariants ─────────────────────────────────────────────────
+//
+// `blendEstimate(default, learned, n, 3, 8)` shifts dramatically with sample
+// count: 0 → fully prior, 3 → 1/6 learned, 6 → 4/6 learned, 8+ → fully
+// learned. These shifts matter because they govern how fast the engine
+// trusts a baby's actual data over the population prior. Pin the shape.
+
+describe("getLearnedNapDuration: blend curve", () => {
+  // 1-nap 10mo baby: SHINE prior ~131 min, observed naps 90 min.
+  // We expect the learned value to slide from prior toward 90 as n grows.
+  function withNSelfNaps(n: number): BabyContext {
+    return scenario({
+      ageMonths: 10, customNapCount: 1,
+      naps: [...Array(n)].map((_, i) => ({ d: 19 + i, h: 9, dur: 90, wokeBy: "self" as const })),
+    });
+  }
+
+  it("with 0 samples it's the SHINE prior, with 8+ samples it's the data", () => {
+    const zero  = getLearnedNapDuration(withNSelfNaps(0));
+    const three = getLearnedNapDuration(withNSelfNaps(3));
+    const eight = getLearnedNapDuration(withNSelfNaps(8));
+
+    expect(zero).toBeGreaterThan(120);
+    expect(eight).toBeLessThanOrEqual(95);
+    // 3 samples should be between zero (prior) and eight (data), strictly.
+    expect(three).toBeLessThan(zero);
+    expect(three).toBeGreaterThan(eight);
   });
 });
