@@ -73,7 +73,7 @@ const ablations = featureNames.map(({ key, label }) => ({
 
 describe("feature ablation", () => {
   it("all features enabled (baseline)", () => {
-    expect(renderSummary(allOn, "all-on")).toMatchInlineSnapshot(`"all-on: 86 days, count 83% (71/86), nap MAE 44.2, dur MAE 23.1, bed MAE 22.6, wake MAE 25.6, nap bias -3.3, count bias +0.08"`);
+    expect(renderSummary(allOn, "all-on")).toMatchInlineSnapshot(`"all-on: 86 days, count 83% (71/86), nap MAE 44.3, dur MAE 23.5, bed MAE 22.6, wake MAE 26.1, nap bias -3.2, count bias +0.08"`);
   });
 
   it("per-feature contribution", () => {
@@ -81,7 +81,7 @@ describe("feature ablation", () => {
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "positional nap duration:
         nap MAE 0 (neutral)
-        dur MAE +0.6 (helps)
+        dur MAE +0.7 (helps)
         bed MAE 0 (neutral)
         wake MAE 0 (neutral)
       habitual wake anchor:
@@ -103,12 +103,12 @@ describe("feature ablation", () => {
         nap MAE 0 (neutral)
         dur MAE 0 (neutral)
         bed MAE 0 (neutral)
-        wake MAE 0 (neutral)
+        wake MAE -0.1 (hurts)
       sleep budget:
         nap MAE 0 (neutral)
         dur MAE 0 (neutral)
         bed MAE 0 (neutral)
-        wake MAE -0.6 (hurts)
+        wake MAE -0.4 (hurts)
       weighted recency:
         nap MAE 0 (neutral)
         dur MAE 0 (neutral)

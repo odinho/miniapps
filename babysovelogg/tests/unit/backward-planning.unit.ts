@@ -34,7 +34,7 @@ describe("planBackwardFromBedtime", () => {
     const naps = planBackwardFromBedtime(WAKE, "2026-03-30T19:00:00Z", ctx({ ageMonths: 14, customNapCount: 1 }));
 
     expect(naps.length).toBe(1);
-    expect(renderNaps(naps)).toMatchInlineSnapshot(`"13:36–14:06"`);
+    expect(renderNaps(naps)).toMatchInlineSnapshot(`"12:01–14:06"`);
   });
 
   it("backward plan differs from forward plan", () => {

@@ -9,6 +9,7 @@ import {
   recommendBedtime,
   detectNapTransition,
   findByAge,
+  shineDaytimeSleepMinutes,
   WAKE_WINDOWS,
   NAP_COUNTS,
   SLEEP_NEEDS,
@@ -271,5 +272,129 @@ describe("incomplete days (missing night) excluded from learning", () => {
     const predsWithout = predictDayNaps(day(27, 7, 0), withoutIncomplete);
 
     expect(renderNaps(predsWith)).toBe(renderNaps(predsWithout));
+  });
+});
+
+// ─── shineDaytimeSleepMinutes ───────────────────────────────────────────────
+//
+// Direct sanity checks on the SHINE interpolation. The age bands come from
+// SHINE 2021 actigraphy medians (1, 6, 12, 24 months); ages between bands are
+// linearly interpolated. We pin the band points exactly and confirm that
+// in-between ages land on the segment.
+
+describe("shineDaytimeSleepMinutes", () => {
+  it("hits SHINE band medians exactly", () => {
+    expect(shineDaytimeSleepMinutes(1)).toBeCloseTo(212.3);
+    expect(shineDaytimeSleepMinutes(6)).toBeCloseTo(140.5);
+    expect(shineDaytimeSleepMinutes(12)).toBeCloseTo(125.5);
+    expect(shineDaytimeSleepMinutes(24)).toBeCloseTo(120.3);
+  });
+
+  it("interpolates linearly between bands", () => {
+    expect(shineDaytimeSleepMinutes(9)).toBeCloseTo(133);   // halfway 6mo → 12mo
+    expect(shineDaytimeSleepMinutes(10)).toBeCloseTo(130.5); // 2/3 of the way
+  });
+
+  it("clamps below 1mo and above 24mo to nearest band", () => {
+    expect(shineDaytimeSleepMinutes(0)).toBeCloseTo(212.3);
+    expect(shineDaytimeSleepMinutes(36)).toBeCloseTo(120.3);
+  });
+});
+
+// ─── nap-count-aware default duration ───────────────────────────────────────
+//
+// The 1-nap-vs-2-nap distinction is the real bug-driver: a 10mo on a single
+// long midday nap should not share a duration prior with a 7mo doing two
+// shorter naps. Both helpers below build a 7-day fixture matching the napping
+// schedule and verify that getLearnedNapDuration responds to it. We do NOT
+// pin the exact prior — that depends on cycle snapping — only the relative
+// ordering and the floor/ceiling that protect against earlier regressions.
+
+/** 7 days × `napsPerDay`, each ~`napMinutes` long, plus a night entry per day. */
+function buildRoutineFixture(napsPerDay: number, napMinutes: number): SleepEntry[] {
+  const sleeps: SleepEntry[] = [];
+  for (let d = 19; d <= 25; d++) {
+    let napStartHour = 8;
+    for (let n = 0; n < napsPerDay; n++) {
+      const startMin = napMinutes;
+      sleeps.push(sleep(day(d, napStartHour, 0), day(d, napStartHour + Math.floor(startMin / 60), startMin % 60)));
+      napStartHour += 4;
+    }
+    sleeps.push(sleep(day(d, 19, 0), day(d + 1, 6, 0), "night"));
+  }
+  return sleeps;
+}
+
+describe("getLearnedNapDuration: nap-count-aware default", () => {
+  it("1-nap baby gets a longer prior than 2-nap baby of the same age", () => {
+    const oneNap = ctx(10, []);
+    oneNap.customNapCount = 1;
+    const twoNap = ctx(10, []);
+    twoNap.customNapCount = 2;
+
+    expect(getLearnedNapDuration(oneNap)).toBeGreaterThan(getLearnedNapDuration(twoNap));
+  });
+
+  it("a 10mo with no recent data gets a sensible 1-nap prior (≥100 min)", () => {
+    // Pre-fix: the hardcoded fallback returned 45 regardless of nap count, which
+    // collapsed predictions for transitioned 1-nap babies. SHINE 10mo daytime
+    // sleep is ~131 min; per-nap with napCount=1 should be in that ballpark.
+    const learnedNapCount1 = ctx(10, []);
+    learnedNapCount1.customNapCount = 1;
+
+    expect(getLearnedNapDuration(learnedNapCount1)).toBeGreaterThanOrEqual(100);
+  });
+
+  it("respects customNapCount when there's no learned data", () => {
+    const c2 = ctx(10, []);
+    c2.customNapCount = 2;
+    const c1 = ctx(10, []);
+    c1.customNapCount = 1;
+
+    // 2-nap default should be roughly half the 1-nap default.
+    const ratio = getLearnedNapDuration(c1) / getLearnedNapDuration(c2);
+    expect(ratio).toBeGreaterThan(1.5);
+    expect(ratio).toBeLessThan(2.5);
+  });
+
+  it("learns from real data and blends toward it", () => {
+    // 7 days × 1 nap × 110 min: a 10mo whose actual nap length is 110 min
+    // should get a learned duration close to that.
+    const oneNapCtx = ctx(10, buildRoutineFixture(1, 110));
+    oneNapCtx.customNapCount = 1;
+
+    const learned = getLearnedNapDuration(oneNapCtx);
+    expect(learned).toBeGreaterThanOrEqual(105);
+    expect(learned).toBeLessThanOrEqual(125);
+  });
+
+  it("Halldis prod-DB scenario: the bug case lifts above the 77 min ceiling", () => {
+    // The exact 7-day window the engine saw on 2026-04-29 (durations in
+    // minutes, in chronological order). With the old hardcoded 45 min default
+    // and no woke_by plumbing, this produced a 77 min prediction. After fix A
+    // alone it should land north of 95 — closer to the natural distribution of
+    // self-wake naps (99, 125 min).
+    const halldis: SleepEntry[] = [
+      sleep(day(23,  7, 25), day(23,  9, 30)),                // 125
+      sleep(day(24,  8, 28), day(24,  9,  9)),                // 41
+      sleep(day(24, 19,  0), day(25,  6,  0), "night"),
+      sleep(day(25,  8,  0), day(25, 10,  0)),                // 120
+      sleep(day(25, 19,  0), day(26,  6,  0), "night"),
+      sleep(day(26,  8, 42), day(26,  9, 30)),                // 48
+      sleep(day(26, 19,  0), day(27,  6,  0), "night"),
+      sleep(day(27,  7, 28), day(27,  9,  8)),                // 99 (rounded)
+      sleep(day(27, 19,  0), day(28,  6,  0), "night"),
+      sleep(day(28,  7, 23), day(28,  9,  8)),                // 104 (rounded)
+      sleep(day(28, 19,  0), day(29,  6,  0), "night"),
+    ];
+    // Add nights for the early days too so all 6 naps qualify as "complete".
+    halldis.unshift(sleep(day(22, 19, 0), day(23, 6, 0), "night"));
+    halldis.splice(2, 0, sleep(day(23, 19, 0), day(24, 6, 0), "night"));
+
+    const halldisCtx = ctx(10, halldis);
+    halldisCtx.customNapCount = 1;
+
+    const learned = getLearnedNapDuration(halldisCtx);
+    expect(learned).toBeGreaterThan(95);
   });
 });

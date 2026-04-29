@@ -4,6 +4,7 @@ export type { SleepEntry } from "$lib/types.js";
 import type { SleepEntry, BabyContext, PredictionFeatures } from "$lib/types.js";
 import { getHourInTz, setHourInTz, isoToDateInTz } from "$lib/tz.js";
 import type { SleepLogRow } from "$lib/types.js";
+import { daytimeSleepDuration } from "$lib/data/shine2021.js";
 
 /** Check if a feature is enabled (defaults to true if not specified). */
 function feat(ctx: BabyContext, key: keyof PredictionFeatures): boolean {
@@ -649,10 +650,43 @@ export function getLearnedNightDuration(ctx: BabyContext): number {
   return Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);
 }
 
+/**
+ * SHINE-derived total daytime sleep at a given age (minutes), linearly interpolated
+ * between the published age bands (1, 6, 12, 24 months). Anchors the per-nap prior
+ * so a 1-nap baby and a 2-nap baby of the same age get sensible — and different —
+ * duration defaults, instead of a single hardcoded number that implicitly assumes
+ * a fixed nap count.
+ */
+export function shineDaytimeSleepMinutes(ageMonths: number): number {
+  const bands = daytimeSleepDuration;
+  const age = Math.max(0, ageMonths);
+  if (age <= bands[0].ageMonths) return bands[0].median;
+  for (let i = 1; i < bands.length; i++) {
+    const lo = bands[i - 1];
+    const hi = bands[i];
+    if (age <= hi.ageMonths) {
+      const t = (age - lo.ageMonths) / (hi.ageMonths - lo.ageMonths);
+      return lo.median + t * (hi.median - lo.median);
+    }
+  }
+  return bands[bands.length - 1].median;
+}
+
+/**
+ * Default per-nap duration prior (minutes): SHINE total daytime sleep / nap count,
+ * clamped to a plausible range. Replaces the previous hardcoded 60/45/30 ladder
+ * which silently assumed 2 naps and pulled 1-nap babies' predictions toward an
+ * implausibly short value (e.g. 45 min for a 10-month-old who naps once a day).
+ */
+function defaultNapDurationPrior(ctx: BabyContext): number {
+  const totalDaytime = shineDaytimeSleepMinutes(ctx.ageMonths);
+  const napCount = Math.max(1, resolveNapCount(ctx));
+  return clamp(Math.round(totalDaytime / napCount), 20, 180);
+}
+
 /** Learn average nap duration from recent completed naps, fallback to age-based defaults. */
 export function getLearnedNapDuration(ctx: BabyContext): number {
-  const ageMonths = ctx.ageMonths;
-  const defaultDuration = ageMonths < 6 ? 60 : ageMonths < 12 ? 45 : 30;
+  const defaultDuration = defaultNapDurationPrior(ctx);
   if (ctx.recentSleeps.length === 0) return defaultDuration;
 
   const cache = getCache(ctx);

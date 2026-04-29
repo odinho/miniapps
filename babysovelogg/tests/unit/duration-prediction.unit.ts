@@ -149,9 +149,9 @@ describe("duration and wake-time prediction", () => {
   it("overall metrics", () => {
     expect(renderDurationMetrics(result)).toMatchInlineSnapshot(`
       "86 days
-      nap dur MAE: 23.1 min (bias -1.1)
-      nap end MAE: 52.6 min
-      wake time MAE: 25.6 min (bias -2.3)"
+      nap dur MAE: 23.5 min (bias -0.8)
+      nap end MAE: 53.1 min
+      wake time MAE: 26.1 min (bias -2.7)"
     `);
 
     expect(result.napDurationMAE).toBeLessThan(30);
@@ -166,10 +166,10 @@ describe("duration and wake-time prediction", () => {
       return `${b.label}: dur MAE ${r.napDurationMAE}, wake MAE ${r.wakeTimeMAE}`;
     });
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "6mo: dur MAE 23.5, wake MAE 11.3
+      "6mo: dur MAE 27.7, wake MAE 19.9
       7mo: dur MAE 26.8, wake MAE 29.1
       8mo: dur MAE 18.9, wake MAE 21.8
-      9mo: dur MAE 23.4, wake MAE 28.8"
+      9mo: dur MAE 23.4, wake MAE 28.6"
     `);
   });
 
@@ -179,10 +179,10 @@ describe("duration and wake-time prediction", () => {
       `${b.label}: dur MAE ${b.result.napDurationMAE}, wake MAE ${b.result.wakeTimeMAE}`,
     );
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "day 1-3: dur MAE 20.1, wake MAE 3.5
+      "day 1-3: dur MAE 28.4, wake MAE 17.9
       day 4-7: dur MAE 36.6, wake MAE 35.8
       day 8-14: dur MAE 20.8, wake MAE 23.7
-      day 15+: dur MAE 22.4, wake MAE 26.2"
+      day 15+: dur MAE 22.4, wake MAE 26.1"
     `);
 
     const earlyDur = warmup.find((b) => b.label === "day 1-3")!.result.napDurationMAE;
@@ -193,8 +193,8 @@ describe("duration and wake-time prediction", () => {
 
   it("per-position duration (1st nap ≠ 2nd nap)", () => {
     expect(renderPositionalDurations()).toMatchInlineSnapshot(`
-      "nap 1: avg 71 min actual, MAE 23.2, bias -3 (n=86)
-      nap 2: avg 61 min actual, MAE 22.9, bias +1.7 (n=58)
+      "nap 1: avg 71 min actual, MAE 23.5, bias -2.7 (n=86)
+      nap 2: avg 61 min actual, MAE 23.3, bias +2.1 (n=58)
       nap 3: avg 60 min actual, MAE 26.4, bias -2.9 (n=2)"
     `);
   });

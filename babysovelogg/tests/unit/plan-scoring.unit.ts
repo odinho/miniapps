@@ -225,7 +225,7 @@ naps done: false (2 expected)"
     expect(renderDayPlan(duringNap)).toMatchInlineSnapshot(`
 "strategy: emerging_rhythm
 lur 1: 14:30–16:00
-nap ends: ~10:29
+nap ends: ~10:46
 bedtime: 20:00
 naps done: false (2 expected)"
 `);

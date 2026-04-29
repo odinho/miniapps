@@ -62,21 +62,21 @@ describe("baseline comparison", () => {
   it("all strategies summary", () => {
     const lines = [engine, ageDefault, yesterday, movingAvg, weighted].map(summaryLine);
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "engine: 86 days, count 83% (71/86), nap MAE 44.2, dur MAE 23.1, bed MAE 22.6, wake MAE 25.6, nap bias -3.3, count bias +0.08
+      "engine: 86 days, count 83% (71/86), nap MAE 44.3, dur MAE 23.5, bed MAE 22.6, wake MAE 26.1, nap bias -3.2, count bias +0.08
       age-default: 86 days, count 63% (54/86), nap MAE 63.7, dur MAE 29.4, bed MAE 59.7, wake MAE 42.5, nap bias -34.3, count bias +0.26
       yesterday: 86 days, count 76% (65/86), nap MAE 56.7, dur MAE 32.4, bed MAE 26.6, wake MAE 27.6, nap bias +5.8, count bias +0.01
       3d-avg: 86 days, count 80% (69/86), nap MAE 48.2, dur MAE 25.2, bed MAE 41.8, wake MAE 24, nap bias +0.3, count bias +0.06
-      weighted: 86 days, count 81% (70/86), nap MAE 52.7, dur MAE 23.4, bed MAE 45.6, wake MAE 25.6, nap bias -11.4, count bias +0.07"
+      weighted: 86 days, count 81% (70/86), nap MAE 52.7, dur MAE 23.4, bed MAE 45.6, wake MAE 26.1, nap bias -11.4, count bias +0.07"
     `);
   });
 
   it("per-month breakdown — engine vs baselines", () => {
     const lines = [engine, ageDefault, yesterday, movingAvg, weighted].map(perMonth);
     expect(lines.join("\n\n")).toMatchInlineSnapshot(`
-      "engine 6mo: 5 days, count 60% (3/5), nap MAE 54.7, dur MAE 23.5, bed MAE 28.7, wake MAE 11.3, nap bias +9.2, count bias -0.4
+      "engine 6mo: 5 days, count 60% (3/5), nap MAE 56.5, dur MAE 27.7, bed MAE 28.7, wake MAE 19.9, nap bias +11, count bias -0.4
       engine 7mo: 31 days, count 77% (24/31), nap MAE 48.9, dur MAE 26.8, bed MAE 24.3, wake MAE 29.1, nap bias -8.8, count bias +0.16
       engine 8mo: 28 days, count 89% (25/28), nap MAE 26.9, dur MAE 18.9, bed MAE 18.1, wake MAE 21.8, nap bias +4.1, count bias +0.11
-      engine 9mo: 22 days, count 86% (19/22), nap MAE 64.1, dur MAE 23.4, bed MAE 24.1, wake MAE 28.8, nap bias -12.5, count bias +0.05
+      engine 9mo: 22 days, count 86% (19/22), nap MAE 64.1, dur MAE 23.4, bed MAE 24.1, wake MAE 28.6, nap bias -12.5, count bias +0.05
 
       age-default 6mo: 5 days, count 20% (1/5), nap MAE 40, dur MAE 20.8, bed MAE 44.9, wake MAE 28, nap bias +25.6, count bias -0.8
       age-default 7mo: 31 days, count 84% (26/31), nap MAE 68.6, dur MAE 30.6, bed MAE 64.9, wake MAE 46.2, nap bias -50.7, count bias +0.1
@@ -93,10 +93,10 @@ describe("baseline comparison", () => {
       3d-avg 8mo: 28 days, count 89% (25/28), nap MAE 39.4, dur MAE 20.1, bed MAE 29.6, wake MAE 19.2, nap bias -6.9, count bias +0.11
       3d-avg 9mo: 22 days, count 91% (20/22), nap MAE 48.8, dur MAE 28.5, bed MAE 44.3, wake MAE 24, nap bias +2.3, count bias 0
 
-      weighted 6mo: 5 days, count 60% (3/5), nap MAE 41.7, dur MAE 21.7, bed MAE 59.5, wake MAE 11.3, nap bias +21.8, count bias -0.4
+      weighted 6mo: 5 days, count 60% (3/5), nap MAE 41.7, dur MAE 21.7, bed MAE 59.5, wake MAE 19.9, nap bias +21.8, count bias -0.4
       weighted 7mo: 31 days, count 74% (23/31), nap MAE 51.1, dur MAE 27.6, bed MAE 45.9, wake MAE 29.1, nap bias -6.1, count bias +0.13
       weighted 8mo: 28 days, count 89% (25/28), nap MAE 33.4, dur MAE 17.7, bed MAE 31.2, wake MAE 21.8, nap bias +10.6, count bias +0.11
-      weighted 9mo: 22 days, count 86% (19/22), nap MAE 104.5, dur MAE 27.2, bed MAE 59.8, wake MAE 28.8, nap bias -90.1, count bias +0.05"
+      weighted 9mo: 22 days, count 86% (19/22), nap MAE 104.5, dur MAE 27.2, bed MAE 59.8, wake MAE 28.6, nap bias -90.1, count bias +0.05"
     `);
   });
 });
