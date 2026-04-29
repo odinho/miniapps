@@ -108,4 +108,42 @@ describe("confidence intervals", () => {
       day 70 (9mo): level=low, nap SDs=[15], bed SD=82, data=7d"
     `);
   });
+
+  // Pin: cut-short censoring narrows the duration SD when woke_by data is
+  // present. Existing fixture-based tests above don't exercise this because
+  // halldis-sleep.json predates the woke_by field — they verify the path is
+  // a no-op without labels. This test verifies the path engages with labels.
+  it("censors cut-shorts before computing nap-duration SD", () => {
+    const ageMonths = 10;
+    const sd2 = (s: SleepEntry[]) => {
+      const dummyNap = { startTime: "2026-04-29T07:00:00Z", endTime: "2026-04-29T08:30:00Z" };
+      return computeConfidence(
+        [dummyNap, { ...dummyNap, startTime: "2026-04-29T11:00:00Z", endTime: "2026-04-29T12:30:00Z" }],
+        "2026-04-29T19:00:00Z",
+        ageMonths,
+        s,
+        TZ,
+      ).napRanges[1].startRange.sdMinutes;
+    };
+
+    const naturalNaps: SleepEntry[] = [
+      { start_time: "2026-04-22T08:00:00Z", end_time: "2026-04-22T09:50:00Z", type: "nap", woke_by: "self" },
+      { start_time: "2026-04-23T08:00:00Z", end_time: "2026-04-23T09:50:00Z", type: "nap", woke_by: "self" },
+      { start_time: "2026-04-24T08:00:00Z", end_time: "2026-04-24T09:55:00Z", type: "nap", woke_by: "self" },
+      { start_time: "2026-04-25T08:00:00Z", end_time: "2026-04-25T09:50:00Z", type: "nap", woke_by: "self" },
+      { start_time: "2026-04-26T08:00:00Z", end_time: "2026-04-26T09:48:00Z", type: "nap", woke_by: "self" },
+    ];
+    const withCutShort: SleepEntry[] = [
+      ...naturalNaps,
+      { start_time: "2026-04-27T08:00:00Z", end_time: "2026-04-27T08:42:00Z", type: "nap", woke_by: "woken" },
+    ];
+    const withoutLabels: SleepEntry[] = withCutShort.map((s) => ({ ...s, woke_by: null }));
+
+    // The cut-short adds a low outlier to the durations. Without censoring
+    // (no labels), it inflates the SD. With labels, the censor drops it and
+    // the SD is closer to the natural-only baseline.
+    const censored = sd2(withCutShort);
+    const uncensored = sd2(withoutLabels);
+    expect(censored).toBeLessThan(uncensored);
+  });
 });
