@@ -148,10 +148,10 @@ function renderDurationDistribution(): string {
 describe("duration and wake-time prediction", () => {
   it("overall metrics", () => {
     expect(renderDurationMetrics(result)).toMatchInlineSnapshot(`
-      "86 days
-      nap dur MAE: 23.5 min (bias -0.8)
-      nap end MAE: 53.1 min
-      wake time MAE: 26.1 min (bias -2.7)"
+      "112 days
+      nap dur MAE: 24.3 min (bias +0.8)
+      nap end MAE: 50.8 min
+      wake time MAE: 25.2 min (bias -1.6)"
     `);
 
     expect(result.napDurationMAE).toBeLessThan(30);
@@ -169,7 +169,8 @@ describe("duration and wake-time prediction", () => {
       "6mo: dur MAE 27.7, wake MAE 19.9
       7mo: dur MAE 26.8, wake MAE 29.1
       8mo: dur MAE 18.9, wake MAE 21.8
-      9mo: dur MAE 23.4, wake MAE 28.6"
+      9mo: dur MAE 26.2, wake MAE 26.2
+      10mo: dur MAE 27, wake MAE 23"
     `);
   });
 
@@ -182,7 +183,7 @@ describe("duration and wake-time prediction", () => {
       "day 1-3: dur MAE 28.4, wake MAE 17.9
       day 4-7: dur MAE 36.6, wake MAE 35.8
       day 8-14: dur MAE 20.8, wake MAE 23.7
-      day 15+: dur MAE 22.4, wake MAE 26.1"
+      day 15+: dur MAE 23.6, wake MAE 25.1"
     `);
 
     const earlyDur = warmup.find((b) => b.label === "day 1-3")!.result.napDurationMAE;
@@ -193,7 +194,7 @@ describe("duration and wake-time prediction", () => {
 
   it("per-position duration (1st nap ≠ 2nd nap)", () => {
     expect(renderPositionalDurations()).toMatchInlineSnapshot(`
-      "nap 1: avg 71 min actual, MAE 23.5, bias -2.7 (n=86)
+      "nap 1: avg 77 min actual, MAE 24.8, bias +0.2 (n=112)
       nap 2: avg 61 min actual, MAE 23.3, bias +2.1 (n=58)
       nap 3: avg 60 min actual, MAE 26.4, bias -2.9 (n=2)"
     `);
@@ -202,7 +203,7 @@ describe("duration and wake-time prediction", () => {
 
 describe("confidence interval coverage", () => {
   it("±1 SD ranges contain a reasonable fraction of actuals", () => {
-    expect(renderCIcoverage()).toMatchInlineSnapshot(`"87/130 naps within ±1 SD range (67%)"`);
+    expect(renderCIcoverage()).toMatchInlineSnapshot(`"101/156 naps within ±1 SD range (65%)"`);
 
     // Ranges are ±1 SD so ~68% coverage expected if well-calibrated.
     // We accept ≥40% as a floor — below that the ranges are meaningless.
@@ -215,9 +216,9 @@ describe("confidence interval coverage", () => {
 describe("duration data characteristics", () => {
   it("distribution summary", () => {
     expect(renderDurationDistribution()).toMatchInlineSnapshot(`
-      "naps: 152 total, CV 47%
-        <30m: 15, 30-60m: 51, 60-90m: 57, 90m+: 29
-      nights: 83 total, CV 5%"
+      "naps: 180 total, CV 46%
+        <30m: 15, 30-60m: 56, 60-90m: 62, 90m+: 47
+      nights: 110 total, CV 5%"
     `);
   });
 });

@@ -44,13 +44,29 @@ db.close();
 // Index day starts by date
 const wakeByDate = new Map(dayStarts.map((d) => [d.date, d.wake_time]));
 
-// Group sleeps by date
+// Group sleeps by start-date
 const byDate = new Map<string, typeof sleeps>();
 for (const s of sleeps) {
   const date = s.start_time.slice(0, 10);
   const list = byDate.get(date) ?? [];
   list.push(s);
   byDate.set(date, list);
+}
+
+// Index night-ends by the date the night *ended* on. Mirrors the prod
+// `getState` rule: today's wake time is yesterday's night.end_time, with
+// `ORDER BY end_time DESC LIMIT 1` picking the latest end on a date when
+// fragmented data has multiple nights ending the same day.
+const nightEndByEndDate = new Map<string, string>();
+for (const s of sleeps) {
+  if (s.type !== "night" || !s.end_time) continue;
+  const endDate = s.end_time.slice(0, 10);
+  // Many nights end in the early hours of the next day — that's the morning
+  // wake we want. Skip nights that end the same day they started (very long
+  // nights or fragmented data).
+  if (endDate === s.start_time.slice(0, 10)) continue;
+  const prev = nightEndByEndDate.get(endDate);
+  if (!prev || s.end_time > prev) nightEndByEndDate.set(endDate, s.end_time);
 }
 
 // Build day records
@@ -60,25 +76,26 @@ for (const date of [...allDates].sort()) {
   const wakeTime = wakeByDate.get(date);
   const daySleeps = byDate.get(date) ?? [];
 
-  // Need a wake time — either from day_start or from ending of a prior night sleep
+  // Need a wake time — either from day_start or from prior night's end_time
   let wake = wakeTime;
   if (!wake) {
-    const nightEnd = daySleeps.find((s) => s.type === "night" && s.end_time);
-    if (nightEnd?.end_time) wake = nightEnd.end_time;
-    else continue; // skip days without a known wake time
+    wake = nightEndByEndDate.get(date);
+    if (!wake) continue; // skip days without a known wake time
   }
+
+  // Skip in-progress days (any active sleep) — fixtures are for replaying
+  // completed history, not partial state.
+  if (daySleeps.some((s) => !s.end_time)) continue;
 
   days.push({
     date,
     wakeTime: wake,
-    sleeps: daySleeps
-      .filter((s) => s.end_time)
-      .map((s) => ({
-        start_time: s.start_time,
-        end_time: s.end_time!,
-        type: s.type as "nap" | "night",
-        woke_by: s.woke_by === "self" || s.woke_by === "woken" ? s.woke_by : null,
-      })),
+    sleeps: daySleeps.map((s) => ({
+      start_time: s.start_time,
+      end_time: s.end_time!,
+      type: s.type as "nap" | "night",
+      woke_by: s.woke_by === "self" || s.woke_by === "woken" ? s.woke_by : null,
+    })),
   });
 }
 

@@ -49,7 +49,7 @@ describe("multi-baby backtest", () => {
   it("all babies summary", () => {
     const lines = results.map((r) => renderSummary(r.result, r.name));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "halldis: 86 days, count 83% (71/86), nap MAE 44.3, dur MAE 23.5, bed MAE 22.6, wake MAE 26.1, nap bias -3.2, count bias +0.08
+      "halldis: 112 days, count 85% (95/112), nap MAE 41.4, dur MAE 24.3, bed MAE 22.7, wake MAE 25.2, nap bias -1.8, count bias +0.04
       baby_1: 619 days, count 82% (505/619), nap MAE 339.5, dur MAE 27.2, bed MAE 176.4, wake MAE 89.1, nap bias +321.1, count bias -0.09
       baby_2: 54 days, count 38% (18/47), nap MAE 62.8, dur MAE 28.8, bed MAE 59.8, wake MAE 74.4, nap bias +16.7, count bias -0.11
       baby_3: 50 days, count 14% (4/28), nap MAE 134.8, dur MAE 38.1, bed MAE 471.6, wake MAE 166.6, nap bias +18.2, count bias +0.57

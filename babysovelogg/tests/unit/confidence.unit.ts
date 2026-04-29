@@ -110,9 +110,10 @@ describe("confidence intervals", () => {
   });
 
   // Pin: cut-short censoring narrows the duration SD when woke_by data is
-  // present. Existing fixture-based tests above don't exercise this because
-  // halldis-sleep.json predates the woke_by field — they verify the path is
-  // a no-op without labels. This test verifies the path engages with labels.
+  // present. The fixture-based tests above mix censored and uncensored days
+  // (the early Halldis logs predate the field, the later ones populate it),
+  // so this test isolates the behavior on a synthetic input where the cut-
+  // short is unambiguous.
   it("censors cut-shorts before computing nap-duration SD", () => {
     const ageMonths = 10;
     const sd2 = (s: SleepEntry[]) => {
