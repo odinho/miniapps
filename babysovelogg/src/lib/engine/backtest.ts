@@ -97,20 +97,27 @@ export function backtest(
   const tz = options?.tz ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   const features = options?.features;
 
+  const DAY_MS = 86_400_000;
+  const dayMsCache = days.map((d) => new Date(d.date + "T12:00:00Z").getTime());
+
   const results: DayResult[] = [];
 
   for (let i = 0; i < days.length; i++) {
     const day = days[i];
 
-    // Collect recent sleeps from prior days (lookback window). No leakage:
-    // each window slices [max(0, i - N), i) — strictly prior days.
+    // Calendar-day windows mirror prod (`Date.now() - 21 * 86_400_000`) — array
+    // indices over-include when the fixture has date gaps. Strictly prior days
+    // only, no leakage from the current day.
+    const dayMs = dayMsCache[i];
+    const recentCutoff = dayMs - lookback * DAY_MS;
+    const extendedCutoff = dayMs - extendedLookback * DAY_MS;
     const recentSleeps: SleepEntry[] = [];
-    for (let j = Math.max(0, i - lookback); j < i; j++) {
-      recentSleeps.push(...days[j].sleeps.filter((s) => s.end_time));
-    }
     const extendedSleeps: SleepEntry[] = [];
-    for (let j = Math.max(0, i - extendedLookback); j < i; j++) {
-      extendedSleeps.push(...days[j].sleeps.filter((s) => s.end_time));
+    for (let j = 0; j < i; j++) {
+      const otherMs = dayMsCache[j];
+      const completed = days[j].sleeps.filter((s) => s.end_time);
+      if (otherMs >= extendedCutoff) extendedSleeps.push(...completed);
+      if (otherMs >= recentCutoff) recentSleeps.push(...completed);
     }
 
     // Need at least 1 prior day to have any learning signal
@@ -128,7 +135,6 @@ export function backtest(
     };
 
     // Determine which strategy applies to this day
-    const dayMs = new Date(day.date + "T12:00:00Z").getTime();
     const strategySignals = computeStrategySignals(recentSleeps, birthdate, tz, dayMs);
     const strategy = selectStrategy(strategySignals);
 
