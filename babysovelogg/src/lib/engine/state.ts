@@ -53,7 +53,11 @@ function toSleepEntry(s: SleepLogRow): SleepEntry {
 }
 
 /** Build a BabyContext from a Baby record and recent sleep data. */
-function buildContext(baby: Baby, recentSleeps: SleepEntry[]): BabyContext {
+function buildContext(
+  baby: Baby,
+  recentSleeps: SleepEntry[],
+  extendedSleeps?: SleepEntry[],
+): BabyContext {
   return {
     birthdate: baby.birthdate,
     ageMonths: calculateAgeMonths(baby.birthdate),
@@ -61,6 +65,7 @@ function buildContext(baby: Baby, recentSleeps: SleepEntry[]): BabyContext {
     customNapCount: baby.custom_nap_count ?? null,
     targetBedtime: baby.target_bedtime ?? null,
     recentSleeps,
+    extendedSleeps,
   };
 }
 
@@ -69,7 +74,11 @@ export function assembleState(data: DayData) {
   const { baby, activeSleep, todaySleeps, recentSleeps, todayWakeUp, pausesBySleep } = data;
 
   const recentEntries = recentSleeps.map(toSleepEntry);
-  const ctx = buildContext(baby, recentEntries);
+  // Determine strategy (use extended lookback for hysteresis when available).
+  // The same extended window also feeds the cut-short censor's self-wake
+  // median so it can fire even when the 7-day window has < 3 self-wakes.
+  const strategyEntries = (data.strategySleeps ?? recentSleeps).map(toSleepEntry);
+  const ctx = buildContext(baby, recentEntries, strategyEntries);
 
   const todaySleepsWithPauses = todaySleeps.map((s) => ({
     ...toSleepEntry(s),
@@ -80,8 +89,6 @@ export function assembleState(data: DayData) {
   // Calculate predictions even during active sleep so ghost arcs stay visible
   const now = data.now ?? Date.now();
 
-  // Determine strategy (use extended lookback for hysteresis when available)
-  const strategyEntries = (data.strategySleeps ?? recentSleeps).map(toSleepEntry);
   const strategy = determineStrategy(strategyEntries, baby.birthdate, ctx.tz, now);
   ctx.strategy = strategy;
 

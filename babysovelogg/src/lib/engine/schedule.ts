@@ -516,7 +516,7 @@ function getPositionalNapDurations(ctx: BabyContext): number[] {
   // Cut-shorts pollute positional learning the same way they pollute the
   // global learned mean — a parent-cut 41 min "1st nap" makes the planner
   // schedule a 41 min nap into the future. Drop them here too.
-  const censored = new Set(censorCutShortNaps(cache.naps));
+  const censored = new Set(censorCutShortNaps(cache.naps, getExtendedSelfMedianMin(ctx)));
   const dursByPosition = new Map<number, number[]>();
 
   for (const [dayKey, daySleeps] of cache.byDay) {
@@ -692,6 +692,69 @@ function defaultNapDurationPrior(ctx: BabyContext): number {
   return clamp(Math.round(totalDaytime / napCount), 20, 180);
 }
 
+/** Median of `values` in minutes, or null if fewer than 3 samples. */
+function stableMedianMin(values: number[]): number | null {
+  if (values.length < 3) return null;
+  const sorted = values.toSorted((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+/**
+ * Self-wake median computed over the optional `extendedSleeps` window
+ * (typically 21 days), filtered to days that match the current dominant nap
+ * count. Returns null if extendedSleeps isn't set or there's still too little
+ * matching data — caller should fall back to the per-call self-median.
+ *
+ * The nap-count filter is the transition guard: a 2→1 nap baby's old-regime
+ * days have a different natural duration distribution and would skew the
+ * censor threshold. We restrict to days matching the baby's *current*
+ * dominant nap count (or napCount when no learned signal yet).
+ */
+function getExtendedSelfMedianMin(ctx: BabyContext): number | null {
+  if (ctx._extendedSelfMedian !== undefined) return ctx._extendedSelfMedian;
+  if (!ctx.extendedSleeps || ctx.extendedSleeps.length === 0) {
+    ctx._extendedSelfMedian = null;
+    return null;
+  }
+
+  const targetNapCount = resolveNapCount(ctx);
+  const napCountByDay = new Map<string, number>();
+  const dayBuckets = new Map<string, { startMs: number; endMs: number; wokeBy: "self" | "woken" | null; type: "nap" | "night" }[]>();
+
+  for (const s of ctx.extendedSleeps) {
+    if (!s.end_time) continue;
+    const day = isoToDateInTz(s.start_time, ctx.tz);
+    let bucket = dayBuckets.get(day);
+    if (!bucket) {
+      bucket = [];
+      dayBuckets.set(day, bucket);
+    }
+    bucket.push({
+      startMs: new Date(s.start_time).getTime(),
+      endMs: new Date(s.end_time).getTime(),
+      wokeBy: s.woke_by ?? null,
+      type: s.type,
+    });
+    if (s.type === "nap") napCountByDay.set(day, (napCountByDay.get(day) ?? 0) + 1);
+  }
+
+  const selfDurs: number[] = [];
+  for (const [day, bucket] of dayBuckets) {
+    if ((napCountByDay.get(day) ?? 0) !== targetNapCount) continue;
+    if (!bucket.some((s) => s.type === "night")) continue; // require complete day
+    for (const s of bucket) {
+      if (s.type !== "nap" || s.wokeBy !== "self") continue;
+      const dur = (s.endMs - s.startMs) / 60_000;
+      if (dur >= 10 && dur <= 180) selfDurs.push(dur);
+    }
+  }
+
+  const median = stableMedianMin(selfDurs);
+  ctx._extendedSelfMedian = median;
+  return median;
+}
+
 /**
  * Drop parent-ended naps that look obviously cut short — i.e. shorter than the
  * baby's own self-wake median. The truth they reveal is "natural duration ≥
@@ -703,22 +766,16 @@ function defaultNapDurationPrior(ctx: BabyContext): number {
  * skip filtering — using noisy real data beats falling back to the prior with
  * no samples at all.
  */
-function censorCutShortNaps(naps: CachedSleep[]): CachedSleep[] {
-  const selfDurs = naps
-    .filter((s) => s.wokeBy === "self")
-    .map((s) => (s.endMs - s.startMs) / 60_000);
-  if (selfDurs.length < 3) return naps;
-
-  const sorted = selfDurs.toSorted((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  const selfMedian = sorted.length % 2
-    ? sorted[mid]
-    : (sorted[mid - 1] + sorted[mid]) / 2;
+function censorCutShortNaps(naps: CachedSleep[], explicitMedianMin?: number | null): CachedSleep[] {
+  const median = explicitMedianMin ?? stableMedianMin(
+    naps.filter((s) => s.wokeBy === "self").map((s) => (s.endMs - s.startMs) / 60_000),
+  );
+  if (median === null) return naps;
 
   return naps.filter((s) => {
     if (s.wokeBy !== "woken") return true;
     const dur = (s.endMs - s.startMs) / 60_000;
-    return dur >= selfMedian;
+    return dur >= median;
   });
 }
 
@@ -733,7 +790,7 @@ export function getLearnedNapDuration(ctx: BabyContext): number {
   // Naps from incomplete days may include misclassified overnight fragments.
   // Then drop obvious cut-shorts (parent-ended below self-wake median).
   const completeNaps = cache.naps.filter((s) => cache.daysWithNight.has(s.localDate));
-  const learnable = censorCutShortNaps(completeNaps);
+  const learnable = censorCutShortNaps(completeNaps, getExtendedSelfMedianMin(ctx));
 
   if (feat(ctx, "weightedRecency")) {
     const samples = collectWeightedDurationsFromCache(learnable, 10, 180);
@@ -973,6 +1030,7 @@ export function estimateSleepCycleFromData(ctx: BabyContext): number {
   // cycle-boundary signal, it's a door opening. Drop those before fitting.
   const naps = censorCutShortNaps(
     cache.naps.filter((s) => cache.daysWithNight.has(s.localDate)),
+    getExtendedSelfMedianMin(ctx),
   );
   if (naps.length < 5) return getSleepCycleMinutes(ctx.ageMonths);
 

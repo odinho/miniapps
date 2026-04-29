@@ -116,6 +116,13 @@ export interface BabyContext {
   tz: string;                 // IANA timezone (e.g. "Europe/Oslo")
   customNapCount: number | null;
   recentSleeps: SleepEntry[]; // last 7 days of completed sleeps
+  /**
+   * Optional wider lookback (e.g. last 21 days) used only for stable estimates
+   * that the 7-day window is too sparse for — currently the self-wake median
+   * that drives `censorCutShortNaps`. Duration learning still uses the 7-day
+   * window so the engine adapts quickly during transitions.
+   */
+  extendedSleeps?: SleepEntry[];
   /** User-set preferred bedtime ("HH:MM"), or null for follow-the-baby mode. */
   targetBedtime?: string | null;
   features?: Partial<PredictionFeatures>;
@@ -123,6 +130,8 @@ export interface BabyContext {
   strategy?: "newborn_guidance" | "emerging_rhythm" | "routine_schedule";
   /** @internal Lazy cache for prediction pipeline. Do not set manually. */
   _cache?: unknown;
+  /** @internal Memoized self-wake median (minutes) over extendedSleeps. */
+  _extendedSelfMedian?: number | null;
 }
 
 export interface EventRow {
