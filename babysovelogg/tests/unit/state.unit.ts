@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { assembleState, type DayData } from "$lib/engine/state.js";
-import type { Baby, SleepLogRow, DayStartRow } from "$lib/types.js";
+import { computeConfidence } from "$lib/engine/confidence.js";
+import type { Baby, SleepLogRow, DayStartRow, SleepEntry } from "$lib/types.js";
 
 const baseBaby: Baby = {
   id: 1,
@@ -437,6 +438,68 @@ describe("assembleState", () => {
     expect(result.prediction!.napsAllDone).toBe(true);
     // Should show bedtime, not next nap
     expect(result.prediction!.nextNap).toBe(result.prediction!.bedtime);
+  });
+
+  it("confidence.napRanges aligns with the visible predictedNaps list", () => {
+    // After 1 nap is done, Timer reads napRanges[0] for the *next* nap's ±N min.
+    // Under the buggy from-morning-wake list, napRanges[0] was for nap-1
+    // (already done) and the displayed SD compounded from a meaningless anchor.
+    const tz = "Europe/Oslo";
+    const baby2nap: Baby = { ...baseBaby, timezone: tz, custom_nap_count: 2 };
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-03-26",
+      wake_time: "2026-03-26T05:00:00.000Z",
+      created_at: "2026-03-26T05:00:00.000Z",
+      created_by_event_id: null,
+    };
+    const nap1 = sleepRow({
+      start_time: "2026-03-26T07:30:00.000Z",
+      end_time: "2026-03-26T08:30:00.000Z",
+      type: "nap",
+    });
+    const recent = scheduleRecentSleeps();
+
+    const result = assembleState(
+      dayData({
+        baby: baby2nap,
+        recentSleeps: recent,
+        todaySleeps: [nap1],
+        todayWakeUp: wakeUp,
+        now: new Date("2026-03-26T09:30:00.000Z").getTime(),
+      }),
+    );
+
+    const predictedNaps = result.prediction!.predictedNaps!;
+    const napRanges = result.prediction!.confidence!.napRanges;
+
+    expect(predictedNaps.length).toBeGreaterThan(0);
+    expect(napRanges.length).toBe(predictedNaps.length);
+    for (let i = 0; i < predictedNaps.length; i++) {
+      expect(napRanges[i].startTime).toBe(predictedNaps[i].startTime);
+      // Critically: napRanges[0].startTime is *after* the completed nap 1's
+      // end. Under the old indexing, napRanges[0] was for nap 1 itself.
+      expect(new Date(napRanges[i].startTime).getTime()).toBeGreaterThan(
+        new Date(nap1.end_time!).getTime(),
+      );
+    }
+
+    // The displayed ±N min for the next nap matches what computeConfidence
+    // produces for the visible predictedNaps list (compounding-from-zero) —
+    // not what compounding from the from-wake position would inflate it to.
+    const recentEntries: SleepEntry[] = recent.map((s) => ({
+      start_time: s.start_time,
+      end_time: s.end_time,
+      type: s.type as "nap" | "night",
+      woke_by: s.woke_by === "self" || s.woke_by === "woken" ? s.woke_by : null,
+    }));
+    const direct = computeConfidence(
+      predictedNaps,
+      result.prediction!.bedtime!,
+      result.ageMonths,
+      recentEntries,
+      tz,
+    );
+    expect(napRanges[0].startRange.sdMinutes).toBe(direct.napRanges[0].startRange.sdMinutes);
   });
 
   // Coherent day plan and target bedtime tests → plan-scoring.unit.ts

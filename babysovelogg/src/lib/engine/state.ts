@@ -423,13 +423,14 @@ function assembleSchedulePrediction(
   const nextNapMs = new Date(nextNap).getTime();
   const overdueMs = now - nextNapMs;
   const napSkipped = !activeSleep && overdueMs > 90 * 60000 && overdueMs < 18 * 60 * 60000;
-  const napsAllDone = consumedNaps >= expectedNapCount || napSkipped;
-
-  if (nextNapMs > bedtimeMs - 60 * 60000 || napsAllDone) {
-    nextNap = bedtime;
-  }
+  // If the next predicted nap would land within 1h of bedtime, treat the day's
+  // naps as effectively done — otherwise the Timer would show "next nap" with
+  // bedtime as the target time.
+  const collapsedToBedtime = nextNapMs > bedtimeMs - 60 * 60000;
+  const napsAllDone = consumedNaps >= expectedNapCount || napSkipped || collapsedToBedtime;
 
   if (napsAllDone) {
+    nextNap = bedtime;
     predictedNaps = null;
   }
 
@@ -437,11 +438,12 @@ function assembleSchedulePrediction(
     predictedNaps = null;
   }
 
-  // Compute confidence intervals and calibration
-  const allPredictedForConf = allPredictedFromWakeUp;
-  const confidence = allPredictedForConf.length > 0
-    ? computeConfidence(allPredictedForConf, bedtime, ctx.ageMonths, ctx.recentSleeps, ctx.tz)
-    : null;
+  // Confidence aligns with the visible nap list — napRanges[i] corresponds to
+  // predictedNaps[i], so the Timer's `napRanges[0]` read is the *next* nap's
+  // SD even after some naps are done. Passing [] still returns a bedtime range,
+  // which Timer uses for bedtime / after-bedtime modes.
+  const confidenceNaps = predictedNaps ?? [];
+  const confidence = computeConfidence(confidenceNaps, bedtime, ctx.ageMonths, ctx.recentSleeps, ctx.tz);
   const calibration = calibrate(ctx.ageMonths, ctx.recentSleeps, ctx.customNapCount, ctx.tz);
 
   // Compute expected nap end for active naps
