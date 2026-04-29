@@ -151,11 +151,13 @@ function calcSleepDuration(s: SleepLogRow): number {
 }
 
 function toSleepEntry(s: SleepLogRow): SleepEntry {
+  const wokeBy = s.woke_by === "self" || s.woke_by === "woken" ? s.woke_by : null;
   return {
     start_time: s.start_time,
     end_time: s.end_time,
     type: s.type as "nap" | "night",
     pauses: s.pauses?.map((p) => ({ pause_time: p.pause_time, resume_time: p.resume_time })),
+    woke_by: wokeBy,
   };
 }
 
