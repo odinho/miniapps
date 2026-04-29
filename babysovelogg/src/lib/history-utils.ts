@@ -33,6 +33,7 @@ export const DIAPER_STATUS_LABELS: Record<string, string> = {
 	damp: 'Litt våt bleie',
 	wet: 'Våt bleie',
 	full: 'Full bleie',
+	dirty: 'Skitten bleie',
 };
 
 export const SLEEP_TYPES = [
@@ -61,13 +62,10 @@ export const POTTY_EDIT_RESULTS = [
 	{ value: 'diaper_only', label: '🧷 Berre bleie' },
 ] as const;
 
-export const POTTY_EDIT_STATUSES = [
-	{ value: 'dry', label: 'Tørr ✨' },
-	{ value: 'damp', label: 'Litt våt 💧' },
-	{ value: 'wet', label: 'Våt 💧💧' },
-	{ value: 'full', label: 'Full 💧💧💧' },
-	{ value: 'dirty', label: 'Skitten 💩' },
-] as const;
+// Re-exported from diaper-form-actions so the new-entry form and the edit
+// modal share a single source of truth — the missing "Skitten" option in
+// the new-entry form was a drift bug here.
+export { POTTY_DIAPER_STATUSES as POTTY_EDIT_STATUSES } from './diaper-form-actions.js';
 
 // ── Unified timeline types ───────────────────────────────────────
 

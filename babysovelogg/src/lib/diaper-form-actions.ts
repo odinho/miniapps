@@ -24,12 +24,18 @@ export const POTTY_RESULTS = [
 	{ value: 'diaper_only', label: '🧷 Ingen do' },
 ] as const;
 
-/** Diaper status options for potty mode (how wet was the diaper). */
+/**
+ * Diaper status options for potty mode — describes what was in the diaper
+ * (independent of the potty result, since a baby can poo in the diaper while
+ * the potty visit produced nothing). Shared between the new-entry form and
+ * the edit modal so the two never drift.
+ */
 export const POTTY_DIAPER_STATUSES = [
 	{ value: 'dry', label: 'Tørr ✨' },
-	{ value: 'damp', label: 'Litt 💧' },
+	{ value: 'damp', label: 'Litt våt 💧' },
 	{ value: 'wet', label: 'Våt 💧💧' },
 	{ value: 'full', label: 'Full 💧💧💧' },
+	{ value: 'dirty', label: 'Skitten 💩' },
 ] as const;
 
 /** Payload for a diaper.logged event. */

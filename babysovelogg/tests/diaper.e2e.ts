@@ -159,6 +159,28 @@ test("Dashboard shows potty count in summary", async ({ page }) => {
   await expect(page.locator(".summary-row")).toContainText("dobesøk", { timeout: 5000 });
 });
 
+test("Potty form lets you mark a poopy diaper at registration", async ({ page }) => {
+  // Regression: the new-entry potty form was missing the 'dirty' diaper-status
+  // option that the edit modal had — meaning a parent who pooped in the diaper
+  // (without anything on the potty) had to log a wet diaper and then edit it.
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
+  enablePottyMode(babyId);
+  await page.goto("/");
+  await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
+
+  await page.getByRole("button", { name: /Do/ }).click();
+  await page.getByRole("button", { name: "∅ Ingenting" }).click();
+  await page.getByTestId("diaper-status-dirty").click();
+  await page.getByRole("button", { name: "Lagra" }).click();
+
+  await expect(page.getByTestId("modal-overlay")).not.toBeVisible({ timeout: 5000 });
+
+  await page.locator(".nav-bar").getByText("Logg").click();
+  await expect(page.locator(".diaper-log-item")).toHaveCount(1, { timeout: 5000 });
+  await expect(page.locator(".diaper-log-item .log-meta")).toContainText("Skitten bleie");
+});
+
 test("Diaper entry still opens diaper edit modal", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
