@@ -6,9 +6,14 @@
  *   bun scripts/db-to-fixture.ts [db-path] [output.json]
  *
  * Defaults: db-path = db.sqlite, output = stdout.
+ *
+ * Date keys ("which day does this sleep belong to?") use the baby's stored
+ * IANA timezone — raw UTC slicing would put a 21:00-local sleep on the wrong
+ * calendar day in any timezone where local midnight isn't UTC midnight.
  */
 
 import Database from "bun:sqlite";
+import { isoToDateInTz } from "../src/lib/tz.js";
 
 interface DayRecord {
   date: string;
@@ -23,6 +28,11 @@ interface DayRecord {
 
 const [dbPath = "db.sqlite", outputPath] = process.argv.slice(2);
 const db = new Database(dbPath, { readonly: true });
+
+const baby = db.prepare(`SELECT timezone FROM baby ORDER BY id DESC LIMIT 1`).get() as
+  | { timezone: string | null }
+  | undefined;
+const tz = baby?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const sleeps = db.prepare(`
   SELECT start_time, end_time, type, woke_by
@@ -44,27 +54,29 @@ db.close();
 // Index day starts by date
 const wakeByDate = new Map(dayStarts.map((d) => [d.date, d.wake_time]));
 
-// Group sleeps by start-date
+// Group sleeps by local start-date (TZ-aware so e.g. Tokyo bedtimes don't
+// land on the wrong UTC date).
 const byDate = new Map<string, typeof sleeps>();
 for (const s of sleeps) {
-  const date = s.start_time.slice(0, 10);
+  const date = isoToDateInTz(s.start_time, tz);
   const list = byDate.get(date) ?? [];
   list.push(s);
   byDate.set(date, list);
 }
 
-// Index night-ends by the date the night *ended* on. Mirrors the prod
+// Index night-ends by the local date the night *ended* on. Mirrors the prod
 // `getState` rule: today's wake time is yesterday's night.end_time, with
 // `ORDER BY end_time DESC LIMIT 1` picking the latest end on a date when
 // fragmented data has multiple nights ending the same day.
 const nightEndByEndDate = new Map<string, string>();
 for (const s of sleeps) {
   if (s.type !== "night" || !s.end_time) continue;
-  const endDate = s.end_time.slice(0, 10);
-  // Many nights end in the early hours of the next day — that's the morning
-  // wake we want. Skip nights that end the same day they started (very long
-  // nights or fragmented data).
-  if (endDate === s.start_time.slice(0, 10)) continue;
+  const endDate = isoToDateInTz(s.end_time, tz);
+  const startDate = isoToDateInTz(s.start_time, tz);
+  // Many nights end in the early hours of the next local day — that's the
+  // morning wake we want. Skip nights that end the same local day they
+  // started (very long nights or fragmented data).
+  if (endDate === startDate) continue;
   const prev = nightEndByEndDate.get(endDate);
   if (!prev || s.end_time > prev) nightEndByEndDate.set(endDate, s.end_time);
 }
