@@ -425,8 +425,9 @@ function assembleSchedulePrediction(
   const napSkipped = !activeSleep && overdueMs > 90 * 60000 && overdueMs < 18 * 60 * 60000;
   // If the next predicted nap would land within 1h of bedtime, treat the day's
   // naps as effectively done — otherwise the Timer would show "next nap" with
-  // bedtime as the target time.
-  const collapsedToBedtime = nextNapMs > bedtimeMs - 60 * 60000;
+  // bedtime as the target time. The `>=` mirrors the B8 filter's strict `<`
+  // above: anything at or beyond bedtime-60m is collapsed.
+  const collapsedToBedtime = nextNapMs >= bedtimeMs - 60 * 60000;
   const napsAllDone = consumedNaps >= expectedNapCount || napSkipped || collapsedToBedtime;
 
   if (napsAllDone) {
