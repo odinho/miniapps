@@ -1,4 +1,6 @@
-# Bugs and issues from smoke testing (2026-03-31)
+# Bugs and issues from smoke testing
+
+(Last reviewed 2026-04-29.)
 
 ## Must fix
 
@@ -18,7 +20,7 @@
 **Root cause:** The end-sleep form uses `TimeInput` component (always-local HH:MM) but no date override. It infers date from context, which can be wrong for multi-day sleeps.
 **Fix needed:** Add an optional date picker to the end-sleep form, or infer date from the previous wake time / sleep start more robustly.
 
-## Must fix
+## Past must-fixes (resolved)
 
 ### ~~B20: Baby timezone is null in production~~ — fixed (1727dba)
 Auto-backfills from server locale on first state fetch. Production will set "Europe/Oslo" on next app load.
@@ -26,8 +28,8 @@ Auto-backfills from server locale on first state fetch. Production will set "Eur
 ### ~~B21: No DST awareness or warnings~~ — fixed
 Added DST transition detection (`dst-utils.ts`) that shows a banner on the dashboard within 3 days of any DST change. Shows Nynorsk guidance: "Sommartid startar [dato] — legg babyen 60 min seinare" or similar for fall-back.
 
-### B22: E2E tests broken (pre-existing)
-`tests/fixtures.ts` imports `bun:sqlite` but Playwright runs under Node.js. All E2E tests fail with `Error: Only URLs with a scheme in: file, data, and node are supported`. This predates our changes (from the bun runtime migration).
+### ~~B22: E2E tests broken (pre-existing)~~ — fixed
+`tests/fixtures.ts` lazy-loads `bun:sqlite` on bun and `better-sqlite3` on Node, so Playwright runs unblocked. 112 E2E tests pass on `bun run test:e2e`.
 
 ## Should fix
 
@@ -57,5 +59,5 @@ Added Auto/Fast tid toggle with TimeInput to settings. Saves as `targetBedtime` 
 - Sleep pause/resume flow works correctly
 - History page is rich and well-organized with good detail
 - Stats page shows useful info (sleep trends, wake windows, potty success rate)
-- All 460 unit tests pass, 0 type errors
+- All unit + integration tests pass with 0 type errors (run `bun run test:unit` and `bun run test:integration` for current counts)
 - Confidence and calibration data flows through the API correctly

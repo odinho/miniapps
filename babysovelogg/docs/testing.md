@@ -78,7 +78,7 @@ expect(renderBabyState(babyId)).toMatchInlineSnapshot(`
 
 Showing the before-state makes the test self-documenting — you can see what changed without looking at the fixture. This is especially valuable when the state is derived (not the direct input). For a sequence of tests on the same fixture, the first test or a dedicated "initial state" test can show the before-snapshot, and later tests can skip it to avoid repetition.
 
-On first run, leave `toMatchInlineSnapshot()` empty — Vitest writes the value into the file. After intentional changes, run `vitest run --update` and review the git diff.
+On first run, leave `toMatchInlineSnapshot()` empty — bun:test writes the value into the file. After intentional changes, run `bun test --update-snapshots` (or scope to a single file: `bun test ./tests/unit/foo.unit.ts --update-snapshots`) and review the git diff.
 
 If someone later adds a new piece of state (say `potty_log`) and forgets to clear it on reset, the renderer will include it and the diff will show it. The bug is impossible to miss.
 
@@ -203,7 +203,7 @@ Default to these when they can express the behavior clearly.
 
 Relevant places in this repo:
 
-- [`tests/integration/`](../tests/integration/) — Vitest integration tests (API, event-sourcing, validation, dedup, rebuild, export, traceability, CLI)
+- [`tests/integration/`](../tests/integration/) — bun:test integration tests (API, event-sourcing, validation, dedup, rebuild, export, traceability, CLI)
 - [`tests/integration/harness.ts`](../tests/integration/harness.ts) — `post()`/`get()`/`postEvents()` wrappers around `fetch()`, re-exports DB helpers
 - [`tests/integration/cli.test.ts`](../tests/integration/cli.test.ts) — CLI integration tests (21 tests, runs `cli/baby.ts` via `bun` against temp databases)
 - [`tests/fixtures.ts`](../tests/fixtures.ts) — Shared DB helpers and Playwright fixtures
@@ -232,7 +232,7 @@ Prefer one assertion on the full result over many assertions on pieces.
 
 Good:
 
-- `expect(renderState()).toMatchInlineSnapshot(...)` — renderer + inline snapshot; updating is `vitest run --update` or `npx playwright test --update-snapshots` then review the git diff
+- `expect(renderState()).toMatchInlineSnapshot(...)` — renderer + inline snapshot; updating is `bun test --update-snapshots` or `npx playwright test --update-snapshots` then review the git diff
 - a table row that shows expected output clearly
 - one `toStrictEqual` on a meaningful returned object
 
@@ -246,7 +246,7 @@ The test for "reset DB clears all projections" should not be five separate `expe
 
 ## Existing test helpers
 
-- **`tests/fixtures.ts`**: The shared test harness (used by both Playwright E2E and Vitest integration). Key exports:
+- **`tests/fixtures.ts`**: The shared test harness (used by both Playwright E2E and bun:test integration). Key exports:
   - `test` — Custom Playwright test with `autoResetDb` (resets all tables) and `autoMorning` (forces hour to 8 AM) fixtures
   - `resetDb()` — Clears all tables: events, baby, sleep_log, diaper_log, day_start, sleep_pauses
   - `createBaby(name, birthdate)` — Creates a baby via event + direct insert
@@ -261,7 +261,7 @@ The test for "reset DB clears all projections" should not be five separate `expe
   - `dismissSheet(page)` — Closes modal overlays (tag sheet, wake-up prompt)
   - `generateId()`, `generateSleepId()`, `generateDiaperId()` — Domain ID generators
 
-- **`tests/integration/harness.ts`**: Lightweight HTTP harness for Vitest integration tests. Re-exports all DB helpers from `fixtures.ts` and adds:
+- **`tests/integration/harness.ts`**: Lightweight HTTP harness for bun:test integration tests. Re-exports all DB helpers from `fixtures.ts` and adds:
   - `post(path, body)` / `get(path)` — `fetch()` wrappers against `http://localhost:3200`
   - `postEvents(events)` — POSTs events to `/api/events` (no `page` needed)
   - `postCsv(path, body)` — POSTs CSV content

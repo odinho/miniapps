@@ -18,8 +18,8 @@ Open `http://localhost:3200`. On first visit you'll be prompted to add a baby.
 
 ```bash
 bun run dev          # SvelteKit dev server with HMR
-bun run test:unit    # Vitest unit tests
-bun run test:integration  # Vitest integration tests
+bun run test:unit    # bun:test unit tests
+bun run test:integration  # bun:test integration tests
 bun run test:e2e     # Playwright E2E tests (requires build first)
 bun run lint         # oxlint
 bun run typecheck    # svelte-check
@@ -60,7 +60,7 @@ Reads/writes the SQLite database directly — no server required.
 - **Framework:** SvelteKit 5 with `adapter-node`
 - **Database:** better-sqlite3 (raw SQL, no ORM)
 - **Validation:** Valibot
-- **Tests:** Playwright (E2E), Vitest (unit + integration)
+- **Tests:** Playwright (E2E), bun:test (unit + integration)
 - **Lint:** oxlint
 - **Language:** TypeScript, Nynorsk Norwegian UI
 
@@ -83,8 +83,8 @@ src/
     server/          — Server-only (db, events, projections, schemas, broadcast)
 cli/                 — CLI tool (baby.ts)
 tests/
-  unit/              — Vitest unit tests (.unit.ts)
-  integration/       — Vitest integration tests (.test.ts)
+  unit/              — bun:test unit tests (.unit.ts)
+  integration/       — bun:test integration tests (.test.ts)
   *.e2e.ts           — Playwright E2E tests
   fixtures.ts        — Shared test harness
 static/              — PWA manifest, icons
