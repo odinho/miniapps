@@ -435,6 +435,53 @@ describe("assembleState", () => {
     expect(next - microEndMs).toBeGreaterThanOrEqual(165 * 60_000);
   });
 
+  it("floor pushes the comeback LATER when the constrained day plan goes too early", () => {
+    // Real scenario from the field: 10mo, 1-nap regime, target_bedtime 18:00,
+    // 28-min cut-short ending 08:49. The natural plan from selectBestPlan
+    // collapses the next WW to ~2h18m to fit the day's budget — but a
+    // post-cut-short comeback needs at least 2h45m for safe pressure
+    // recovery. Without floor enforcement, the engine recommended 11:07
+    // (Napper recommended 12:20 in the same scenario; user agreed that was
+    // closer). With the floor, we land at 11:34 — earliest defensible.
+    const baby10mo: Baby = {
+      ...baseBaby,
+      birthdate: "2025-06-12",
+      custom_nap_count: 1,
+      target_bedtime: "18:00",
+      timezone: "Europe/Oslo",
+    };
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-05-07",
+      wake_time: "2026-05-07T03:30:00.000Z", // 05:30 Oslo
+      created_at: "2026-05-07T03:30:00.000Z",
+      created_by_event_id: null,
+    };
+    const cutShort = sleepRow({
+      start_time: "2026-05-07T06:21:00.000Z", // 08:21 Oslo
+      end_time: "2026-05-07T06:49:00.000Z",   // 08:49 Oslo, 28 min
+      type: "nap",
+      woke_by: "woken",
+    });
+
+    const result = assembleState(
+      dayData({
+        baby: baby10mo,
+        recentSleeps: rested1NapHistory(),
+        todaySleeps: [cutShort],
+        todayWakeUp: wakeUp,
+        now: new Date("2026-05-07T08:12:00.000Z").getTime(), // 10:12 Oslo
+      }),
+    );
+
+    const cutShortEndMs = new Date("2026-05-07T06:49:00.000Z").getTime();
+    const next = new Date(result.prediction!.nextNap!).getTime();
+    // Hard floor: the comeback must be ≥ 2h45m after the cut-short end,
+    // even when the day's natural plan would put it sooner.
+    expect(next - cutShortEndMs).toBeGreaterThanOrEqual(165 * 60_000);
+    // Sanity ceiling: not so late we bleed into bedtime.
+    expect(next).toBeLessThan(new Date(result.prediction!.bedtime!).getTime());
+  });
+
   it("continuation window opens for ~25 min after a cut-short", () => {
     // Pediatric guidance (Mindell, Weissbluth) consistently lands at 15–25
     // min — past that, arousal systems have stabilised and re-induction

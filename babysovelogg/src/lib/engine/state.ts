@@ -165,10 +165,10 @@ function compressComebackNap(
 
   const discharge = Math.pow(Math.min(1, cutShort.durMin / 60), 0.7);
   const factor = 0.6 + 0.4 * discharge;
-  const compressedWWMin = Math.max(165, baselineWWMin * factor);
-  if (compressedWWMin >= baselineWWMin) return nap;
+  const targetWWMin = Math.max(165, baselineWWMin * factor);
+  if (targetWWMin === baselineWWMin) return nap;
 
-  const newStartMs = cutShort.endMs + compressedWWMin * 60_000;
+  const newStartMs = cutShort.endMs + targetWWMin * 60_000;
   const napDurMs = napEndMs - napStartMs;
   return {
     startTime: new Date(newStartMs).toISOString(),
