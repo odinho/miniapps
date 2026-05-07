@@ -435,10 +435,11 @@ describe("assembleState", () => {
     expect(next - microEndMs).toBeGreaterThanOrEqual(165 * 60_000);
   });
 
-  it("continuation window opens for ~45 min after a cut-short", () => {
-    // Calibration anchor: 28-min cut-short ending 06:49, baby fell back asleep
-    // at 07:30 — 41 min later. The 25-min window I shipped first closed too
-    // early. Bumped to 45 min based on this and pediatric-guidance ranges.
+  it("continuation window opens for ~25 min after a cut-short", () => {
+    // Pediatric guidance (Mindell, Weissbluth) consistently lands at 15–25
+    // min — past that, arousal systems have stabilised and re-induction
+    // success rate drops sharply. We use 25 min so the parent gets a
+    // realistic try-again window, then is told to plan the comeback nap.
     const baby10mo: Baby = { ...baseBaby, birthdate: "2025-06-12", custom_nap_count: 1 };
     const wakeUp: DayStartRow = {
       id: 1, baby_id: 1, date: "2026-04-29",
@@ -464,36 +465,22 @@ describe("assembleState", () => {
       }),
     );
     expect(open.prediction!.continuationWindow).not.toBeNull();
-    expect(open.prediction!.continuationWindow!.closesAt).toBe("2026-04-29T07:34:00.000Z");
-    // capLatestEnd = cut-short start + learnedNapDuration. With ~110 min
-    // learned: 06:21 + 110m = 08:11. Pin a generous range to allow learning
-    // jitter without making the test brittle.
+    expect(open.prediction!.continuationWindow!.closesAt).toBe("2026-04-29T07:14:00.000Z");
+    // capLatestEnd = cut-short start + learnedNapDuration. Pin a generous
+    // range to allow learning jitter without making the test brittle.
     const cap = new Date(open.prediction!.continuationWindow!.capLatestEnd).getTime();
     const cutShortStartMs = new Date("2026-04-29T06:21:00.000Z").getTime();
     expect(cap).toBeGreaterThan(cutShortStartMs + 60 * 60_000); // ≥ +60 min
     expect(cap).toBeLessThan(cutShortStartMs + 180 * 60_000);   // ≤ +180 min
 
-    // 41 min after cut-short ended (the actual time Halldis fell asleep
-    // again) → window must STILL BE OPEN. This is the calibration anchor.
-    const stillOpen = assembleState(
-      dayData({
-        baby: baby10mo,
-        recentSleeps: rested1NapHistory(),
-        todaySleeps: [cutShort],
-        todayWakeUp: wakeUp,
-        now: new Date("2026-04-29T07:30:00.000Z").getTime(),
-      }),
-    );
-    expect(stillOpen.prediction!.continuationWindow).not.toBeNull();
-
-    // 50 min after cut-short ended → window CLOSED (>45 min).
+    // 30 min after cut-short ended → window CLOSED (>25 min).
     const closed = assembleState(
       dayData({
         baby: baby10mo,
         recentSleeps: rested1NapHistory(),
         todaySleeps: [cutShort],
         todayWakeUp: wakeUp,
-        now: new Date("2026-04-29T07:39:00.000Z").getTime(),
+        now: new Date("2026-04-29T07:19:00.000Z").getTime(),
       }),
     );
     expect(closed.prediction!.continuationWindow).toBeNull();

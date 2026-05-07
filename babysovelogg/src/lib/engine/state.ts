@@ -97,15 +97,18 @@ function mostRecentCutShort(
 
 /**
  * Minutes after a cut-short during which residual sleep pressure is still high
- * enough to re-induce sleep. Pediatric guidance varies (Mindell, Weissbluth,
- * Taking Cara Babies all give 15–60 min depending on the source). Calibrated
- * to 45 min based on real observation: a 28-min cut-short ending 08:49 with
- * the baby falling back asleep at 09:30 (41 min later) — the conservative
- * 25-min window I shipped first closed too early to be useful. 45 min covers
- * realistic recoveries without recommending attempts after the parent should
- * have switched to comeback-nap planning.
+ * enough to re-induce sleep. Pediatric guidance (Mindell, Weissbluth, ChatGPT
+ * sleep coach echoing both) consistently lands at 15–25 min — past that,
+ * arousal systems have stabilised and re-induction success rate drops sharply.
+ *
+ * Calibration story: I briefly bumped this to 45 min based on what looked
+ * like a real recovery (28-min cut-short → "fell asleep at 09:30, 41 min
+ * later"). Turned out to be a false signal — the parent had a chill but
+ * awake baby in the stroller, not a sleeping one. Snapping back to 25 min
+ * keeps the science honest and tells the parent earlier when to give up
+ * and plan the comeback nap.
  */
-const CONTINUATION_WINDOW_MIN = 45;
+const CONTINUATION_WINDOW_MIN = 25;
 
 /**
  * Compute the continuation window for the given cut-short, or null if the
