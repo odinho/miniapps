@@ -97,13 +97,15 @@ function mostRecentCutShort(
 
 /**
  * Minutes after a cut-short during which residual sleep pressure is still high
- * enough to re-induce sleep. Pediatric guidance (Mindell, Weissbluth) says a
- * 5–25 min low-stimulation attempt right after a too-short nap often produces
- * a continuation that behaves like an extension of the original nap; after
- * ~25 min of being awake, arousal systems have stabilized and the next sleep
- * needs a normal-ish wake window.
+ * enough to re-induce sleep. Pediatric guidance varies (Mindell, Weissbluth,
+ * Taking Cara Babies all give 15–60 min depending on the source). Calibrated
+ * to 45 min based on real observation: a 28-min cut-short ending 08:49 with
+ * the baby falling back asleep at 09:30 (41 min later) — the conservative
+ * 25-min window I shipped first closed too early to be useful. 45 min covers
+ * realistic recoveries without recommending attempts after the parent should
+ * have switched to comeback-nap planning.
  */
-const CONTINUATION_WINDOW_MIN = 25;
+const CONTINUATION_WINDOW_MIN = 45;
 
 /**
  * Compute the continuation window for the given cut-short, or null if the
