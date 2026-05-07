@@ -273,6 +273,310 @@ describe("assembleState", () => {
     );
   });
 
+  // Helper: build a 10-day 1-nap rested-baby history with a ~4h morning WW so
+  // compression has room to take effect (compression floor is 2h45m).
+  function rested1NapHistory(): SleepLogRow[] {
+    const recent: SleepLogRow[] = [];
+    for (let d = 19; d <= 28; d++) {
+      const date = `2026-04-${String(d).padStart(2, "0")}`;
+      recent.push(
+        sleepRow({
+          id: d * 10 + 1,
+          start_time: `${date}T09:30:00Z`, // ~4h after wake-from-night
+          end_time: `${date}T11:20:00Z`, // 110 min
+          type: "nap",
+          woke_by: "self",
+          domain_id: `slp_h${d}a`,
+        }),
+        sleepRow({
+          id: d * 10 + 2,
+          start_time: `${date}T16:00:00Z`,
+          end_time: `2026-04-${String(d + 1).padStart(2, "0")}T05:30:00Z`,
+          type: "night",
+          woke_by: "self",
+          domain_id: `slp_h${d}b`,
+        }),
+      );
+    }
+    return recent;
+  }
+
+  it("cut-short nap: engine predicts a comeback nap when the day's nap budget isn't met", () => {
+    // 10mo, 1-nap regime, predicted nap ~120 min. A 28-min car nap (woken)
+    // doesn't fulfill the day's sleep need, so the engine should plan another
+    // nap rather than jump straight to bedtime. Without this, "Vaken 4m" with
+    // a 28-min nap behind the baby flips napsAllDone=true.
+    const baby10mo: Baby = { ...baseBaby, birthdate: "2025-06-12", custom_nap_count: 1 };
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-04-29",
+      wake_time: "2026-04-29T05:30:00.000Z",
+      created_at: "2026-04-29T05:30:00.000Z",
+      created_by_event_id: null,
+    };
+    const cutShort = sleepRow({
+      id: 9001,
+      start_time: "2026-04-29T06:21:00.000Z",
+      end_time: "2026-04-29T06:49:00.000Z", // 28 min, parent-cut-short
+      type: "nap",
+      woke_by: "woken",
+      domain_id: "slp_repro",
+    });
+
+    const result = assembleState(
+      dayData({
+        baby: baby10mo,
+        recentSleeps: rested1NapHistory(),
+        todaySleeps: [cutShort],
+        todayWakeUp: wakeUp,
+        now: new Date("2026-04-29T06:53:00.000Z").getTime(),
+      }),
+    );
+
+    expect(result.prediction!.napsAllDone).toBe(false);
+    expect(result.prediction!.predictedNaps).not.toBeNull();
+    expect(result.prediction!.predictedNaps!.length).toBeGreaterThan(0);
+    // Comeback nap is anchored on the 28-min nap's actual end (06:49 UTC)
+    // plus a wake window — must be after the cut-short ended, before bedtime.
+    const next = new Date(result.prediction!.nextNap!).getTime();
+    expect(next).toBeGreaterThan(new Date("2026-04-29T06:49:00.000Z").getTime());
+    expect(next).toBeLessThan(new Date(result.prediction!.bedtime!).getTime());
+  });
+
+  it("cut-short nap: comeback wake window is SWA-compressed (Borbély 2-process)", () => {
+    // After a 28-min cut-short, the next wake window is shorter than baseline
+    // by a concave SWA-weighted factor. discharge = (28/60)^0.7 ≈ 0.58 →
+    // factor = 0.6 + 0.4 * 0.58 ≈ 0.83 → comeback ≈ baseline * 0.83 (floored
+    // at 2h45m). For the 28-min input we want the comeback to land *earlier*
+    // than the same baby's plan after a non-cut-short start.
+    const baby10mo: Baby = { ...baseBaby, birthdate: "2025-06-12", custom_nap_count: 1 };
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-04-29",
+      wake_time: "2026-04-29T05:30:00.000Z",
+      created_at: "2026-04-29T05:30:00.000Z",
+      created_by_event_id: null,
+    };
+    const recent = rested1NapHistory();
+
+    // Scenario A: 28-min cut-short ending 06:49 UTC.
+    const cutShort = sleepRow({
+      start_time: "2026-04-29T06:21:00.000Z",
+      end_time: "2026-04-29T06:49:00.000Z",
+      type: "nap",
+      woke_by: "woken",
+    });
+    const compressed = assembleState(
+      dayData({
+        baby: baby10mo, recentSleeps: recent,
+        todaySleeps: [cutShort], todayWakeUp: wakeUp,
+        now: new Date("2026-04-29T06:53:00.000Z").getTime(),
+      }),
+    );
+
+    // Scenario B: same baby, but morning wake at 06:49 with no cut-short —
+    // i.e. the wake window the engine would use for a normal-day first nap
+    // anchored on the same time. This is the baseline the comeback must beat.
+    const baseline = assembleState(
+      dayData({
+        baby: baby10mo, recentSleeps: recent,
+        todaySleeps: [],
+        todayWakeUp: { ...wakeUp, wake_time: "2026-04-29T06:49:00.000Z" },
+        now: new Date("2026-04-29T06:53:00.000Z").getTime(),
+      }),
+    );
+
+    const compressedNext = new Date(compressed.prediction!.nextNap!).getTime();
+    const baselineNext = new Date(baseline.prediction!.nextNap!).getTime();
+    expect(compressedNext).toBeLessThan(baselineNext);
+
+    // Pin: compression brings the comeback at least 15 min earlier than the
+    // baseline-WW first-nap-of-the-day. This is the science-backed shift the
+    // user expected — without it, the engine treats a 28-min nap as if it
+    // never happened (at best) or as fully consuming the budget (at worst).
+    const minutesEarlier = (baselineNext - compressedNext) / 60_000;
+    expect(minutesEarlier).toBeGreaterThanOrEqual(15);
+
+    // Floor (2h45m / 165 min from cut-short end) holds: comeback never lands
+    // sooner than 2h45m after the cut-short.
+    const cutShortEndMs = new Date("2026-04-29T06:49:00.000Z").getTime();
+    expect(compressedNext - cutShortEndMs).toBeGreaterThanOrEqual(165 * 60_000);
+  });
+
+  it("cut-short floor protects against very-short naps planning unsafe comebacks", () => {
+    // A 5-min "nap" (e.g. nodded off in stroller) shouldn't push the comeback
+    // to within minutes of the cut-short. SWA discharge is tiny but the floor
+    // (2h45m) keeps recovery safe.
+    const baby10mo: Baby = { ...baseBaby, birthdate: "2025-06-12", custom_nap_count: 1 };
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-04-29",
+      wake_time: "2026-04-29T05:30:00.000Z",
+      created_at: "2026-04-29T05:30:00.000Z",
+      created_by_event_id: null,
+    };
+    const microNap = sleepRow({
+      start_time: "2026-04-29T06:30:00.000Z",
+      end_time: "2026-04-29T06:35:00.000Z", // 5 min
+      type: "nap",
+      woke_by: "woken",
+    });
+
+    const result = assembleState(
+      dayData({
+        baby: baby10mo,
+        recentSleeps: rested1NapHistory(),
+        todaySleeps: [microNap],
+        todayWakeUp: wakeUp,
+        now: new Date("2026-04-29T06:40:00.000Z").getTime(),
+      }),
+    );
+
+    const next = new Date(result.prediction!.nextNap!).getTime();
+    const microEndMs = new Date("2026-04-29T06:35:00.000Z").getTime();
+    // Floor enforced at 2h45m
+    expect(next - microEndMs).toBeGreaterThanOrEqual(165 * 60_000);
+  });
+
+  it("[short, full, active] — active nap runs full, not capped as a rescue", () => {
+    // 2-nap baby has a 28-min cut-short (woken), then a full 90-min nap, and
+    // is now actively napping. The active is making up for the missing short
+    // budget, NOT an extra third nap. detectRescueNap must see only the full
+    // prior (sufficient) nap and decline the rescue cap so the active runs
+    // full. Pre-fix: `completedNaps.length=2 >= expectedNapCount=2` → "extra
+    // nap" rescue → wake recommended at activeStart + ~50 min.
+    const baby8mo: Baby = { ...baseBaby, birthdate: "2025-06-12", custom_nap_count: 2 };
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-02-12",
+      wake_time: "2026-02-12T05:30:00.000Z",
+      created_at: "2026-02-12T05:30:00.000Z",
+      created_by_event_id: null,
+    };
+    const cutShort = sleepRow({
+      id: 8001,
+      start_time: "2026-02-12T07:30:00.000Z",
+      end_time: "2026-02-12T07:58:00.000Z", // 28 min, parent-cut-short
+      type: "nap", woke_by: "woken",
+      domain_id: "slp_cs",
+    });
+    const fullNap = sleepRow({
+      id: 8002,
+      start_time: "2026-02-12T11:00:00.000Z",
+      end_time: "2026-02-12T12:30:00.000Z", // 90 min — sufficient
+      type: "nap", woke_by: "self",
+      domain_id: "slp_full",
+    });
+    const activeComeback = sleepRow({
+      id: 8003,
+      start_time: "2026-02-12T15:00:00.000Z",
+      end_time: null,
+      type: "nap",
+      domain_id: "slp_active",
+    });
+    const recent = scheduleRecentSleeps();
+
+    // Mirror prod ORDER BY start_time DESC: active (15:00) → full (11:00) → cut-short (07:30)
+    const result = assembleState(
+      dayData({
+        baby: baby8mo,
+        recentSleeps: recent,
+        todaySleeps: [activeComeback, fullNap, cutShort],
+        activeSleep: activeComeback,
+        todayWakeUp: wakeUp,
+        now: new Date("2026-02-12T15:05:00.000Z").getTime(),
+      }),
+    );
+
+    // The day is incomplete (1 cut-short + 1 full + 1 active = 1 sufficient
+    // completed + 1 active = 2 effective, but the cut-short doesn't count
+    // toward the budget so the active is the "missing" nap, not extra).
+    expect(result.prediction!.rescueNap).toBeNull();
+  });
+
+  it("short-then-full: compression keys off the LATEST cut-short, not an earlier one", () => {
+    // Two completed naps: a 70-min mostly-full nap at 09:00, then a 20-min
+    // cut-short at 13:00. The comeback should be planned from the 13:00
+    // cut-short end (not from the earlier full nap end). With learning
+    // suggesting threshold ~50 min, the 70-min nap is sufficient and the
+    // 20-min nap is the cut-short.
+    const baby10mo: Baby = { ...baseBaby, birthdate: "2025-06-12", custom_nap_count: 2 };
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-04-29",
+      wake_time: "2026-04-29T05:30:00.000Z",
+      created_at: "2026-04-29T05:30:00.000Z",
+      created_by_event_id: null,
+    };
+    // Use a 2-nap rested history so threshold lands so the 70-min counts as
+    // sufficient and the 20-min counts as cut-short.
+    const recent: SleepLogRow[] = [];
+    for (let d = 19; d <= 28; d++) {
+      const date = `2026-04-${String(d).padStart(2, "0")}`;
+      recent.push(
+        sleepRow({ id: d * 10 + 1, start_time: `${date}T08:00:00Z`, end_time: `${date}T09:30:00Z`, type: "nap", woke_by: "self", domain_id: `slp_2n${d}a` }),
+        sleepRow({ id: d * 10 + 2, start_time: `${date}T12:30:00Z`, end_time: `${date}T13:50:00Z`, type: "nap", woke_by: "self", domain_id: `slp_2n${d}b` }),
+        sleepRow({ id: d * 10 + 3, start_time: `${date}T17:00:00Z`, end_time: `2026-04-${String(d + 1).padStart(2, "0")}T05:30:00Z`, type: "night", woke_by: "self", domain_id: `slp_2n${d}c` }),
+      );
+    }
+    const fullNap = sleepRow({
+      id: 8001,
+      start_time: "2026-04-29T07:00:00.000Z",
+      end_time: "2026-04-29T08:10:00.000Z", // 70 min — sufficient
+      type: "nap", woke_by: "self",
+      domain_id: "slp_full",
+    });
+    const cutShort = sleepRow({
+      id: 8002,
+      start_time: "2026-04-29T11:00:00.000Z",
+      end_time: "2026-04-29T11:20:00.000Z", // 20 min cut-short
+      type: "nap", woke_by: "woken",
+      domain_id: "slp_cs",
+    });
+
+    // Mirror prod: server queries todaySleeps `ORDER BY start_time DESC`
+    // and `lastCompleted = todaySleeps.find(s.end_time)` relies on that order.
+    const result = assembleState(
+      dayData({
+        baby: baby10mo,
+        recentSleeps: recent,
+        todaySleeps: [cutShort, fullNap],
+        todayWakeUp: wakeUp,
+        now: new Date("2026-04-29T11:25:00.000Z").getTime(),
+      }),
+    );
+
+    // Comeback must be at least 2h45m after the LATEST cut-short (11:20),
+    // not from the earlier full nap end. Floor: 14:05 minimum.
+    const next = new Date(result.prediction!.nextNap!).getTime();
+    const cutShortEndMs = new Date("2026-04-29T11:20:00.000Z").getTime();
+    expect(next - cutShortEndMs).toBeGreaterThanOrEqual(165 * 60_000);
+  });
+
+  it("a sufficiently long completed nap still flips napsAllDone for 1-nap baby", () => {
+    // Sanity: the cut-short fix doesn't break the normal 1-nap-done flow.
+    const baby10mo: Baby = { ...baseBaby, birthdate: "2025-06-12", custom_nap_count: 1 };
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-04-29",
+      wake_time: "2026-04-29T05:30:00.000Z",
+      created_at: "2026-04-29T05:30:00.000Z",
+      created_by_event_id: null,
+    };
+    const fullNap = sleepRow({
+      start_time: "2026-04-29T08:00:00.000Z",
+      end_time: "2026-04-29T09:50:00.000Z", // 110 min — meets threshold
+      type: "nap",
+      woke_by: "self",
+    });
+
+    const result = assembleState(
+      dayData({
+        baby: baby10mo,
+        todaySleeps: [fullNap],
+        todayWakeUp: wakeUp,
+        now: new Date("2026-04-29T11:00:00.000Z").getTime(),
+      }),
+    );
+
+    expect(result.prediction!.napsAllDone).toBe(true);
+    expect(result.prediction!.nextNap).toBe(result.prediction!.bedtime);
+  });
+
   it("B8: no nap suggested within 60 min of bedtime", () => {
     // Set up: 9mo baby, wake at 06:00, 1 nap already done ending at 11:00
     // At 16:51 bedtime should be ~18:00, no nap should be suggested

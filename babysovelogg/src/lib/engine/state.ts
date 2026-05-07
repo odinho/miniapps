@@ -52,6 +52,88 @@ function toSleepEntry(s: SleepLogRow): SleepEntry {
   };
 }
 
+/**
+ * How many of today's naps actually satisfied the day's nap budget.
+ *
+ * A nap shorter than `shortNapThresholdMin` (~learned duration minus half a
+ * sleep cycle) doesn't fulfill the day's sleep need — the baby still has the
+ * deficit and the engine should plan another. Without this, a 28-min car nap
+ * counts the same as a 120-min full nap and the engine jumps straight to
+ * bedtime. Active naps count optimistically; their length isn't known yet,
+ * and downstream rescue-nap logic will recommend cutting short if needed.
+ */
+function countSufficientNaps(
+  completedNaps: SleepLogRow[],
+  shortNapThresholdMin: number,
+  hasActiveNap: boolean,
+): number {
+  const sufficient = completedNaps.filter((s) => {
+    if (!s.end_time) return false;
+    const durMin = (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60_000;
+    return durMin >= shortNapThresholdMin;
+  });
+  return sufficient.length + (hasActiveNap ? 1 : 0);
+}
+
+/**
+ * Find the most recently-ended completed nap that fell short of the threshold.
+ * Drives the comeback-nap re-anchor in assembleSchedulePrediction.
+ */
+function mostRecentCutShort(
+  completedNaps: SleepLogRow[],
+  shortNapThresholdMin: number,
+): { endMs: number; durMin: number } | null {
+  let best: { endMs: number; durMin: number } | null = null;
+  for (const s of completedNaps) {
+    if (!s.end_time) continue;
+    const endMs = new Date(s.end_time).getTime();
+    const durMin = (endMs - new Date(s.start_time).getTime()) / 60_000;
+    if (durMin >= shortNapThresholdMin) continue;
+    if (!best || endMs > best.endMs) best = { endMs, durMin };
+  }
+  return best;
+}
+
+/**
+ * SWA-weighted wake-window compression after a cut-short.
+ *
+ * Borbély's two-process model treats sleep pressure as exponential dissipation
+ * during sleep, with slow-wave activity concentrated in the first NREM cycle.
+ * A 28-min nap captures mostly N1/N2 with minimal N3, so it discharges roughly
+ * one cycle's worth (~30%) of pressure relief, not the linear 28/120 ≈ 23%.
+ *
+ *   discharge = min(1, napMin / 60) ^ 0.7        // concave, SWA-weighted
+ *   factor    = 0.6 + 0.4 * discharge            // 60% floor, 100% if full nap
+ *   nextWW    = max(165 min, baselineWW * factor) // floor: 2h45m
+ *
+ * Sources: Achermann & Borbély 2003 (SWA dissipation), Galland 2012 meta
+ * (10mo WW range), Weissbluth (overtired-WW shortening), Mindell 2nd ed.
+ */
+function compressComebackNap(
+  nap: PredictedNap,
+  cutShort: { endMs: number; durMin: number },
+): PredictedNap {
+  const napStartMs = new Date(nap.startTime).getTime();
+  const napEndMs = new Date(nap.endTime).getTime();
+  const baselineWWMin = (napStartMs - cutShort.endMs) / 60_000;
+  // If the planned nap is at or before the cut-short end (e.g. unmoved
+  // morning-anchored plan), there's nothing to compress — caller should have
+  // re-anchored already; bail out rather than producing a past-time nap.
+  if (baselineWWMin <= 0) return nap;
+
+  const discharge = Math.pow(Math.min(1, cutShort.durMin / 60), 0.7);
+  const factor = 0.6 + 0.4 * discharge;
+  const compressedWWMin = Math.max(165, baselineWWMin * factor);
+  if (compressedWWMin >= baselineWWMin) return nap;
+
+  const newStartMs = cutShort.endMs + compressedWWMin * 60_000;
+  const napDurMs = napEndMs - napStartMs;
+  return {
+    startTime: new Date(newStartMs).toISOString(),
+    endTime: new Date(newStartMs + napDurMs).toISOString(),
+  };
+}
+
 /** Build a BabyContext from a Baby record and recent sleep data. */
 function buildContext(
   baby: Baby,
@@ -255,8 +337,12 @@ function assembleEmergingPrediction(
   });
 
   const completedNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time);
-  const consumedNaps = completedNaps.length + (activeSleep?.type === "nap" ? 1 : 0);
+  // Don't count cut-short naps toward the day's budget — see schedule branch.
+  const cycleMin = estimateSleepCycleFromData(ctx);
+  const shortThreshold = computeShortNapThreshold(getLearnedNapDuration(ctx), cycleMin);
+  const consumedNaps = countSufficientNaps(completedNaps, shortThreshold, activeSleep?.type === "nap");
   const expectedNapCount = resolveNapCount(ctx);
+  const lastCutShort = mostRecentCutShort(completedNaps, shortThreshold);
 
   // ── Select best plan (natural vs target-guided, scored) ──
   const selected = todayWakeUp
@@ -268,7 +354,7 @@ function assembleEmergingPrediction(
   let bedtime: string | null = selected?.bedtime ?? null;
   if (remaining.length > 0 && wakeTimeForPrediction) {
     const actualWakeMs = new Date(wakeTimeForPrediction).getTime();
-    if (actualWakeMs > new Date(remaining[0].startTime).getTime()) {
+    if (actualWakeMs > new Date(remaining[0].startTime).getTime() || lastCutShort) {
       const adjusted = selectBestPlan(
         wakeTimeForPrediction, todaySleeps.map(toSleepEntry), activeSleep,
         { ...ctx, customNapCount: remaining.length }, now,
@@ -276,6 +362,11 @@ function assembleEmergingPrediction(
       remaining = adjusted.naps;
       bedtime = adjusted.bedtime;
     }
+  }
+
+  // Borbély 2-process compression on the comeback nap — see schedule branch.
+  if (lastCutShort && remaining.length > 0) {
+    remaining = [compressComebackNap(remaining[0], lastCutShort), ...remaining.slice(1)];
   }
 
   let bedtimeMs = bedtime ? new Date(bedtime).getTime() : Infinity;
@@ -315,12 +406,15 @@ function assembleEmergingPrediction(
   let rescueNap: Prediction["rescueNap"] = null;
   if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
     expectedNapEnd = predictNapEndTime(activeSleep.start_time, ctx);
-    const cycleMin = estimateSleepCycleFromData(ctx);
-    const shortThreshold = computeShortNapThreshold(getLearnedNapDuration(ctx), cycleMin);
     const rescueCap = computeRescueNapCap(cycleMin);
+    const priorSufficient = completedNaps.filter((s) => {
+      if (!s.end_time) return false;
+      const dur = (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60_000;
+      return dur >= shortThreshold;
+    });
     rescueNap = detectRescueNap(
       activeSleep.start_time,
-      completedNaps.filter((s) => s.end_time).map((s) => ({ start_time: s.start_time, end_time: s.end_time! })),
+      priorSufficient.map((s) => ({ start_time: s.start_time, end_time: s.end_time! })),
       expectedNapCount,
       bedtime,
       shortThreshold,
@@ -377,9 +471,14 @@ function assembleSchedulePrediction(
   if (!wakeTimeForPrediction) return null;
 
   const completedNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time);
-  // During active nap, count it toward consumed slots
-  const consumedNaps = completedNaps.length + (activeSleep?.type === "nap" ? 1 : 0);
+  // Cut-short naps don't fulfill the day's nap budget. A 28-min car nap when
+  // the learned duration is ~120 min leaves a sleep deficit, so count only
+  // naps that crossed the short-nap threshold and let the engine plan another.
+  const cycleMin = estimateSleepCycleFromData(ctx);
+  const shortThreshold = computeShortNapThreshold(getLearnedNapDuration(ctx), cycleMin);
+  const consumedNaps = countSufficientNaps(completedNaps, shortThreshold, activeSleep?.type === "nap");
   const expectedNapCount = resolveNapCount(ctx);
+  const lastCutShort = mostRecentCutShort(completedNaps, shortThreshold);
 
   // ── Select best plan (natural vs target-guided, scored) ──
   const selected = todayWakeUp
@@ -389,12 +488,14 @@ function assembleSchedulePrediction(
 
   let remaining = allPredictedFromWakeUp.slice(consumedNaps);
 
-  // Stale check: if actual wake time is past the first predicted nap start,
-  // re-select with adjusted context (updates both naps AND bedtime)
+  // Stale check: re-select on the last actual wake when (a) the original
+  // plan's first nap is in the past, or (b) we're recovering from a cut-short
+  // — its prior wake-time anchor is wrong now that the day's nap budget needs
+  // re-planning around the deficit.
   let bedtime = selected?.bedtime ?? new Date(now).toISOString();
   if (remaining.length > 0) {
     const actualWakeMs = new Date(wakeTimeForPrediction).getTime();
-    if (actualWakeMs > new Date(remaining[0].startTime).getTime()) {
+    if (actualWakeMs > new Date(remaining[0].startTime).getTime() || lastCutShort) {
       const adjusted = selectBestPlan(
         wakeTimeForPrediction, todaySleeps.map(toSleepEntry), activeSleep,
         { ...ctx, customNapCount: remaining.length }, now,
@@ -402,6 +503,14 @@ function assembleSchedulePrediction(
       remaining = adjusted.naps;
       bedtime = adjusted.bedtime;
     }
+  }
+
+  // Borbély 2-process model: a cut-short discharges sleep pressure non-linearly
+  // (most slow-wave activity dissipates in the first cycle). Compress the next
+  // wake window by an SWA-weighted factor so the comeback nap lands earlier
+  // than a normal first-nap-of-the-day would, but not too aggressively.
+  if (lastCutShort && remaining.length > 0) {
+    remaining = [compressComebackNap(remaining[0], lastCutShort), ...remaining.slice(1)];
   }
 
   let bedtimeMs = new Date(bedtime).getTime();
@@ -452,12 +561,19 @@ function assembleSchedulePrediction(
   let rescueNap: Prediction["rescueNap"] = null;
   if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
     expectedNapEnd = predictNapEndTime(activeSleep.start_time, ctx);
-    const cycleMin = estimateSleepCycleFromData(ctx);
-    const shortThreshold = computeShortNapThreshold(getLearnedNapDuration(ctx), cycleMin);
     const rescueCap = computeRescueNapCap(cycleMin);
+    // Pass only sufficient-length prior naps to the rescue detector. A
+    // comeback nap after a 28-min cut-short shouldn't be treated as an "extra"
+    // nap and capped at ~50 min — it's making up for the missed real nap and
+    // should run full length.
+    const priorSufficient = completedNaps.filter((s) => {
+      if (!s.end_time) return false;
+      const dur = (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60_000;
+      return dur >= shortThreshold;
+    });
     rescueNap = detectRescueNap(
       activeSleep.start_time,
-      completedNaps.filter((s) => s.end_time).map((s) => ({ start_time: s.start_time, end_time: s.end_time! })),
+      priorSufficient.map((s) => ({ start_time: s.start_time, end_time: s.end_time! })),
       expectedNapCount,
       bedtime,
       shortThreshold,
