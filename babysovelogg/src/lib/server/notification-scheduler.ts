@@ -150,6 +150,24 @@ export function reconcileNotifications(state: ReconcileInput): void {
     cancelByKind(baby.id, "bedtime_approaching");
   }
 
+  // ── Continuation window opens ───────────────────────────────────
+  // Fire immediately when the parent ends a too-short nap so they aren't
+  // relying on having the dashboard open to see the banner. Dedup by the
+  // closesAt timestamp — if the same window keeps reconciling we don't
+  // re-send. Cancel when no longer applicable (window closed, baby is
+  // sleeping again, etc).
+  if (prefs.continuation_open && isAwake && pred?.continuationWindow) {
+    const cw = pred.continuationWindow;
+    const dedupe = `continuation_open:${cw.closesAt}`;
+    upsert(baby.id, "continuation_open", Date.now(), dedupe, {
+      title: "Forleng luren",
+      body: `Førre lur var altfor kort. Prøv å la henne sove att — vindauget stenger ${formatTime(cw.closesAt)}.`,
+      data: { kind: "continuation_open", closesAt: cw.closesAt, capLatestEnd: cw.capLatestEnd },
+    });
+  } else {
+    cancelByKind(baby.id, "continuation_open");
+  }
+
   // ── Nap overdue ─────────────────────────────────────────────────
   if (
     prefs.nap_overdue &&

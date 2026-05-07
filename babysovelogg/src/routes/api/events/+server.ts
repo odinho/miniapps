@@ -5,7 +5,7 @@ import { processBatchTx, getEvents } from "$lib/server/events.js";
 import { validateBatch } from "$lib/server/schemas.js";
 import { getState } from "$lib/server/state.js";
 import { broadcast } from "$lib/server/broadcast.js";
-import { reconcileNotifications } from "$lib/server/notification-scheduler.js";
+import { reconcileNotifications, fireDueNotifications } from "$lib/server/notification-scheduler.js";
 import type { EventRow } from "$lib/types.js";
 
 export const GET: RequestHandler = ({ url }) => {
@@ -81,6 +81,12 @@ export const POST: RequestHandler = async ({ request }) => {
       broadcast("update", { state });
       try {
         reconcileNotifications(state);
+        // Fire any newly-due notifications (e.g. continuation-window opens
+        // immediately on cut-short logging) without waiting on web-push so
+        // the HTTP response stays fast. The 30s poll loop is a safety net.
+        fireDueNotifications().catch((err) => {
+          console.error("[fireDueNotifications]", err);
+        });
       } catch (err) {
         console.error("[reconcileNotifications]", err);
       }

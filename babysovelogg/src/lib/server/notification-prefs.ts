@@ -5,7 +5,8 @@ export type NotificationKind =
   | "nap_ending_soon"
   | "nap_overtime"
   | "bedtime_approaching"
-  | "nap_overdue";
+  | "nap_overdue"
+  | "continuation_open";
 
 export type NotificationPrefs = Record<NotificationKind, boolean>;
 
@@ -16,6 +17,7 @@ export const DEFAULT_PREFS: NotificationPrefs = {
   nap_overtime: true,
   bedtime_approaching: true,
   nap_overdue: false,
+  continuation_open: true,
 };
 
 /** All notification kinds in the order they should appear in the UI. */
@@ -25,6 +27,7 @@ export const ALL_KINDS: NotificationKind[] = [
   "nap_overtime",
   "bedtime_approaching",
   "nap_overdue",
+  "continuation_open",
 ];
 
 export function getPrefs(babyId: number): NotificationPrefs {

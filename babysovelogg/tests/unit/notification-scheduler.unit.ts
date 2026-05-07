@@ -298,6 +298,67 @@ describe("reconcileNotifications – nap_overdue", () => {
   });
 });
 
+describe("reconcileNotifications – continuation_open", () => {
+  it("schedules to fire immediately when continuation window is set and baby is awake", () => {
+    const before = Date.now();
+    reconcileNotifications({
+      baby,
+      activeSleep: null,
+      prediction: makePrediction({
+        continuationWindow: {
+          closesAt: "2026-04-29T07:34:00.000Z",
+          capLatestEnd: "2026-04-29T08:11:00.000Z",
+        },
+      }),
+    });
+    const rows = rowsOf("continuation_open");
+    expect(rows).toHaveLength(1);
+    // fire_at should be ~now (we use Date.now() in the upsert)
+    const fireAtMs = new Date(rows[0].fire_at).getTime();
+    expect(fireAtMs).toBeGreaterThanOrEqual(before);
+    expect(fireAtMs).toBeLessThanOrEqual(Date.now() + 1000);
+    const payload = JSON.parse(rows[0].payload_json);
+    expect(payload.title).toBe("Forleng luren");
+    expect(payload.body).toContain("vindauget stenger");
+  });
+
+  it("dedupes by closesAt — same window doesn't double-fire", () => {
+    const cw = {
+      closesAt: "2026-04-29T07:34:00.000Z",
+      capLatestEnd: "2026-04-29T08:11:00.000Z",
+    };
+    reconcileNotifications({
+      baby, activeSleep: null,
+      prediction: makePrediction({ continuationWindow: cw }),
+    });
+    reconcileNotifications({
+      baby, activeSleep: null,
+      prediction: makePrediction({ continuationWindow: cw }),
+    });
+    expect(rowsOf("continuation_open")).toHaveLength(1);
+  });
+
+  it("cancels when baby starts napping (continuation succeeded)", () => {
+    reconcileNotifications({
+      baby, activeSleep: null,
+      prediction: makePrediction({
+        continuationWindow: {
+          closesAt: "2026-04-29T07:34:00.000Z",
+          capLatestEnd: "2026-04-29T08:11:00.000Z",
+        },
+      }),
+    });
+    expect(rowsOf("continuation_open")).toHaveLength(1);
+
+    const active = makeActiveSleep("2026-04-29T07:30:00.000Z");
+    reconcileNotifications({
+      baby, activeSleep: active,
+      prediction: makePrediction({ continuationWindow: null }),
+    });
+    expect(rowsOf("continuation_open")).toHaveLength(0);
+  });
+});
+
 describe("reconcileNotifications – prefs gating", () => {
   it("respects prefs.rescue_wake = false", () => {
     setPrefs(1, { rescue_wake: false });

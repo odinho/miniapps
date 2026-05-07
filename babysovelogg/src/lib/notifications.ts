@@ -133,7 +133,8 @@ export type NotificationKind =
   | "nap_ending_soon"
   | "nap_overtime"
   | "bedtime_approaching"
-  | "nap_overdue";
+  | "nap_overdue"
+  | "continuation_open";
 
 export type NotificationPrefs = Record<NotificationKind, boolean>;
 
@@ -157,6 +158,10 @@ export const TRIGGER_LABELS: Record<NotificationKind, { title: string; hint: str
   nap_overdue: {
     title: "Lur er forsinka",
     hint: "30 min etter forventa lurstart. Kan vere noko masete.",
+  },
+  continuation_open: {
+    title: "Forleng luren",
+    hint: "Med ein gong etter ein altfor kort lur — vindauget for å få henne ned att.",
   },
 };
 
