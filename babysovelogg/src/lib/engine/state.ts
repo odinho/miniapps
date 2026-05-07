@@ -82,16 +82,53 @@ function countSufficientNaps(
 function mostRecentCutShort(
   completedNaps: SleepLogRow[],
   shortNapThresholdMin: number,
-): { endMs: number; durMin: number } | null {
-  let best: { endMs: number; durMin: number } | null = null;
+): { startMs: number; endMs: number; durMin: number } | null {
+  let best: { startMs: number; endMs: number; durMin: number } | null = null;
   for (const s of completedNaps) {
     if (!s.end_time) continue;
+    const startMs = new Date(s.start_time).getTime();
     const endMs = new Date(s.end_time).getTime();
-    const durMin = (endMs - new Date(s.start_time).getTime()) / 60_000;
+    const durMin = (endMs - startMs) / 60_000;
     if (durMin >= shortNapThresholdMin) continue;
-    if (!best || endMs > best.endMs) best = { endMs, durMin };
+    if (!best || endMs > best.endMs) best = { startMs, endMs, durMin };
   }
   return best;
+}
+
+/**
+ * Minutes after a cut-short during which residual sleep pressure is still high
+ * enough to re-induce sleep. Pediatric guidance (Mindell, Weissbluth) says a
+ * 5–25 min low-stimulation attempt right after a too-short nap often produces
+ * a continuation that behaves like an extension of the original nap; after
+ * ~25 min of being awake, arousal systems have stabilized and the next sleep
+ * needs a normal-ish wake window.
+ */
+const CONTINUATION_WINDOW_MIN = 25;
+
+/**
+ * Compute the continuation window for the given cut-short, or null if the
+ * window has already closed at `now`.
+ *
+ *   closesAt    = cutShort.endMs + 25 min
+ *   capLatestEnd = cutShort.startMs + learnedNapDurationMin
+ *
+ * `capLatestEnd` keeps the continuation from running so long it disrupts the
+ * day's pattern — the implicit assumption is that the cut-short + continuation
+ * together should not exceed the baby's normal nap length by much.
+ */
+function computeContinuationWindow(
+  cutShort: { endMs: number },
+  cutShortStartMs: number,
+  learnedNapDurationMin: number,
+  now: number,
+): { closesAt: string; capLatestEnd: string } | null {
+  const closesAtMs = cutShort.endMs + CONTINUATION_WINDOW_MIN * 60_000;
+  if (now > closesAtMs) return null;
+  const capLatestEndMs = cutShortStartMs + learnedNapDurationMin * 60_000;
+  return {
+    closesAt: new Date(closesAtMs).toISOString(),
+    capLatestEnd: new Date(capLatestEndMs).toISOString(),
+  };
 }
 
 /**
@@ -294,6 +331,7 @@ function assembleNewbornPrediction(
     confidence: null,
     calibration: null,
     rescueNap: null,
+    continuationWindow: null,
     // Newborn fields
     sleepWindow: result.sleepWindow,
     sleepPressure: result.sleepPressure,
@@ -429,6 +467,10 @@ function assembleEmergingPrediction(
     expectedNightEnd = predictNightEndTime(activeSleep.start_time, ctx, todayNapMin);
   }
 
+  const continuationWindow = !activeSleep && lastCutShort
+    ? computeContinuationWindow(lastCutShort, lastCutShort.startMs, getLearnedNapDuration(ctx), now)
+    : null;
+
   return {
     strategy: "emerging_rhythm",
     nextNap,
@@ -441,6 +483,7 @@ function assembleEmergingPrediction(
     confidence: null,
     calibration: null,
     rescueNap,
+    continuationWindow,
     sleepWindow: result.sleepWindow,
     sleepPressure: result.sleepPressure,
     totalSleep24h: result.rolling.totalSleep24h,
@@ -590,6 +633,10 @@ function assembleSchedulePrediction(
     expectedNightEnd = predictNightEndTime(activeSleep.start_time, ctx, todayNapMin);
   }
 
+  const continuationWindow = !activeSleep && lastCutShort
+    ? computeContinuationWindow(lastCutShort, lastCutShort.startMs, getLearnedNapDuration(ctx), now)
+    : null;
+
   return {
     strategy,
     nextNap,
@@ -602,6 +649,7 @@ function assembleSchedulePrediction(
     confidence,
     calibration,
     rescueNap,
+    continuationWindow,
     // Newborn fields — null for schedule-based strategies
     sleepWindow: null,
     sleepPressure: null,

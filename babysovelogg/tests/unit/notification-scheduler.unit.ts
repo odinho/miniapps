@@ -71,6 +71,7 @@ function makePrediction(overrides: Partial<Prediction> = {}): Prediction {
     rolling: null,
     learnedSchedule: null,
     rescueNap: null,
+    continuationWindow: null,
     ...overrides,
   };
 }

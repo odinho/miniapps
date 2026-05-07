@@ -435,6 +435,96 @@ describe("assembleState", () => {
     expect(next - microEndMs).toBeGreaterThanOrEqual(165 * 60_000);
   });
 
+  it("continuation window opens for ~25 min after a cut-short", () => {
+    // Pediatric guidance (Mindell, Weissbluth): for ~25 min after a too-short
+    // nap, residual sleep pressure is high enough to re-induce sleep — so a
+    // low-stimulation attempt is worth it. After that, arousal stabilises and
+    // the next sleep needs a normal-ish wake window.
+    const baby10mo: Baby = { ...baseBaby, birthdate: "2025-06-12", custom_nap_count: 1 };
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-04-29",
+      wake_time: "2026-04-29T05:30:00.000Z",
+      created_at: "2026-04-29T05:30:00.000Z",
+      created_by_event_id: null,
+    };
+    const cutShort = sleepRow({
+      start_time: "2026-04-29T06:21:00.000Z",
+      end_time: "2026-04-29T06:49:00.000Z", // 28 min
+      type: "nap",
+      woke_by: "woken",
+    });
+
+    // 4 min after cut-short ended → window OPEN.
+    const open = assembleState(
+      dayData({
+        baby: baby10mo,
+        recentSleeps: rested1NapHistory(),
+        todaySleeps: [cutShort],
+        todayWakeUp: wakeUp,
+        now: new Date("2026-04-29T06:53:00.000Z").getTime(),
+      }),
+    );
+    expect(open.prediction!.continuationWindow).not.toBeNull();
+    expect(open.prediction!.continuationWindow!.closesAt).toBe("2026-04-29T07:14:00.000Z");
+    // capLatestEnd = cut-short start + learnedNapDuration. With ~110 min
+    // learned: 06:21 + 110m = 08:11. Pin a generous range to allow learning
+    // jitter without making the test brittle.
+    const cap = new Date(open.prediction!.continuationWindow!.capLatestEnd).getTime();
+    const cutShortStartMs = new Date("2026-04-29T06:21:00.000Z").getTime();
+    expect(cap).toBeGreaterThan(cutShortStartMs + 60 * 60_000); // ≥ +60 min
+    expect(cap).toBeLessThan(cutShortStartMs + 180 * 60_000);   // ≤ +180 min
+
+    // 30 min after cut-short ended → window CLOSED (>25 min).
+    const closed = assembleState(
+      dayData({
+        baby: baby10mo,
+        recentSleeps: rested1NapHistory(),
+        todaySleeps: [cutShort],
+        todayWakeUp: wakeUp,
+        now: new Date("2026-04-29T07:19:00.000Z").getTime(),
+      }),
+    );
+    expect(closed.prediction!.continuationWindow).toBeNull();
+  });
+
+  it("continuation window is null while a nap is active", () => {
+    // The user already has the baby down — no need to suggest "try now".
+    const baby10mo: Baby = { ...baseBaby, birthdate: "2025-06-12", custom_nap_count: 1 };
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-04-29",
+      wake_time: "2026-04-29T05:30:00.000Z",
+      created_at: "2026-04-29T05:30:00.000Z",
+      created_by_event_id: null,
+    };
+    const cutShort = sleepRow({
+      id: 9001,
+      start_time: "2026-04-29T06:21:00.000Z",
+      end_time: "2026-04-29T06:49:00.000Z",
+      type: "nap",
+      woke_by: "woken",
+      domain_id: "slp_cs",
+    });
+    const activeContinuation = sleepRow({
+      id: 9002,
+      start_time: "2026-04-29T06:55:00.000Z",
+      end_time: null,
+      type: "nap",
+      domain_id: "slp_cont",
+    });
+
+    const result = assembleState(
+      dayData({
+        baby: baby10mo,
+        recentSleeps: rested1NapHistory(),
+        todaySleeps: [activeContinuation, cutShort],
+        activeSleep: activeContinuation,
+        todayWakeUp: wakeUp,
+        now: new Date("2026-04-29T06:58:00.000Z").getTime(),
+      }),
+    );
+    expect(result.prediction!.continuationWindow).toBeNull();
+  });
+
   it("[short, full, active] — active nap runs full, not capped as a rescue", () => {
     // 2-nap baby has a 28-min cut-short (woken), then a full 90-min nap, and
     // is now actively napping. The active is making up for the missing short

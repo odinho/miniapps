@@ -501,6 +501,24 @@
 			</button>
 		</div>
 
+		{#if prediction?.continuationWindow && (!activeSleep || activeSleep.end_time)}
+			{@const cw = prediction.continuationWindow}
+			{@const closesIn = new Date(cw.closesAt).getTime() - now}
+			<div class="continuation-banner" data-testid="continuation-banner">
+				<div class="continuation-title">💤 Forleng luren</div>
+				<div class="continuation-body">
+					{#if closesIn > 0}
+						Førre lur var altfor kort. Prøv å la henne sove att no — vindauget stenger {formatTime(cw.closesAt)} ({formatDuration(closesIn)}).
+					{:else}
+						Vindauget for forlenging er over. Vent på neste lur.
+					{/if}
+				</div>
+				<div class="continuation-hint">
+					Lite stimuli, mørkt rom. Viss ho sov inn, vekk innan {formatTime(cw.capLatestEnd)} så dagen heng saman.
+				</div>
+			</div>
+		{/if}
+
 		{#if prediction?.rescueNap && activeSleep && !activeSleep.end_time && activeSleep.type === 'nap'}
 			{@const recWake = new Date(prediction.rescueNap.recommendedWakeTime)}
 			{@const recCountdown = recWake.getTime() - now}

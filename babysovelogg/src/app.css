@@ -967,6 +967,32 @@ html, body {
   line-height: 1.3;
 }
 
+/* --- Continuation-nap banner (after a cut-short, ~25 min window) --- */
+.continuation-banner {
+  background: var(--peach);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin: 8px 0 4px;
+}
+
+.continuation-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.continuation-body {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.continuation-hint {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
 /* Arc endpoint icons */
 .arc-endpoint-icon { cursor: pointer; }
 .arc-endpoint-icon:hover circle:first-child {

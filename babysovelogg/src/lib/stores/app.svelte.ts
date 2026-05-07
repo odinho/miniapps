@@ -45,6 +45,18 @@ export interface Prediction {
 	learnedSchedule: LearnedSchedule | null;
 	/** Rescue nap guidance (when active nap is extra or after a short nap) */
 	rescueNap: { recommendedWakeTime: string; reason: "extra_nap" | "short_prior_nap" | "both" } | null;
+	/**
+	 * Continuation-nap window: a short period right after a cut-short during
+	 * which residual sleep pressure is still high enough to re-induce sleep.
+	 * If null, no continuation attempt is currently recommended (window closed,
+	 * baby is napping, or no recent cut-short).
+	 */
+	continuationWindow: {
+		/** ISO — try to put baby back to sleep before this; window closes here. */
+		closesAt: string;
+		/** ISO — if she falls asleep, wake by this so the day's plan stays workable. */
+		capLatestEnd: string;
+	} | null;
 }
 
 export interface LearnedSchedule {
