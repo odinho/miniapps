@@ -11,6 +11,8 @@ const PRE_NOTIFY_MIN = 2;
 const OVERTIME_OFFSET_MIN = 20;
 /** Minutes before bedtime to fire bedtime_approaching. */
 const BEDTIME_APPROACH_MIN = 30;
+/** Minutes before predicted nap to fire nap_approaching wind-down notice. */
+const NAP_APPROACH_MIN = 30;
 /** Minutes past nextNap before "nap overdue" fires. */
 const OVERDUE_OFFSET_MIN = 30;
 
@@ -148,6 +150,30 @@ export function reconcileNotifications(state: ReconcileInput): void {
   } else if (active && active.type === "night") {
     // Night sleep started — cancel any pending bedtime_approaching
     cancelByKind(baby.id, "bedtime_approaching");
+  }
+
+  // ── Nap approaching (wind-down) ─────────────────────────────────
+  // 30 min before predicted nap so the parent has time to wind down
+  // (lower stim, get to where the baby naps, etc.). Skip when napsAllDone
+  // (bedtime_approaching covers that case).
+  if (
+    prefs.nap_approaching &&
+    isAwake &&
+    pred?.nextNap &&
+    !pred.napsAllDone
+  ) {
+    const napMs = new Date(pred.nextNap).getTime();
+    const fireAt = napMs - NAP_APPROACH_MIN * 60_000;
+    // Dedup by the nap's start time so a re-anchor (e.g. cut-short comeback)
+    // overwrites the row instead of double-firing.
+    const dedupe = `nap_approaching:${pred.nextNap}`;
+    upsert(baby.id, "nap_approaching", fireAt, dedupe, {
+      title: "Snart lurtid",
+      body: `Forventa kl. ${formatTime(pred.nextNap)} — byrj å vinde ned.`,
+      data: { kind: "nap_approaching", nextNap: pred.nextNap },
+    });
+  } else {
+    cancelByKind(baby.id, "nap_approaching");
   }
 
   // ── Continuation window opens ───────────────────────────────────

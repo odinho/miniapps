@@ -28,3 +28,30 @@ attached.
 **Impact:** low — production is unaffected; the test exercises onboarding and
 this scenario is well-covered elsewhere. But "no flakiness allowed" is the
 project rule.
+
+## UI: render the nap-confidence band on the arc
+
+Source: 2026-05-07 user feedback after Halldis fell asleep at 12:05 vs
+predicted 11:34 (±15 min text only). The ±N min figure is in the timer
+center but doesn't translate to a feel for "how soft is the prediction". A
+faded uncertainty band around the predicted-nap arc would make it visually
+obvious. Should map directly off `prediction.confidence.napRanges[0].lo/hi`
+which we already compute.
+
+Sketch: in `Arc.svelte`, when there's a `confidence.napRanges[0]`, render
+an extra translucent band beneath the existing predicted-nap band, spanning
+`lo → hi`. Keep colour sympathetic to the day theme. Do not overlap the
+cut-short bubble or the active-sleep arc.
+
+## UX: "give up and try later" guidance after sticking too long
+
+Source: same 2026-05-07 conversation. User's pattern: they sometimes spend
+25+ min trying for a nap that won't come, tiring both parent and baby. The
+engine could surface a "try again in 20 min" suggestion when there's been
+no active sleep N minutes past the predicted window.
+
+Concrete: when `awakeMs > nextNap + (configurable threshold, e.g. 20 min)`
+and no active sleep, show a banner "Vurder å gi seg og prøve igjen om
+~20 min — fortsett ikkje viss begge blir slitne". Ties into the existing
+overdue logic but is more directive. Consider making the threshold a
+per-baby setting tuned to historical fall-asleep latency.

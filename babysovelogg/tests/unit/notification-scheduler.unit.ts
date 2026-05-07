@@ -298,6 +298,67 @@ describe("reconcileNotifications – nap_overdue", () => {
   });
 });
 
+describe("reconcileNotifications – nap_approaching", () => {
+  it("schedules 30 min before predicted nextNap when baby is awake", () => {
+    reconcileNotifications({
+      baby,
+      activeSleep: null,
+      prediction: makePrediction({
+        nextNap: "2026-04-13T11:00:00.000Z",
+        napsAllDone: false,
+      }),
+    });
+    const rows = rowsOf("nap_approaching");
+    expect(rows).toHaveLength(1);
+    expect(new Date(rows[0].fire_at).toISOString()).toBe("2026-04-13T10:30:00.000Z");
+    const payload = JSON.parse(rows[0].payload_json);
+    expect(payload.title).toBe("Snart lurtid");
+  });
+
+  it("dedupes by nextNap so re-anchor overwrites, doesn't double-fire", () => {
+    // Initial plan
+    reconcileNotifications({
+      baby, activeSleep: null,
+      prediction: makePrediction({ nextNap: "2026-04-13T11:00:00.000Z", napsAllDone: false }),
+    });
+    // Same prediction reconciled again — should still be 1 row
+    reconcileNotifications({
+      baby, activeSleep: null,
+      prediction: makePrediction({ nextNap: "2026-04-13T11:00:00.000Z", napsAllDone: false }),
+    });
+    expect(rowsOf("nap_approaching")).toHaveLength(1);
+  });
+
+  it("cancels when napsAllDone (day's done)", () => {
+    reconcileNotifications({
+      baby, activeSleep: null,
+      prediction: makePrediction({ nextNap: "2026-04-13T11:00:00.000Z", napsAllDone: false }),
+    });
+    expect(rowsOf("nap_approaching")).toHaveLength(1);
+
+    reconcileNotifications({
+      baby, activeSleep: null,
+      prediction: makePrediction({ nextNap: "2026-04-13T11:00:00.000Z", napsAllDone: true }),
+    });
+    expect(rowsOf("nap_approaching")).toHaveLength(0);
+  });
+
+  it("cancels when baby starts napping", () => {
+    reconcileNotifications({
+      baby, activeSleep: null,
+      prediction: makePrediction({ nextNap: "2026-04-13T11:00:00.000Z", napsAllDone: false }),
+    });
+    expect(rowsOf("nap_approaching")).toHaveLength(1);
+
+    const active = makeActiveSleep("2026-04-13T11:00:00.000Z");
+    reconcileNotifications({
+      baby, activeSleep: active,
+      prediction: makePrediction({ nextNap: "2026-04-13T11:00:00.000Z", napsAllDone: false }),
+    });
+    expect(rowsOf("nap_approaching")).toHaveLength(0);
+  });
+});
+
 describe("reconcileNotifications – continuation_open", () => {
   it("schedules to fire immediately when continuation window is set and baby is awake", () => {
     const before = Date.now();
