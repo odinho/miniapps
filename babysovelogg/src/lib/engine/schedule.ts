@@ -345,10 +345,20 @@ export function recommendBedtime(todaySleeps: SleepEntry[], ctx: BabyContext): s
     bedtime = pressureBedtime;
   }
 
-  // Wide sanity clamp in the baby's local time
+  // Wide sanity clamp in the baby's local time. Anchor the clamp on the day
+  // implied by the last completed sleep — without that, an overflowed
+  // calculation that lands past midnight gets clamped to 16:00 of THE NEXT
+  // DAY, which is what produced "bedtime in 22h 17m" pointing to tomorrow.
+  const dayAnchor = new Date(lastSleep.end_time);
+  const dayAnchorDate = isoToDateInTz(dayAnchor.toISOString(), ctx.tz);
+  const bedtimeLocalDate = isoToDateInTz(bedtime.toISOString(), ctx.tz);
+  if (bedtimeLocalDate !== dayAnchorDate) {
+    // Calculation wrapped to a different day — pin to the anchor day's 23:00.
+    return setHourInTz(dayAnchor, 23, 0, ctx.tz).toISOString();
+  }
   const hour = getHourInTz(bedtime, ctx.tz);
-  if (hour < 16) return setHourInTz(bedtime, 16, 0, ctx.tz).toISOString();
-  if (hour > 23) return setHourInTz(bedtime, 23, 0, ctx.tz).toISOString();
+  if (hour < 16) return setHourInTz(dayAnchor, 16, 0, ctx.tz).toISOString();
+  if (hour > 23) return setHourInTz(dayAnchor, 23, 0, ctx.tz).toISOString();
 
   return bedtime.toISOString();
 }
@@ -1423,6 +1433,13 @@ export function targetBedtimeToISO(hhmm: string, now: number, tz: string): strin
 /**
  * Build the sleep list for recommendBedtime: actual completed sleeps + synthetic
  * entries for active nap (predicted end) and remaining predicted naps.
+ *
+ * Synthetic naps that would END past 17:00 local are dropped — they wouldn't
+ * actually fit before any reasonable bedtime, and including them in the
+ * pressure calculation pushes bedtime ~6h past the synthetic-nap end (e.g. a
+ * synthetic comeback ending 18:23 sets bedtime past midnight). After cut-shorts
+ * eat the day, the right answer is "no more naps" + earlier-than-usual bedtime,
+ * not "stuff a late nap in and bedtime tomorrow".
  */
 export function buildSleepsForBedtime(
   todaySleeps: SleepEntry[],
@@ -1438,7 +1455,10 @@ export function buildSleepsForBedtime(
       type: "nap",
     });
   }
+  const LATEST_NAP_END_HOUR_LOCAL = 17;
   for (const pn of remainingPredicted) {
+    const endHourLocal = getHourInTz(new Date(pn.endTime), ctx.tz);
+    if (endHourLocal >= LATEST_NAP_END_HOUR_LOCAL) continue;
     sleeps.push({ start_time: pn.startTime, end_time: pn.endTime, type: "nap" });
   }
   return sleeps;

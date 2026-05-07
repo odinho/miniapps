@@ -435,6 +435,62 @@ describe("assembleState", () => {
     expect(next - microEndMs).toBeGreaterThanOrEqual(165 * 60_000);
   });
 
+  it("bedtime never lands on TOMORROW after a heavy-deficit cut-short day", () => {
+    // Field-reported regression (2026-05-07): two cut-shorts (28 min + 39 min)
+    // ended 12:44, now 17:43. Engine produced bedtime = 16:00 on the NEXT day
+    // ("LEGGETID OM 22t 17m"). Three compounding bugs:
+    //   1. recommendBedtime's pressure overflowed past midnight (lastSleep +
+    //      6h bedtime-WW = 18:49 + 6h = 00:49) — landed on next day.
+    //   2. Sanity clamp set hour to 16:00 of *that overflowed day* — locking
+    //      bedtime to next-day 16:00.
+    //   3. buildSleepsForBedtime included a synthetic comeback nap that
+    //      ended past 17:00, inflating the pressure base.
+    // Pin: bedtime stays on TODAY, in a 16:00–22:00 sane window.
+    const baby10mo: Baby = {
+      ...baseBaby,
+      birthdate: "2025-06-12",
+      timezone: "Europe/Oslo",
+    };
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-05-07",
+      wake_time: "2026-05-07T03:30:00.000Z",
+      created_at: "2026-05-07T03:30:00.000Z",
+      created_by_event_id: null,
+    };
+    const morningCutShort = sleepRow({
+      start_time: "2026-05-07T06:21:00.000Z",
+      end_time: "2026-05-07T06:49:00.000Z", // 28 min
+      type: "nap",
+      woke_by: "self",
+    });
+    const middayCutShort = sleepRow({
+      id: 9002,
+      start_time: "2026-05-07T10:05:00.000Z",
+      end_time: "2026-05-07T10:44:00.000Z", // 39 min
+      type: "nap",
+      woke_by: "woken",
+      domain_id: "slp_mid_cs",
+    });
+
+    const result = assembleState(
+      dayData({
+        baby: baby10mo,
+        recentSleeps: rested1NapHistory(),
+        todaySleeps: [middayCutShort, morningCutShort], // DESC like prod
+        todayWakeUp: wakeUp,
+        now: new Date("2026-05-07T15:43:00.000Z").getTime(),
+      }),
+    );
+
+    expect(result.prediction!.bedtime).not.toBeNull();
+    const bedtimeMs = new Date(result.prediction!.bedtime!).getTime();
+    // Must be on today (May 7), not tomorrow.
+    expect(bedtimeMs).toBeLessThan(new Date("2026-05-08T00:00:00.000Z").getTime());
+    // And in a sane evening window (16:00–22:00 Oslo on May 7).
+    expect(bedtimeMs).toBeGreaterThan(new Date("2026-05-07T14:00:00.000Z").getTime()); // ≥ 16:00 Oslo
+    expect(bedtimeMs).toBeLessThan(new Date("2026-05-07T20:00:00.000Z").getTime());    // < 22:00 Oslo
+  });
+
   it("floor pushes the comeback LATER when the constrained day plan goes too early", () => {
     // Real scenario from the field: 10mo, 1-nap regime, target_bedtime 18:00,
     // 28-min cut-short ending 08:49. The natural plan from selectBestPlan
