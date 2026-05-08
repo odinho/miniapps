@@ -1434,18 +1434,25 @@ export function targetBedtimeToISO(hhmm: string, now: number, tz: string): strin
  * Build the sleep list for recommendBedtime: actual completed sleeps + synthetic
  * entries for active nap (predicted end) and remaining predicted naps.
  *
- * Synthetic naps that would END past 17:00 local are dropped — they wouldn't
- * actually fit before any reasonable bedtime, and including them in the
- * pressure calculation pushes bedtime ~6h past the synthetic-nap end (e.g. a
- * synthetic comeback ending 18:23 sets bedtime past midnight). After cut-shorts
- * eat the day, the right answer is "no more naps" + earlier-than-usual bedtime,
- * not "stuff a late nap in and bedtime tomorrow".
+ * Two drops on synthetic naps:
+ *
+ * 1. Naps that END past 17:00 local — they wouldn't actually fit before any
+ *    reasonable bedtime, and including them pushes bedtime ~6h past the
+ *    synthetic-nap end (e.g. a comeback ending 18:23 + 6h bedtimeWW = 00:23
+ *    overflows past midnight).
+ * 2. Naps whose START is already in the past at `now` — they were planned
+ *    earlier in the day but didn't actually happen (parent skipped). Stale
+ *    plans shouldn't drag bedtime later as if they had occurred. This was
+ *    the May-8 19:22 bug: 46-min cut-short ended 10:07, parent skipped the
+ *    comeback, but the engine still anchored bedtime calc on the synthetic
+ *    13:00 nap.
  */
 export function buildSleepsForBedtime(
   todaySleeps: SleepEntry[],
   activeSleep: SleepLogRow | undefined,
   remainingPredicted: PredictedNap[],
   ctx: BabyContext,
+  now: number,
 ): SleepEntry[] {
   const sleeps = [...todaySleeps];
   if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
@@ -1457,6 +1464,8 @@ export function buildSleepsForBedtime(
   }
   const LATEST_NAP_END_HOUR_LOCAL = 17;
   for (const pn of remainingPredicted) {
+    const startMs = new Date(pn.startTime).getTime();
+    if (startMs <= now) continue; // skipped: planned start is in the past
     const endHourLocal = getHourInTz(new Date(pn.endTime), ctx.tz);
     if (endHourLocal >= LATEST_NAP_END_HOUR_LOCAL) continue;
     sleeps.push({ start_time: pn.startTime, end_time: pn.endTime, type: "nap" });
@@ -1586,7 +1595,7 @@ export function selectBestPlan(
 
   // Natural plan: forward walk + learned bedtime
   const naturalNaps = predictDayNaps(wakeUpTime, ctx);
-  const sleepsForBedtime = buildSleepsForBedtime(todaySleeps, activeSleep, naturalNaps, ctx);
+  const sleepsForBedtime = buildSleepsForBedtime(todaySleeps, activeSleep, naturalNaps, ctx, now);
   const naturalBedtime = recommendBedtime(sleepsForBedtime, ctx);
   const naturalPlan: PlanCandidate = { naps: naturalNaps, bedtime: naturalBedtime };
 

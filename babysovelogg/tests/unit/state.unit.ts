@@ -435,6 +435,57 @@ describe("assembleState", () => {
     expect(next - microEndMs).toBeGreaterThanOrEqual(165 * 60_000);
   });
 
+  it("bedtime ignores synthetic comeback naps that the parent skipped", () => {
+    // Field-reported regression (2026-05-08): one 46-min cut-short ended
+    // 10:07. At 16:22 (6h 15m after that nap end, parent skipped the
+    // engine-suggested comeback), bedtime predicted at 19:22 — way too late.
+    // Root cause: the re-anchored selectBestPlan added a synthetic comeback
+    // (e.g. ~13:00 nap) to buildSleepsForBedtime, dragging the pressure
+    // calculation 6h past that synthetic end. The synthetic nap's startTime
+    // (13:00) was already in the past at 16:22, so it should have been
+    // dropped — it represents a plan the parent already missed.
+    const baby10mo: Baby = {
+      ...baseBaby,
+      birthdate: "2025-06-12",
+      timezone: "Europe/Oslo",
+    };
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-05-08",
+      wake_time: "2026-05-08T03:45:00.000Z", // 05:45 Oslo
+      created_at: "2026-05-08T03:45:00.000Z",
+      created_by_event_id: null,
+    };
+    const cutShort = sleepRow({
+      start_time: "2026-05-08T07:20:40.000Z", // 09:20 Oslo
+      end_time: "2026-05-08T08:07:00.000Z",   // 10:07 Oslo, 46 min
+      type: "nap",
+      woke_by: "self",
+    });
+
+    const result = assembleState(
+      dayData({
+        baby: baby10mo,
+        recentSleeps: rested1NapHistory(),
+        todaySleeps: [cutShort],
+        todayWakeUp: wakeUp,
+        now: new Date("2026-05-08T14:22:00.000Z").getTime(), // 16:22 Oslo
+      }),
+    );
+
+    expect(result.prediction!.bedtime).not.toBeNull();
+    const bedtimeMs = new Date(result.prediction!.bedtime!).getTime();
+    const cutShortEndMs = new Date("2026-05-08T08:07:00.000Z").getTime();
+    const wwFromCutShortMin = (bedtimeMs - cutShortEndMs) / 60_000;
+
+    // Bedtime must be reachable from the cut-short end + a sane bedtime-WW —
+    // not the cut-short end + bedtime-WW + synthetic comeback duration. With
+    // ~6h learned bedtime-WW for Halldis, that means bedtime within 8h of
+    // the cut-short end (anything > 9h is the bug we just fixed).
+    expect(wwFromCutShortMin).toBeLessThan(9 * 60);
+    // And reasonably close to the cut-short end + bedtime-WW (≥ 5h).
+    expect(wwFromCutShortMin).toBeGreaterThan(5 * 60);
+  });
+
   it("bedtime never lands on TOMORROW after a heavy-deficit cut-short day", () => {
     // Field-reported regression (2026-05-07): two cut-shorts (28 min + 39 min)
     // ended 12:44, now 17:43. Engine produced bedtime = 16:00 on the NEXT day
