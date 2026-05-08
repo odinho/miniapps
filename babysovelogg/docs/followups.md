@@ -124,12 +124,13 @@ Probably needs labeled-fixture-skip or a real fix.
 
 These are non-bug improvements both reviewers want:
 
-- **Round float values in `renderPrediction`** — `ww=183.07692307692307m` is
-  noise. Round to 1 decimal so a real shift stands out.
 - **Extract `tests/helpers/baby-history.ts`** — `oneNapHistory`,
   `twoNapHistory`, `threeNapHistory`, `sparseHistory`, `newbornHistory`. The
   archetype builders in engine-scenarios are the canonical version; remove
   duplicates in `state.unit.ts:278` and `plan-scoring.unit.ts:46-81`.
+  Lower priority — each builder is only used in one file today; the bigger
+  leverage is cleaning up state.unit.ts duplicates (separate followup),
+  which would delete `rested1NapHistory` outright.
 - **Add `expectTimeNear(actual, expected, withinMin=5)` matcher** — for
   bug-pin tests like the May-7 floor where a 2-min engine improvement
   shouldn't cause test churn but a 30-min regression should.

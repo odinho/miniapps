@@ -60,6 +60,17 @@ function addMin(hhmm: string, minutes: number): string {
   return `${pad(Math.floor(total / 60))}:${pad(total % 60)}`;
 }
 
+/**
+ * Format a learned-minute value with at most 1 decimal place. Without this,
+ * snapshots show noise like `ww=183.07692307692307m`, which both hides real
+ * shifts and produces large diffs on tiny engine tweaks.
+ */
+function fmtMin(value: number): string {
+  return Number.isInteger(value)
+    ? value.toString()
+    : (Math.round(value * 10) / 10).toString();
+}
+
 /** Convert a UTC ISO timestamp to "HH:MM" in Oslo. */
 function osloHHMM(iso: string): string {
   const fmt = new Intl.DateTimeFormat("en-GB", {
@@ -522,7 +533,7 @@ function renderPrediction(scn: BuiltScenario, p: Prediction | null): string {
   }
   if (p.learnedSchedule) {
     const ls = p.learnedSchedule;
-    lines.push(`  learned: nap=${ls.napDurationMin}m night=${ls.nightDurationMin}m ww=${ls.wakeWindowMin}m bedww=${ls.bedtimeWakeWindowMin}m`);
+    lines.push(`  learned: nap=${fmtMin(ls.napDurationMin)}m night=${fmtMin(ls.nightDurationMin)}m ww=${fmtMin(ls.wakeWindowMin)}m bedww=${fmtMin(ls.bedtimeWakeWindowMin)}m`);
   }
   if (p.sleepWindow) {
     lines.push(`  sleepWindow: ${osloHHMM(p.sleepWindow.earliest)}–${osloHHMM(p.sleepWindow.latest)}`);
@@ -2084,7 +2095,7 @@ describe("Ada NoTarget (2-nap, no target_bedtime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (2 napRanges)
-        learned: nap=80m night=660m ww=183.07692307692307m bedww=250m
+        learned: nap=80m night=660m ww=183.1m bedww=250m
 
       scenario: 09:00 right at first nap
         now: 09:00
@@ -2099,7 +2110,7 @@ describe("Ada NoTarget (2-nap, no target_bedtime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (2 napRanges)
-        learned: nap=80m night=660m ww=183.07692307692307m bedww=250m
+        learned: nap=80m night=660m ww=183.1m bedww=250m
 
       scenario: 11:00 after first nap
         now: 11:00
@@ -2114,7 +2125,7 @@ describe("Ada NoTarget (2-nap, no target_bedtime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (1 napRanges)
-        learned: nap=80m night=660m ww=183.07692307692307m bedww=250m
+        learned: nap=80m night=660m ww=183.1m bedww=250m
 
       scenario: 13:30 right at second nap
         now: 13:30
@@ -2129,7 +2140,7 @@ describe("Ada NoTarget (2-nap, no target_bedtime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (1 napRanges)
-        learned: nap=80m night=660m ww=183.07692307692307m bedww=250m
+        learned: nap=80m night=660m ww=183.1m bedww=250m
 
       scenario: 14:00 active nap 2
         now: 14:00
@@ -2144,7 +2155,7 @@ describe("Ada NoTarget (2-nap, no target_bedtime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (0 napRanges)
-        learned: nap=80m night=660m ww=183.07692307692307m bedww=250m
+        learned: nap=80m night=660m ww=183.1m bedww=250m
 
       scenario: 15:30 after 2 naps
         now: 15:30
@@ -2159,7 +2170,7 @@ describe("Ada NoTarget (2-nap, no target_bedtime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (0 napRanges)
-        learned: nap=80m night=660m ww=183.07692307692307m bedww=250m
+        learned: nap=80m night=660m ww=183.1m bedww=250m
 
       scenario: 18:30 evening, napsAllDone
         now: 18:30
@@ -2174,7 +2185,7 @@ describe("Ada NoTarget (2-nap, no target_bedtime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (0 napRanges)
-        learned: nap=80m night=660m ww=183.07692307692307m bedww=250m
+        learned: nap=80m night=660m ww=183.1m bedww=250m
 
       scenario: 20:00 just before bedtime
         now: 20:00
@@ -2189,7 +2200,7 @@ describe("Ada NoTarget (2-nap, no target_bedtime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (0 napRanges)
-        learned: nap=80m night=660m ww=183.07692307692307m bedww=250m
+        learned: nap=80m night=660m ww=183.1m bedww=250m
 
       scenario: 06:00 same day with target=18:00 override
         now: 06:00
@@ -2204,7 +2215,7 @@ describe("Ada NoTarget (2-nap, no target_bedtime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (2 napRanges)
-        learned: nap=80m night=660m ww=183.07692307692307m bedww=250m"
+        learned: nap=80m night=660m ww=183.1m bedww=250m"
     `);
   });
 });
@@ -3190,7 +3201,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (0 napRanges)
-        learned: nap=80m night=660m ww=183.07692307692307m bedww=250m
+        learned: nap=80m night=660m ww=183.1m bedww=250m
 
       scenario: midday no sleeps logged at 13:00
         now: 13:00
@@ -3205,7 +3216,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (1 napRanges)
-        learned: nap=80m night=660m ww=183.07692307692307m bedww=250m
+        learned: nap=80m night=660m ww=183.1m bedww=250m
 
       ──────────
 
