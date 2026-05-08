@@ -65,22 +65,24 @@ shipped, reading snapshots critically for behavioural regressions baked in by
 `--update`. Both reviewers converged on the same major findings — high
 confidence each is a real engine bug.
 
-### Engine bug: `target_bedtime` setting has no visible effect
+### UX: signal when `target_bedtime` is rejected as infeasible
 
-**Where:** Settings sweep on Oskar — variants `target=18:00 (early)` AND
-`target=21:00 (late)` both produce nearly identical bedtime values.
+When the family's stated target produces a day plan that violates hard
+constraints (e.g. final wake-window > 1.3× max), `selectBestPlan` falls
+back to `naturalPlan` silently — `SelectedPlan.source` becomes `"natural"`
+but no signal reaches the UI explaining why. A parent who set target=21:00
+on a 1-nap baby and got bedtime=19:30 has no way to know the engine
+ignored their target. Surface the rejection reason (from
+`scorePlan`'s `hardViolations`) to the prediction shape.
 
-**Root cause** (Codex 2026-05-08 review): `selectBestPlan` clamps the
-target to natural ±15 min via `DAILY_SHIFT_CAP_MS`
-(`src/lib/engine/schedule.ts:1610-1615`). And the natural bedtime itself
-goes through `recommendBedtime`'s sanity clamp first. So if natural lands
-at 17:00 (e.g. via the new 17:00 floor), target=21:00 can only push to
-17:15. The structural limit means target_bedtime is mostly cosmetic.
+### Backtest blind spot: target_bedtime not threaded
 
-**Fix plan:** Lift `DAILY_SHIFT_CAP_MS` to something larger (60-90 min) so
-the family's stated target can actually move bedtime. Document the cap
-explicitly in the snapshot. Add a paired test: target=18:00 produces
-*materially* earlier bedtime than target=21:00.
+`src/lib/engine/backtest.ts`: `DayRecord` has no target_bedtime field and
+`ctx` is built without `targetBedtime`. So MAE on Halldis or any baby
+can't reflect target_bedtime tuning. Adding target to the backtest
+fixture would let us measure whether the new 60-min cap actually
+improves prediction accuracy on real data, instead of just satisfying
+the synthetic settings sweep.
 
 ### Engine bug: emerging path lacks "collapsed to bedtime" cleanup
 

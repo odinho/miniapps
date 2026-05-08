@@ -1426,7 +1426,16 @@ export interface SelectedPlan extends PlanCandidate {
   source: "natural" | "target-guided";
 }
 
-const DAILY_SHIFT_CAP_MS = 15 * 60_000;
+/**
+ * How far the family's stated `target_bedtime` can shift the day's
+ * predicted bedtime away from the natural (habitual / pressure-driven)
+ * bedtime. Originally 15 min, which made target_bedtime essentially
+ * cosmetic (e.g. target=21:00 with natural=19:30 effective bedtime
+ * capped to 19:45). Raised to 60 min in 2026-05 so the target actually
+ * pulls predictions toward the family's preference, while still
+ * preventing wildly unrealistic targets from breaking the day plan.
+ */
+const DAILY_SHIFT_CAP_MS = 60 * 60_000;
 
 /** Convert a "HH:MM" target bedtime to an ISO timestamp for today in the baby's timezone. */
 export function targetBedtimeToISO(hhmm: string, now: number, tz: string): string {
@@ -1607,7 +1616,7 @@ export function selectBestPlan(
     return { ...naturalPlan, source: "natural" };
   }
 
-  // Compute effective target (capped ±15 min from natural bedtime)
+  // Compute effective target (capped by DAILY_SHIFT_CAP_MS from natural bedtime)
   const naturalBedtimeMs = new Date(naturalBedtime).getTime();
   const rawTargetMs = new Date(targetBedtimeToISO(ctx.targetBedtime, now, ctx.tz)).getTime();
   const shift = Math.max(-DAILY_SHIFT_CAP_MS, Math.min(DAILY_SHIFT_CAP_MS, rawTargetMs - naturalBedtimeMs));

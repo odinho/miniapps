@@ -180,13 +180,13 @@ describe("selectBestPlan", () => {
     expect(result.source).toBe("natural");
   });
 
-  it("target shifts bedtime by at most 15 min from natural", () => {
+  it("target shifts bedtime by at most 60 min from natural", () => {
     const natural = selectBestPlan("2026-03-28T07:00:00Z", [], undefined, ctx({ recentSleeps }), NOW);
     const withTarget = selectBestPlan("2026-03-28T07:00:00Z", [], undefined,
       ctx({ recentSleeps, targetBedtime: "16:00" }), NOW);
 
     expect(Math.abs(new Date(natural.bedtime).getTime() - new Date(withTarget.bedtime).getTime()))
-      .toBeLessThanOrEqual(15 * 60_000);
+      .toBeLessThanOrEqual(60 * 60_000);
   });
 
   it("feasible target-guided plan wins when closer to target", () => {
@@ -260,7 +260,11 @@ naps done: false (2 expected)"
     }
   });
 
-  it("target bedtime: plan scored and selected, shift capped at 15 min", () => {
+  it("target bedtime: plan scored and selected, shift capped at 60 min", () => {
+    // The cap was originally 15 min, which made target_bedtime essentially
+    // cosmetic (target=18:30 with natural=19:45 effective bedtime capped to
+    // 19:30). Raised to 60 min so the family's stated target actually pulls
+    // predictions toward their preference.
     const bedtimeBaby = { ...baseBaby, timezone: "UTC", target_bedtime: "18:30" };
 
     const morning = assembleState(
@@ -269,12 +273,12 @@ naps done: false (2 expected)"
     );
 
     expect(renderDayPlan(morning)).toMatchInlineSnapshot(`
-"strategy: emerging_rhythm
-lur 1: 09:45–11:15
-lur 2: 14:15–15:45
-bedtime: 19:45
-naps done: false (2 expected)"
-`);
+      "strategy: emerging_rhythm
+      lur 1: 10:00–11:30
+      lur 2: 14:30–16:00
+      bedtime: 20:00
+      naps done: false (2 expected)"
+    `);
 
     const withoutTarget = assembleState(
       dayData({ baby: utcBaby, recentSleeps: sparseRows, todaySleeps: [],
@@ -285,8 +289,8 @@ naps done: false (2 expected)"
     const targetBedtimeMs = new Date(morning.prediction!.bedtime!).getTime();
     const learnedBedtimeMs = new Date(withoutTarget.prediction!.bedtime!).getTime();
     expect(targetBedtimeMs).toBeLessThanOrEqual(learnedBedtimeMs);
-    // Pin: shift capped at 15 min from natural bedtime
-    expect(learnedBedtimeMs - targetBedtimeMs).toBeLessThanOrEqual(15 * 60_000);
+    // Pin: shift capped at 60 min from natural bedtime
+    expect(learnedBedtimeMs - targetBedtimeMs).toBeLessThanOrEqual(60 * 60_000);
   });
 
   it("midday replan after completed nap: naps and bedtime stay coherent", () => {

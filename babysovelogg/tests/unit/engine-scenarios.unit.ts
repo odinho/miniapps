@@ -1230,8 +1230,8 @@ describe("Mina Learned (3-nap routine_schedule)", () => {
         now: 16:30
         inputs: wake=06:30 done=[08:50-09:35] target=19:15
         strategy: routine_schedule
-        nextNap: 17:00 (+30m)
-        bedtime: 17:00 (+30m)
+        nextNap: 18:00 (+1h 30m)
+        bedtime: 18:00 (+1h 30m)
         predictedNaps: none
         napsAllDone: true (3 expected)
         expectedNapEnd: none
@@ -1683,9 +1683,9 @@ describe("Oskar OneNap (1-nap routine_schedule, cut-short matrix)", () => {
         now: 08:12
         inputs: wake=06:00 done=[06:21-06:49!] target=18:00
         strategy: routine_schedule
-        nextNap: 10:32 (+2h 20m)
-        bedtime: 19:17 (+11h 05m)
-        predictedNaps: 10:32-12:22
+        nextNap: 09:55 (+1h 43m)
+        bedtime: 18:32 (+10h 20m)
+        predictedNaps: 09:55-11:45
         napsAllDone: false (1 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -1897,9 +1897,9 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         now: 06:30
         inputs: wake=06:00 target=19:45
         strategy: emerging_rhythm
-        nextNap: 06:37 (+07m)
-        bedtime: 17:15 (+10h 45m)
-        predictedNaps: 06:37-07:27, 09:31-10:26, 11:59-12:49, 14:55-15:40
+        nextNap: 07:22 (+52m)
+        bedtime: 18:00 (+11h 30m)
+        predictedNaps: 07:22-08:12, 10:16-11:11, 12:44-13:34, 15:40-16:25
         napsAllDone: false (4 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -1913,9 +1913,9 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         now: 08:30
         inputs: wake=06:00 target=19:45
         strategy: emerging_rhythm
-        nextNap: 09:31 (+1h 01m)
-        bedtime: 17:15 (+8h 45m)
-        predictedNaps: 09:31-10:26, 11:59-12:49, 14:55-15:40
+        nextNap: 10:16 (+1h 46m)
+        bedtime: 18:00 (+9h 30m)
+        predictedNaps: 10:16-11:11, 12:44-13:34, 15:40-16:25
         napsAllDone: false (4 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -1929,9 +1929,9 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         now: 10:00
         inputs: wake=06:00 done=[08:00-08:50] target=19:45
         strategy: emerging_rhythm
-        nextNap: 09:44 (-15m)
-        bedtime: 17:28 (+7h 28m)
-        predictedNaps: 09:44-10:39, 12:12-13:02, 15:08-15:53
+        nextNap: 10:29 (+29m)
+        bedtime: 18:13 (+8h 13m)
+        predictedNaps: 10:29-11:24, 12:57-13:47, 15:53-16:38
         napsAllDone: false (4 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -1945,9 +1945,9 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         now: 12:30
         inputs: wake=06:00 done=[11:00-11:50, 08:00-08:50] target=19:45
         strategy: emerging_rhythm
-        nextNap: 12:12 (-17m)
-        bedtime: 17:28 (+4h 58m)
-        predictedNaps: 12:12-13:02, 15:08-15:53
+        nextNap: 12:57 (+27m)
+        bedtime: 18:13 (+5h 43m)
+        predictedNaps: 12:57-13:47, 15:53-16:38
         napsAllDone: false (4 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -1961,9 +1961,9 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         now: 14:30
         inputs: wake=06:00 done=[11:00-11:50, 08:00-08:50] active=14:00(nap) target=19:45
         strategy: emerging_rhythm
-        nextNap: 17:34 (+3h 04m)
-        bedtime: 17:34 (+3h 04m)
-        predictedNaps: none
+        nextNap: 16:14 (+1h 44m)
+        bedtime: 18:34 (+4h 04m)
+        predictedNaps: 16:14-16:59
         napsAllDone: false (4 expected)
         expectedNapEnd: 14:49 (+19m)
         expectedNightEnd: none
@@ -2009,9 +2009,9 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         now: 12:30
         inputs: wake=06:00 done=[11:00-11:30!, 08:00-08:50] target=19:45
         strategy: emerging_rhythm
-        nextNap: 12:12 (-17m)
-        bedtime: 17:28 (+4h 58m)
-        predictedNaps: 12:12-13:02, 15:08-15:53
+        nextNap: 12:57 (+27m)
+        bedtime: 18:13 (+5h 43m)
+        predictedNaps: 12:57-13:47, 15:53-16:38
         napsAllDone: false (4 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -2237,9 +2237,9 @@ describe("Iben Sparse (emerging_rhythm via demotion)", () => {
         now: 06:30
         inputs: wake=06:30 target=20:00
         strategy: emerging_rhythm
-        nextNap: 10:15 (+3h 45m)
-        bedtime: 19:54 (+13h 24m)
-        predictedNaps: 10:15-11:19, 14:49-15:53
+        nextNap: 10:20 (+3h 50m)
+        bedtime: 20:00 (+13h 30m)
+        predictedNaps: 10:20-11:24, 14:54-15:58
         napsAllDone: false (2 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -2253,9 +2253,9 @@ describe("Iben Sparse (emerging_rhythm via demotion)", () => {
         now: 10:30
         inputs: wake=06:30 target=20:00
         strategy: emerging_rhythm
-        nextNap: 09:38 (-51m)
-        bedtime: 19:18 (+8h 48m)
-        predictedNaps: 09:38-10:42, 14:12-15:16
+        nextNap: 10:20 (-09m)
+        bedtime: 20:00 (+9h 30m)
+        predictedNaps: 10:20-11:24, 14:54-15:58
         napsAllDone: false (2 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -2269,9 +2269,9 @@ describe("Iben Sparse (emerging_rhythm via demotion)", () => {
         now: 12:00
         inputs: wake=06:30 done=[10:00-11:00] target=20:00
         strategy: emerging_rhythm
-        nextNap: 14:49 (+2h 49m)
-        bedtime: 19:54 (+7h 54m)
-        predictedNaps: 14:49-15:53
+        nextNap: 14:54 (+2h 54m)
+        bedtime: 20:00 (+8h 00m)
+        predictedNaps: 14:54-15:58
         napsAllDone: false (2 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -2285,8 +2285,8 @@ describe("Iben Sparse (emerging_rhythm via demotion)", () => {
         now: 15:30
         inputs: wake=06:30 done=[14:30-15:15, 10:00-11:00] target=20:00
         strategy: emerging_rhythm
-        nextNap: 19:31 (+4h 01m)
-        bedtime: 19:31 (+4h 01m)
+        nextNap: 20:00 (+4h 30m)
+        bedtime: 20:00 (+4h 30m)
         predictedNaps: none
         napsAllDone: true (2 expected)
         expectedNapEnd: none
@@ -2301,8 +2301,8 @@ describe("Iben Sparse (emerging_rhythm via demotion)", () => {
         now: 20:00
         inputs: wake=06:30 done=[14:30-15:15, 10:00-11:00] target=20:00
         strategy: emerging_rhythm
-        nextNap: 19:31 (-28m)
-        bedtime: 19:31 (-28m)
+        nextNap: 20:00 (+00m)
+        bedtime: 20:00 (+00m)
         predictedNaps: none
         napsAllDone: true (2 expected)
         expectedNapEnd: none
@@ -2317,9 +2317,9 @@ describe("Iben Sparse (emerging_rhythm via demotion)", () => {
         now: 11:00
         inputs: wake=06:30 active=10:30(nap) target=20:00
         strategy: emerging_rhythm
-        nextNap: 14:49 (+3h 49m)
-        bedtime: 19:54 (+8h 54m)
-        predictedNaps: 14:49-15:53
+        nextNap: 14:54 (+3h 54m)
+        bedtime: 20:00 (+9h 00m)
+        predictedNaps: 14:54-15:58
         napsAllDone: false (2 expected)
         expectedNapEnd: 11:31 (+31m)
         expectedNightEnd: none
@@ -2418,6 +2418,27 @@ describe("paired-baseline invariants", () => {
     const nextMs = new Date(result.prediction!.nextNap!).getTime();
     expect(nextMs - cutEndMs).toBeGreaterThanOrEqual(165 * 60_000);
   });
+
+  it("Oskar: target_bedtime materially shifts the predicted bedtime", () => {
+    // The settings-sweep finding from the 2026-05-08 review: target=18:00
+    // and target=21:00 both produced essentially the same bedtime because
+    // DAILY_SHIFT_CAP_MS was 15 min. After raising the cap to 60 min, an
+    // early target should produce a bedtime ≥30 min earlier than a late
+    // target on the same day plan.
+    const arch = buildOskar();
+
+    const earlyArch = { ...arch, baby: { ...arch.baby, target_bedtime: "18:00" } };
+    const lateArch = { ...arch, baby: { ...arch.baby, target_bedtime: "21:00" } };
+
+    const earlyResult = assembleState(buildScenario(earlyArch, { label: "early", now: "06:00" }).data);
+    const lateResult = assembleState(buildScenario(lateArch, { label: "late", now: "06:00" }).data);
+
+    const earlyMs = new Date(earlyResult.prediction!.bedtime!).getTime();
+    const lateMs = new Date(lateResult.prediction!.bedtime!).getTime();
+    const diffMin = (lateMs - earlyMs) / 60_000;
+    expect(diffMin, "target=21:00 should produce later bedtime than target=18:00")
+      .toBeGreaterThanOrEqual(30);
+  });
 });
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -2428,6 +2449,215 @@ describe("paired-baseline invariants", () => {
 // settings (timezone, custom_nap_count override, potty_mode) can plug into
 // the same runSettingsSweep harness.
 // ────────────────────────────────────────────────────────────────────────────
+
+describe("settings sweep: Mina × target_bedtime (3-nap regime)", () => {
+  it("renders day plan across target_bedtime variants", () => {
+    const arch = buildMina();
+    const settings: Array<{ label: string; overrides: Partial<Baby> }> = [
+      { label: "target=null", overrides: { target_bedtime: null } },
+      { label: "target=18:30 (early)", overrides: { target_bedtime: "18:30" } },
+      { label: "target=19:15 (baseline)", overrides: { target_bedtime: "19:15" } },
+      { label: "target=20:30 (late)", overrides: { target_bedtime: "20:30" } },
+    ];
+    const scenarios: ScenarioInput[] = [
+      { label: "06:30 morning", now: "06:30" },
+      { label: "10:00 after first nap", now: "10:00", done: ["08:50-09:35"] },
+      { label: "16:30 napsAllDone", now: "16:30",
+        done: ["15:55-16:35", "12:10-13:20", "08:50-09:35"] },
+    ];
+    expect(runSettingsSweep(arch, settings, scenarios)).toMatchInlineSnapshot(`
+      "baby: Mina Learned — settings sweep (8mo, 3-nap, target 19:15, 21d)
+
+      ══ setting: target=null ══
+
+      scenario: 06:30 morning
+        now: 06:30
+        inputs: wake=06:30 target=none
+        strategy: routine_schedule
+        nextNap: 08:55 (+2h 25m)
+        bedtime: 19:14 (+12h 44m)
+        predictedNaps: 08:55-09:40, 12:13-13:23, 15:54-16:34
+        napsAllDone: false (3 expected)
+        expectedNapEnd: none
+        expectedNightEnd: none
+        rescueNap: none
+        continuationWindow: none
+        confidence: high (3 napRanges)
+        learned: nap=45m night=675m ww=150.5m bedww=160m
+
+      scenario: 10:00 after first nap
+        now: 10:00
+        inputs: wake=06:30 done=[08:50-09:35] target=none
+        strategy: routine_schedule
+        nextNap: 12:13 (+2h 13m)
+        bedtime: 19:14 (+9h 14m)
+        predictedNaps: 12:13-13:23, 15:54-16:34
+        napsAllDone: false (3 expected)
+        expectedNapEnd: none
+        expectedNightEnd: none
+        rescueNap: none
+        continuationWindow: none
+        confidence: high (2 napRanges)
+        learned: nap=45m night=675m ww=150.5m bedww=160m
+
+      scenario: 16:30 napsAllDone
+        now: 16:30
+        inputs: wake=06:30 done=[15:55-16:35, 12:10-13:20, 08:50-09:35] target=none
+        strategy: routine_schedule
+        nextNap: 19:15 (+2h 45m)
+        bedtime: 19:15 (+2h 45m)
+        predictedNaps: none
+        napsAllDone: true (3 expected)
+        expectedNapEnd: none
+        expectedNightEnd: none
+        rescueNap: none
+        continuationWindow: none
+        confidence: high (0 napRanges)
+        learned: nap=45m night=675m ww=150.5m bedww=160m
+
+      ══ setting: target=18:30 (early) ══
+
+      scenario: 06:30 morning
+        now: 06:30
+        inputs: wake=06:30 target=18:30
+        strategy: routine_schedule
+        nextNap: 08:09 (+1h 39m)
+        bedtime: 18:30 (+12h 00m)
+        predictedNaps: 08:09-08:54, 11:29-12:39, 15:10-15:50
+        napsAllDone: false (3 expected)
+        expectedNapEnd: none
+        expectedNightEnd: none
+        rescueNap: none
+        continuationWindow: none
+        confidence: high (3 napRanges)
+        learned: nap=45m night=675m ww=150.5m bedww=160m
+
+      scenario: 10:00 after first nap
+        now: 10:00
+        inputs: wake=06:30 done=[08:50-09:35] target=18:30
+        strategy: routine_schedule
+        nextNap: 11:29 (+1h 29m)
+        bedtime: 18:30 (+8h 30m)
+        predictedNaps: 11:29-12:39, 15:10-15:50
+        napsAllDone: false (3 expected)
+        expectedNapEnd: none
+        expectedNightEnd: none
+        rescueNap: none
+        continuationWindow: none
+        confidence: high (2 napRanges)
+        learned: nap=45m night=675m ww=150.5m bedww=160m
+
+      scenario: 16:30 napsAllDone
+        now: 16:30
+        inputs: wake=06:30 done=[15:55-16:35, 12:10-13:20, 08:50-09:35] target=18:30
+        strategy: routine_schedule
+        nextNap: 18:30 (+2h 00m)
+        bedtime: 18:30 (+2h 00m)
+        predictedNaps: none
+        napsAllDone: true (3 expected)
+        expectedNapEnd: none
+        expectedNightEnd: none
+        rescueNap: none
+        continuationWindow: none
+        confidence: high (0 napRanges)
+        learned: nap=45m night=675m ww=150.5m bedww=160m
+
+      ══ setting: target=19:15 (baseline) ══
+
+      scenario: 06:30 morning
+        now: 06:30
+        inputs: wake=06:30 target=19:15
+        strategy: routine_schedule
+        nextNap: 08:55 (+2h 25m)
+        bedtime: 19:14 (+12h 44m)
+        predictedNaps: 08:55-09:40, 12:13-13:23, 15:54-16:34
+        napsAllDone: false (3 expected)
+        expectedNapEnd: none
+        expectedNightEnd: none
+        rescueNap: none
+        continuationWindow: none
+        confidence: high (3 napRanges)
+        learned: nap=45m night=675m ww=150.5m bedww=160m
+
+      scenario: 10:00 after first nap
+        now: 10:00
+        inputs: wake=06:30 done=[08:50-09:35] target=19:15
+        strategy: routine_schedule
+        nextNap: 12:13 (+2h 13m)
+        bedtime: 19:14 (+9h 14m)
+        predictedNaps: 12:13-13:23, 15:54-16:34
+        napsAllDone: false (3 expected)
+        expectedNapEnd: none
+        expectedNightEnd: none
+        rescueNap: none
+        continuationWindow: none
+        confidence: high (2 napRanges)
+        learned: nap=45m night=675m ww=150.5m bedww=160m
+
+      scenario: 16:30 napsAllDone
+        now: 16:30
+        inputs: wake=06:30 done=[15:55-16:35, 12:10-13:20, 08:50-09:35] target=19:15
+        strategy: routine_schedule
+        nextNap: 19:15 (+2h 45m)
+        bedtime: 19:15 (+2h 45m)
+        predictedNaps: none
+        napsAllDone: true (3 expected)
+        expectedNapEnd: none
+        expectedNightEnd: none
+        rescueNap: none
+        continuationWindow: none
+        confidence: high (0 napRanges)
+        learned: nap=45m night=675m ww=150.5m bedww=160m
+
+      ══ setting: target=20:30 (late) ══
+
+      scenario: 06:30 morning
+        now: 06:30
+        inputs: wake=06:30 target=20:30
+        strategy: routine_schedule
+        nextNap: 09:54 (+3h 24m)
+        bedtime: 20:14 (+13h 44m)
+        predictedNaps: 09:54-10:39, 13:14-14:24, 16:54-17:34
+        napsAllDone: false (3 expected)
+        expectedNapEnd: none
+        expectedNightEnd: none
+        rescueNap: none
+        continuationWindow: none
+        confidence: high (3 napRanges)
+        learned: nap=45m night=675m ww=150.5m bedww=160m
+
+      scenario: 10:00 after first nap
+        now: 10:00
+        inputs: wake=06:30 done=[08:50-09:35] target=20:30
+        strategy: routine_schedule
+        nextNap: 13:14 (+3h 14m)
+        bedtime: 20:14 (+10h 14m)
+        predictedNaps: 13:14-14:24, 16:54-17:34
+        napsAllDone: false (3 expected)
+        expectedNapEnd: none
+        expectedNightEnd: none
+        rescueNap: none
+        continuationWindow: none
+        confidence: high (2 napRanges)
+        learned: nap=45m night=675m ww=150.5m bedww=160m
+
+      scenario: 16:30 napsAllDone
+        now: 16:30
+        inputs: wake=06:30 done=[15:55-16:35, 12:10-13:20, 08:50-09:35] target=20:30
+        strategy: routine_schedule
+        nextNap: 20:15 (+3h 45m)
+        bedtime: 20:15 (+3h 45m)
+        predictedNaps: none
+        napsAllDone: true (3 expected)
+        expectedNapEnd: none
+        expectedNightEnd: none
+        rescueNap: none
+        continuationWindow: none
+        confidence: high (0 napRanges)
+        learned: nap=45m night=675m ww=150.5m bedww=160m"
+    `);
+  });
+});
 
 describe("settings sweep: Oskar × target_bedtime", () => {
   it("renders day plan across target_bedtime variants", () => {
@@ -2520,9 +2750,9 @@ describe("settings sweep: Oskar × target_bedtime", () => {
         now: 06:00
         inputs: wake=06:00 target=18:00
         strategy: routine_schedule
-        nextNap: 11:07 (+5h 07m)
-        bedtime: 19:17 (+13h 17m)
-        predictedNaps: 11:07-12:57
+        nextNap: 10:17 (+4h 17m)
+        bedtime: 18:17 (+12h 17m)
+        predictedNaps: 10:17-12:07
         napsAllDone: false (1 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -2535,8 +2765,8 @@ describe("settings sweep: Oskar × target_bedtime", () => {
         now: 13:30
         inputs: wake=06:00 done=[11:30-13:20] target=18:00
         strategy: routine_schedule
-        nextNap: 19:30 (+6h 00m)
-        bedtime: 19:30 (+6h 00m)
+        nextNap: 18:30 (+5h 00m)
+        bedtime: 18:30 (+5h 00m)
         predictedNaps: none
         napsAllDone: true (1 expected)
         expectedNapEnd: none
@@ -2550,8 +2780,8 @@ describe("settings sweep: Oskar × target_bedtime", () => {
         now: 16:00
         inputs: wake=06:00 done=[11:30-13:20] target=18:00
         strategy: routine_schedule
-        nextNap: 19:30 (+3h 30m)
-        bedtime: 19:30 (+3h 30m)
+        nextNap: 18:30 (+2h 30m)
+        bedtime: 18:30 (+2h 30m)
         predictedNaps: none
         napsAllDone: true (1 expected)
         expectedNapEnd: none
@@ -2565,9 +2795,9 @@ describe("settings sweep: Oskar × target_bedtime", () => {
         now: 08:12
         inputs: wake=06:00 done=[06:21-06:49!] target=18:00
         strategy: routine_schedule
-        nextNap: 10:32 (+2h 20m)
-        bedtime: 19:17 (+11h 05m)
-        predictedNaps: 10:32-12:22
+        nextNap: 09:55 (+1h 43m)
+        bedtime: 18:32 (+10h 20m)
+        predictedNaps: 09:55-11:45
         napsAllDone: false (1 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -2689,9 +2919,9 @@ describe("settings sweep: Oskar × target_bedtime", () => {
         now: 08:12
         inputs: wake=06:00 done=[06:21-06:49!] target=21:00
         strategy: routine_schedule
-        nextNap: 10:57 (+2h 45m)
-        bedtime: 19:47 (+11h 35m)
-        predictedNaps: 10:57-12:47
+        nextNap: 10:55 (+2h 43m)
+        bedtime: 19:32 (+11h 20m)
+        predictedNaps: 10:55-12:45
         napsAllDone: false (1 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -2848,9 +3078,9 @@ describe("cross-archetype shared scenarios", () => {
         now: 13:00
         inputs: wake=06:00 target=19:45
         strategy: emerging_rhythm
-        nextNap: 14:55 (+1h 55m)
-        bedtime: 17:15 (+4h 15m)
-        predictedNaps: 14:55-15:40
+        nextNap: 12:44 (-15m)
+        bedtime: 18:00 (+5h 00m)
+        predictedNaps: 12:44-13:34, 15:40-16:25
         napsAllDone: false (4 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -2888,9 +3118,9 @@ describe("cross-archetype shared scenarios", () => {
         now: 13:00
         inputs: wake=06:30 target=19:15
         strategy: routine_schedule
-        nextNap: 12:10 (-49m)
-        bedtime: 19:10 (+6h 10m)
-        predictedNaps: 12:10-13:20, 15:50-16:30
+        nextNap: 12:14 (-45m)
+        bedtime: 19:15 (+6h 15m)
+        predictedNaps: 12:14-13:24, 15:55-16:35
         napsAllDone: false (3 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -3001,8 +3231,8 @@ describe("cross-archetype shared scenarios", () => {
         now: 22:30
         inputs: wake=06:30 active=22:00(night) target=20:00
         strategy: emerging_rhythm
-        nextNap: 19:15 (-3h 15m)
-        bedtime: 19:15 (-3h 15m)
+        nextNap: 20:00 (-2h 30m)
+        bedtime: 20:00 (-2h 30m)
         predictedNaps: none
         napsAllDone: true (2 expected)
         expectedNapEnd: none
@@ -3017,9 +3247,9 @@ describe("cross-archetype shared scenarios", () => {
         now: 13:00
         inputs: wake=06:30 target=20:00
         strategy: emerging_rhythm
-        nextNap: 14:12 (+1h 12m)
-        bedtime: 19:18 (+6h 18m)
-        predictedNaps: 14:12-15:16
+        nextNap: 14:54 (+1h 54m)
+        bedtime: 20:00 (+7h 00m)
+        predictedNaps: 14:54-15:58
         napsAllDone: false (2 expected)
         expectedNapEnd: none
         expectedNightEnd: none
