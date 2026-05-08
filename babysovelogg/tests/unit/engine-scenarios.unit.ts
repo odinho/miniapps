@@ -593,22 +593,15 @@ function assertInvariants({ archetype, scenario, prediction }: InvariantContext)
     expect(dt, `${where}: bedtime within 18h of now`).toBeLessThan(18 * 3_600_000);
   }
 
-  // I-7: napsAllDone implies predictedNaps is null AND (when not in an active
-  // night) nextNap == bedtime AND rescueNap == null.
+  // I-7: napsAllDone implies nextNap == bedtime AND predictedNaps is null
+  // AND (when idle) rescueNap is null.
   //
-  // ENGINE INCONSISTENCY: when an active night starts before all expected
-  // naps are done, state.ts:651 OR's `activeSleep.type === "night"` into the
-  // returned napsAllDone, but the internal napsAllDone branch that collapses
-  // nextNap to bedtime (state.ts:590) was not taken. The result has
-  // napsAllDone=true with nextNap=earlier-predicted-time. Open question
-  // whether to tighten the engine here; for now the invariant gates on
-  // !active-night so the contract still pins for the common case.
+  // The engine treats an active night as ending the day's nap budget, so
+  // the napsAllDone collapse (nextNap = bedtime, predictedNaps = null)
+  // applies uniformly — no active-night gate needed.
   if (p?.napsAllDone) {
+    expect(p.nextNap, `${where}: napsAllDone → nextNap == bedtime`).toBe(p.bedtime);
     expect(p.predictedNaps, `${where}: napsAllDone → predictedNaps null`).toBeNull();
-    if (data.activeSleep?.type !== "night") {
-      expect(p.nextNap, `${where}: napsAllDone (not active night) → nextNap == bedtime`)
-        .toBe(p.bedtime);
-    }
     if (!data.activeSleep) {
       expect(p.rescueNap, `${where}: napsAllDone (idle) → rescueNap null`).toBeNull();
     }
@@ -2794,7 +2787,7 @@ describe("cross-archetype shared scenarios", () => {
         now: 22:30
         inputs: wake=06:00 active=22:00(night) target=19:45
         strategy: emerging_rhythm
-        nextNap: 07:59 (-14h 31m)
+        nextNap: 19:00 (-3h 30m)
         bedtime: 19:00 (-3h 30m)
         predictedNaps: none
         napsAllDone: true (4 expected)
@@ -2835,7 +2828,7 @@ describe("cross-archetype shared scenarios", () => {
         now: 22:30
         inputs: wake=06:30 active=22:00(night) target=19:15
         strategy: routine_schedule
-        nextNap: 08:54 (-13h 35m)
+        nextNap: 19:15 (-3h 15m)
         bedtime: 19:15 (-3h 15m)
         predictedNaps: none
         napsAllDone: true (3 expected)
@@ -2874,7 +2867,7 @@ describe("cross-archetype shared scenarios", () => {
         now: 22:30
         inputs: wake=06:00 active=22:00(night) target=19:30
         strategy: routine_schedule
-        nextNap: 11:07 (-11h 22m)
+        nextNap: 19:00 (-3h 30m)
         bedtime: 19:00 (-3h 30m)
         predictedNaps: none
         napsAllDone: true (1 expected)
@@ -2913,7 +2906,7 @@ describe("cross-archetype shared scenarios", () => {
         now: 22:30
         inputs: wake=06:00 active=22:00(night) target=none
         strategy: routine_schedule
-        nextNap: 09:07 (-13h 22m)
+        nextNap: 19:00 (-3h 30m)
         bedtime: 19:00 (-3h 30m)
         predictedNaps: none
         napsAllDone: true (2 expected)
@@ -2963,7 +2956,7 @@ describe("cross-archetype shared scenarios", () => {
         now: 22:30
         inputs: wake=06:30 active=22:00(night) target=20:00
         strategy: emerging_rhythm
-        nextNap: 09:35 (-12h 54m)
+        nextNap: 19:15 (-3h 15m)
         bedtime: 19:15 (-3h 15m)
         predictedNaps: none
         napsAllDone: true (2 expected)

@@ -56,20 +56,6 @@ and no active sleep, show a banner "Vurder å gi seg og prøve igjen om
 overdue logic but is more directive. Consider making the threshold a
 per-baby setting tuned to historical fall-asleep latency.
 
-## Engine inconsistency: active-night flips napsAllDone but not nextNap
-
-Surfaced by the engine-scenario sweep (`engine-scenarios.unit.ts`). When an
-active night sleep starts before all expected naps are done, `state.ts:651`
-OR's `activeSleep.type === "night"` into the returned `napsAllDone`, but the
-internal branch that collapses `nextNap` to `bedtime` (state.ts:590) was not
-taken. The result: `napsAllDone: true` with `nextNap` pointing to an
-earlier-predicted nap time. The sweep gates the
-`napsAllDone → nextNap == bedtime` invariant on `!active-night` to allow
-this through; question is whether to tighten the engine so the contract
-holds unconditionally, or leave it because the UI already ignores `nextNap`
-during active night. Visible in the cross-archetype "active night at 22:30"
-snapshot for Eli/Mina/Oskar/Ada/Iben.
-
 ## Comprehensive engine-scenario test sweep — DELIVERED
 
 Source: 2026-05-08 user feedback after the *fifth* prediction-engine bug

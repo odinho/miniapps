@@ -427,21 +427,21 @@ function assembleEmergingPrediction(
     nextNap = predictedNaps[0].startTime;
   }
 
-  // Detect skipped naps and determine if all naps are done
+  // Detect skipped naps and determine if all naps are done. An active night
+  // ends the day's nap budget regardless of count — see schedule branch for
+  // the detailed reasoning. Including this here keeps nextNap/predictedNaps
+  // consistent with the boolean.
   const nextNapMs = nextNap ? new Date(nextNap).getTime() : 0;
   const overdueMs = nextNapMs ? now - nextNapMs : 0;
   const napSkipped = !activeSleep && overdueMs > 90 * 60000 && overdueMs < 18 * 60 * 60000;
-  const napsAllDone = consumedNaps >= expectedNapCount || napSkipped;
+  const napsAllDone = consumedNaps >= expectedNapCount || napSkipped
+    || activeSleep?.type === "night";
 
   if (nextNapMs > bedtimeMs - 60 * 60000 || napsAllDone) {
     nextNap = bedtime;
   }
 
   if (napsAllDone) {
-    predictedNaps = null;
-  }
-
-  if (activeSleep && activeSleep.type === "night") {
     predictedNaps = null;
   }
 
@@ -483,7 +483,7 @@ function assembleEmergingPrediction(
     bedtime,
     predictedNaps,
     expectedNapCount,
-    napsAllDone: napsAllDone || activeSleep?.type === "night",
+    napsAllDone,
     expectedNapEnd,
     expectedNightEnd,
     confidence: null,
@@ -586,14 +586,17 @@ function assembleSchedulePrediction(
   // bedtime as the target time. The `>=` mirrors the B8 filter's strict `<`
   // above: anything at or beyond bedtime-60m is collapsed.
   const collapsedToBedtime = nextNapMs >= bedtimeMs - 60 * 60000;
-  const napsAllDone = consumedNaps >= expectedNapCount || napSkipped || collapsedToBedtime;
+  // An active night ends the day's nap budget regardless of how many naps
+  // were completed: if the parent has the baby down for the night, no more
+  // naps are coming. Including this here (rather than OR'ing only into the
+  // returned napsAllDone) keeps `nextNap`/`predictedNaps` consistent with
+  // the boolean — otherwise `nextNap` points to a stale predicted-nap time
+  // while napsAllDone says "done".
+  const napsAllDone = consumedNaps >= expectedNapCount || napSkipped || collapsedToBedtime
+    || activeSleep?.type === "night";
 
   if (napsAllDone) {
     nextNap = bedtime;
-    predictedNaps = null;
-  }
-
-  if (activeSleep && activeSleep.type === "night") {
     predictedNaps = null;
   }
 
@@ -649,7 +652,7 @@ function assembleSchedulePrediction(
     bedtime,
     predictedNaps,
     expectedNapCount,
-    napsAllDone: napsAllDone || activeSleep?.type === "night",
+    napsAllDone,
     expectedNapEnd,
     expectedNightEnd,
     confidence,
