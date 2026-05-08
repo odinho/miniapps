@@ -622,12 +622,20 @@ function assertInvariants({ archetype, scenario, prediction }: InvariantContext)
     }
   }
 
-  // I-B8: every visible predictedNap starts ≥60min before bedtime.
+  // I-B8: every visible predictedNap must end well before bedtime.
+  //
+  // Original B8 only checked startTime, which let through naps like
+  // Eli's 16:16-17:01 with bedtime 17:34 — start was 78m before bedtime
+  // (passing) but end was only 33m before bedtime (the baby would wake
+  // from the nap and need to immediately wind down). Check both bounds.
   if (p?.predictedNaps && p.bedtime) {
     const bedtimeMs = new Date(p.bedtime).getTime();
     for (const n of p.predictedNaps) {
       const startMs = new Date(n.startTime).getTime();
-      expect(bedtimeMs - startMs, `${where}: predictedNap within 60m of bedtime`)
+      const endMs = new Date(n.endTime).getTime();
+      expect(bedtimeMs - startMs, `${where}: predictedNap start within 60m of bedtime`)
+        .toBeGreaterThan(60 * 60_000);
+      expect(bedtimeMs - endMs, `${where}: predictedNap END within 60m of bedtime`)
         .toBeGreaterThan(60 * 60_000);
     }
   }
@@ -1222,15 +1230,15 @@ describe("Mina Learned (3-nap routine_schedule)", () => {
         now: 16:30
         inputs: wake=06:30 done=[08:50-09:35] target=19:15
         strategy: routine_schedule
-        nextNap: 15:54 (-35m)
+        nextNap: 17:00 (+30m)
         bedtime: 17:00 (+30m)
-        predictedNaps: 15:54-16:34
-        napsAllDone: false (3 expected)
+        predictedNaps: none
+        napsAllDone: true (3 expected)
         expectedNapEnd: none
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: high (1 napRanges)
+        confidence: high (0 napRanges)
         learned: nap=45m night=675m ww=150.5m bedww=160m
 
       scenario: 10:00 no wake reference
@@ -1585,30 +1593,30 @@ describe("Oskar OneNap (1-nap routine_schedule, cut-short matrix)", () => {
         now: 12:30
         inputs: wake=06:00 done=[11:30-12:25!] target=19:30
         strategy: routine_schedule
-        nextNap: 17:17 (+4h 47m)
+        nextNap: 17:25 (+4h 55m)
         bedtime: 19:21 (+6h 51m)
-        predictedNaps: 17:17-19:07
+        predictedNaps: none
         napsAllDone: false (1 expected)
         expectedNapEnd: none
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: closes 12:50 cap 13:23
-        confidence: medium (1 napRanges)
+        confidence: high (0 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: 55m cs: 4h later, would-be comeback
         now: 16:25
         inputs: wake=06:00 done=[11:30-12:25!] target=19:30
         strategy: routine_schedule
-        nextNap: 17:17 (+52m)
+        nextNap: 17:25 (+1h 00m)
         bedtime: 19:21 (+2h 56m)
-        predictedNaps: 17:17-19:07
+        predictedNaps: none
         napsAllDone: false (1 expected)
         expectedNapEnd: none
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (0 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: active comeback at 14:35 after 28m cs
@@ -1953,9 +1961,9 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         now: 14:30
         inputs: wake=06:00 done=[11:00-11:50, 08:00-08:50] active=14:00(nap) target=19:45
         strategy: emerging_rhythm
-        nextNap: 16:16 (+1h 46m)
+        nextNap: 17:34 (+3h 04m)
         bedtime: 17:34 (+3h 04m)
-        predictedNaps: 16:16-17:01
+        predictedNaps: none
         napsAllDone: false (4 expected)
         expectedNapEnd: 14:49 (+19m)
         expectedNightEnd: none

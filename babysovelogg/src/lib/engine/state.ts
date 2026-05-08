@@ -418,7 +418,10 @@ function assembleEmergingPrediction(
   // Safety B8 + stale filter: see schedule branch for rationale.
   let predictedNaps: PredictedNap[] | null = remaining.filter((n) => {
     const startMs = new Date(n.startTime).getTime();
-    return startMs < bedtimeMs - 60 * 60000 && startMs > now - 60 * 60_000;
+    const endMs = new Date(n.endTime).getTime();
+    return startMs < bedtimeMs - 60 * 60_000  // B8: nap starts ≥60 before bedtime
+      && endMs < bedtimeMs - 60 * 60_000      // B8: nap ENDS ≥60 before bedtime
+      && startMs > now - 60 * 60_000;          // not stale
   });
   if (predictedNaps.length === 0) predictedNaps = null;
 
@@ -577,7 +580,10 @@ function assembleSchedulePrediction(
   // overdue) because the napSkipped 90-min threshold was a hair too lax.
   let predictedNaps: PredictedNap[] | null = remaining.filter((n) => {
     const startMs = new Date(n.startTime).getTime();
-    return startMs < bedtimeMs - 60 * 60000 && startMs > now - 60 * 60_000;
+    const endMs = new Date(n.endTime).getTime();
+    return startMs < bedtimeMs - 60 * 60_000  // B8: nap starts ≥60 before bedtime
+      && endMs < bedtimeMs - 60 * 60_000      // B8: nap ENDS ≥60 before bedtime
+      && startMs > now - 60 * 60_000;          // not stale
   });
   if (predictedNaps.length === 0) predictedNaps = null;
 

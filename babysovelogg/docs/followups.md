@@ -82,17 +82,6 @@ the family's stated target can actually move bedtime. Document the cap
 explicitly in the snapshot. Add a paired test: target=18:00 produces
 *materially* earlier bedtime than target=21:00.
 
-### Engine bug: B8 60-min filter checks `startTime`, should check `endTime`
-
-**Where:** Eli at 12:30 active nap 3 has `predictedNaps: 16:16-17:01` with
-`bedtime: 17:34` — only 33 minutes between nap end and bedtime, but B8 was
-intended to ensure naps end well before bedtime. `tests/unit/engine-scenarios.unit.ts:1915-1929` shows the violation; the engine code at
-`src/lib/engine/state.ts:567` filters on `n.startTime < bedtime - 60min`.
-
-**Fix plan:** Change the B8 filter (and the matching invariant in the
-sweep) to check `n.endTime` against bedtime. Pediatric rule should be on
-how long after a nap ends bedtime is — not the start.
-
 ### Engine bug: emerging path lacks "collapsed to bedtime" cleanup
 
 **Where:** Eli at 13:00 truncates `predictedNaps` to 3 entries but
