@@ -189,11 +189,15 @@ describe("selectBestPlan", () => {
       .toBeLessThanOrEqual(60 * 60_000);
   });
 
-  it("feasible target-guided plan wins when closer to target", () => {
+  it("a non-natural plan wins when target is set and feasible", () => {
+    // Used to check `source === "target-guided"`. After 2026-05 added the
+    // "target-nudged" candidate, either non-natural plan can win (the
+    // nudged plan keeps morning structure intact, so it wins more often).
+    // What matters here is that natural is NOT the winner.
     const result = selectBestPlan("2026-03-28T07:00:00Z", [], undefined,
       ctx({ recentSleeps, targetBedtime: "19:45" }), NOW);
 
-    expect(result.source).toBe("target-guided");
+    expect(["target-guided", "target-nudged"]).toContain(result.source);
   });
 });
 
@@ -274,7 +278,7 @@ naps done: false (2 expected)"
 
     expect(renderDayPlan(morning)).toMatchInlineSnapshot(`
       "strategy: emerging_rhythm
-      lur 1: 09:45–11:15
+      lur 1: 10:00–11:30
       lur 2: 14:15–15:45
       bedtime: 19:45
       naps done: false (2 expected)"

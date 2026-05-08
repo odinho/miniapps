@@ -65,44 +65,46 @@ shipped, reading snapshots critically for behavioural regressions baked in by
 `--update`. Both reviewers converged on the same major findings — high
 confidence each is a real engine bug.
 
-### Engine: `target_bedtime` doesn't actually converge over multi-day adjustment
+### Engine: clean up the `target_bedtime` convergence architecture
 
-**Surfaced by:** `tests/unit/engine-scenarios.unit.ts` paired-baseline
-"target_bedtime trail: 7-day simulation surfaces (lack of) convergence".
-Mina with target=18:00 and starting natural ~19:14 was simulated for 7
-days, with each day's predicted bedtime fed back as the previous night's
-actual. Trail:
+**Status (2026-05-08):** convergence WORKS now. The 14-day Mina trail
+(target=18:00, natural ~19:14) slides smoothly from 18:59 to 18:06 over
+14 days. The fix was a third "target-nudged" candidate in `selectBestPlan`
+that shifts the LAST nap and bedtime by the capped amount toward target,
+plus fixing the multi-day test to also append predicted naps each day
+(not just nights — without naps the 7-day learning window starves of
+nap data and natural drifts to defaults).
 
-```
-day 0: bedtime=19:14
-day 1: bedtime=19:13
-day 2: bedtime=19:13
-day 3: bedtime=19:14
-day 4: bedtime=19:18
-day 5: bedtime=19:17
-day 6: bedtime=19:21
-```
+**But:** Codex's parallel design review points out the current fix is a
+pragmatic patch, not the cleanest architecture. Three points:
 
-Bedtime barely moves and even drifts AWAY from target. The asymmetric
-daily cap (15 min earlier, 45 min later) is in place, but
-`selectBestPlan`'s scorer weights wake-window deviation
-(`W_WW = 0.5 * diff²`) heavily enough that the natural plan beats the
-target-guided plan on cost. So the prediction stays anchored to history
-and never moves toward target.
+1. **Target convergence belongs in `recommendBedtime`, not `selectBestPlan`.**
+   `recommendBedtime` blends pressure-bedtime with habitual; adding
+   target as a third soft anchor (post-blending) would let "natural"
+   itself drift toward target each day. Then `selectBestPlan` stays
+   focused on feasibility/scoring rather than target manipulation.
 
-**Design question:** how should the engine actually nudge the family
-toward target? Three options:
-1. **Increase `W_TARGET`** so target-guided plans win more often. Risk:
-   more aggressive shifts when target is unrealistic.
-2. **Direct nudge in `selectBestPlan`**: even if natural plan wins on
-   score, blend a fraction (e.g. 10%) of the gap toward target into the
-   final bedtime. Simpler, more predictable.
-3. **Anchor the natural calculation on target when set**: have
-   `recommendBedtime` weight the target alongside habitual when computing
-   "natural", so each day's natural is closer to target than yesterday's.
+2. **"Nudge last nap + bedtime" mixes two concerns.** It pushes WW
+   deviation onto the pre-last-nap window. A *proportional* whole-day
+   nudge (shift all naps by `shift / napCount`) spreads the deviation
+   evenly. Bedtime-only soft anchoring is right when naps are already
+   logged.
 
-This needs a "lateral-thinking pass" — see "Process" section below. The
-right answer depends on what feels good for parent and baby in real life.
+3. **`selectBestPlan` silently returns natural when ALL candidates are
+   infeasible.** Surfaced by Codex during the convergence diagnosis:
+   day 6 of the trail (when test data was sparser) had natural,
+   target-nudged AND target-guided all infeasible (final-WW or nap-WW
+   violations); engine fell back to natural-with-violations rather than
+   surfacing the failure. Make this explicit — return the lowest-cost
+   plan even if infeasible, OR return null for the parent UI to handle.
+
+**Refactor plan:**
+- Move target soft-anchoring into `recommendBedtime` (after habitual blend).
+- Replace last-nap-only nudge with proportional whole-day shift in
+  `selectBestPlan`'s nudged candidate (or remove the candidate entirely
+  if the recommendBedtime soft anchor is enough).
+- Make all-infeasible explicit instead of silent natural fallback.
+- Re-run the 14-day convergence trail; expect smoother monotonic slide.
 
 ### UX: signal when `target_bedtime` is rejected as infeasible
 
@@ -122,6 +124,24 @@ can't reflect target_bedtime tuning. Adding target to the backtest
 fixture would let us measure whether the new 60-min cap actually
 improves prediction accuracy on real data, instead of just satisfying
 the synthetic settings sweep.
+
+### Engine bug: Eli's natural bedtime is unrealistically early (~17:00 for 3.5mo with target 19:45)
+
+Surfaced during unit 6 convergence work. Eli at 06:30 fresh-day with
+target_bedtime=19:45 produces natural bedtime around 17:00. The
+target-nudged cap pushes it to 17:30 (natural + 30 min), but that's
+still way too early for a 3.5-month-old whose family wants 19:45.
+
+The issue: `predictEmerging`'s bedtime calculation (or `recommendBedtime`
+called from the emerging path) is anchoring on something that produces
+17:00 rather than the habitual 19:30 in the history. Pre-existing —
+not introduced by unit 6, just newly visible because the convergence
+fix shifted Eli from 17:15 to 17:30.
+
+Investigate: walk through `recommendBedtime` for Eli's emerging context
+and identify why pressure_bedtime + habitual_blend lands at 17:00. May
+be that the multiplier (`hasEnoughNaps ? 1.0 : 0.85`) compounds with a
+partial habitual weight to drag bedtime way earlier than habitual.
 
 ### Engine bug: emerging path lacks "collapsed to bedtime" cleanup
 

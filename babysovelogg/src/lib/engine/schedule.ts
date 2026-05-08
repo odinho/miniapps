@@ -1423,7 +1423,21 @@ export interface PlanScore {
 }
 
 export interface SelectedPlan extends PlanCandidate {
-  source: "natural" | "target-guided";
+  /**
+   * Which candidate won the score:
+   * - `natural`: forward-walk plan from learned values (no target set, or
+   *   target's pull lost the score).
+   * - `target-nudged`: natural's day plan but with the last nap and
+   *   bedtime shifted by the capped amount toward target. Used when
+   *   target-guided's full backward walk would be infeasible (typical
+   *   on tight days) but a small bedtime nudge still gets us closer to
+   *   target without disrupting morning naps the parent has likely
+   *   already done.
+   * - `target-guided`: full backward-walk plan from the effective target.
+   *   Wins when target is close enough to natural that the backward walk
+   *   is feasible AND beats natural on score.
+   */
+  source: "natural" | "target-nudged" | "target-guided";
 }
 
 /**
@@ -1652,16 +1666,68 @@ export function selectBestPlan(
   const effectiveTargetMs = naturalBedtimeMs + shift;
   const effectiveTarget = new Date(effectiveTargetMs).toISOString();
 
-  // Target-guided plan: backward walk from effective target
+  // Target-guided plan: backward walk from effective target. Often
+  // infeasible on tight days (the day's nap budget can't compress enough
+  // to hit a meaningfully different bedtime), but when it works it gives
+  // the cleanest day plan.
   const targetNaps = planBackwardFromBedtime(wakeUpTime, effectiveTarget, ctx);
   const targetPlan: PlanCandidate = { naps: targetNaps, bedtime: effectiveTarget };
 
-  // Score both against the effective target (today's objective), not the raw target
+  // Target-nudged plan: keep natural's day plan but shift the LAST nap +
+  // bedtime by the capped amount. The last nap is the only one we shift
+  // (parents can't undo morning naps already done — see the asymmetric
+  // cap rationale). This plan is feasible whenever natural is, since the
+  // final wake window stays the same; it just pulls bedtime closer to
+  // target. This is the candidate that drives multi-day convergence
+  // toward target — natural's score doesn't budge with target alone, but
+  // target-nudged's score is identical to natural's plus a target-
+  // proximity win.
+  const nudgedPlan: PlanCandidate = nudgeLastNapAndBedtime(naturalNaps, naturalBedtimeMs, shift);
+
   const naturalScore = scorePlan(naturalPlan, ctx, wakeUpMs, effectiveTargetMs, naturalNaps.length);
+  const nudgedScore = scorePlan(nudgedPlan, ctx, wakeUpMs, effectiveTargetMs, naturalNaps.length);
   const targetScore = scorePlan(targetPlan, ctx, wakeUpMs, effectiveTargetMs, naturalNaps.length);
 
-  if (targetScore.feasible && targetScore.cost <= naturalScore.cost) {
-    return { ...targetPlan, source: "target-guided" };
+  // Pick the lowest-cost feasible plan. Ties prefer simpler plans
+  // (natural > nudged > target-guided) so the source signal is honest.
+  let bestSource: SelectedPlan["source"] = "natural";
+  let bestPlan: PlanCandidate = naturalPlan;
+  let bestCost = naturalScore.feasible ? naturalScore.cost : Infinity;
+
+  if (nudgedScore.feasible && nudgedScore.cost < bestCost) {
+    bestSource = "target-nudged";
+    bestPlan = nudgedPlan;
+    bestCost = nudgedScore.cost;
   }
-  return { ...naturalPlan, source: "natural" };
+  if (targetScore.feasible && targetScore.cost < bestCost) {
+    bestSource = "target-guided";
+    bestPlan = targetPlan;
+    bestCost = targetScore.cost;
+  }
+  return { ...bestPlan, source: bestSource };
+}
+
+/**
+ * Build the target-nudged candidate: natural naps with the last nap and
+ * bedtime shifted by `shiftMs` (positive = later, negative = earlier). If
+ * there are no naps, just bedtime moves.
+ */
+function nudgeLastNapAndBedtime(
+  naturalNaps: PredictedNap[],
+  naturalBedtimeMs: number,
+  shiftMs: number,
+): PlanCandidate {
+  const newBedtime = new Date(naturalBedtimeMs + shiftMs).toISOString();
+  if (naturalNaps.length === 0) {
+    return { naps: [], bedtime: newBedtime };
+  }
+  const last = naturalNaps[naturalNaps.length - 1];
+  const shiftedLast: PredictedNap = {
+    startTime: new Date(new Date(last.startTime).getTime() + shiftMs).toISOString(),
+    endTime: new Date(new Date(last.endTime).getTime() + shiftMs).toISOString(),
+  };
+  return {
+    naps: [...naturalNaps.slice(0, -1), shiftedLast],
+    bedtime: newBedtime,
+  };
 }
