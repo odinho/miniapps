@@ -16,6 +16,14 @@ Baby sleep tracker. SvelteKit 5, better-sqlite3, Playwright + bun:test.
 
 Read [`docs/testing.md`](docs/testing.md) before writing or updating tests.
 
+## Workflow
+
+Read [`docs/workflow.md`](docs/workflow.md) before any non-trivial unit
+of work. It captures: how to use [`docs/followups.md`](docs/followups.md)
+(the durable todo file), how/when to run Codex pair-review via the
+`codex:rescue` agent, the lateral-thinking checklist for engine
+changes, multi-day testing patterns, and the unit-of-work flow.
+
 ## Language
 
 UI text is in Nynorsk Norwegian. Keep it consistent.
