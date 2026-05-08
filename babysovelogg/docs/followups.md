@@ -74,91 +74,128 @@ sweeps `assembleState()` across a small set of synthetic babies × a wide
 set of "current-state" inputs, snapshotting the full Prediction render
 and pinning universal invariants that can't be `--update`-pasted away.
 
-### Synthetic babies (4–6 archetypes covering the strategy space)
+### Synthetic babies (6 archetypes covering the strategy space)
 
-Each archetype sets up a `Baby` row + 14–21 days of synthetic history
-that lands the strategy selector exactly where we want it. Suggested
-starting set:
+Each archetype is a `Baby` row + a synthetic history that lands the
+strategy selector deterministically. Birthdates anchored on a fixed
+"today" so age is stable. Final names/dates to be confirmed at impl
+time, but the shape is:
 
-1. **`newborn-3mo`** — strategy `newborn_guidance`. No schedule, no
-   target. Verifies sleep-window mode renders sanely.
-2. **`emerging-5mo`** — strategy `emerging_rhythm`. 4 short naps, no
-   target. Verifies the adapter between newborn and schedule.
-3. **`twonap-8mo-no-target`** — `routine_schedule`, 2-nap, no target,
-   ~14 days of consistent 09:30 + 13:30 naps and 19:00 bedtime.
-4. **`onenap-10mo-target-18`** — Halldis-shape: `routine_schedule`,
-   1-nap, target 18:00, learned 108-min nap, bedtime ~18:30.
-5. **`transition-13mo`** — `routine_schedule`, oscillating 1↔2 nap
-   (transition-filter exercised).
-6. **`toddler-15mo`** — `routine_schedule`, 1-nap late (~13:00), no
-   target.
+1. **Nora Newborn** — strategy `newborn_guidance`, 5-7 naps, unstable
+   wake windows, target ~20:30, 5 days of noisy logging. No reliable
+   learnedSchedule. Verifies sleep-window rendering.
+2. **Eli Emerging** — strategy `emerging_rhythm`, 4 naps, occasional
+   rescue, target 19:45, 21 days. Short first naps, improving afternoon.
+   Verifies the newborn↔schedule adapter.
+3. **Mina Learned** — strategy `routine_schedule`, 3 naps, target 19:15,
+   45 days of consistent timing/duration. Strong learnedSchedule —
+   predictions should be tight.
+4. **Oskar OneNap** — `routine_schedule`, 1 nap, target 19:30, 60 days
+   of long midday nap. The Halldis-shape; primary surface for skipped-
+   comeback / cut-short recovery scenarios.
+5. **Ada NoTarget** — `routine_schedule`, 2 naps, `target_bedtime: null`
+   (deliberately removed), 30 days of normal history. Verifies engine
+   doesn't crash or default poorly when target is unset.
+6. **Iben Sparse** — 3-4 naps, target 20:00, 6 scattered days with
+   gaps and partial logs. Stress-tests null-ish inputs and missing data.
 
 ### Scenario axis
 
-Sweep each baby through these "current-state" inputs:
+Sweep each baby through these inputs:
 
-- **Times of day**: 06:00, 09:00, 11:00, 13:00, 15:00, 17:00, 19:30
-  local — covers pre-nap, post-nap, late-afternoon, pre-bedtime,
-  post-bedtime.
-- **Today's sleep state**: pristine; mid-active-nap; one full nap done;
-  one cut-short done (woke_by="woken"); two cut-shorts; one full +
-  one cut-short; missed-nap (predicted overdue 90+ min); active-night.
-
-That's roughly 7 × 8 = 56 scenarios per baby, ~300 total at 5 babies.
-Skip combinations that don't make sense (e.g. active-nap at 06:00) and
-the matrix collapses to ~150.
+- **Now buckets**: 06:00, 08:30, 11:30, 14:30, 17:30, 19:00, 21:30 local
+  — pre-nap, just-woke, late-afternoon, pre-bedtime, post-bedtime.
+- **Today's sleep state**: pristine; in active nap; just woke; one full
+  nap done; all naps done; missed/skipped expected nap.
+- **Cut-short variants**: 5m, 20m, 35m, 55m durations × comeback timing
+  at +0m, +60m, +2h18m, +2h45m, +3h15m from cut-short end. The recent
+  regressions all live in this sub-matrix.
+- **Continuation-window states**: open, closed/dismissed, expired,
+  overlapping rescueNap candidate.
+- **Synthetic/comeback states**: accepted, skipped, still pending —
+  explicitly assert skipped synthetic comeback does not pull bedtime
+  earlier than the no-comeback baseline (the May-8 19:22 bug).
+- **Missing data**: no target_bedtime, null learned inputs, empty day,
+  malformed partial nap, future nap.
+- **Age boundary sweeps**: shift fixture birthdate ±7 days around
+  regime thresholds (3-mo, 6-mo, 9-mo, 12-mo, 18-mo) to confirm
+  transition behaviour.
 
 ### Render shape
 
-A compact human-readable string per scenario, snapshotted inline:
+One snapshot block per baby × scenario. Stable ordering, local `HH:MM`
+times, `+Xh Ym` deltas, `none` for absent values:
 
 ```
-strategy: routine_schedule (Tilpassa)
-expectedNapCount: 1, napsAllDone: false
-nextNap: 11:00 ±15m
-bedtime: 18:00 ±20m
-predictedNaps: 11:00–12:48
-expectedNapEnd: —
-rescueNap: —
-continuationWindow: —
-learned: nap=108m, bedtimeWW=345m, cycle=55m
+baby: Mina Learned
+scenario: cut-short-third-nap-now-16:37
+now: 16:37
+inputs: naps=today[08:50-09:28, 12:11-13:24, 15:58-16:12], target=19:15
+prediction:
+  nextNap: 18:57 (+2h20m)
+  bedtime: 19:45 (+3h08m)
+  predictedNaps: [08:50-09:35, 12:10-13:20, 15:55-16:40, 18:57-19:17]
+  napsAllDone: false
+  expectedNapEnd: 16:40
+  rescueNap: true
+  continuationWindow: false
+  learnedSchedule: 3-nap, confidence=high
 ```
 
 ### Pinned invariants (apply to every scenario, not just the snapshot)
 
-These are the things that have *all* been violated by recent regressions
-and must be checked unconditionally:
+Run these *before* the snapshot compare so a `--update` can't paste
+over a broken state. These are the contracts every recent regression
+violated:
 
-- `bedtime` (if non-null) is on the *local date implied by the wake
-  reference* — not next-day.
-- `bedtime` hour ∈ [16:00, 23:00] in baby's local TZ.
-- `nextNap` (if not equal to `bedtime`) is in the future relative to
-  `now`, with at most 90 min grace for the napSkipped path.
-- `predictedNaps[i].startTime > predictedNaps[i-1].startTime`.
-- No `predictedNaps[i].endTime > bedtime - 60 min`.
-- When `napsAllDone === true`, `predictedNaps === null`.
-- `continuationWindow.closesAt > now`.
-- No NaN, no negative durations, all ISO timestamps parse.
+1. No rendered Prediction value contains `NaN`, `Invalid Date`, `null`,
+   or `undefined` where a value is expected.
+2. `bedtime` is on today's local date — never "tomorrow because of
+   overflow" (the May-7 22h-17m bug).
+3. `bedtime` is within 18h of `now`; clamp violations fail before
+   snapshot compare.
+4. If `rescueNap` follows a cut-short, `nextNap` is never earlier than
+   `cutShort.end + 2h45m` unless fixture is in newborn strategy (the
+   May-7 11:07 floor bug).
+5. A closed `continuationWindow` must render `false` and stay false
+   for the rest of the scenario — no banner staleness.
+6. **Skipped comeback / synthetic nap must not pull `bedtime` earlier
+   or later than the no-comeback baseline** (the May-8 19:22 bug).
+7. `napsAllDone: true` implies `nextNap: none` AND `rescueNap: false`.
+8. `expectedNapEnd` cannot be before `now` for an active-nap scenario.
+9. `predictedNaps` are chronological and non-overlapping.
+10. Missing `target_bedtime` must still produce a finite `bedtime` or
+    a deliberate `none` — never crashy output.
+11. `continuationWindow` and `rescueNap` cannot advertise contradictory
+    actions for the same nap unless explicitly intended and labeled.
 
 ### Layering with existing tests
 
-- **Keep `duration-prediction.unit.ts`** — fixture-backtest measures
-  historical accuracy on Halldis. Different question.
+- **Single file**: `tests/unit/engine-scenarios.unit.ts`. Don't split
+  per-strategy — these are *cross-strategy behavioural contracts* for
+  `assembleState()`; splitting hides regressions caused by interactions
+  between `learnedSchedule`, `rescueNap`, `continuationWindow`,
+  `bedtime`, and `predictedNaps`.
+- **Absorb most of `state.unit.ts`**: the 28 tests there are mostly
+  bug-specific. Once the sweep covers their surface, leave them as
+  targeted pins (each linked to a commit message reference) but expect
+  the sweep to be the primary defence going forward.
+- **Keep `duration-prediction.unit.ts`** — historical accuracy backtest
+  on Halldis is a different question (regression on real data vs.
+  contract correctness).
 - **Keep `learned-duration-scenarios.unit.ts`** — duration-learning
-  table, unrelated to runtime prediction shape.
-- **Migrate from `state.unit.ts`**: the 28 tests there are mostly
-  bug-specific regressions. Once the scenario sweep covers their
-  surface area, leave them in place as targeted pins (each commit
-  message reference) but expect the sweep to be the primary line of
-  defence going forward.
-- **Keep `plan-scoring.unit.ts`** — that's about scoring internals.
+  table is unrelated to runtime prediction shape.
+- **Keep `plan-scoring.unit.ts`** — scoring internals.
+- **Keep small focused unit tests** only for pure helpers where failure
+  diagnosis through `assembleState()` would be noisy.
 
 ### Implementation notes
 
-- Heavy use of helper builders so each scenario row is one line:
-  `scenario("11:00", { naps: [["08:00", "08:28", "woken"]] })` etc.
-- Inline snapshots, but invariants run *before* the snapshot so a
-  `--update` can't paste over a broken state.
-- Codex consulted on shape (see ai-pair-review thread 2026-05-08); his
-  input was the cleanest version: keep the matrix small and dense, not
-  a sparse mountain of tests no-one reads.
+- Heavy helper builders so each scenario row is one line:
+  `scenario("11:00", { naps: [["08:00", "08:28", "woken"]] })`.
+- Invariants run **before** snapshot compare so `--update` can't paste
+  a violation away.
+- Aim for ~150 scenarios total once invalid combinations (active-nap
+  at 06:00, etc.) collapse.
+- Codex pair-reviewed the design (2026-05-08 thread) — converged on
+  the structure above.
