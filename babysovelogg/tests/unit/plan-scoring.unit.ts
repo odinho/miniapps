@@ -180,7 +180,7 @@ describe("selectBestPlan", () => {
     expect(result.source).toBe("natural");
   });
 
-  it("target shifts bedtime by at most 60 min from natural", () => {
+  it("target shifts bedtime by at most the daily cap from natural (asymmetric)", () => {
     const natural = selectBestPlan("2026-03-28T07:00:00Z", [], undefined, ctx({ recentSleeps }), NOW);
     const withTarget = selectBestPlan("2026-03-28T07:00:00Z", [], undefined,
       ctx({ recentSleeps, targetBedtime: "16:00" }), NOW);
@@ -274,9 +274,9 @@ naps done: false (2 expected)"
 
     expect(renderDayPlan(morning)).toMatchInlineSnapshot(`
       "strategy: emerging_rhythm
-      lur 1: 10:00–11:30
-      lur 2: 14:30–16:00
-      bedtime: 20:00
+      lur 1: 09:45–11:15
+      lur 2: 14:15–15:45
+      bedtime: 19:45
       naps done: false (2 expected)"
     `);
 

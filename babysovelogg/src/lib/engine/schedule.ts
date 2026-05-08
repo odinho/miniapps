@@ -1427,15 +1427,40 @@ export interface SelectedPlan extends PlanCandidate {
 }
 
 /**
- * How far the family's stated `target_bedtime` can shift the day's
- * predicted bedtime away from the natural (habitual / pressure-driven)
- * bedtime. Originally 15 min, which made target_bedtime essentially
- * cosmetic (e.g. target=21:00 with natural=19:30 effective bedtime
- * capped to 19:45). Raised to 60 min in 2026-05 so the target actually
- * pulls predictions toward the family's preference, while still
- * preventing wildly unrealistic targets from breaking the day plan.
+ * Daily caps on how far the family's stated `target_bedtime` can shift
+ * today's predicted bedtime away from the natural (habitual /
+ * pressure-driven) bedtime. Asymmetric and gradual:
+ *
+ * - LATER (target > natural): keeping baby up longer is the easier
+ *   direction — no fighting reluctance, no needing earlier morning wake
+ *   to build pressure first. Cap at 30 min/day. AASM clock-shift
+ *   guidance lands around 15-20 min for either direction; 30 here
+ *   acknowledges this direction is more feasible while still being
+ *   conservative.
+ *
+ * - EARLIER (target < natural): putting baby down sooner is harder —
+ *   the baby isn't tired enough, you'd need to back up morning wake
+ *   too, and forcing it produces resistance and crying. Cap at 15
+ *   min/day so the family can slide toward the new target gradually
+ *   without crashing the day.
+ *
+ * The intended convergence is multi-day: as the family acts on each
+ * day's suggestion, history drifts, and tomorrow's natural should
+ * anchor closer to target. **In practice (2026-05) the engine doesn't
+ * actually converge** — `selectBestPlan`'s scorer keeps the natural
+ * plan winning because target-guided plans pay too much wake-window
+ * deviation cost. See `docs/followups.md` "Engine: target_bedtime
+ * doesn't actually converge" for the design discussion. Until that
+ * lands, the cap defines the *upper bound* of the per-day shift
+ * whenever the target plan is selected.
+ *
+ * Originally a single symmetric 15-min cap (made target essentially
+ * cosmetic for any meaningful difference). Tried 60 min symmetric
+ * briefly (too aggressive — 1h single-day jumps disrupt the baby's
+ * rhythm). Asymmetric gradual is the model.
  */
-const DAILY_SHIFT_CAP_MS = 60 * 60_000;
+const DAILY_SHIFT_CAP_LATER_MS = 30 * 60_000;
+const DAILY_SHIFT_CAP_EARLIER_MS = 15 * 60_000;
 
 /** Convert a "HH:MM" target bedtime to an ISO timestamp for today in the baby's timezone. */
 export function targetBedtimeToISO(hhmm: string, now: number, tz: string): string {
@@ -1616,10 +1641,14 @@ export function selectBestPlan(
     return { ...naturalPlan, source: "natural" };
   }
 
-  // Compute effective target (capped by DAILY_SHIFT_CAP_MS from natural bedtime)
+  // Compute effective target with asymmetric daily caps. See the
+  // DAILY_SHIFT_CAP_*_MS doc comment for rationale.
   const naturalBedtimeMs = new Date(naturalBedtime).getTime();
   const rawTargetMs = new Date(targetBedtimeToISO(ctx.targetBedtime, now, ctx.tz)).getTime();
-  const shift = Math.max(-DAILY_SHIFT_CAP_MS, Math.min(DAILY_SHIFT_CAP_MS, rawTargetMs - naturalBedtimeMs));
+  const rawShift = rawTargetMs - naturalBedtimeMs;
+  const shift = rawShift > 0
+    ? Math.min(DAILY_SHIFT_CAP_LATER_MS, rawShift)      // toward later: 30 min cap
+    : Math.max(-DAILY_SHIFT_CAP_EARLIER_MS, rawShift);  // toward earlier: 15 min cap
   const effectiveTargetMs = naturalBedtimeMs + shift;
   const effectiveTarget = new Date(effectiveTargetMs).toISOString();
 

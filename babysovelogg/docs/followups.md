@@ -65,6 +65,45 @@ shipped, reading snapshots critically for behavioural regressions baked in by
 `--update`. Both reviewers converged on the same major findings — high
 confidence each is a real engine bug.
 
+### Engine: `target_bedtime` doesn't actually converge over multi-day adjustment
+
+**Surfaced by:** `tests/unit/engine-scenarios.unit.ts` paired-baseline
+"target_bedtime trail: 7-day simulation surfaces (lack of) convergence".
+Mina with target=18:00 and starting natural ~19:14 was simulated for 7
+days, with each day's predicted bedtime fed back as the previous night's
+actual. Trail:
+
+```
+day 0: bedtime=19:14
+day 1: bedtime=19:13
+day 2: bedtime=19:13
+day 3: bedtime=19:14
+day 4: bedtime=19:18
+day 5: bedtime=19:17
+day 6: bedtime=19:21
+```
+
+Bedtime barely moves and even drifts AWAY from target. The asymmetric
+daily cap (15 min earlier, 45 min later) is in place, but
+`selectBestPlan`'s scorer weights wake-window deviation
+(`W_WW = 0.5 * diff²`) heavily enough that the natural plan beats the
+target-guided plan on cost. So the prediction stays anchored to history
+and never moves toward target.
+
+**Design question:** how should the engine actually nudge the family
+toward target? Three options:
+1. **Increase `W_TARGET`** so target-guided plans win more often. Risk:
+   more aggressive shifts when target is unrealistic.
+2. **Direct nudge in `selectBestPlan`**: even if natural plan wins on
+   score, blend a fraction (e.g. 10%) of the gap toward target into the
+   final bedtime. Simpler, more predictable.
+3. **Anchor the natural calculation on target when set**: have
+   `recommendBedtime` weight the target alongside habitual when computing
+   "natural", so each day's natural is closer to target than yesterday's.
+
+This needs a "lateral-thinking pass" — see "Process" section below. The
+right answer depends on what feels good for parent and baby in real life.
+
 ### UX: signal when `target_bedtime` is rejected as infeasible
 
 When the family's stated target produces a day plan that violates hard
@@ -160,6 +199,27 @@ These are non-bug improvements both reviewers want:
 - `arc.e2e.ts:39-56`, `prediction.e2e.ts:175-203`, `bugs.e2e.ts:148-178` —
   E2E tests that assert "settings saved" or "arc visible" but not the
   prediction *effect*.
+
+## Process: lateral-thinking checklist for non-trivial engine fixes
+
+The `target_bedtime` cap iteration (15 → 60 → asymmetric 30/15) exposed
+a meta-pattern: technical fixes can be locally correct but solve the
+wrong problem if they don't think from first principles about how the
+app should feel for a parent and baby. Use this as a PR-review checklist
+on engine changes that affect predictions, not as a blocker on every
+small fix:
+
+1. Does this serve the parent's experience over multiple days, not just
+   today's snapshot output?
+2. Are there asymmetries (easier vs harder directions, baby's cycle,
+   age-dependent tolerances) the fix should respect?
+3. Does the test setup capture the multi-day mechanic, or only single-
+   day? If single-day, is that the right granularity?
+4. What's the worst case from the baby's perspective if this fix is
+   slightly wrong? (Tolerable nudge, or "baby cries every night"?)
+
+When the answer surfaces a real product risk, capture it in this file
+as a separate followup section. When it doesn't, no doc entry needed.
 
 ## Coverage gaps
 
