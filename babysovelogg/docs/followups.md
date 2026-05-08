@@ -1,6 +1,14 @@
 # Followups
 
-Tracked work to fix soon. Don't let this list grow.
+Tracked work that's ready to act on but not yet shipped. **This is the
+durable todo list for this repo** — every agent should add to it when
+something surfaces, and remove entries as units land. Don't reinvent
+(no `TODO.md`, no `BACKLOG.md`, etc.).
+
+Process rules — Codex pair-review, lateral-thinking checklist,
+multi-day testing, the unit-of-work flow — live in
+[`workflow.md`](./workflow.md). Don't put process in this file; this
+is for tracked product/engine/test work.
 
 ## Flaky E2E: `dashboard.e2e.ts:165` — Redirects to settings when no baby exists
 
@@ -189,27 +197,6 @@ These are non-bug improvements both reviewers want:
 - `arc.e2e.ts:39-56`, `prediction.e2e.ts:175-203`, `bugs.e2e.ts:148-178` —
   E2E tests that assert "settings saved" or "arc visible" but not the
   prediction *effect*.
-
-## Process: lateral-thinking checklist for non-trivial engine fixes
-
-The `target_bedtime` cap iteration (15 → 60 → asymmetric 30/15) exposed
-a meta-pattern: technical fixes can be locally correct but solve the
-wrong problem if they don't think from first principles about how the
-app should feel for a parent and baby. Use this as a PR-review checklist
-on engine changes that affect predictions, not as a blocker on every
-small fix:
-
-1. Does this serve the parent's experience over multiple days, not just
-   today's snapshot output?
-2. Are there asymmetries (easier vs harder directions, baby's cycle,
-   age-dependent tolerances) the fix should respect?
-3. Does the test setup capture the multi-day mechanic, or only single-
-   day? If single-day, is that the right granularity?
-4. What's the worst case from the baby's perspective if this fix is
-   slightly wrong? (Tolerable nudge, or "baby cries every night"?)
-
-When the answer surfaces a real product risk, capture it in this file
-as a separate followup section. When it doesn't, no doc entry needed.
 
 ## Coverage gaps
 

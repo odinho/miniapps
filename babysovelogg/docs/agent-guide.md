@@ -4,6 +4,9 @@ Use this only when the change crosses layers or you need a fast repo map.
 
 Read first if the task touches events, projections, API shape, optimistic sync, or prediction logic.
 
+For workflow (Codex pair-review, followups.md as durable todo,
+multi-day testing, unit-of-work flow): see [`workflow.md`](./workflow.md).
+
 ## Authoritative Files
 
 ### App structure
