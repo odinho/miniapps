@@ -632,6 +632,43 @@ function assertInvariants({ archetype, scenario, prediction }: InvariantContext)
     }
   }
 
+  // I-bedtime-evening-hour: bedtime should land in a realistic evening
+  // window — never before 17:00 local for routine/emerging babies, never
+  // after 23:00. Catches the May-2026 review finding where Mina (3-nap,
+  // target 19:15) returned bedtime: 16:15 after a skipped-nap day — the
+  // engine collapsed too aggressively to "go to bed now" instead of
+  // pushing to a sensible evening time.
+  //
+  // Newborn strategy is more permissive (no schedule-based bedtime), so
+  // gate on strategy. Active-night also exempt (the night may have started
+  // before the canonical bedtime hour).
+  if (
+    p?.bedtime
+    && p.strategy !== "newborn_guidance"
+    && data.activeSleep?.type !== "night"
+  ) {
+    const bedtimeHour = parseInt(osloHHMM(p.bedtime).split(":")[0]);
+    expect(bedtimeHour, `${where}: bedtime hour-of-day in [17, 23] for routine/emerging`)
+      .toBeGreaterThanOrEqual(17);
+    expect(bedtimeHour, `${where}: bedtime hour-of-day in [17, 23] for routine/emerging`)
+      .toBeLessThanOrEqual(23);
+  }
+
+  // I-stale: when the engine still considers naps unfinished, `nextNap`
+  // should not be substantially in the past — whether it came from the
+  // predictedNaps list or from the predictNextNap fallback. Catches both
+  // (a) the emerging path's missing stale-replan, (b) the routine path's
+  // 90-min-was-too-lax napSkipped threshold, and (c) the fallback case
+  // where predictedNaps is null but predictNextNap returned a stale time.
+  //
+  // Surfaced by the 2026-05-08 review across Eli/Iben/Oskar scenarios.
+  if (p?.nextNap && !p.napsAllDone && !data.activeSleep) {
+    const nextNapMs = new Date(p.nextNap).getTime();
+    const overdueMin = (nowMs - nextNapMs) / 60_000;
+    expect(overdueMin, `${where}: nextNap not >60 min in the past`)
+      .toBeLessThanOrEqual(60);
+  }
+
   // I-confidence-aligned: napRanges length matches predictedNaps.
   if (p?.confidence && p.predictedNaps !== undefined) {
     const napCount = p.predictedNaps?.length ?? 0;
@@ -1185,15 +1222,15 @@ describe("Mina Learned (3-nap routine_schedule)", () => {
         now: 16:30
         inputs: wake=06:30 done=[08:50-09:35] target=19:15
         strategy: routine_schedule
-        nextNap: 16:15 (-15m)
-        bedtime: 16:15 (-15m)
-        predictedNaps: none
-        napsAllDone: true (3 expected)
+        nextNap: 15:54 (-35m)
+        bedtime: 17:00 (+30m)
+        predictedNaps: 15:54-16:34
+        napsAllDone: false (3 expected)
         expectedNapEnd: none
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: high (0 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=45m night=675m ww=150.5m bedww=160m
 
       scenario: 10:00 no wake reference
@@ -1623,15 +1660,15 @@ describe("Oskar OneNap (1-nap routine_schedule, cut-short matrix)", () => {
         now: 15:43
         inputs: wake=06:00 done=[10:05-10:44!, 06:21-06:49!] target=19:30
         strategy: routine_schedule
-        nextNap: 14:13 (-1h 29m)
+        nextNap: 15:44 (+01m)
         bedtime: 19:06 (+3h 23m)
-        predictedNaps: 14:13-16:03
+        predictedNaps: none
         napsAllDone: false (1 expected)
         expectedNapEnd: none
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (0 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: May-7 floor: 28m cs at 06:21-06:49, now 08:12
@@ -1852,9 +1889,9 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         now: 06:30
         inputs: wake=06:00 target=19:45
         strategy: emerging_rhythm
-        nextNap: 07:59 (+1h 29m)
-        bedtime: 16:22 (+9h 52m)
-        predictedNaps: 07:59-08:49, 10:53-11:48, 13:21-14:11
+        nextNap: 06:37 (+07m)
+        bedtime: 17:15 (+10h 45m)
+        predictedNaps: 06:37-07:27, 09:31-10:26, 11:59-12:49, 14:55-15:40
         napsAllDone: false (4 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -1868,9 +1905,9 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         now: 08:30
         inputs: wake=06:00 target=19:45
         strategy: emerging_rhythm
-        nextNap: 07:59 (-31m)
-        bedtime: 16:22 (+7h 52m)
-        predictedNaps: 07:59-08:49, 10:53-11:48, 13:21-14:11
+        nextNap: 09:31 (+1h 01m)
+        bedtime: 17:15 (+8h 45m)
+        predictedNaps: 09:31-10:26, 11:59-12:49, 14:55-15:40
         napsAllDone: false (4 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -2803,10 +2840,10 @@ describe("cross-archetype shared scenarios", () => {
         now: 13:00
         inputs: wake=06:00 target=19:45
         strategy: emerging_rhythm
-        nextNap: 16:22 (+3h 22m)
-        bedtime: 16:22 (+3h 22m)
-        predictedNaps: none
-        napsAllDone: true (4 expected)
+        nextNap: 14:55 (+1h 55m)
+        bedtime: 17:15 (+4h 15m)
+        predictedNaps: 14:55-15:40
+        napsAllDone: false (4 expected)
         expectedNapEnd: none
         expectedNightEnd: none
         rescueNap: none
@@ -2843,15 +2880,15 @@ describe("cross-archetype shared scenarios", () => {
         now: 13:00
         inputs: wake=06:30 target=19:15
         strategy: routine_schedule
-        nextNap: 19:10 (+6h 10m)
+        nextNap: 12:10 (-49m)
         bedtime: 19:10 (+6h 10m)
-        predictedNaps: none
-        napsAllDone: true (3 expected)
+        predictedNaps: 12:10-13:20, 15:50-16:30
+        napsAllDone: false (3 expected)
         expectedNapEnd: none
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: high (0 napRanges)
+        confidence: high (2 napRanges)
         learned: nap=45m night=675m ww=150.5m bedww=160m
 
       ──────────
@@ -2921,15 +2958,15 @@ describe("cross-archetype shared scenarios", () => {
         now: 13:00
         inputs: wake=06:00 target=none
         strategy: routine_schedule
-        nextNap: 18:31 (+5h 31m)
+        nextNap: 13:30 (+30m)
         bedtime: 18:31 (+5h 31m)
-        predictedNaps: none
-        napsAllDone: true (2 expected)
+        predictedNaps: 13:30-14:50
+        napsAllDone: false (2 expected)
         expectedNapEnd: none
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: high (0 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=80m night=660m ww=183.07692307692307m bedww=250m
 
       ──────────
@@ -2972,10 +3009,10 @@ describe("cross-archetype shared scenarios", () => {
         now: 13:00
         inputs: wake=06:30 target=20:00
         strategy: emerging_rhythm
-        nextNap: 19:18 (+6h 18m)
+        nextNap: 14:12 (+1h 12m)
         bedtime: 19:18 (+6h 18m)
-        predictedNaps: none
-        napsAllDone: true (2 expected)
+        predictedNaps: 14:12-15:16
+        napsAllDone: false (2 expected)
         expectedNapEnd: none
         expectedNightEnd: none
         rescueNap: none

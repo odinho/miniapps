@@ -357,7 +357,11 @@ export function recommendBedtime(todaySleeps: SleepEntry[], ctx: BabyContext, no
     return setHourInTz(dayAnchor, 23, 0, ctx.tz).toISOString();
   }
   const hour = getHourInTz(bedtime, ctx.tz);
-  if (hour < 16) return setHourInTz(dayAnchor, 16, 0, ctx.tz).toISOString();
+  // Floor at 17:00 local. The May-7 fix used 16:00, but the May-2026 review
+  // surfaced cases where overtired-day pressure math produced 16:15-16:22
+  // bedtimes for babies whose target was 19:15-19:45 — clearly too early.
+  // 17:00 is the earliest realistic bedtime for the babies this app targets.
+  if (hour < 17) return setHourInTz(dayAnchor, 17, 0, ctx.tz).toISOString();
   if (hour > 23) return setHourInTz(dayAnchor, 23, 0, ctx.tz).toISOString();
 
   return bedtime.toISOString();

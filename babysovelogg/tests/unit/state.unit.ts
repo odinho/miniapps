@@ -950,7 +950,10 @@ describe("assembleState", () => {
   });
 
   it("B11: napsAllDone flag set when all expected naps are completed", () => {
-    // 9mo with 2 expected naps (default), both completed
+    // 9mo with 2 expected naps (default), both completed.
+    // Use 90-min naps so they exceed the engine's short-nap threshold
+    // (max(20, learned 90 - cycle 22.5) ≈ 68 min). 60-min naps would be
+    // classified as cut-shorts, leaving the day's budget unfulfilled.
     const wakeUp: DayStartRow = {
       id: 1,
       baby_id: 1,
@@ -962,14 +965,14 @@ describe("assembleState", () => {
     const nap1 = sleepRow({
       id: 1,
       start_time: "2026-03-26T08:30:00.000Z",
-      end_time: "2026-03-26T09:30:00.000Z",
+      end_time: "2026-03-26T10:00:00.000Z",
       type: "nap",
       domain_id: "slp_1",
     });
     const nap2 = sleepRow({
       id: 2,
       start_time: "2026-03-26T12:00:00.000Z",
-      end_time: "2026-03-26T13:00:00.000Z",
+      end_time: "2026-03-26T13:30:00.000Z",
       type: "nap",
       domain_id: "slp_2",
     });

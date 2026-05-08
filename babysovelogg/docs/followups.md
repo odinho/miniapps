@@ -65,57 +65,22 @@ shipped, reading snapshots critically for behavioural regressions baked in by
 `--update`. Both reviewers converged on the same major findings — high
 confidence each is a real engine bug.
 
-### Engine bug: `bedtime` lands BEFORE `now` after skipped naps
-
-**Where:** Mina at 16:30 with only the morning nap done returns
-`bedtime: 16:15 (-15m)` — the predicted bedtime is in the past at evaluation
-time. Visible in `tests/unit/engine-scenarios.unit.ts:1184-1197`.
-
-**Hypothesis:** Skipped-nap collapse anchors on `lastSleepEnd + bedtimeWW`
-(09:35 + ~6h40m ≈ 16:15) without clamping against `now` or pushing toward an
-evening default. The May-7 fix prevented bedtime rolling to *tomorrow* but
-left the symmetric "lands in the past" case open.
-
-**Fix plan:** Add invariant `I-bedtime-future: bedtime ≥ now − 30 min` (when
-not in an active-night). Watch it fail in the sweep, then clamp in
-`recommendBedtime` (or `selectBestPlan`) so a skipped-nap day pushes bedtime
-to a sane evening time, not a stale historical one.
-
-### Engine bug: `nextNap` shown in the past while `predictedNaps` non-null
-
-**Where:** Multiple scenarios across emerging + routine paths:
-- Eli at 08:30 no naps → `nextNap: 07:59 (-31m)`
-- Eli at 10:00 after 1 nap → `nextNap: 09:44 (-15m)`
-- Iben at 10:30 → `nextNap: 09:38 (-51m)`
-- Oskar 35m cut-short at 17:00 → `nextNap: 16:27 (-32m)`
-- Oskar May-7 bug at 15:43 → `nextNap: 14:13 (-1h 29m)` with predictedNaps
-  starting in the past too
-
-**Hypothesis:** Emerging path (`predictEmerging`) has no stale-replan logic
-when the first planned nap time is already past. Routine path's
-`napSkipped` threshold (90 min overdue) is too lax for comeback naps after
-a cut-short — those should collapse faster.
-
-**Fix plan:** Add invariant `I-stale: when not napsAllDone and predictedNaps
-non-null, nextNap not more than 60 min in the past`. Watch it fail. Fix the
-emerging path to filter past nap candidates or re-anchor; tighten the
-napSkipped threshold for comeback-nap state.
-
 ### Engine bug: `target_bedtime` setting has no visible effect
 
-**Where:** Settings sweep on Oskar at
-`tests/unit/engine-scenarios.unit.ts:2474-2480, 2598-2604` — variants
-`target=18:00 (early)` AND `target=21:00 (late)` both produce identical
-`bedtime: 19:17`.
+**Where:** Settings sweep on Oskar — variants `target=18:00 (early)` AND
+`target=21:00 (late)` both produce nearly identical bedtime values.
 
-**Hypothesis:** Habitual / learned bedtime is overpowering the target in
-`selectBestPlan` plan scoring, or the target shift cap (`DAILY_SHIFT_CAP_MS`)
-is too tight, or the target plan never wins the score.
+**Root cause** (Codex 2026-05-08 review): `selectBestPlan` clamps the
+target to natural ±15 min via `DAILY_SHIFT_CAP_MS`
+(`src/lib/engine/schedule.ts:1610-1615`). And the natural bedtime itself
+goes through `recommendBedtime`'s sanity clamp first. So if natural lands
+at 17:00 (e.g. via the new 17:00 floor), target=21:00 can only push to
+17:15. The structural limit means target_bedtime is mostly cosmetic.
 
-**Fix plan:** First diagnose by reading the scoring; then either lift the
-cap, increase the target weight, or document the cap explicitly. Add a
-paired test: target=18:00 should produce a *materially* earlier bedtime
-than target=21:00 on the same day plan.
+**Fix plan:** Lift `DAILY_SHIFT_CAP_MS` to something larger (60-90 min) so
+the family's stated target can actually move bedtime. Document the cap
+explicitly in the snapshot. Add a paired test: target=18:00 produces
+*materially* earlier bedtime than target=21:00.
 
 ### Engine bug: B8 60-min filter checks `startTime`, should check `endTime`
 

@@ -415,10 +415,11 @@ function assembleEmergingPrediction(
 
   let bedtimeMs = bedtime ? new Date(bedtime).getTime() : Infinity;
 
-  // Safety B8 filter
-  let predictedNaps: PredictedNap[] | null = remaining.filter(
-    (n) => new Date(n.startTime).getTime() < bedtimeMs - 60 * 60000,
-  );
+  // Safety B8 + stale filter: see schedule branch for rationale.
+  let predictedNaps: PredictedNap[] | null = remaining.filter((n) => {
+    const startMs = new Date(n.startTime).getTime();
+    return startMs < bedtimeMs - 60 * 60000 && startMs > now - 60 * 60_000;
+  });
   if (predictedNaps.length === 0) predictedNaps = null;
 
   // Derive nextNap from remaining predictions
@@ -433,7 +434,11 @@ function assembleEmergingPrediction(
   // consistent with the boolean.
   const nextNapMs = nextNap ? new Date(nextNap).getTime() : 0;
   const overdueMs = nextNapMs ? now - nextNapMs : 0;
-  const napSkipped = !activeSleep && overdueMs > 90 * 60000 && overdueMs < 18 * 60 * 60000;
+  // Tightened from 90 to 60 min in the May-2026 review: 90 min was just lax
+  // enough to let the predictNextNap fallback render a stale past-time nap
+  // (e.g. Oskar nextNap=15:06 at now=16:22, 76 min overdue but napSkipped
+  // didn't fire). Matches the 60-min past-nap visibility filter elsewhere.
+  const napSkipped = !activeSleep && overdueMs > 60 * 60000 && overdueMs < 18 * 60 * 60000;
   const napsAllDone = consumedNaps >= expectedNapCount || napSkipped
     || activeSleep?.type === "night";
 
@@ -564,10 +569,16 @@ function assembleSchedulePrediction(
 
   let bedtimeMs = new Date(bedtime).getTime();
 
-  // Safety B8 filter
-  let predictedNaps: PredictedNap[] | null = remaining.filter(
-    (n) => new Date(n.startTime).getTime() < bedtimeMs - 60 * 60000,
-  );
+  // Safety B8 + stale filter: drop naps that would land within 60 min of
+  // bedtime (B8) AND drop naps whose start time is already >60 min in the
+  // past (stale — parent didn't act on them, no point displaying them as
+  // "next" anymore). Surfaced by the May-2026 review where Oskar's planned
+  // comeback at 14:13 was still rendered as nextNap at now=15:43 (89 min
+  // overdue) because the napSkipped 90-min threshold was a hair too lax.
+  let predictedNaps: PredictedNap[] | null = remaining.filter((n) => {
+    const startMs = new Date(n.startTime).getTime();
+    return startMs < bedtimeMs - 60 * 60000 && startMs > now - 60 * 60_000;
+  });
   if (predictedNaps.length === 0) predictedNaps = null;
 
   // ── Step 4: Derive nextNap, napsAllDone, and final cleanup ──
@@ -580,7 +591,11 @@ function assembleSchedulePrediction(
 
   const nextNapMs = new Date(nextNap).getTime();
   const overdueMs = now - nextNapMs;
-  const napSkipped = !activeSleep && overdueMs > 90 * 60000 && overdueMs < 18 * 60 * 60000;
+  // Tightened from 90 to 60 min in the May-2026 review: 90 min was just lax
+  // enough to let the predictNextNap fallback render a stale past-time nap
+  // (e.g. Oskar nextNap=15:06 at now=16:22, 76 min overdue but napSkipped
+  // didn't fire). Matches the 60-min past-nap visibility filter elsewhere.
+  const napSkipped = !activeSleep && overdueMs > 60 * 60000 && overdueMs < 18 * 60 * 60000;
   // If the next predicted nap would land within 1h of bedtime, treat the day's
   // naps as effectively done — otherwise the Timer would show "next nap" with
   // bedtime as the target time. The `>=` mirrors the B8 filter's strict `<`
