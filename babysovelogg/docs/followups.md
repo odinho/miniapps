@@ -65,46 +65,16 @@ shipped, reading snapshots critically for behavioural regressions baked in by
 `--update`. Both reviewers converged on the same major findings — high
 confidence each is a real engine bug.
 
-### Engine: clean up the `target_bedtime` convergence architecture
+### Engine: `selectBestPlan` silently returns natural when ALL candidates are infeasible
 
-**Status (2026-05-08):** convergence WORKS now. The 14-day Mina trail
-(target=18:00, natural ~19:14) slides smoothly from 18:59 to 18:06 over
-14 days. The fix was a third "target-nudged" candidate in `selectBestPlan`
-that shifts the LAST nap and bedtime by the capped amount toward target,
-plus fixing the multi-day test to also append predicted naps each day
-(not just nights — without naps the 7-day learning window starves of
-nap data and natural drifts to defaults).
+Codex caught this during the convergence diagnosis (2026-05-08). Day 6
+of the trail (when test data was sparser) had both natural AND
+target-guided infeasible (final-WW or nap-WW violations); the engine
+returned natural-with-violations rather than surfacing the failure.
 
-**But:** Codex's parallel design review points out the current fix is a
-pragmatic patch, not the cleanest architecture. Three points:
-
-1. **Target convergence belongs in `recommendBedtime`, not `selectBestPlan`.**
-   `recommendBedtime` blends pressure-bedtime with habitual; adding
-   target as a third soft anchor (post-blending) would let "natural"
-   itself drift toward target each day. Then `selectBestPlan` stays
-   focused on feasibility/scoring rather than target manipulation.
-
-2. **"Nudge last nap + bedtime" mixes two concerns.** It pushes WW
-   deviation onto the pre-last-nap window. A *proportional* whole-day
-   nudge (shift all naps by `shift / napCount`) spreads the deviation
-   evenly. Bedtime-only soft anchoring is right when naps are already
-   logged.
-
-3. **`selectBestPlan` silently returns natural when ALL candidates are
-   infeasible.** Surfaced by Codex during the convergence diagnosis:
-   day 6 of the trail (when test data was sparser) had natural,
-   target-nudged AND target-guided all infeasible (final-WW or nap-WW
-   violations); engine fell back to natural-with-violations rather than
-   surfacing the failure. Make this explicit — return the lowest-cost
-   plan even if infeasible, OR return null for the parent UI to handle.
-
-**Refactor plan:**
-- Move target soft-anchoring into `recommendBedtime` (after habitual blend).
-- Replace last-nap-only nudge with proportional whole-day shift in
-  `selectBestPlan`'s nudged candidate (or remove the candidate entirely
-  if the recommendBedtime soft anchor is enough).
-- Make all-infeasible explicit instead of silent natural fallback.
-- Re-run the 14-day convergence trail; expect smoother monotonic slide.
+Make all-infeasible explicit — either return the lowest-cost plan with
+a feasibility flag, OR return null for the parent UI to handle ("we
+can't fit a coherent day plan; check the inputs").
 
 ### UX: signal when `target_bedtime` is rejected as infeasible
 

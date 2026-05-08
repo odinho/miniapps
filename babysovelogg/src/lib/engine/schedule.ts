@@ -345,6 +345,27 @@ export function recommendBedtime(todaySleeps: SleepEntry[], ctx: BabyContext, no
     bedtime = pressureBedtime;
   }
 
+  // Target soft-anchor: if the family set a target_bedtime, nudge the
+  // blended bedtime toward target by the asymmetric daily cap. The shift
+  // is bounded per-day; convergence is multi-day (as the family acts on
+  // each day's suggestion, history shifts and tomorrow's blended bedtime
+  // anchors closer to target). See DAILY_SHIFT_CAP_*_MS rationale.
+  //
+  // This used to live in selectBestPlan as a separate "effective target"
+  // calculation that produced an extra plan candidate. Moving it here
+  // keeps target as a property of natural's bedtime itself, which is
+  // architecturally cleaner — selectBestPlan stays focused on day-shape
+  // feasibility, not target manipulation.
+  if (ctx.targetBedtime) {
+    const targetMs = new Date(targetBedtimeToISO(ctx.targetBedtime, nowMs, ctx.tz)).getTime();
+    const currentMs = bedtime.getTime();
+    const rawShift = targetMs - currentMs;
+    const shift = rawShift > 0
+      ? Math.min(DAILY_SHIFT_CAP_LATER_MS, rawShift)
+      : Math.max(-DAILY_SHIFT_CAP_EARLIER_MS, rawShift);
+    bedtime = new Date(currentMs + shift);
+  }
+
   // Wide sanity clamp in the baby's local time. Anchor the clamp on the day
   // implied by the last completed sleep — without that, an overflowed
   // calculation that lands past midnight gets clamped to 16:00 of THE NEXT
@@ -1424,20 +1445,19 @@ export interface PlanScore {
 
 export interface SelectedPlan extends PlanCandidate {
   /**
-   * Which candidate won the score:
-   * - `natural`: forward-walk plan from learned values (no target set, or
-   *   target's pull lost the score).
-   * - `target-nudged`: natural's day plan but with the last nap and
-   *   bedtime shifted by the capped amount toward target. Used when
-   *   target-guided's full backward walk would be infeasible (typical
-   *   on tight days) but a small bedtime nudge still gets us closer to
-   *   target without disrupting morning naps the parent has likely
-   *   already done.
-   * - `target-guided`: full backward-walk plan from the effective target.
-   *   Wins when target is close enough to natural that the backward walk
-   *   is feasible AND beats natural on score.
+   * Which candidate won the day-shape score:
+   * - `natural`: forward-walk plan from learned values. Bedtime
+   *   incorporates the target soft-anchor (when target_bedtime is set,
+   *   `recommendBedtime` shifts the blended bedtime toward target by the
+   *   asymmetric daily cap). This means natural's bedtime drifts toward
+   *   target each day as history catches up, even when this candidate
+   *   wins.
+   * - `target-guided`: backward-walk plan from the SAME bedtime as
+   *   natural, just walked through naps in the other direction. Wins
+   *   when the backward walk produces a lower-cost day shape (tight
+   *   days where forward walking lands naps awkwardly).
    */
-  source: "natural" | "target-nudged" | "target-guided";
+  source: "natural" | "target-guided";
 }
 
 /**
@@ -1655,79 +1675,23 @@ export function selectBestPlan(
     return { ...naturalPlan, source: "natural" };
   }
 
-  // Compute effective target with asymmetric daily caps. See the
-  // DAILY_SHIFT_CAP_*_MS doc comment for rationale.
+  // Natural's bedtime ALREADY incorporates the target soft-anchor (added
+  // in `recommendBedtime` via the asymmetric daily cap). So the cap math
+  // doesn't repeat here — we just check whether the backward-walk plan
+  // beats the forward-walk plan on day-shape feasibility, both targeting
+  // the same naturalBedtime.
   const naturalBedtimeMs = new Date(naturalBedtime).getTime();
-  const rawTargetMs = new Date(targetBedtimeToISO(ctx.targetBedtime, now, ctx.tz)).getTime();
-  const rawShift = rawTargetMs - naturalBedtimeMs;
-  const shift = rawShift > 0
-    ? Math.min(DAILY_SHIFT_CAP_LATER_MS, rawShift)      // toward later: 30 min cap
-    : Math.max(-DAILY_SHIFT_CAP_EARLIER_MS, rawShift);  // toward earlier: 15 min cap
-  const effectiveTargetMs = naturalBedtimeMs + shift;
-  const effectiveTarget = new Date(effectiveTargetMs).toISOString();
 
-  // Target-guided plan: backward walk from effective target. Often
-  // infeasible on tight days (the day's nap budget can't compress enough
-  // to hit a meaningfully different bedtime), but when it works it gives
-  // the cleanest day plan.
-  const targetNaps = planBackwardFromBedtime(wakeUpTime, effectiveTarget, ctx);
-  const targetPlan: PlanCandidate = { naps: targetNaps, bedtime: effectiveTarget };
+  // Target-guided plan: backward walk from naturalBedtime. Sometimes
+  // produces a cleaner nap shape than the forward walk for tight days.
+  const targetNaps = planBackwardFromBedtime(wakeUpTime, naturalBedtime, ctx);
+  const targetPlan: PlanCandidate = { naps: targetNaps, bedtime: naturalBedtime };
 
-  // Target-nudged plan: keep natural's day plan but shift the LAST nap +
-  // bedtime by the capped amount. The last nap is the only one we shift
-  // (parents can't undo morning naps already done — see the asymmetric
-  // cap rationale). This plan is feasible whenever natural is, since the
-  // final wake window stays the same; it just pulls bedtime closer to
-  // target. This is the candidate that drives multi-day convergence
-  // toward target — natural's score doesn't budge with target alone, but
-  // target-nudged's score is identical to natural's plus a target-
-  // proximity win.
-  const nudgedPlan: PlanCandidate = nudgeLastNapAndBedtime(naturalNaps, naturalBedtimeMs, shift);
+  const naturalScore = scorePlan(naturalPlan, ctx, wakeUpMs, naturalBedtimeMs, naturalNaps.length);
+  const targetScore = scorePlan(targetPlan, ctx, wakeUpMs, naturalBedtimeMs, naturalNaps.length);
 
-  const naturalScore = scorePlan(naturalPlan, ctx, wakeUpMs, effectiveTargetMs, naturalNaps.length);
-  const nudgedScore = scorePlan(nudgedPlan, ctx, wakeUpMs, effectiveTargetMs, naturalNaps.length);
-  const targetScore = scorePlan(targetPlan, ctx, wakeUpMs, effectiveTargetMs, naturalNaps.length);
-
-  // Pick the lowest-cost feasible plan. Ties prefer simpler plans
-  // (natural > nudged > target-guided) so the source signal is honest.
-  let bestSource: SelectedPlan["source"] = "natural";
-  let bestPlan: PlanCandidate = naturalPlan;
-  let bestCost = naturalScore.feasible ? naturalScore.cost : Infinity;
-
-  if (nudgedScore.feasible && nudgedScore.cost < bestCost) {
-    bestSource = "target-nudged";
-    bestPlan = nudgedPlan;
-    bestCost = nudgedScore.cost;
+  if (targetScore.feasible && targetScore.cost < naturalScore.cost) {
+    return { ...targetPlan, source: "target-guided" };
   }
-  if (targetScore.feasible && targetScore.cost < bestCost) {
-    bestSource = "target-guided";
-    bestPlan = targetPlan;
-    bestCost = targetScore.cost;
-  }
-  return { ...bestPlan, source: bestSource };
-}
-
-/**
- * Build the target-nudged candidate: natural naps with the last nap and
- * bedtime shifted by `shiftMs` (positive = later, negative = earlier). If
- * there are no naps, just bedtime moves.
- */
-function nudgeLastNapAndBedtime(
-  naturalNaps: PredictedNap[],
-  naturalBedtimeMs: number,
-  shiftMs: number,
-): PlanCandidate {
-  const newBedtime = new Date(naturalBedtimeMs + shiftMs).toISOString();
-  if (naturalNaps.length === 0) {
-    return { naps: [], bedtime: newBedtime };
-  }
-  const last = naturalNaps[naturalNaps.length - 1];
-  const shiftedLast: PredictedNap = {
-    startTime: new Date(new Date(last.startTime).getTime() + shiftMs).toISOString(),
-    endTime: new Date(new Date(last.endTime).getTime() + shiftMs).toISOString(),
-  };
-  return {
-    naps: [...naturalNaps.slice(0, -1), shiftedLast],
-    bedtime: newBedtime,
-  };
+  return { ...naturalPlan, source: "natural" };
 }
