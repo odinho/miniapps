@@ -82,7 +82,7 @@ export function predictEmerging(input: EmergingContext): EmergingPrediction {
 
   if (wakeUpTime) {
     predictedNaps = predictDayNaps(wakeUpTime, ctx);
-    bedtime = recommendBedtime(todaySleeps, ctx);
+    bedtime = recommendBedtime(todaySleeps, ctx, now);
 
     // Classify confidence per nap position
     for (let i = 0; i < predictedNaps.length; i++) {

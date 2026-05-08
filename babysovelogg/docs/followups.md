@@ -56,13 +56,41 @@ and no active sleep, show a banner "Vurder å gi seg og prøve igjen om
 overdue logic but is more directive. Consider making the threshold a
 per-baby setting tuned to historical fall-asleep latency.
 
-## Comprehensive engine-scenario test sweep
+## Engine inconsistency: active-night flips napsAllDone but not nextNap
+
+Surfaced by the engine-scenario sweep (`engine-scenarios.unit.ts`). When an
+active night sleep starts before all expected naps are done, `state.ts:651`
+OR's `activeSleep.type === "night"` into the returned `napsAllDone`, but the
+internal branch that collapses `nextNap` to `bedtime` (state.ts:590) was not
+taken. The result: `napsAllDone: true` with `nextNap` pointing to an
+earlier-predicted nap time. The sweep gates the
+`napsAllDone → nextNap == bedtime` invariant on `!active-night` to allow
+this through; question is whether to tighten the engine so the contract
+holds unconditionally, or leave it because the UI already ignores `nextNap`
+during active night. Visible in the cross-archetype "active night at 22:30"
+snapshot for Eli/Mina/Oskar/Ada/Iben.
+
+## Comprehensive engine-scenario test sweep — DELIVERED
 
 Source: 2026-05-08 user feedback after the *fifth* prediction-engine bug
 in a week reached prod. Specific bug: skipped synthetic comeback dragged
 bedtime to 19:22 (vs ~17:30 expected). Pattern: every fix has been a
 post-hoc regression test for one bug, never a category-spanning sweep
 that would catch the *next* bug before it ships.
+
+**Status (2026-05-08):** shipped as `tests/unit/engine-scenarios.unit.ts`.
+6 archetypes (Nora newborn, Eli emerging, Mina 3-nap, Oskar 1-nap, Ada
+no-target, Iben sparse), ~80 scenarios, ~12 universal invariants applied
+before snapshot, paired-baseline tests for May-7 floor, May-7 22h-17m,
+May-8 19:22 bugs. Settings dimension (Oskar × target_bedtime). Cross-
+archetype shared scenarios with per-strategy `expect`/`skipFor` for N/A
+handling. Codex pair-reviewed at architecture and final-pass stages.
+
+Concurrent engine fix: `buildContext` and `recommendBedtime` now thread
+`now` through the wall-clock-using spots (`calculateAgeMonths` and the
+synthetic-penalty / target-bedtime fallbacks), so the engine is fully
+deterministic when `data.now` is supplied. Original test-suite plan
+follows for reference of what the spec was.
 
 Quoting the user: *"If I'd written them, they'd be high level and have
 stats from a few made up babies and with a lot of scenarios for each of

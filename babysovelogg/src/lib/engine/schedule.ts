@@ -305,7 +305,8 @@ export function planBackwardFromBedtime(
 }
 
 /** Recommend bedtime based on today's sleeps and baby context. */
-export function recommendBedtime(todaySleeps: SleepEntry[], ctx: BabyContext): string {
+export function recommendBedtime(todaySleeps: SleepEntry[], ctx: BabyContext, now?: number): string {
+  const nowMs = now ?? Date.now();
   const targetNaps = resolveNapCount(ctx);
 
   const lastSleep = [...todaySleeps]
@@ -313,7 +314,7 @@ export function recommendBedtime(todaySleeps: SleepEntry[], ctx: BabyContext): s
     .toSorted((a, b) => new Date(b.end_time!).getTime() - new Date(a.end_time!).getTime())[0];
 
   if (!lastSleep?.end_time) {
-    return setHourInTz(new Date(), 19, 0, ctx.tz).toISOString();
+    return setHourInTz(new Date(nowMs), 19, 0, ctx.tz).toISOString();
   }
 
   // Pressure-based: last nap end + bedtime wake window
@@ -335,8 +336,7 @@ export function recommendBedtime(todaySleeps: SleepEntry[], ctx: BabyContext): s
     const baseWeight = getHabitualBedtimeWeight(ctx);
     // At day start, all sleeps are synthetic (predicted, with future end times).
     // Reduce habitual influence since we're building on predictions, not actuals.
-    const now = Date.now();
-    const allSynthetic = todaySleeps.every((s) => !s.end_time || new Date(s.end_time).getTime() > now);
+    const allSynthetic = todaySleeps.every((s) => !s.end_time || new Date(s.end_time).getTime() > nowMs);
     const syntheticPenalty = allSynthetic ? 0.5 : 1.0;
     const weight = (hasEnoughNaps ? baseWeight : baseWeight * 0.5) * syntheticPenalty;
     const blendedMs = pressureBedtime.getTime() * (1 - weight) + habitualBedtimeMs * weight;
@@ -1596,7 +1596,7 @@ export function selectBestPlan(
   // Natural plan: forward walk + learned bedtime
   const naturalNaps = predictDayNaps(wakeUpTime, ctx);
   const sleepsForBedtime = buildSleepsForBedtime(todaySleeps, activeSleep, naturalNaps, ctx, now);
-  const naturalBedtime = recommendBedtime(sleepsForBedtime, ctx);
+  const naturalBedtime = recommendBedtime(sleepsForBedtime, ctx, now);
   const naturalPlan: PlanCandidate = { naps: naturalNaps, bedtime: naturalBedtime };
 
   if (!ctx.targetBedtime) {

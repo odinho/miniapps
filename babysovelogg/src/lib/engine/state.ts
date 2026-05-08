@@ -180,11 +180,12 @@ function compressComebackNap(
 function buildContext(
   baby: Baby,
   recentSleeps: SleepEntry[],
+  now: number,
   extendedSleeps?: SleepEntry[],
 ): BabyContext {
   return {
     birthdate: baby.birthdate,
-    ageMonths: calculateAgeMonths(baby.birthdate),
+    ageMonths: calculateAgeMonths(baby.birthdate, new Date(now)),
     tz: baby.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
     customNapCount: baby.custom_nap_count ?? null,
     targetBedtime: baby.target_bedtime ?? null,
@@ -197,21 +198,21 @@ function buildContext(
 export function assembleState(data: DayData) {
   const { baby, activeSleep, todaySleeps, recentSleeps, todayWakeUp, pausesBySleep } = data;
 
+  // Calculate predictions even during active sleep so ghost arcs stay visible
+  const now = data.now ?? Date.now();
+
   const recentEntries = recentSleeps.map(toSleepEntry);
   // Determine strategy (use extended lookback for hysteresis when available).
   // The same extended window also feeds the cut-short censor's self-wake
   // median so it can fire even when the 7-day window has < 3 self-wakes.
   const strategyEntries = (data.strategySleeps ?? recentSleeps).map(toSleepEntry);
-  const ctx = buildContext(baby, recentEntries, strategyEntries);
+  const ctx = buildContext(baby, recentEntries, now, strategyEntries);
 
   const todaySleepsWithPauses = todaySleeps.map((s) => ({
     ...toSleepEntry(s),
     pauses: pausesBySleep.get(s.id) || [],
   }));
   const stats = getTodayStats(todaySleepsWithPauses);
-
-  // Calculate predictions even during active sleep so ghost arcs stay visible
-  const now = data.now ?? Date.now();
 
   const strategy = determineStrategy(strategyEntries, baby.birthdate, ctx.tz, now);
   ctx.strategy = strategy;
