@@ -101,6 +101,10 @@
 		};
 	}
 
+	function isoOffset(base: number, mins: number) {
+		return new Date(base + mins * 60000).toISOString();
+	}
+
 	function makeCalibration(trust: CalibrationReport['trust']): CalibrationReport {
 		const learned = { source: 'learned' as const, sampleCount: 28 };
 		const ageDefault = { source: 'age-default' as const, sampleCount: 0 };
@@ -151,7 +155,6 @@
 
 		// Fixed 2am for deep-night scenario
 		const twoAm = (() => { const d = new Date(); d.setHours(2, 0, 0, 0); return d.getTime(); })();
-		const oa = (base: number, mins: number) => new Date(base + mins * 60000).toISOString();
 
 		// Fixed 21:00 for evening bedtime scenario (isEvening check in getTimerMode)
 		const eveningBase = (() => { const d = new Date(); d.setHours(21, 0, 0, 0); return d.getTime(); })();
@@ -528,14 +531,14 @@
 				nowMs: twoAm,
 				activeSleep: null,
 				prediction: null,
-				todayWakeUp: { wake_time: oa(twoAm, +300) }, // wakes at 2am + 5h = 7am
+				todayWakeUp: { wake_time: isoOffset(twoAm, +300) }, // wakes at 2am + 5h = 7am
 				todaySleeps: [],
 				arcSleeps: [],
 				arcActive: null,
 				arcPred: null,
 				arcIsNight: true,
 				arcStartLabel: null,
-				arcEndLabel: hm(oa(twoAm, +300)),
+				arcEndLabel: hm(isoOffset(twoAm, +300)),
 				arcBands: [],
 			},
 		];
