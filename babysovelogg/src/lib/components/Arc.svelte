@@ -30,6 +30,8 @@
 		endTimeLabel?: string | null;
 		/** Confidence bands for predicted nap starts: lo/hi ISO timestamps spanning ~±1 SD */
 		napConfidenceBands?: Array<{ lo: string; hi: string }>;
+		/** Override internal clock (ms since epoch). Used by the dev playground. */
+		nowMs?: number;
 		onStartClick?: () => void;
 		onEndClick?: () => void;
 		onSleepClick?: (index: number) => void;
@@ -45,6 +47,7 @@
 		startTimeLabel = null,
 		endTimeLabel = null,
 		napConfidenceBands = [],
+		nowMs,
 		onStartClick,
 		onEndClick,
 		onSleepClick,
@@ -60,6 +63,10 @@
 	let now = $state(new Date());
 
 	$effect(() => {
+		if (nowMs != null) {
+			now = new Date(nowMs);
+			return;
+		}
 		const interval = setInterval(() => {
 			now = new Date();
 		}, 10_000);
