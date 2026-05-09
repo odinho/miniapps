@@ -264,8 +264,13 @@ naps done: false (2 expected)"
     expect(renderDayPlan(afterLateNap)).toMatchInlineSnapshot(`
 "strategy: emerging_rhythm
 bedtime: 19:00
-naps done: false (2 expected)"
+naps done: true (2 expected)"
 `);
+    // Pin: when the 2nd predicted nap lands within 60 min of bedtime, emerging
+    // collapses to bedtime just like the routine path. nextNap == bedtime.
+    expect(afterLateNap.prediction!.napsAllDone).toBe(true);
+    expect(afterLateNap.prediction!.nextNap).toBe(afterLateNap.prediction!.bedtime);
+    expect(afterLateNap.prediction!.predictedNaps).toBeNull();
 
     // Pin: bedtime is valid (computed from real data, in a sane window) and
     // sits after the last predicted nap end. The previous "not equal to

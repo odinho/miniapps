@@ -95,16 +95,6 @@ improves prediction accuracy on real data, instead of just satisfying
 the synthetic settings sweep.
 
 
-### Engine bug: emerging path lacks "collapsed to bedtime" cleanup
-
-**Where:** Eli at 13:00 truncates `predictedNaps` to 3 entries but
-`napsAllDone: false (4 expected)`. Same shape in plan-scoring.unit.ts:240-243.
-
-**Hypothesis:** Routine path collapses to bedtime when remaining naps would
-land within 60 min of bedtime; emerging path doesn't have the equivalent.
-
-**Fix plan:** Port the routine collapse logic to `predictEmerging`.
-
 ### Engine: sleepWindow during active sleep shows "now" window, not post-wakeup window
 
 Codex flagged (2026-05-09) during the sleepWindow staleness fix. When a

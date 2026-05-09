@@ -442,14 +442,16 @@ function assembleEmergingPrediction(
   // (e.g. Oskar nextNap=15:06 at now=16:22, 76 min overdue but napSkipped
   // didn't fire). Matches the 60-min past-nap visibility filter elsewhere.
   const napSkipped = !activeSleep && overdueMs > 60 * 60000 && overdueMs < 18 * 60 * 60000;
-  const napsAllDone = consumedNaps >= expectedNapCount || napSkipped
+  // Mirror routine path: when the next predicted nap lands within 60 min of
+  // bedtime (≥ threshold), treat the day's naps as done. Without this, the
+  // Timer would show nextNap=bedtime but napsAllDone=false — an inconsistent
+  // state where the UI doesn't know whether to show a "nap" or "bedtime" mode.
+  const collapsedToBedtime = nextNapMs >= bedtimeMs - 60 * 60000;
+  const napsAllDone = consumedNaps >= expectedNapCount || napSkipped || collapsedToBedtime
     || activeSleep?.type === "night";
 
-  if (nextNapMs > bedtimeMs - 60 * 60000 || napsAllDone) {
-    nextNap = bedtime;
-  }
-
   if (napsAllDone) {
+    nextNap = bedtime;
     predictedNaps = null;
   }
 
