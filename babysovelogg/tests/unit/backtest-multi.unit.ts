@@ -10,8 +10,9 @@ import halldisData from "../fixtures/halldis-sleep.json";
 import baby1Data from "../fixtures/baby_1-sleep.json";
 import baby2Data from "../fixtures/baby_2-sleep.json";
 import baby3Data from "../fixtures/baby_3-sleep.json";
-// baby_5 excluded — timestamps appear to be AEST (UTC+10), not the assumed US Eastern;
-// bed MAE 1646 min (~27h) and wake MAE 975 min (~16h) confirm a ~14h offset mismatch.
+// baby_5 excluded — data quality: only 9 days, night sleeps are truncated (3-4h tails only,
+// no full overnight entry), overlapping entries on some days. Bed MAE 1466+ min across all
+// timezones confirms the issue is structural, not a timezone offset.
 
 // =============================================================================
 // Multi-baby backtest: validates algorithm generalizes beyond Halldis

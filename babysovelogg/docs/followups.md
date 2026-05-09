@@ -38,6 +38,33 @@ and no active sleep, show a banner "Vurder å gi seg og prøve igjen om
 overdue logic but is more directive. Consider making the threshold a
 per-baby setting tuned to historical fall-asleep latency.
 
+## Docs: document wall-clock assumptions in the engine
+
+Source: 2026-05-09 user question — "would this work on a spaceship?" The engine
+currently assumes a conventional day/night schedule via several wall-clock anchors:
+
+- `getHours()` for day-boundary logic (deep-night = 0-5am, evening = 18h+)
+- `getLocalMinuteOfDay` throughout schedule scoring and habitual-anchor computation
+- Bedtime habitual anchor assumes 17:00–23:00 range in plan scoring
+- Night sleep typed as "night" for duration weighting (longest stretch = likely night)
+- DST transition detection uses local time
+
+A baby on an inverted schedule (bed 01:00, wake 12:00) would be misidentified as
+"deep-night" during their active awake period and would have extremely high overtime
+signals. The engine's "night sleep" concept is currently the longest sleep, but the
+boundary logic would fight an inverted schedule.
+
+Concrete documentation tasks:
+1. Add a `## Wall-clock assumptions` section to `docs/agent-guide.md` listing the
+   above anchors with file:line pointers.
+2. Add a note to the user-facing README/settings about the conventional-schedule
+   assumption and that unusual schedules may need the strategy to be set manually.
+
+Long-term: habitual-wake / habitual-bedtime anchors are already learned per-baby —
+if we track "longest sleep = night" without a hard hour boundary, the engine would
+work on any schedule. The hour-gated logic in `timer-state.ts` (deep-night, evening)
+is the main remaining assumption.
+
 ---
 
 ## Open bugs surfaced by the 2026-05-08 test-suite review
@@ -50,10 +77,10 @@ confidence each is a real engine bug.
 ### UX: infeasibility banner tested but not E2E-verified
 
 `feasible` is now threaded from `SelectedPlan` through `Prediction` to Timer.svelte
-(2026-05-09). The Timer shows "Målet ditt passa ikkje i dag" in bedtime mode when
-`feasible === false`. No E2E test yet covers the path: set target > engine max,
-verify the banner text appears. Low priority — the engine logic is unit-tested;
-this is a display assertion.
+(2026-05-09). The Timer shows "Målet ditt (HH:MM) er ikkje nåeleg i dag" in bedtime
+mode when `feasible === false`, with the target time shown explicitly. No E2E test yet
+covers the path: set target > engine max, verify the banner text appears. Low priority —
+the engine logic is unit-tested; this is a display assertion.
 
 ### Backtest blind spot: target_bedtime data missing from Halldis fixture
 

@@ -9,10 +9,11 @@
 		prediction: Prediction | null;
 		todayWakeUp: { wake_time: string } | null;
 		todaySleeps: SleepLogRow[];
+		targetBedtime?: string | null;
 		onEditStart?: () => void;
 	}
 
-	let { activeSleep, prediction, todayWakeUp, todaySleeps, onEditStart }: Props = $props();
+	let { activeSleep, prediction, todayWakeUp, todaySleeps, targetBedtime = null, onEditStart }: Props = $props();
 
 	let now = $state(Date.now());
 
@@ -108,7 +109,7 @@
 		<span class="countdown-value">{formatDuration(mode.countdown)}</span>
 		<div class="arc-sub-label">{formatTime(mode.bedtime)} {confidenceLabel ? `(${confidenceLabel})` : ''}</div>
 		{#if prediction?.feasible === false}
-			<div class="arc-sub-label" style="color: var(--peach-dark); font-size: 0.7rem;">Målet ditt passa ikkje i dag</div>
+			<div class="arc-sub-label" style="color: var(--peach-dark); font-size: 0.7rem;">Målet ditt{targetBedtime ? ` (${targetBedtime})` : ''} er ikkje nåeleg i dag</div>
 		{/if}
 	{:else if mode.kind === 'after-bedtime'}
 		<div class="arc-center-label">Etter leggetid</div>

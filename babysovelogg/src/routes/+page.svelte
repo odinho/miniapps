@@ -480,6 +480,7 @@
 				{prediction}
 				{todayWakeUp}
 				{todaySleeps}
+				targetBedtime={baby?.target_bedtime ?? null}
 				onEditStart={activeSleep && !activeSleep.end_time ? () => { editingSleep = activeSleep; } : undefined}
 			/>
 		</div>
