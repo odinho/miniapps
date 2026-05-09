@@ -83,9 +83,17 @@ export const test = base.extend<
   },
 
   autoResetDb: [
-    async ({ workerServer }, use) => {
+    async ({ workerServer, page }, use) => {
       void workerServer; // ensure server + DB are ready
       resetDb();
+      // Clear localStorage keys so stale cached state and queued events from a prior
+      // test don't bleed into this one. All tests in a worker share one browser context
+      // (and therefore localStorage), so we must clear it here rather than relying on
+      // the browser to do so between tests.
+      await page.addInitScript(() => {
+        localStorage.removeItem("babysovelogg_event_queue");
+        localStorage.removeItem("babysovelogg_cached_state");
+      });
       await use();
     },
     { auto: true },
@@ -107,13 +115,21 @@ export function getDb() {
 }
 
 function resetDb() {
-  try { _db.prepare("DELETE FROM sleep_pauses").run(); } catch {}
-  try { _db.prepare("DELETE FROM diaper_log").run(); } catch {}
-  try { _db.prepare("DELETE FROM sleep_log").run(); } catch {}
-  try { _db.prepare("DELETE FROM day_start").run(); } catch {}
-  try { _db.prepare("DELETE FROM baby").run(); } catch {}
-  try { _db.prepare("DELETE FROM events").run(); } catch {}
-  try { _db.prepare("DELETE FROM sqlite_sequence").run(); } catch {}
+  // Disable FK checks so we can delete in any order without constraint errors.
+  // The silent try/catch pattern masked a bug: notification_* tables reference
+  // baby(id), so DELETE FROM baby failed whenever those rows existed.
+  _db.exec("PRAGMA foreign_keys = OFF");
+  _db.prepare("DELETE FROM notification_schedule").run();
+  _db.prepare("DELETE FROM notification_subscriptions").run();
+  _db.prepare("DELETE FROM notification_preferences").run();
+  _db.prepare("DELETE FROM sleep_pauses").run();
+  _db.prepare("DELETE FROM diaper_log").run();
+  _db.prepare("DELETE FROM sleep_log").run();
+  _db.prepare("DELETE FROM day_start").run();
+  _db.prepare("DELETE FROM baby").run();
+  _db.prepare("DELETE FROM events").run();
+  _db.prepare("DELETE FROM sqlite_sequence").run();
+  _db.exec("PRAGMA foreign_keys = ON");
 }
 
 // --- ID generation ---
