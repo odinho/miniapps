@@ -73,26 +73,17 @@ shipped, reading snapshots critically for behavioural regressions baked in by
 `--update`. Both reviewers converged on the same major findings — high
 confidence each is a real engine bug.
 
-### Engine: `selectBestPlan` silently returns natural when ALL candidates are infeasible
+### UX: surface plan infeasibility and rejection reason to the parent
 
-Codex caught this during the convergence diagnosis (2026-05-08). Day 6
-of the trail (when test data was sparser) had both natural AND
-target-guided infeasible (final-WW or nap-WW violations); the engine
-returned natural-with-violations rather than surfacing the failure.
+`SelectedPlan.feasible` now surfaces when the best available plan violates
+hard constraints (2026-05-09). But `feasible: false` is not yet wired to the
+UI. A parent who set target=21:00 on a 1-nap baby and got bedtime=19:30 still
+has no way to know the engine couldn't honour their target.
 
-Make all-infeasible explicit — either return the lowest-cost plan with
-a feasibility flag, OR return null for the parent UI to handle ("we
-can't fit a coherent day plan; check the inputs").
-
-### UX: signal when `target_bedtime` is rejected as infeasible
-
-When the family's stated target produces a day plan that violates hard
-constraints (e.g. final wake-window > 1.3× max), `selectBestPlan` falls
-back to `naturalPlan` silently — `SelectedPlan.source` becomes `"natural"`
-but no signal reaches the UI explaining why. A parent who set target=21:00
-on a 1-nap baby and got bedtime=19:30 has no way to know the engine
-ignored their target. Surface the rejection reason (from
-`scorePlan`'s `hardViolations`) to the prediction shape.
+**To complete:** thread `selected.feasible` and `scorePlan.hardViolations`
+into the `Prediction` shape, then show a contextual banner: "Målet ditt
+(21:00) passar ikkje med babyen sin søvnrytme i dag — viser best mogeleg
+plan" or similar.
 
 ### Backtest blind spot: target_bedtime not threaded
 
@@ -103,23 +94,6 @@ fixture would let us measure whether the new 60-min cap actually
 improves prediction accuracy on real data, instead of just satisfying
 the synthetic settings sweep.
 
-### Engine bug: Eli's natural bedtime is unrealistically early (~17:00 for 3.5mo with target 19:45)
-
-Surfaced during unit 6 convergence work. Eli at 06:30 fresh-day with
-target_bedtime=19:45 produces natural bedtime around 17:00. The
-target-nudged cap pushes it to 17:30 (natural + 30 min), but that's
-still way too early for a 3.5-month-old whose family wants 19:45.
-
-The issue: `predictEmerging`'s bedtime calculation (or `recommendBedtime`
-called from the emerging path) is anchoring on something that produces
-17:00 rather than the habitual 19:30 in the history. Pre-existing —
-not introduced by unit 6, just newly visible because the convergence
-fix shifted Eli from 17:15 to 17:30.
-
-Investigate: walk through `recommendBedtime` for Eli's emerging context
-and identify why pressure_bedtime + habitual_blend lands at 17:00. May
-be that the multiplier (`hasEnoughNaps ? 1.0 : 0.85`) compounds with a
-partial habitual weight to drag bedtime way earlier than habitual.
 
 ### Engine bug: emerging path lacks "collapsed to bedtime" cleanup
 
@@ -131,17 +105,18 @@ land within 60 min of bedtime; emerging path doesn't have the equivalent.
 
 **Fix plan:** Port the routine collapse logic to `predictEmerging`.
 
-### Engine bug: newborn `sleepWindow` is stale
+### Engine: sleepWindow during active sleep shows "now" window, not post-wakeup window
 
-**Where:** Nora at `now=07:00` shows `sleepWindow: 03:50–04:50` — the window
-is in the past. `tests/unit/engine-scenarios.unit.ts:1690-1704`.
+Codex flagged (2026-05-09) during the sleepWindow staleness fix. When a
+newborn/emerging baby is actively sleeping, `sleepWindow` is clamped to
+near-now (invariant), but the semantically correct value would be the
+expected next window _after this sleep ends_. `lastSleepEndMs` from
+`assembleNewbornPrediction` / `assembleEmergingPrediction` takes the most
+recent COMPLETED sleep, so the active sleep's predicted end time is not
+used.
 
-**Hypothesis:** Newborn `predictNewborn` anchors sleep window on historical
-or default timing rather than the current wake context.
-
-**Fix plan:** Compute sleepWindow from now-relative wake state, not from
-fixed historical anchors. Add invariant: newborn `sleepWindow.earliest ≥
-now − 15 min`.
+Low priority if the UI suppresses `sleepWindow` during active sleep. Verify
+the UI doesn't show it, or fix by using the predicted wake time instead.
 
 ### Suspicious backtest results: baby_5 with absurd MAE
 

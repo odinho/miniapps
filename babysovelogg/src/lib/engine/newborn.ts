@@ -67,9 +67,16 @@ export function predictNewborn(ctx: NewbornContext): NewbornPrediction {
 
   if (ctx.lastSleepEndMs !== null) {
     const window = computeSleepWindow(ctx.lastSleepEndMs, recentWakeWindows, ctx.ageMonths);
+    // Invariant: sleepWindow.earliest ≥ now − 15 min.
+    // computeSleepWindow anchors on lastSleepEndMs which can be hours in the past
+    // (e.g. overnight sleep ending 03:00, now 07:00 → window 03:50–04:50).
+    // Shift the window forward if it has already passed so the display stays meaningful.
+    const graceMs = 15 * 60_000;
+    const earliestMs = window.earliestMs < now - graceMs ? now - graceMs : window.earliestMs;
+    const windowWidthMs = window.latestMs - window.earliestMs;
     sleepWindow = {
-      earliest: new Date(window.earliestMs).toISOString(),
-      latest: new Date(window.latestMs).toISOString(),
+      earliest: new Date(earliestMs).toISOString(),
+      latest: new Date(earliestMs + windowWidthMs).toISOString(),
     };
     sleepPressure = computeSleepPressure(ctx.lastSleepEndMs, ctx.ageMonths, now, recentWakeWindows);
   } else {

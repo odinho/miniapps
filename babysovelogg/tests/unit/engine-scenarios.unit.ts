@@ -763,6 +763,14 @@ function assertInvariants({ archetype, scenario, prediction }: InvariantContext)
       expect(p.confidence, `${where}: newborn confidence null`).toBeNull();
       expect(p.learnedSchedule, `${where}: newborn learnedSchedule null`).toBeNull();
       expect(p.sleepWindow, `${where}: newborn sleepWindow set`).not.toBeNull();
+      // I-sleepWindow-current: earliest must not be >15 min in the past.
+      // Anchoring on lastSleepEndMs (e.g. overnight ending 03:00) with no
+      // clamp produced windows like 03:50–04:50 at 07:00 — entirely stale.
+      if (p.sleepWindow) {
+        const earliestMs = new Date(p.sleepWindow.earliest).getTime();
+        expect(nowMs - earliestMs, `${where}: sleepWindow.earliest ≤ 15 min in past (newborn)`)
+          .toBeLessThanOrEqual(15 * 60_000);
+      }
     } else if (p.strategy === "routine_schedule") {
       expect(p.learnedSchedule, `${where}: routine learnedSchedule set`).not.toBeNull();
       expect(p.sleepWindow, `${where}: routine sleepWindow null`).toBeNull();
@@ -771,6 +779,11 @@ function assertInvariants({ archetype, scenario, prediction }: InvariantContext)
       expect(p.learnedSchedule, `${where}: emerging learnedSchedule null`).toBeNull();
       expect(p.confidence, `${where}: emerging confidence null`).toBeNull();
       expect(p.sleepWindow, `${where}: emerging sleepWindow set`).not.toBeNull();
+      if (p.sleepWindow) {
+        const earliestMs = new Date(p.sleepWindow.earliest).getTime();
+        expect(nowMs - earliestMs, `${where}: sleepWindow.earliest ≤ 15 min in past (emerging)`)
+          .toBeLessThanOrEqual(15 * 60_000);
+      }
     }
   }
 }
@@ -1756,7 +1769,7 @@ describe("Nora Newborn (newborn_guidance)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 03:50–04:50
+        sleepWindow: 06:45–07:45
         sleepPressure: high
 
       scenario: 09:00 fed and active
@@ -1788,7 +1801,7 @@ describe("Nora Newborn (newborn_guidance)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 08:50–09:50
+        sleepWindow: 10:15–11:15
         sleepPressure: high
 
       scenario: 12:30 just woke from second nap
@@ -1804,7 +1817,7 @@ describe("Nora Newborn (newborn_guidance)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 11:15–12:15
+        sleepWindow: 12:15–13:15
         sleepPressure: high
 
       scenario: 16:00 mid-afternoon
@@ -1820,7 +1833,7 @@ describe("Nora Newborn (newborn_guidance)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 15:05–16:05
+        sleepWindow: 15:45–16:45
         sleepPressure: high
 
       scenario: 20:00 evening, sleep window opens
@@ -1836,7 +1849,7 @@ describe("Nora Newborn (newborn_guidance)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 18:50–19:50
+        sleepWindow: 19:45–20:45
         sleepPressure: high
 
       scenario: 22:00 active night sleep
@@ -1852,7 +1865,7 @@ describe("Nora Newborn (newborn_guidance)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 18:50–19:50
+        sleepWindow: 21:45–22:45
         sleepPressure: high
 
       scenario: no wake set: still produces newborn output
@@ -1868,7 +1881,7 @@ describe("Nora Newborn (newborn_guidance)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 03:50–04:50
+        sleepWindow: 07:45–08:45
         sleepPressure: high"
     `);
   });
@@ -1933,7 +1946,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 07:15–08:35
+        sleepWindow: 08:15–09:35
         sleepPressure: high
 
       scenario: 10:00 after first nap
@@ -1981,7 +1994,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 13:05–14:25
+        sleepWindow: 14:15–15:35
         sleepPressure: high
 
       scenario: 17:30 after 4 naps, evening
@@ -2013,7 +2026,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 19:00–20:20
+        sleepWindow: 19:30–20:50
         sleepPressure: rising
 
       scenario: 30m cut-short nap 2, now 12:30
@@ -2045,7 +2058,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 07:15–08:35
+        sleepWindow: 09:45–11:05
         sleepPressure: high"
     `);
   });
@@ -2257,7 +2270,7 @@ describe("Iben Sparse (emerging_rhythm via demotion)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 16:30–17:45
+        sleepWindow: 06:15–07:30
         sleepPressure: high
 
       scenario: 10:30 mid-morning, no nap yet
@@ -2273,7 +2286,7 @@ describe("Iben Sparse (emerging_rhythm via demotion)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 16:30–17:45
+        sleepWindow: 10:15–11:30
         sleepPressure: high
 
       scenario: 12:00 after first nap
@@ -2321,7 +2334,7 @@ describe("Iben Sparse (emerging_rhythm via demotion)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 16:30–17:45
+        sleepWindow: 19:45–21:00
         sleepPressure: high
 
       scenario: 11:00 active mid-morning nap
@@ -2337,7 +2350,7 @@ describe("Iben Sparse (emerging_rhythm via demotion)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 16:30–17:45
+        sleepWindow: 10:45–12:00
         sleepPressure: high
 
       scenario: no wake reference
@@ -2353,7 +2366,7 @@ describe("Iben Sparse (emerging_rhythm via demotion)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 16:30–17:45
+        sleepWindow: 07:45–09:00
         sleepPressure: high"
     `);
   });
@@ -3154,7 +3167,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 03:50–04:50
+        sleepWindow: 09:45–10:45
         sleepPressure: high
 
       scenario: active night at 22:30
@@ -3170,7 +3183,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 03:50–04:50
+        sleepWindow: 22:15–23:15
         sleepPressure: high
 
       scenario: midday no sleeps logged at 13:00
@@ -3186,7 +3199,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 03:50–04:50
+        sleepWindow: 12:45–13:45
         sleepPressure: high
 
       ──────────
@@ -3206,7 +3219,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 07:15–08:35
+        sleepWindow: 09:45–11:05
         sleepPressure: high
 
       scenario: active night at 22:30
@@ -3222,7 +3235,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 07:15–08:35
+        sleepWindow: 22:15–23:35
         sleepPressure: high
 
       scenario: midday no sleeps logged at 13:00
@@ -3238,7 +3251,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 07:15–08:35
+        sleepWindow: 12:45–14:05
         sleepPressure: high
 
       ──────────
@@ -3375,7 +3388,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 16:30–17:45
+        sleepWindow: 09:45–11:00
         sleepPressure: high
 
       scenario: active night at 22:30
@@ -3391,7 +3404,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 16:30–17:45
+        sleepWindow: 22:15–23:30
         sleepPressure: high
 
       scenario: midday no sleeps logged at 13:00
@@ -3407,7 +3420,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 16:30–17:45
+        sleepWindow: 12:45–14:00
         sleepPressure: high"
     `);
   });

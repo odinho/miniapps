@@ -111,9 +111,13 @@ export function predictEmerging(input: EmergingContext): EmergingPrediction {
   if (lastSleepEndMs !== null) {
     const wws = extractWakeWindows(ctx.recentSleeps);
     const window = computeSleepWindow(lastSleepEndMs, wws, ctx.ageMonths);
+    // Same invariant as newborn: earliest ≥ now − 15 min.
+    const graceMs = 15 * 60_000;
+    const earliestMs = window.earliestMs < now - graceMs ? now - graceMs : window.earliestMs;
+    const windowWidthMs = window.latestMs - window.earliestMs;
     sleepWindow = {
-      earliest: new Date(window.earliestMs).toISOString(),
-      latest: new Date(window.latestMs).toISOString(),
+      earliest: new Date(earliestMs).toISOString(),
+      latest: new Date(earliestMs + windowWidthMs).toISOString(),
     };
     sleepPressure = computeSleepPressure(lastSleepEndMs, ctx.ageMonths, now, wws);
   }
