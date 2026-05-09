@@ -52,6 +52,7 @@ function makeActiveSleep(startTime: string, domainId = "slp_test", type = "nap")
 function makePrediction(overrides: Partial<Prediction> = {}): Prediction {
   return {
     strategy: "routine_schedule",
+    feasible: true,
     nextNap: null,
     bedtime: null,
     predictedNaps: null,

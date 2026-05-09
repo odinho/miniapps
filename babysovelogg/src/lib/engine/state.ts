@@ -326,6 +326,7 @@ function assembleNewbornPrediction(
 
   return {
     strategy: "newborn_guidance",
+    feasible: true,
     // Schedule fields — null for newborn
     nextNap: null,
     bedtime: null,
@@ -489,6 +490,7 @@ function assembleEmergingPrediction(
 
   return {
     strategy: "emerging_rhythm",
+    feasible: true,
     nextNap,
     bedtime,
     predictedNaps,
@@ -671,6 +673,7 @@ function assembleSchedulePrediction(
 
   return {
     strategy,
+    feasible: selected?.feasible ?? true,
     nextNap,
     bedtime,
     predictedNaps,

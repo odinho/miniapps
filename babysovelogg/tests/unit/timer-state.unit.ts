@@ -30,6 +30,7 @@ function makeSleep(overrides: Partial<SleepLogRow> = {}): SleepLogRow {
 function makePrediction(overrides: Partial<Prediction> = {}): Prediction {
   return {
     strategy: "routine_schedule",
+    feasible: true,
     nextNap: "2026-03-27T14:00:00.000Z",
     bedtime: "2026-03-27T19:00:00.000Z",
     predictedNaps: null,

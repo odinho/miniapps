@@ -9,6 +9,8 @@ import type { RollingSleepStats, AgeNorms } from "$lib/engine/features.js";
 export interface Prediction {
 	/** Which prediction strategy produced this result */
 	strategy: Strategy;
+	/** False when the selected plan violates a hard constraint (e.g. target bedtime unreachable today) */
+	feasible: boolean;
 	// ── Schedule fields (routine_schedule, partially used by emerging_rhythm) ──
 	nextNap: string | null;
 	bedtime: string | null;

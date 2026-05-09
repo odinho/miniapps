@@ -107,6 +107,9 @@
 		<div class="arc-center-label">Leggetid om</div>
 		<span class="countdown-value">{formatDuration(mode.countdown)}</span>
 		<div class="arc-sub-label">{formatTime(mode.bedtime)} {confidenceLabel ? `(${confidenceLabel})` : ''}</div>
+		{#if prediction?.feasible === false}
+			<div class="arc-sub-label" style="color: var(--peach-dark); font-size: 0.7rem;">Målet ditt passa ikkje i dag</div>
+		{/if}
 	{:else if mode.kind === 'after-bedtime'}
 		<div class="arc-center-label">Etter leggetid</div>
 		<span class="countdown-value">{formatTime(mode.bedtime)}</span>

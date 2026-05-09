@@ -73,17 +73,13 @@ shipped, reading snapshots critically for behavioural regressions baked in by
 `--update`. Both reviewers converged on the same major findings — high
 confidence each is a real engine bug.
 
-### UX: surface plan infeasibility and rejection reason to the parent
+### UX: infeasibility banner tested but not E2E-verified
 
-`SelectedPlan.feasible` now surfaces when the best available plan violates
-hard constraints (2026-05-09). But `feasible: false` is not yet wired to the
-UI. A parent who set target=21:00 on a 1-nap baby and got bedtime=19:30 still
-has no way to know the engine couldn't honour their target.
-
-**To complete:** thread `selected.feasible` and `scorePlan.hardViolations`
-into the `Prediction` shape, then show a contextual banner: "Målet ditt
-(21:00) passar ikkje med babyen sin søvnrytme i dag — viser best mogeleg
-plan" or similar.
+`feasible` is now threaded from `SelectedPlan` through `Prediction` to Timer.svelte
+(2026-05-09). The Timer shows "Målet ditt passa ikkje i dag" in bedtime mode when
+`feasible === false`. No E2E test yet covers the path: set target > engine max,
+verify the banner text appears. Low priority — the engine logic is unit-tested;
+this is a display assertion.
 
 ### Backtest blind spot: target_bedtime data missing from Halldis fixture
 
