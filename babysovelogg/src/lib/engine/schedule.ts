@@ -1508,10 +1508,10 @@ export function targetBedtimeToISO(hhmm: string, now: number, tz: string): strin
  *
  * Two drops on synthetic naps:
  *
- * 1. Naps that END past 17:00 local — they wouldn't actually fit before any
- *    reasonable bedtime, and including them pushes bedtime ~6h past the
- *    synthetic-nap end (e.g. a comeback ending 18:23 + 6h bedtimeWW = 00:23
- *    overflows past midnight).
+ * 1. Naps whose END is past `getLatestNapEndCutoffMin(ctx, now)` — they
+ *    wouldn't actually fit before any sensible bedtime, and including them
+ *    pushes pressureBedtime past midnight (e.g. a comeback ending 18:23 + 6h
+ *    bedtimeWW = 00:23 overflows past the day boundary).
  * 2. Naps whose START is already in the past at `now` — they were planned
  *    earlier in the day but didn't actually happen (parent skipped). Stale
  *    plans shouldn't drag bedtime later as if they had occurred. This was
@@ -1534,15 +1534,39 @@ export function buildSleepsForBedtime(
       type: "nap",
     });
   }
-  const LATEST_NAP_END_HOUR_LOCAL = 17;
+  const cutoffMin = getLatestNapEndCutoffMin(ctx, now);
   for (const pn of remainingPredicted) {
     const startMs = new Date(pn.startTime).getTime();
     if (startMs <= now) continue; // skipped: planned start is in the past
-    const endHourLocal = getHourInTz(new Date(pn.endTime), ctx.tz);
-    if (endHourLocal >= LATEST_NAP_END_HOUR_LOCAL) continue;
+    const endMin = getLocalMinuteOfDay(new Date(pn.endTime), ctx.tz);
+    if (endMin > cutoffMin) continue;
     sleeps.push({ start_time: pn.startTime, end_time: pn.endTime, type: "nap" });
   }
   return sleeps;
+}
+
+/**
+ * Latest local minute-of-day a synthetic nap may END and still anchor
+ * pressureBedtime. Derived from the family's evening anchor (habitual
+ * bedtime → target_bedtime → 17:00 fallback) minus `MIN_PRE_BEDTIME_WAKE`.
+ *
+ * A fixed-17:00 cutoff dropped the legitimate 4th nap of 3.5-mo emerging
+ * babies (last nap ends ~17:00, bedtime 19:30), leaving pressureBedtime
+ * anchored on the 3rd-from-last nap and driving the suggestion 2.5h earlier
+ * than habitual.
+ */
+function getLatestNapEndCutoffMin(ctx: BabyContext, now: number): number {
+  const minPreBedtime = RESCUE_NAP.MIN_PRE_BEDTIME_WAKE;
+  const habitualMs = feat(ctx, "habitualBedtime")
+    ? getHabitualBedtimePrediction(new Date(now), ctx) : null;
+  if (habitualMs !== null) {
+    return getLocalMinuteOfDay(new Date(habitualMs), ctx.tz) - minPreBedtime;
+  }
+  if (ctx.targetBedtime) {
+    const targetMs = new Date(targetBedtimeToISO(ctx.targetBedtime, now, ctx.tz)).getTime();
+    return getLocalMinuteOfDay(new Date(targetMs), ctx.tz) - minPreBedtime;
+  }
+  return 17 * 60;
 }
 
 // Scoring weights

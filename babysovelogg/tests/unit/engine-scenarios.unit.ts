@@ -1908,9 +1908,9 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         now: 06:30
         inputs: wake=06:00 target=19:45
         strategy: emerging_rhythm
-        nextNap: 06:22 (-07m)
-        bedtime: 17:00 (+10h 30m)
-        predictedNaps: 06:22-07:12, 09:16-10:11, 11:44-12:34, 14:40-15:25
+        nextNap: 07:59 (+1h 29m)
+        bedtime: 19:29 (+12h 59m)
+        predictedNaps: 07:59-08:49, 10:53-11:48, 13:21-14:11, 16:16-17:01
         napsAllDone: false (4 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -1924,9 +1924,9 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         now: 08:30
         inputs: wake=06:00 target=19:45
         strategy: emerging_rhythm
-        nextNap: 09:16 (+46m)
-        bedtime: 17:00 (+8h 30m)
-        predictedNaps: 09:16-10:11, 11:44-12:34, 14:40-15:25
+        nextNap: 07:59 (-31m)
+        bedtime: 19:06 (+10h 36m)
+        predictedNaps: 07:59-08:49, 10:53-11:48, 13:21-14:11, 16:16-17:01
         napsAllDone: false (4 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -1941,8 +1941,8 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         inputs: wake=06:00 done=[08:00-08:50] target=19:45
         strategy: emerging_rhythm
         nextNap: 10:53 (+53m)
-        bedtime: 17:43 (+7h 43m)
-        predictedNaps: 10:53-11:48, 13:21-14:11
+        bedtime: 19:45 (+9h 45m)
+        predictedNaps: 10:53-11:48, 13:21-14:11, 16:16-17:01
         napsAllDone: false (4 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -1957,8 +1957,8 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         inputs: wake=06:00 done=[11:00-11:50, 08:00-08:50] target=19:45
         strategy: emerging_rhythm
         nextNap: 13:21 (+51m)
-        bedtime: 17:43 (+5h 13m)
-        predictedNaps: 13:21-14:11
+        bedtime: 19:45 (+7h 15m)
+        predictedNaps: 13:21-14:11, 16:16-17:01
         napsAllDone: false (4 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -1973,7 +1973,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         inputs: wake=06:00 done=[11:00-11:50, 08:00-08:50] active=14:00(nap) target=19:45
         strategy: emerging_rhythm
         nextNap: 16:16 (+1h 46m)
-        bedtime: 18:04 (+3h 34m)
+        bedtime: 19:45 (+5h 15m)
         predictedNaps: 16:16-17:01
         napsAllDone: false (4 expected)
         expectedNapEnd: 14:49 (+19m)
@@ -2021,8 +2021,8 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         inputs: wake=06:00 done=[11:00-11:30!, 08:00-08:50] target=19:45
         strategy: emerging_rhythm
         nextNap: 13:21 (+51m)
-        bedtime: 17:43 (+5h 13m)
-        predictedNaps: 13:21-14:11
+        bedtime: 19:45 (+7h 15m)
+        predictedNaps: 13:21-14:11, 16:16-17:01
         napsAllDone: false (4 expected)
         expectedNapEnd: none
         expectedNightEnd: none
@@ -3229,9 +3229,9 @@ describe("cross-archetype shared scenarios", () => {
         now: 13:00
         inputs: wake=06:00 target=19:45
         strategy: emerging_rhythm
-        nextNap: 14:40 (+1h 40m)
-        bedtime: 17:00 (+4h 00m)
-        predictedNaps: 14:40-15:25
+        nextNap: 13:21 (+21m)
+        bedtime: 19:06 (+6h 06m)
+        predictedNaps: 13:21-14:11, 16:16-17:01
         napsAllDone: false (4 expected)
         expectedNapEnd: none
         expectedNightEnd: none

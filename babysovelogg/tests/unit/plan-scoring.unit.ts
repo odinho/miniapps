@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { scorePlan, selectBestPlan } from "$lib/engine/schedule.js";
+import { scorePlan, selectBestPlan, buildSleepsForBedtime } from "$lib/engine/schedule.js";
 import { assembleState, type DayData } from "$lib/engine/state.js";
 import type { BabyContext, SleepEntry, Baby, SleepLogRow, DayStartRow } from "$lib/types.js";
-import type { PlanCandidate } from "$lib/engine/schedule.js";
+import type { PlanCandidate, PredictedNap } from "$lib/engine/schedule.js";
 
 // ─── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -329,5 +329,41 @@ naps done: false (2 expected)"
     // Pin: bedtime is after the remaining nap
     expect(new Date(result.prediction!.bedtime!).getTime())
       .toBeGreaterThan(new Date(naps[0].endTime).getTime());
+  });
+});
+
+// ─── buildSleepsForBedtime: synthetic nap cutoff ──────────────────────────────
+
+describe("buildSleepsForBedtime: late-nap cutoff respects family bedtime", () => {
+  const noon = new Date("2026-03-28T13:00:00Z").getTime();
+
+  it("cold-start with target=19:45: nap ending 17:01 is retained", () => {
+    const c = ctx({ targetBedtime: "19:45", recentSleeps: [] });
+    const nap: PredictedNap = {
+      startTime: "2026-03-28T16:11:00Z",
+      endTime: "2026-03-28T17:01:00Z",
+    };
+    const result = buildSleepsForBedtime([], undefined, [nap], c, noon);
+    expect(result).toHaveLength(1);
+  });
+
+  it("no-target fallback: nap ending 17:01 is dropped (past 17:00 floor)", () => {
+    const c = ctx({ recentSleeps: [] });
+    const nap: PredictedNap = {
+      startTime: "2026-03-28T16:11:00Z",
+      endTime: "2026-03-28T17:01:00Z",
+    };
+    const result = buildSleepsForBedtime([], undefined, [nap], c, noon);
+    expect(result).toHaveLength(0);
+  });
+
+  it("no-target fallback: nap ending exactly 17:00 is kept (boundary is exclusive)", () => {
+    const c = ctx({ recentSleeps: [] });
+    const nap: PredictedNap = {
+      startTime: "2026-03-28T16:10:00Z",
+      endTime: "2026-03-28T17:00:00Z",
+    };
+    const result = buildSleepsForBedtime([], undefined, [nap], c, noon);
+    expect(result).toHaveLength(1);
   });
 });
