@@ -11,20 +11,6 @@ multi-day testing, the unit-of-work flow — live in
 is for tracked product/engine/test work.
 
 
-## UI: render the nap-confidence band on the arc
-
-Source: 2026-05-07 user feedback after Halldis fell asleep at 12:05 vs
-predicted 11:34 (±15 min text only). The ±N min figure is in the timer
-center but doesn't translate to a feel for "how soft is the prediction". A
-faded uncertainty band around the predicted-nap arc would make it visually
-obvious. Should map directly off `prediction.confidence.napRanges[0].lo/hi`
-which we already compute.
-
-Sketch: in `Arc.svelte`, when there's a `confidence.napRanges[0]`, render
-an extra translucent band beneath the existing predicted-nap band, spanning
-`lo → hi`. Keep colour sympathetic to the day theme. Do not overlap the
-cut-short bubble or the active-sleep arc.
-
 ## UX: "give up and try later" guidance after sticking too long
 
 Source: same 2026-05-07 conversation. User's pattern: they sometimes spend

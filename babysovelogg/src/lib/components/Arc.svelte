@@ -28,6 +28,8 @@
 		wakeUpTime?: string | null;
 		startTimeLabel?: string | null;
 		endTimeLabel?: string | null;
+		/** Confidence bands for predicted nap starts: lo/hi ISO timestamps spanning ~±1 SD */
+		napConfidenceBands?: Array<{ lo: string; hi: string }>;
 		onStartClick?: () => void;
 		onEndClick?: () => void;
 		onSleepClick?: (index: number) => void;
@@ -42,6 +44,7 @@
 		wakeUpTime = null,
 		startTimeLabel = null,
 		endTimeLabel = null,
+		napConfidenceBands = [],
 		onStartClick,
 		onEndClick,
 		onSleepClick,
@@ -225,6 +228,26 @@
 
 		return result;
 	});
+
+	interface RenderedBand {
+		d: string;
+		visible: boolean;
+	}
+
+	// Confidence bands: translucent zones showing ±1 SD uncertainty for predicted nap starts.
+	// Only render while the window is still open (hi > now).
+	const renderedBands = $derived.by((): RenderedBand[] => {
+		return napConfidenceBands.map((band) => {
+			const hiMs = new Date(band.hi).getTime();
+			if (hiMs < now.getTime()) return { d: '', visible: false };
+
+			const loFrac = timeToArcFraction(new Date(band.lo), config);
+			const hiFrac = timeToArcFraction(new Date(band.hi), config);
+			if (hiFrac <= loFrac || hiFrac - loFrac < 0.005) return { d: '', visible: false };
+
+			return { d: describeArc(cx, cy, r, loFrac, hiFrac), visible: true };
+		});
+	});
 </script>
 
 <svg viewBox="0 0 {S} {S}" width="100%" class="sleep-arc">
@@ -323,6 +346,20 @@
 			stroke-linecap="round"
 		/>
 	{/if}
+
+	<!-- Nap confidence bands (±1 SD zones, rendered beneath predicted naps) -->
+	{#each renderedBands as band}
+		{#if band.visible}
+			<path
+				d={band.d}
+				fill="none"
+				stroke="var(--peach-dark)"
+				stroke-width={trackWidth * 2.4}
+				stroke-linecap="round"
+				opacity="0.12"
+			/>
+		{/if}
+	{/each}
 
 	<!-- Sleep bubbles -->
 	{#each renderedBubbles as b}

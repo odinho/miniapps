@@ -159,6 +159,12 @@
 				}
 			: null,
 	);
+	const arcNapConfidenceBands = $derived(
+		prediction?.confidence?.napRanges.map((nr) => ({
+			lo: nr.startRange.lo,
+			hi: nr.startRange.hi,
+		})) ?? [],
+	);
 
 	// Arc endpoint time labels
 	const arcStartLabel = $derived.by(() => {
@@ -471,6 +477,7 @@
 				wakeUpTime={todayWakeUp?.wake_time}
 				startTimeLabel={arcStartLabel}
 				endTimeLabel={arcEndLabel}
+				napConfidenceBands={arcNapConfidenceBands}
 				onSleepClick={onArcBubbleClick}
 				onStartClick={onArcStartClick}
 				onEndClick={onArcEndClick}
