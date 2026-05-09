@@ -85,14 +85,15 @@ into the `Prediction` shape, then show a contextual banner: "Målet ditt
 (21:00) passar ikkje med babyen sin søvnrytme i dag — viser best mogeleg
 plan" or similar.
 
-### Backtest blind spot: target_bedtime not threaded
+### Backtest blind spot: target_bedtime data missing from Halldis fixture
 
-`src/lib/engine/backtest.ts`: `DayRecord` has no target_bedtime field and
-`ctx` is built without `targetBedtime`. So MAE on Halldis or any baby
-can't reflect target_bedtime tuning. Adding target to the backtest
-fixture would let us measure whether the new 60-min cap actually
-improves prediction accuracy on real data, instead of just satisfying
-the synthetic settings sweep.
+`DayRecord` now has `target_bedtime?: string | null` and the backtest threads
+it into `ctx.targetBedtime` (2026-05-09). But `tests/fixtures/halldis-sleep.json`
+has no `target_bedtime` data (the feature didn't exist when the fixture was
+exported). To actually measure whether the 60-min cap helps, re-export a fresh
+Halldis fixture from prod that includes current target_bedtime settings, or
+back-fill the field for known date ranges (e.g. target was ~19:30 from
+approximately Halldis's 3-month mark).
 
 
 ### Engine: sleepWindow during active sleep shows "now" window, not post-wakeup window

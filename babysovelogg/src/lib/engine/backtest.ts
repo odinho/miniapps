@@ -14,6 +14,7 @@ export interface DayRecord {
   date: string; // YYYY-MM-DD
   wakeTime: string; // ISO — when baby woke up for the day
   sleeps: SleepEntry[]; // actual sleeps this day (naps + night)
+  target_bedtime?: string | null; // HH:MM local — family's bedtime target on this day (if tracked)
 }
 
 /** Per-day comparison result. */
@@ -129,6 +130,7 @@ export function backtest(
       ageMonths: calculateAgeMonths(birthdate, new Date(day.date + "T12:00:00Z")),
       tz,
       customNapCount,
+      targetBedtime: day.target_bedtime ?? null,
       recentSleeps,
       extendedSleeps,
       features,
