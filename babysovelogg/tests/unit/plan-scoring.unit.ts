@@ -204,6 +204,21 @@ describe("selectBestPlan", () => {
     expect(withTargetMs).not.toBe(noTargetMs);
     expect(["natural", "target-guided"]).toContain(withTarget.source);
   });
+
+  it("all-infeasible: returns natural plan with feasible=false instead of silent bad plan", () => {
+    // Force 0 naps → no-nap 9mo with wake 07:00 and bedtime ~19:00 →
+    // final WW = 720 min, well above max 273 min → hard violation.
+    const noDataCtx = ctx({ recentSleeps: [], customNapCount: 0 });
+    const result = selectBestPlan("2026-03-28T07:00:00Z", [], undefined, noDataCtx, NOW);
+    expect(result.feasible).toBe(false);
+    expect(result.source).toBe("natural");
+    expect(result.bedtime).toBeDefined();
+  });
+
+  it("feasible plan: returns feasible=true", () => {
+    const result = selectBestPlan("2026-03-28T07:00:00Z", [], undefined, ctx({ recentSleeps }), NOW);
+    expect(result.feasible).toBe(true);
+  });
 });
 
 // ─── Coherent day plan (assembleState integration) ───────────────────────────

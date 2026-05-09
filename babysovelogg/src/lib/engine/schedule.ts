@@ -1458,6 +1458,10 @@ export interface SelectedPlan extends PlanCandidate {
    *   days where forward walking lands naps awkwardly).
    */
   source: "natural" | "target-guided";
+  /** Whether the selected plan satisfies all hard constraints. False means
+   *  the plan is the best available but violates at least one hard constraint
+   *  (e.g. final wake window too long). */
+  feasible: boolean;
 }
 
 /**
@@ -1695,8 +1699,11 @@ export function selectBestPlan(
   const naturalBedtime = recommendBedtime(sleepsForBedtime, ctx, now);
   const naturalPlan: PlanCandidate = { naps: naturalNaps, bedtime: naturalBedtime };
 
+  const naturalBedtimeMs = new Date(naturalBedtime).getTime();
+  const naturalScore = scorePlan(naturalPlan, ctx, wakeUpMs, naturalBedtimeMs, naturalNaps.length);
+
   if (!ctx.targetBedtime) {
-    return { ...naturalPlan, source: "natural" };
+    return { ...naturalPlan, source: "natural", feasible: naturalScore.feasible };
   }
 
   // Natural's bedtime ALREADY incorporates the target soft-anchor (added
@@ -1704,18 +1711,17 @@ export function selectBestPlan(
   // doesn't repeat here — we just check whether the backward-walk plan
   // beats the forward-walk plan on day-shape feasibility, both targeting
   // the same naturalBedtime.
-  const naturalBedtimeMs = new Date(naturalBedtime).getTime();
 
   // Target-guided plan: backward walk from naturalBedtime. Sometimes
   // produces a cleaner nap shape than the forward walk for tight days.
   const targetNaps = planBackwardFromBedtime(wakeUpTime, naturalBedtime, ctx);
   const targetPlan: PlanCandidate = { naps: targetNaps, bedtime: naturalBedtime };
 
-  const naturalScore = scorePlan(naturalPlan, ctx, wakeUpMs, naturalBedtimeMs, naturalNaps.length);
   const targetScore = scorePlan(targetPlan, ctx, wakeUpMs, naturalBedtimeMs, naturalNaps.length);
 
   if (targetScore.feasible && targetScore.cost < naturalScore.cost) {
-    return { ...targetPlan, source: "target-guided" };
+    return { ...targetPlan, source: "target-guided", feasible: true };
   }
-  return { ...naturalPlan, source: "natural" };
+  // When both are infeasible, return natural with feasible=false so callers can signal it.
+  return { ...naturalPlan, source: "natural", feasible: naturalScore.feasible };
 }
