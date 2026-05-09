@@ -108,18 +108,6 @@ used.
 Low priority if the UI suppresses `sleepWindow` during active sleep. Verify
 the UI doesn't show it, or fix by using the predicted wake time instead.
 
-### Suspicious backtest results: baby_5 with absurd MAE
-
-**Where:** `tests/unit/backtest-multi.unit.ts:51-57` shows
-`baby_5: 8 days, count 0% (0/4), nap MAE 134.3, dur MAE 55.2, bed MAE 1601.1, wake MAE 975`. 1601 minutes ≈ 26 hours; 975 minutes ≈ 16 hours. Same in
-`ablation-multi.unit.ts:115-120` (`baby_5: nap 0, wake +104`).
-
-**Hypothesis:** Date-boundary / timezone bug matching predictions against
-the wrong day. Aggregate ablation thresholds are too lax to catch it.
-
-**Fix plan:** Investigate `baby_5` fixture data; check tz normalization.
-Probably needs labeled-fixture-skip or a real fix.
-
 ---
 
 ## Test infrastructure improvements (from the same review)

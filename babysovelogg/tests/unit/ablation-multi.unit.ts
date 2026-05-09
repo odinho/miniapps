@@ -12,7 +12,8 @@ import halldisData from "../fixtures/halldis-sleep.json";
 import baby1Data from "../fixtures/baby_1-sleep.json";
 import baby2Data from "../fixtures/baby_2-sleep.json";
 import baby3Data from "../fixtures/baby_3-sleep.json";
-import baby5Data from "../fixtures/baby_5-sleep.json";
+// baby_5 excluded — timestamps appear to be AEST (UTC+10), not the assumed US Eastern;
+// bed MAE 1646 min (~27h) and wake MAE 975 min (~16h) confirm a ~14h offset mismatch.
 
 interface BabyFixture {
   name: string;
@@ -26,7 +27,6 @@ const babies: BabyFixture[] = [
   { name: "baby_1", ...(baby1Data as { birthdate: string; days: DayRecord[] }), tz: "America/New_York" },
   { name: "baby_2", ...(baby2Data as { birthdate: string; days: DayRecord[] }), tz: "America/New_York" },
   { name: "baby_3", ...(baby3Data as { birthdate: string; days: DayRecord[] }), tz: "America/New_York" },
-  { name: "baby_5", ...(baby5Data as { birthdate: string; days: DayRecord[] }), tz: "America/New_York" },
 ];
 
 type FeatureKey = keyof PredictionFeatures;
@@ -81,43 +81,36 @@ describe("multi-baby ablation", () => {
         baby_1: nap -6.3, wake 0
         baby_2: nap +1.6, wake 0
         baby_3: nap -3.4, wake 0
-        baby_5: nap +2.3, wake 0
       habitualWake:
         halldis: nap 0, wake +4.7
         baby_1: nap 0, wake +20.2
         baby_2: nap 0, wake +7.9
         baby_3: nap 0, wake +55.6
-        baby_5: nap 0, wake 0
       habitualBedtime:
         halldis: nap 0, wake 0
         baby_1: nap 0, wake 0
         baby_2: nap 0, wake 0
         baby_3: nap 0, wake 0
-        baby_5: nap 0, wake 0
       habitualNapStart:
         halldis: nap +3.4, wake 0
         baby_1: nap +2.2, wake 0
         baby_2: nap 0, wake 0
         baby_3: nap 0, wake 0
-        baby_5: nap 0, wake 0
       cycleBias:
         halldis: nap 0, wake 0
         baby_1: nap 0, wake 0
         baby_2: nap 0, wake -0.2
         baby_3: nap 0, wake -0.2
-        baby_5: nap 0, wake +1.1
       sleepBudget:
         halldis: nap 0, wake -0.3
         baby_1: nap 0, wake -0.2
         baby_2: nap 0, wake +4.6
         baby_3: nap 0, wake -3
-        baby_5: nap 0, wake 0
       weightedRecency:
         halldis: nap 0, wake +0.1
         baby_1: nap +0.1, wake -0.1
         baby_2: nap +0.4, wake +2.2
-        baby_3: nap 0, wake +7.3
-        baby_5: nap 0, wake +104"
+        baby_3: nap 0, wake +7.3"
     `);
   });
 

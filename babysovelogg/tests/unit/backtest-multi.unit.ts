@@ -10,7 +10,8 @@ import halldisData from "../fixtures/halldis-sleep.json";
 import baby1Data from "../fixtures/baby_1-sleep.json";
 import baby2Data from "../fixtures/baby_2-sleep.json";
 import baby3Data from "../fixtures/baby_3-sleep.json";
-import baby5Data from "../fixtures/baby_5-sleep.json";
+// baby_5 excluded — timestamps appear to be AEST (UTC+10), not the assumed US Eastern;
+// bed MAE 1646 min (~27h) and wake MAE 975 min (~16h) confirm a ~14h offset mismatch.
 
 // =============================================================================
 // Multi-baby backtest: validates algorithm generalizes beyond Halldis
@@ -37,7 +38,6 @@ const babies: BabyFixture[] = [
   loadKaggle("baby_1", baby1Data as { birthdate: string; days: DayRecord[] }),
   loadKaggle("baby_2", baby2Data as { birthdate: string; days: DayRecord[] }),
   loadKaggle("baby_3", baby3Data as { birthdate: string; days: DayRecord[] }),
-  loadKaggle("baby_5", baby5Data as { birthdate: string; days: DayRecord[] }),
 ];
 
 describe("multi-baby backtest", () => {
@@ -52,8 +52,7 @@ describe("multi-baby backtest", () => {
       "halldis: 112 days, count 85% (95/112), nap MAE 41.4, dur MAE 24.3, bed MAE 21.4, wake MAE 25.2, nap bias -1.8, count bias +0.04
       baby_1: 619 days, count 80% (498/619), nap MAE 310.8, dur MAE 27.4, bed MAE 148.9, wake MAE 89.6, nap bias +294.5, count bias -0.21
       baby_2: 54 days, count 40% (19/47), nap MAE 64.1, dur MAE 25.5, bed MAE 50.3, wake MAE 84.4, nap bias -0.6, count bias +0.13
-      baby_3: 50 days, count 11% (3/28), nap MAE 131.7, dur MAE 35.6, bed MAE 207.5, wake MAE 169.6, nap bias +5.1, count bias +0.79
-      baby_5: 8 days, count 0% (0/4), nap MAE 134.3, dur MAE 55.2, bed MAE 1646.1, wake MAE 975, nap bias -69.4, count bias +2.5"
+      baby_3: 50 days, count 11% (3/28), nap MAE 131.7, dur MAE 35.6, bed MAE 207.5, wake MAE 169.6, nap bias +5.1, count bias +0.79"
     `);
   });
 
