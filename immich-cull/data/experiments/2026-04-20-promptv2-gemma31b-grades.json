@@ -1,0 +1,9 @@
+{
+  "2025-05-17-a0dcf1e12e8e::g3::picks=0": {
+    "severity": 1,
+    "keepBias": null,
+    "note": "image 0 is just a crop of image 4. So there's that.",
+    "updatedAt": "2026-04-19T20:55:27.687Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  }
+}

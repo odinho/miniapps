@@ -1,0 +1,16 @@
+{
+  "_comment": "Experiment IDs to de-prioritize in the grader picker. Grades are still read into the inheritance index — they just don't clutter the active list. Add/remove IDs here; no code changes needed.",
+  "archived": [
+    "2026-04-19-stageA",
+    "2026-04-19-stageB4",
+    "2026-04-20-promptv2",
+    "2026-04-20-promptv2-gemma31b",
+    "2026-04-20-promptv3-adaptive",
+    "2026-04-20-promptv3-priorities",
+    "2026-04-20-promptv3-min",
+    "2026-04-20-prod-prompt-validation",
+    "2026-04-20-face-coverage",
+    "2026-04-20-burst-quality-scores",
+    "2026-04-20-batch-batch_min"
+  ]
+}

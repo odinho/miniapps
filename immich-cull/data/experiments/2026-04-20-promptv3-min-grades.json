@@ -1,0 +1,58 @@
+{
+  "2025-10-25-88408d7b0da0::g3::picks=1": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-19T20:49:47.574Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2025-06-02-d97c0edf5b59::g1::picks=2": {
+    "severity": 0,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T20:51:01.479Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2025-06-02-d97c0edf5b59::g1::picks=0": {
+    "severity": 0,
+    "keepBias": null,
+    "note": "Yeah, this one has open eyes.",
+    "updatedAt": "2026-04-19T20:51:46.913Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2025-05-17-a0dcf1e12e8e::g3::picks=0": {
+    "severity": 1,
+    "keepBias": null,
+    "note": "image 0 is just a crop of image 4. So there's that.",
+    "updatedAt": "2026-04-19T20:55:27.687Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2024-11-09-f6f42e970ec7::g1::picks=4": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-19T20:57:17.720Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2024-11-09-f6f42e970ec7::g1::picks=3": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-19T20:57:23.877Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2026-01-31-3e202cb1b758::g4::picks=0": {
+    "severity": 0,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T20:59:53.149Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2024-11-09-f6f42e970ec7::g1::picks=5": {
+    "severity": 2,
+    "keepBias": 0,
+    "note": "father is actually looking away, none of these are great, hence the pick is only 'meh'. I'd have kept 1 or ever 4 instead. But sure.",
+    "updatedAt": "2026-04-19T20:19:23.006Z",
+    "inheritedFrom": "2026-04-19-stageB4"
+  }
+}

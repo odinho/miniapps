@@ -1,0 +1,548 @@
+{
+  "timestamp": "2026-04-21T04:00:30.555Z",
+  "completedGroups": 5,
+  "targetGroups": 30,
+  "variants": [
+    "qwen36_a3b_terse_v3_min",
+    "gemma4_31b_v3_min",
+    "gemma4_e4b_v3_min",
+    "31flashlite_v3_min"
+  ],
+  "promptKind": "min",
+  "prompt": "Pick the photo(s) worth keeping from this burst of similar shots.\n\nReturn JSON: {\"best\": [indices], \"reason\": \"brief why\", \"ranking\": [best_to_worst]}.\nIndices 0-based. If every frame fails (blur, closed eyes), return \"best\": [].",
+  "results": [
+    {
+      "group": {
+        "batchId": "2025-10-25-88408d7b0da0",
+        "subgroupId": "g3",
+        "type": "near_duplicate",
+        "assetIds": [
+          "3e4e9250-8bb3-4d39-b470-b2b70ee48848",
+          "63e8fbaf-7193-463c-a3f8-147dc55e9a9c",
+          "cf2dcbbe-64c0-4432-a8fd-b8143f70e6df"
+        ],
+        "filenames": [
+          "20251025_133852.jpg",
+          "20251025_133854.jpg",
+          "20251025_133855.jpg"
+        ],
+        "llmKeepIds": [
+          "3e4e9250-8bb3-4d39-b470-b2b70ee48848",
+          "63e8fbaf-7193-463c-a3f8-147dc55e9a9c"
+        ],
+        "llmRanking": [
+          "3e4e9250-8bb3-4d39-b470-b2b70ee48848",
+          "63e8fbaf-7193-463c-a3f8-147dc55e9a9c",
+          "cf2dcbbe-64c0-4432-a8fd-b8143f70e6df"
+        ],
+        "userKeepIds": [
+          "63e8fbaf-7193-463c-a3f8-147dc55e9a9c"
+        ],
+        "userCullIds": [
+          "3e4e9250-8bb3-4d39-b470-b2b70ee48848",
+          "cf2dcbbe-64c0-4432-a8fd-b8143f70e6df"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_min",
+          "bestPicks": [
+            1
+          ],
+          "ranking": [
+            1,
+            0,
+            2
+          ],
+          "reason": "Image 1 is the best because the main subject (the blonde girl) is looking directly at the camera with a clear expression, and the composition is relatively unobstructed. Image 0 is a side profile and less engaging, while Image 2 is significantly ruined by a large, blurry foreground obstruction.",
+          "elapsed": 47.334,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 6191,
+          "tokensOut": 99
+        },
+        {
+          "variant": "gemma4_31b_v3_min",
+          "bestPicks": [
+            1
+          ],
+          "ranking": [
+            1,
+            0,
+            2
+          ],
+          "reason": "Image 1 is the clearest shot with the best composition, showing the children's faces and the scene clearly without significant obstruction.",
+          "elapsed": 257.451,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 912,
+          "tokensOut": 49
+        },
+        {
+          "variant": "gemma4_e4b_v3_min",
+          "bestPicks": [
+            1
+          ],
+          "ranking": [
+            1,
+            0,
+            2
+          ],
+          "reason": "Image 1 captures the best moment with the blonde girl looking directly at the camera with a clear, engaged expression. The other images are either too blurry or have less engaging compositions.",
+          "elapsed": 33.363,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 912,
+          "tokensOut": 59
+        },
+        {
+          "variant": "31flashlite_v3_min",
+          "bestPicks": [
+            1
+          ],
+          "ranking": [
+            1,
+            2,
+            0
+          ],
+          "reason": "Image 1 is the only shot where the main subject is clearly visible and not obscured by motion blur or foreground obstructions.",
+          "elapsed": 2.372,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 3285,
+          "tokensOut": 55
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2025-06-02-d97c0edf5b59",
+        "subgroupId": "g1",
+        "type": "burst",
+        "assetIds": [
+          "5cba4abe-5848-4bc5-943c-e4a12df1e487",
+          "33dd2b1a-54a0-435f-9ec2-a2c239a253d2",
+          "7ef7969a-3e06-4c40-934f-10ffa3cb0aa5",
+          "675abb16-b9ce-4285-a9ad-ed021989e34e"
+        ],
+        "filenames": [
+          "20250602_190431.jpg",
+          "20250602_190423.jpg",
+          "20250602_190424.jpg",
+          "20250602_190432.jpg"
+        ],
+        "llmKeepIds": [
+          "5cba4abe-5848-4bc5-943c-e4a12df1e487",
+          "33dd2b1a-54a0-435f-9ec2-a2c239a253d2"
+        ],
+        "llmRanking": [
+          "5cba4abe-5848-4bc5-943c-e4a12df1e487",
+          "33dd2b1a-54a0-435f-9ec2-a2c239a253d2",
+          "7ef7969a-3e06-4c40-934f-10ffa3cb0aa5",
+          "675abb16-b9ce-4285-a9ad-ed021989e34e"
+        ],
+        "userKeepIds": [
+          "7ef7969a-3e06-4c40-934f-10ffa3cb0aa5"
+        ],
+        "userCullIds": [
+          "5cba4abe-5848-4bc5-943c-e4a12df1e487",
+          "33dd2b1a-54a0-435f-9ec2-a2c239a253d2",
+          "675abb16-b9ce-4285-a9ad-ed021989e34e"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_min",
+          "bestPicks": [
+            2
+          ],
+          "ranking": [
+            2,
+            1,
+            0,
+            3
+          ],
+          "reason": "Image 2 is the best because it has the sharpest focus on the cat's face, capturing the details of its fur and eyes clearly. The cat's expression with its tongue out is perfectly captured, and the lighting is well-balanced. Image 1 is also good but slightly less sharp. Images 0 and 3 are less ideal due to tighter framing or the cat looking away.",
+          "elapsed": 58.503,
+          "matchesUser": true,
+          "matchesLlm": false,
+          "tokensIn": 8225,
+          "tokensOut": 119
+        },
+        {
+          "variant": "gemma4_31b_v3_min",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            2,
+            1,
+            3
+          ],
+          "reason": "Image 0 is the best because it is a close-up, clear shot of the cat's face with its tongue sticking out (blep), a cute and expressive expression. Images 1 and 2 are further away and include more background distractions, and Image 3 is a profile shot where the cat is looking away.",
+          "elapsed": 305.199,
+          "matchesUser": false,
+          "matchesLlm": true,
+          "tokensIn": 1184,
+          "tokensOut": 102
+        },
+        {
+          "variant": "gemma4_e4b_v3_min",
+          "bestPicks": [
+            1
+          ],
+          "ranking": [
+            1,
+            2,
+            0,
+            3
+          ],
+          "reason": "Image 1 is the clearest shot with the best focus and natural composition, capturing the cat's expression well.",
+          "elapsed": 38.424,
+          "matchesUser": false,
+          "matchesLlm": true,
+          "tokensIn": 1184,
+          "tokensOut": 49
+        },
+        {
+          "variant": "31flashlite_v3_min",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            2,
+            1,
+            3
+          ],
+          "reason": "Image 0 is the only shot where the cat is looking directly at the camera with clear, focused eyes. The other shots have the cat looking away or with half-closed eyes.",
+          "elapsed": 3.031,
+          "matchesUser": false,
+          "matchesLlm": true,
+          "tokensIn": 4354,
+          "tokensOut": 71
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2025-05-17-a0dcf1e12e8e",
+        "subgroupId": "g3",
+        "type": "burst",
+        "assetIds": [
+          "d7ea3113-71c8-4c16-b6a6-a106dfa10cdd",
+          "90844c7f-0e9e-4334-9323-8f26d098f540",
+          "4e933ea0-7385-4156-b772-e8a446e91365",
+          "aeaa1da7-92dd-494e-820c-0436327df18f",
+          "40fc9b02-6f78-4bca-b22f-b4c31e0666d2"
+        ],
+        "filenames": [
+          "20250517_101406(1).jpg",
+          "20250517_101433.jpg",
+          "20250517_101428.jpg",
+          "20250517_101421.jpg",
+          "20250517_101406.jpg"
+        ],
+        "llmKeepIds": [
+          "d7ea3113-71c8-4c16-b6a6-a106dfa10cdd",
+          "90844c7f-0e9e-4334-9323-8f26d098f540"
+        ],
+        "llmRanking": [
+          "d7ea3113-71c8-4c16-b6a6-a106dfa10cdd",
+          "90844c7f-0e9e-4334-9323-8f26d098f540",
+          "4e933ea0-7385-4156-b772-e8a446e91365",
+          "aeaa1da7-92dd-494e-820c-0436327df18f",
+          "40fc9b02-6f78-4bca-b22f-b4c31e0666d2"
+        ],
+        "userKeepIds": [
+          "d7ea3113-71c8-4c16-b6a6-a106dfa10cdd",
+          "90844c7f-0e9e-4334-9323-8f26d098f540"
+        ],
+        "userCullIds": [
+          "4e933ea0-7385-4156-b772-e8a446e91365",
+          "aeaa1da7-92dd-494e-820c-0436327df18f",
+          "40fc9b02-6f78-4bca-b22f-b4c31e0666d2"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_min",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            4,
+            1,
+            3,
+            2
+          ],
+          "reason": "Image 0 is the best because all three subjects are clearly visible, looking at the camera, and smiling. In the other images, the child is either partially obscured by the mother or looking away, making them less ideal for a family portrait.",
+          "elapsed": 64.325,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 10246,
+          "tokensOut": 92
+        },
+        {
+          "variant": "gemma4_31b_v3_min",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            1,
+            4,
+            3,
+            2
+          ],
+          "reason": "Image 0 has the best composition and the subjects are all looking at the camera with clear expressions. The other images have more foreground foliage blocking the subjects, and in images 2 and 3, the man's eyes are closed or blinking.",
+          "elapsed": 364.913,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1454,
+          "tokensOut": 88
+        },
+        {
+          "variant": "gemma4_e4b_v3_min",
+          "bestPicks": [
+            2
+          ],
+          "ranking": [
+            2,
+            1,
+            3,
+            0,
+            4
+          ],
+          "reason": "Image 2 has the best overall composition, lighting, and clarity compared to the others, making it the most appealing shot.",
+          "elapsed": 32.991,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 1454,
+          "tokensOut": 54
+        },
+        {
+          "variant": "31flashlite_v3_min",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            4,
+            3,
+            1,
+            2
+          ],
+          "reason": "Image 0 is the only shot where everyone is looking at the camera and smiling clearly.",
+          "elapsed": 3.673,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 5463,
+          "tokensOut": 55
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2024-11-09-f6f42e970ec7",
+        "subgroupId": "g1",
+        "type": "burst",
+        "assetIds": [
+          "8fdd4b86-9d65-4ab0-9bd1-0e6f0236e607",
+          "98c75fdc-3a3e-45c4-a4d6-519a3437f8c3",
+          "e716b822-111b-486b-beac-234e731f6d87",
+          "e6ad1009-10aa-4567-b545-58ef5550df64",
+          "f2beaadc-c0fe-492a-8f04-20c53121d32f",
+          "8ef2260f-1895-4e3f-b3d0-70fd243946c2"
+        ],
+        "filenames": [
+          "DSC_3284.NEF",
+          "DSC_3286.NEF",
+          "DSC_3283.NEF",
+          "DSC_3285.NEF",
+          "DSC_3287.NEF",
+          "DSC_3288.NEF"
+        ],
+        "llmKeepIds": [
+          "8fdd4b86-9d65-4ab0-9bd1-0e6f0236e607",
+          "98c75fdc-3a3e-45c4-a4d6-519a3437f8c3"
+        ],
+        "llmRanking": [
+          "8fdd4b86-9d65-4ab0-9bd1-0e6f0236e607",
+          "98c75fdc-3a3e-45c4-a4d6-519a3437f8c3",
+          "e716b822-111b-486b-beac-234e731f6d87",
+          "e6ad1009-10aa-4567-b545-58ef5550df64",
+          "f2beaadc-c0fe-492a-8f04-20c53121d32f",
+          "8ef2260f-1895-4e3f-b3d0-70fd243946c2"
+        ],
+        "userKeepIds": [
+          "8fdd4b86-9d65-4ab0-9bd1-0e6f0236e607",
+          "98c75fdc-3a3e-45c4-a4d6-519a3437f8c3",
+          "e6ad1009-10aa-4567-b545-58ef5550df64"
+        ],
+        "userCullIds": [
+          "e716b822-111b-486b-beac-234e731f6d87",
+          "f2beaadc-c0fe-492a-8f04-20c53121d32f",
+          "8ef2260f-1895-4e3f-b3d0-70fd243946c2"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_min",
+          "bestPicks": [
+            1,
+            4,
+            5
+          ],
+          "ranking": [
+            1,
+            4,
+            5,
+            3,
+            0,
+            2
+          ],
+          "reason": "These are the best photos because they are well-composed, fully in focus, and capture the subjects clearly. Image 1 is the best overall as it shows the complete family portrait with the bride's dress train. Images 4 and 5 are also excellent, capturing a sweet, natural moment between the parents and child.",
+          "elapsed": 75.258,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 12005,
+          "tokensOut": 117
+        },
+        {
+          "variant": "gemma4_31b_v3_min",
+          "bestPicks": [
+            5
+          ],
+          "ranking": [
+            5,
+            1,
+            4,
+            3,
+            0,
+            2
+          ],
+          "reason": "Image 5 has the best composition and the subjects are all looking towards the camera with clear expressions.",
+          "elapsed": 337.704,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 1692,
+          "tokensOut": 52
+        },
+        {
+          "variant": "gemma4_e4b_v3_min",
+          "bestPicks": [
+            4
+          ],
+          "ranking": [
+            4,
+            2,
+            0,
+            3,
+            1,
+            5
+          ],
+          "reason": "Image 4 is the sharpest and most composed shot, with clear focus on all subjects and minimal motion blur, making it the most professional and keepers-worthy photo.",
+          "elapsed": 40.085,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 1692,
+          "tokensOut": 66
+        },
+        {
+          "variant": "31flashlite_v3_min",
+          "bestPicks": [
+            3
+          ],
+          "ranking": [
+            3,
+            1,
+            5,
+            4,
+            0,
+            2
+          ],
+          "reason": "Image 3 is the best shot where everyone is looking towards the camera and the composition is clear. Image 1 is also good but slightly less sharp than 3. Image 2 is obstructed by another person, and images 0, 4, and 5 have less ideal expressions or poses.",
+          "elapsed": 2.829,
+          "matchesUser": true,
+          "matchesLlm": false,
+          "tokensIn": 6588,
+          "tokensOut": 102
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2026-01-31-3e202cb1b758",
+        "subgroupId": "g4",
+        "type": "burst",
+        "assetIds": [
+          "8e0a5c02-b9c4-45f6-8932-b40a8edfb84e",
+          "96f24e50-28ba-420d-a400-63911efe20d4",
+          "509fcbbd-fb89-481d-b0f1-506ff6ae4d1a",
+          "a52c037f-b8ba-447e-bab3-1337aa60021a",
+          "ba59834c-3159-4da3-a3a5-8eb0af6c3d3e",
+          "e60bb517-60ce-4f2d-a3dc-caeb85b3543b",
+          "c3da9366-3b8d-43c2-ba53-779fbb400e21"
+        ],
+        "filenames": [
+          "20260131_175647.jpg",
+          "20260131_175639.jpg",
+          "20260131_175649.jpg",
+          "20260131_175636.jpg",
+          "20260131_175643.jpg",
+          "20260131_175654.jpg",
+          "20260131_175659.jpg"
+        ],
+        "llmKeepIds": [
+          "8e0a5c02-b9c4-45f6-8932-b40a8edfb84e",
+          "96f24e50-28ba-420d-a400-63911efe20d4"
+        ],
+        "llmRanking": [
+          "8e0a5c02-b9c4-45f6-8932-b40a8edfb84e",
+          "96f24e50-28ba-420d-a400-63911efe20d4",
+          "509fcbbd-fb89-481d-b0f1-506ff6ae4d1a",
+          "a52c037f-b8ba-447e-bab3-1337aa60021a",
+          "ba59834c-3159-4da3-a3a5-8eb0af6c3d3e",
+          "e60bb517-60ce-4f2d-a3dc-caeb85b3543b",
+          "c3da9366-3b8d-43c2-ba53-779fbb400e21"
+        ],
+        "userKeepIds": [
+          "8e0a5c02-b9c4-45f6-8932-b40a8edfb84e",
+          "96f24e50-28ba-420d-a400-63911efe20d4"
+        ],
+        "userCullIds": [
+          "509fcbbd-fb89-481d-b0f1-506ff6ae4d1a",
+          "a52c037f-b8ba-447e-bab3-1337aa60021a",
+          "ba59834c-3159-4da3-a3a5-8eb0af6c3d3e",
+          "e60bb517-60ce-4f2d-a3dc-caeb85b3543b",
+          "c3da9366-3b8d-43c2-ba53-779fbb400e21"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_min",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            2,
+            4,
+            1,
+            5,
+            3
+          ],
+          "reason": "Image 0 is the best because it is a clear, well-composed portrait with all three subjects' faces visible and in focus. The lighting is balanced, and the man is looking directly at the camera, creating a strong connection with the viewer. Image 2 is a close second but has a slightly more intense color cast. The other images are less ideal due to motion blur, awkward poses, or subjects looking away.",
+          "elapsed": 87.811,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 14327,
+          "tokensOut": 134
+        }
+      ]
+    }
+  ]
+}

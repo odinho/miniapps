@@ -33,6 +33,7 @@
     keepBias?: number | null;   // -1=too few, 0=right, 1=too many
     note?: string;
     updatedAt?: string;
+    inheritedFrom?: string;     // source experiment id if grade was carried over from another run
   };
 
   const SEVERITY_LABELS = ['perfect', 'fine', 'meh', 'sad', '😢'];
@@ -54,7 +55,7 @@
     variants: VariantResult[];
   };
 
-  let experiments: Array<{ id: string }> = [];
+  let experiments: Array<{ id: string; archived?: boolean }> = [];
   let selectedId = '';
   let results: GroupResult[] = [];
   let grades: Record<string, Grade> = {};
@@ -226,24 +227,87 @@
 
   onDestroy(() => resizeObserver?.disconnect());
 
+  // One-shot notice shown after load if grades were carried over from other experiments.
+  let inheritedNotice: { count: number; sources: string[] } | null = null;
+
+  async function persistAllGrades(id: string, next: Record<string, Grade>): Promise<void> {
+    await fetch(`/api/experiments/${id}/grades`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ grades: next }),
+    });
+  }
+
+  // Collect every grade-key this experiment could meaningfully store: one per pick bundle,
+  // plus the per-group EXCLUDED_KEY. Anything outside this set would be stale and is ignored.
+  function localGradeKeys(xs: GroupResult[]): Set<string> {
+    const keys = new Set<string>();
+    for (const g of xs) {
+      const gk = groupKeyOf(g);
+      for (const v of g.variants) {
+        if (!isGradable(v)) continue;
+        keys.add(gradeKey(gk, pickKeyOf(v.bestPicks)));
+      }
+      keys.add(gradeKey(gk, EXCLUDED_KEY));
+    }
+    return keys;
+  }
+
+  // Cross-experiment inheritance: pick-bundles with the same (group, picks) key as a
+  // graded bundle in any other experiment inherit that grade. The user graded the PICK,
+  // not the model, so the judgment transfers regardless of which run produced the picks.
+  async function inheritCrossExperimentGrades(
+    id: string,
+    currentGrades: Record<string, Grade>,
+    xs: GroupResult[],
+  ): Promise<{ next: Record<string, Grade>; count: number; sources: Set<string> }> {
+    const relevantKeys = localGradeKeys(xs);
+    let all: Record<string, { grade: Grade; sourceExperiment: string }>;
+    try {
+      const resp = await fetch('/api/grades/all').then((r) => r.json());
+      all = resp.grades ?? {};
+    } catch (err) {
+      console.warn('Grade inheritance: /api/grades/all unavailable, skipping:', err);
+      return { next: currentGrades, count: 0, sources: new Set() };
+    }
+
+    const patch: Record<string, Grade> = {};
+    const sources = new Set<string>();
+    for (const [key, entry] of Object.entries(all)) {
+      if (!relevantKeys.has(key)) continue;
+      if (entry.sourceExperiment === id) continue;
+      if (currentGrades[key]) continue;
+      patch[key] = { ...entry.grade, inheritedFrom: entry.sourceExperiment };
+      sources.add(entry.sourceExperiment);
+    }
+    const count = Object.keys(patch).length;
+    if (count === 0) return { next: currentGrades, count: 0, sources };
+    return { next: { ...currentGrades, ...patch }, count, sources };
+  }
+
   async function loadExperiment(id: string) {
     loading = true;
     selectedId = id;
+    inheritedNotice = null;
+
     const data = await fetch(`/api/experiments/${id}`).then((r) => r.json());
     results = data.experiment.results ?? [];
-    const rawGrades = data.grades ?? {};
+    const rawGrades: Record<string, Grade> = data.grades ?? {};
+
+    // 1. Back-compat migration of legacy variant-keyed grades.
     const migrated = migrateGradesToPickBased({ results }, rawGrades);
-    if (migrated) {
-      grades = migrated;
-      // persist migration so we never do it again
-      await fetch(`/api/experiments/${id}/grades`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ grades: migrated }),
-      });
-    } else {
-      grades = rawGrades;
+    let next: Record<string, Grade> = migrated ?? rawGrades;
+    if (migrated) await persistAllGrades(id, migrated);
+
+    // 2. Pull in any prior grades for the same (group, picks) from other experiments.
+    const inherited = await inheritCrossExperimentGrades(id, next, results as GroupResult[]);
+    if (inherited.count > 0) {
+      next = inherited.next;
+      await persistAllGrades(id, next);
+      inheritedNotice = { count: inherited.count, sources: [...inherited.sources].toSorted() };
     }
+
+    grades = next;
     groupIdx = findFirstUngradedGroup();
     activePickIdx = 0;
     loading = false;
@@ -293,7 +357,10 @@
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   async function setGrade(pickKey: string, patch: Partial<Grade>) {
     const key = gradeKey(groupKey, pickKey);
-    grades = { ...grades, [key]: { ...grades[key], ...patch } };
+    // User edit removes the "inherited" marker — it's now a grade in this experiment.
+    const prior = grades[key] ?? {};
+    const { inheritedFrom: _drop, ...priorWithoutInherit } = prior;
+    grades = { ...grades, [key]: { ...priorWithoutInherit, ...patch } };
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(async () => {
       const g = grades[key];
@@ -315,6 +382,18 @@
   }
   function prevGroup() {
     if (groupIdx > 0) { groupIdx--; activePickIdx = 0; }
+  }
+  // Skip groups where every pick bundle already has a severity (including inherited).
+  // Stops at the next group with at least one ungraded bundle.
+  function nextUngradedGroup() {
+    for (let i = groupIdx + 1; i < results.length; i++) {
+      if (ungradedBundlesOf(results[i]).length > 0) { groupIdx = i; activePickIdx = 0; return; }
+    }
+  }
+  function prevUngradedGroup() {
+    for (let i = groupIdx - 1; i >= 0; i--) {
+      if (ungradedBundlesOf(results[i]).length > 0) { groupIdx = i; activePickIdx = 0; return; }
+    }
   }
   function cyclePick(dir: 1 | -1) {
     if (!pickBundles.length) return;
@@ -357,16 +436,30 @@
   // Per-variant summary: each variant inherits the grade of its bundle's pick.
   // Excluded groups contribute nothing to the totals.
   $: summary = (() => {
-    type Row = { gradable: number; graded: number; sev: number[]; bias: number[] };
+    type Row = {
+      gradable: number;
+      graded: number;
+      sev: number[];
+      bias: number[];
+      f1: number[];
+      keepCounts: number[];
+    };
     const s: Record<string, Row> = {};
-    for (const v of variantNames) s[v] = { gradable: 0, graded: 0, sev: [], bias: [] };
+    for (const v of variantNames) {
+      s[v] = { gradable: 0, graded: 0, sev: [], bias: [], f1: [], keepCounts: [] };
+    }
     let excludedGroups = 0;
     for (const g of results) {
       const k = groupKeyOf(g);
       if (isExcluded(k)) { excludedGroups++; continue; }
+      const userKeeps = g.group.userKeepIds ?? [];
+      const userCulls = g.group.userCullIds ?? [];
+      const userKeepSet = new Set(userKeeps);
+      const userCullSet = new Set(userCulls);
       for (const v of g.variants) {
         if (!isGradable(v)) continue;
         s[v.variant].gradable++;
+        s[v.variant].keepCounts.push(v.bestPicks.length);
         const pk = pickKeyOf(v.bestPicks);
         const gr = grades[gradeKey(k, pk)];
         if (gr?.severity !== null && gr?.severity !== undefined) {
@@ -375,6 +468,16 @@
         }
         if (gr?.keepBias !== null && gr?.keepBias !== undefined) {
           s[v.variant].bias.push(gr.keepBias);
+        }
+        // F1 against user keeps — picks on user-undecided photos don't count
+        if (userKeeps.length > 0) {
+          const picked = v.bestPicks.map((i) => g.group.assetIds[i]).filter(Boolean);
+          const tp = picked.filter((id) => userKeepSet.has(id)).length;
+          const fp = picked.filter((id) => userCullSet.has(id)).length;
+          const p = tp + fp > 0 ? tp / (tp + fp) : 0;
+          const r = tp / userKeeps.length;
+          const f1 = p + r > 0 ? (2 * p * r) / (p + r) : 0;
+          s[v.variant].f1.push(f1);
         }
       }
     }
@@ -409,6 +512,8 @@
     if (!activeBundle) return;
     const activeGrade = (grades[gradeKey(groupKey, activeBundle.pickKey)] ?? {}) as Grade;
 
+    if ((e.key === 'ArrowRight' || e.key === 'N') && e.shiftKey) { nextUngradedGroup(); e.preventDefault(); return; }
+    if ((e.key === 'ArrowLeft' || e.key === 'P') && e.shiftKey) { prevUngradedGroup(); e.preventDefault(); return; }
     if (e.key === 'n' || e.key === 'ArrowRight' || e.key === ' ') { nextGroup(); e.preventDefault(); return; }
     if (e.key === 'p' || e.key === 'ArrowLeft') { prevGroup(); e.preventDefault(); return; }
 
@@ -466,9 +571,15 @@
 <div class="grader">
   <div class="top-bar">
     <select class="exp-picker" bind:value={selectedId} on:change={(e) => loadExperiment((e.target as HTMLSelectElement).value)}>
-      {#each experiments as e}
+      {#each experiments.filter((e) => !e.archived) as e}
         <option value={e.id}>{e.id}</option>
       {/each}
+      {#if experiments.some((e) => e.archived)}
+        <option disabled>──────── archived ────────</option>
+        {#each experiments.filter((e) => e.archived) as e}
+          <option value={e.id}>(archived) {e.id}</option>
+        {/each}
+      {/if}
     </select>
     <button on:click={prevGroup} disabled={groupIdx === 0} title="prev (p)">◀</button>
     <span class="nav-idx">{groupIdx + 1}/{results.length}</span>
@@ -485,7 +596,16 @@
       {/if}
       <button class="exclude-btn" on:click={toggleExcludeCurrent} title="Exclude/include this group (x)">{excluded ? 'include' : 'exclude'}</button>
       {#if !blindMode}
-        <span class="user-keep">U:{#each currentGroup.group.userKeepIds as id}<span class="idx-badge">{currentGroup.group.assetIds.indexOf(id)}</span>{/each}</span>
+        {@const userKeepCount = currentGroup.group.userKeepIds.length}
+        {@const userCullCount = currentGroup.group.userCullIds.length}
+        {@const total = currentGroup.group.assetIds.length}
+        {#if userKeepCount + userCullCount > 10}
+          <span class="user-keep" title="user kept / user culled / total in group">
+            user <b>{userKeepCount}k / {userCullCount}c</b> of {total}
+          </span>
+        {:else}
+          <span class="user-keep">U:{#each currentGroup.group.userKeepIds as id}<span class="idx-badge">{currentGroup.group.assetIds.indexOf(id)}</span>{/each}</span>
+        {/if}
       {:else}
         <span class="hidden-note">user hidden · <kbd>r</kbd></span>
       {/if}
@@ -496,6 +616,19 @@
     </label>
     <button class="help-btn" on:click={() => helpOpen = !helpOpen} title="Show help (?)">?</button>
   </div>
+
+  {#if inheritedNotice}
+    <div class="inherited-banner">
+      <span>↩</span>
+      Inherited <b>{inheritedNotice.count}</b> grade{inheritedNotice.count === 1 ? '' : 's'}
+      from prior experiment{inheritedNotice.sources.length === 1 ? '' : 's'}:
+      {#each inheritedNotice.sources as src, i}
+        <code>{src}</code>{i < inheritedNotice.sources.length - 1 ? ', ' : ''}
+      {/each}
+      · Same (group, pick) key — edit any row to take ownership in this experiment.
+      <button type="button" class="dismiss" on:click={() => inheritedNotice = null}>dismiss</button>
+    </div>
+  {/if}
 
   {#if loading}
     <div class="empty">Loading...</div>
@@ -541,28 +674,49 @@
       {#each pickBundles as b, bi}
         {@const grade = grades[gradeKey(groupKey, b.pickKey)] ?? {}}
         {@const isActive = bi === activePickIdx}
-        {@const picksStr = b.bestPicks.join(',')}
+        {@const picksStr = b.bestPicks.length > 12
+          ? b.bestPicks.slice(0, 12).join(',') + `,…(+${b.bestPicks.length - 12})`
+          : b.bestPicks.join(',')}
         {@const matchesUser = !blindMode && b.variants.some((v) => v.matchesUser === true)}
+        {@const totalPhotos = currentGroup?.group.assetIds.length ?? 0}
+        {@const userKeepSet = new Set(currentGroup?.group.userKeepIds ?? [])}
+        {@const userCullSet = new Set(currentGroup?.group.userCullIds ?? [])}
+        {@const pickAssetIds = b.bestPicks.map((i) => currentGroup?.group.assetIds[i]).filter(Boolean) as string[]}
+        {@const tp = pickAssetIds.filter((id) => userKeepSet.has(id)).length}
+        {@const fp = pickAssetIds.filter((id) => userCullSet.has(id)).length}
+        {@const fn = (currentGroup?.group.userKeepIds.length ?? 0) - tp}
+        {@const precision = (tp + fp) > 0 ? tp / (tp + fp) : 0}
+        {@const recall = (currentGroup?.group.userKeepIds.length ?? 0) > 0 ? tp / currentGroup!.group.userKeepIds.length : 0}
+        {@const f1 = (precision + recall) > 0 ? (2 * precision * recall) / (precision + recall) : 0}
         <div
           role="button"
           tabindex="0"
           class="variant pick-bundle"
           class:active={isActive}
           class:graded={grade.severity !== null && grade.severity !== undefined}
+          class:inherited-grade={!!grade.inheritedFrom}
           bind:this={bundleRefs[bi]}
           on:click={() => activePickIdx = bi}
           on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { activePickIdx = bi; e.preventDefault(); } }}
         >
           <div class="vhead">
             <span class="vidx">{bi + 1}</span>
-            <span class="pick">picks=[{picksStr}]</span>
+            <span class="keep-count">{b.bestPicks.length}/{totalPhotos} kept</span>
+            <span class="pick">[{picksStr}]</span>
             <span class="variant-chips">
               {#each b.variants as v}
                 <span class="chip" title="{v.variant} · {v.elapsed.toFixed(1)}s">{v.variant}</span>
               {/each}
             </span>
-            {#if !blindMode}
-              <span class="umatch" class:ok={matchesUser}>{matchesUser ? '✓ user' : '✗ user'}</span>
+            {#if grade.inheritedFrom}
+              <span class="inherited" title="Grade carried over from {grade.inheritedFrom} — edit to take ownership in this experiment.">
+                ↩ from {grade.inheritedFrom}
+              </span>
+            {/if}
+            {#if !blindMode && (currentGroup?.group.userKeepIds.length ?? 0) > 0}
+              <span class="metrics" title="against user's keep set — precision={precision.toFixed(2)} recall={recall.toFixed(2)}">
+                F1 <b>{f1.toFixed(2)}</b> · tp{tp} fp{fp} fn{fn}
+              </span>
             {/if}
           </div>
           <div class="reasons">
@@ -625,7 +779,7 @@
     <div class="roll-up">
       <h4>Across experiment ({results.length - summary.excludedGroups} scored · {summary.excludedGroups} excluded)</h4>
       <table>
-        <thead><tr><th>variant</th><th>graded</th><th>avg severity</th><th>avg bias</th></tr></thead>
+        <thead><tr><th>variant</th><th>graded</th><th>avg sev</th><th>avg bias</th><th>avg F1 (vs user)</th><th>avg keep count</th></tr></thead>
         <tbody>
           {#each variantNames as v}
             <tr>
@@ -633,6 +787,8 @@
               <td>{summary.perVariant[v]?.graded ?? 0} / {summary.perVariant[v]?.gradable ?? 0}</td>
               <td>{avg(summary.perVariant[v]?.sev ?? [])}</td>
               <td>{avg(summary.perVariant[v]?.bias ?? [])}</td>
+              <td>{avg(summary.perVariant[v]?.f1 ?? [])}</td>
+              <td>{avg(summary.perVariant[v]?.keepCounts ?? [])}</td>
             </tr>
           {/each}
         </tbody>
@@ -690,6 +846,8 @@
           <tbody>
             <tr><td><kbd>n</kbd> / <kbd>space</kbd> / <kbd>→</kbd></td><td>next group</td></tr>
             <tr><td><kbd>p</kbd> / <kbd>←</kbd></td><td>prev group</td></tr>
+            <tr><td><kbd>Shift</kbd>+<kbd>→</kbd> / <kbd>Shift</kbd>+<kbd>N</kbd></td><td>next group with <strong>ungraded</strong> bundles (skip inherited-only)</td></tr>
+            <tr><td><kbd>Shift</kbd>+<kbd>←</kbd> / <kbd>Shift</kbd>+<kbd>P</kbd></td><td>previous ungraded group</td></tr>
             <tr><td><kbd>↑</kbd> / <kbd>↓</kbd> / <kbd>j</kbd> <kbd>k</kbd></td><td>cycle active pick bundle</td></tr>
             <tr><td><kbd>0</kbd> <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></td><td>severity for active pick: 0=perfect → 4=very sad (press again to clear)</td></tr>
             <tr><td><kbd>,</kbd></td><td>keep: too few</td></tr>
@@ -728,6 +886,7 @@
   .top-meta { color: #aaa; }
   .progress { color: #f0a040; font-weight: 500; }
   .user-keep { display: inline-flex; align-items: center; gap: 3px; color: #aaa; }
+  .user-keep b { color: #6d9e6d; font-weight: 600; margin: 0 2px; }
   .hidden-note { color: #666; font-style: italic; font-size: 11px; }
   .hidden-note kbd { background: #333; border: 1px solid #555; padding: 0 4px; border-radius: 2px; font-family: monospace; color: #f0a040; }
   .blind-toggle { display: flex; gap: 3px; align-items: center; cursor: pointer; color: #888; }
@@ -780,7 +939,22 @@
   .errored-list .chip-bad { background: #3a1f1f; color: #a06868; padding: 1px 6px; border-radius: 8px; font-family: monospace; font-size: 10px; margin-left: 4px; }
   .vidx { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background: #444; border-radius: 50%; font-size: 11px; font-weight: bold; color: #ccc; }
   .variant.active .vidx { background: #f0a040; color: #1e1e1e; }
-  .pick { font-family: monospace; color: #ccc; font-size: 13px; }
+  .pick { font-family: monospace; color: #888; font-size: 12px; max-width: 420px; overflow: hidden; text-overflow: ellipsis; }
+  .keep-count { background: #2a3f2a; color: #a8d5a8; padding: 1px 8px; border-radius: 3px; font-family: monospace; font-size: 12px; font-weight: 500; }
+  .metrics { font-size: 11px; color: #888; font-family: monospace; margin-left: 4px; }
+  .metrics b { color: #e0a040; }
+  .inherited { font-size: 10px; color: #9fb5d4; background: #1f2a3a; padding: 1px 6px; border-radius: 3px; font-family: monospace; font-style: italic; border: 1px solid #2a4060; }
+  .inherited-banner {
+    margin: 0 0 8px; padding: 8px 12px;
+    background: #1f2a3a; border: 1px solid #2a4060; border-radius: 4px;
+    color: #c9d7ea; font-size: 12px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .inherited-banner b { color: #e0a040; }
+  .inherited-banner code { background: #121820; color: #9fb5d4; padding: 1px 6px; border-radius: 3px; font-family: monospace; font-size: 11px; }
+  .inherited-banner .dismiss { margin-left: auto; background: transparent; border: 1px solid #2a4060; color: #9fb5d4; padding: 2px 10px; border-radius: 3px; cursor: pointer; font-size: 11px; }
+  .inherited-banner .dismiss:hover { background: #2a4060; color: #fff; }
+  .variant.graded.inherited-grade { background: #232a34; border-color: #3a527a; }
+  .variant.graded.inherited-grade.active { background: #2a3550; border-color: #5a7db0; }
   .umatch { font-size: 12px; color: #888; }
   .umatch.ok { color: #6d9e6d; }
   .umatch.off { color: #c08040; }

@@ -1,0 +1,3705 @@
+{
+  "timestamp": "2026-04-20T21:34:44.206Z",
+  "completedGroups": 30,
+  "targetGroups": 30,
+  "variants": [
+    "qwen36_a3b_terse_v3_adaptive",
+    "gemma4_31b_v3_adaptive",
+    "gemma4_e4b_v3_adaptive",
+    "31flashlite_v3_adaptive"
+  ],
+  "promptKind": "adaptive",
+  "prompt": "You judge which photos to keep from a burst of very similar family photos.\n\nLook at the frames and decide a COUNT first:\n- Nearly identical shutter-bursts → keep 1\n- Two genuinely different expressions or moments → keep 2\n- Action sequence with distinct stages → keep 3 or more\n- All frames fail (blurry, closed eyes, bad composition) → keep 0\n\nWithin the count you chose, rank by: (1) sharpness/focus, (2) faces & expressions, (3) composition, (4) moment.\nThese are family memories — when torn, prefer keeping over losing a real moment.\n\nReturn JSON: {\"best\": [indices], \"reason\": \"brief why\", \"ranking\": [best_to_worst]}\nIndices 0-based.",
+  "results": [
+    {
+      "group": {
+        "batchId": "2025-10-25-88408d7b0da0",
+        "subgroupId": "g3",
+        "type": "near_duplicate",
+        "assetIds": [
+          "3e4e9250-8bb3-4d39-b470-b2b70ee48848",
+          "63e8fbaf-7193-463c-a3f8-147dc55e9a9c",
+          "cf2dcbbe-64c0-4432-a8fd-b8143f70e6df"
+        ],
+        "filenames": [
+          "20251025_133852.jpg",
+          "20251025_133854.jpg",
+          "20251025_133855.jpg"
+        ],
+        "llmKeepIds": [
+          "3e4e9250-8bb3-4d39-b470-b2b70ee48848",
+          "63e8fbaf-7193-463c-a3f8-147dc55e9a9c"
+        ],
+        "llmRanking": [
+          "3e4e9250-8bb3-4d39-b470-b2b70ee48848",
+          "63e8fbaf-7193-463c-a3f8-147dc55e9a9c",
+          "cf2dcbbe-64c0-4432-a8fd-b8143f70e6df"
+        ],
+        "userKeepIds": [
+          "63e8fbaf-7193-463c-a3f8-147dc55e9a9c"
+        ],
+        "userCullIds": [
+          "3e4e9250-8bb3-4d39-b470-b2b70ee48848",
+          "cf2dcbbe-64c0-4432-a8fd-b8143f70e6df"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            1
+          ],
+          "ranking": [
+            1,
+            2,
+            0
+          ],
+          "reason": "Image 1 is the best because it clearly captures the main subject's face and expression without any obstructions. Image 2 is a close second but is marred by a large blurry figure in the foreground. Image 0 is too blurry and poorly composed.",
+          "elapsed": 58.959,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 6295,
+          "tokensOut": 207
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            1
+          ],
+          "ranking": [
+            1,
+            0,
+            2
+          ],
+          "reason": "Image 1 is the only frame where the main subject (the blonde girl) is facing the camera with a clear, sharp expression and the composition is balanced, showing more of the family group.",
+          "elapsed": 229.913,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1014,
+          "tokensOut": 62
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            1
+          ],
+          "ranking": [
+            1,
+            0,
+            2
+          ],
+          "reason": "Image 1 captures the best moment with the clearest focus and the most engaging expressions from the main subjects (the two girls).",
+          "elapsed": 51.708,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1014,
+          "tokensOut": 49
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            1
+          ],
+          "ranking": [
+            1,
+            2,
+            0
+          ],
+          "reason": "Image 1 is the only frame where the central subject is looking toward the camera with a clear expression. Image 0 is blurry/out of focus, and Image 2 is obstructed by a large foreground blur.",
+          "elapsed": 2.648,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 3387,
+          "tokensOut": 74
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2025-06-02-d97c0edf5b59",
+        "subgroupId": "g1",
+        "type": "burst",
+        "assetIds": [
+          "5cba4abe-5848-4bc5-943c-e4a12df1e487",
+          "33dd2b1a-54a0-435f-9ec2-a2c239a253d2",
+          "7ef7969a-3e06-4c40-934f-10ffa3cb0aa5",
+          "675abb16-b9ce-4285-a9ad-ed021989e34e"
+        ],
+        "filenames": [
+          "20250602_190431.jpg",
+          "20250602_190423.jpg",
+          "20250602_190424.jpg",
+          "20250602_190432.jpg"
+        ],
+        "llmKeepIds": [
+          "5cba4abe-5848-4bc5-943c-e4a12df1e487",
+          "33dd2b1a-54a0-435f-9ec2-a2c239a253d2"
+        ],
+        "llmRanking": [
+          "5cba4abe-5848-4bc5-943c-e4a12df1e487",
+          "33dd2b1a-54a0-435f-9ec2-a2c239a253d2",
+          "7ef7969a-3e06-4c40-934f-10ffa3cb0aa5",
+          "675abb16-b9ce-4285-a9ad-ed021989e34e"
+        ],
+        "userKeepIds": [
+          "7ef7969a-3e06-4c40-934f-10ffa3cb0aa5"
+        ],
+        "userCullIds": [
+          "5cba4abe-5848-4bc5-943c-e4a12df1e487",
+          "33dd2b1a-54a0-435f-9ec2-a2c239a253d2",
+          "675abb16-b9ce-4285-a9ad-ed021989e34e"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            2
+          ],
+          "ranking": [
+            2,
+            1,
+            0,
+            3
+          ],
+          "reason": "Image 2 is the best because it captures the cat's full expression with the tongue out while showing the interaction of being petted, providing a complete and engaging family moment. Image 1 is a close second but is slightly darker. Image 0 is a good close-up but lacks the context of the interaction.",
+          "elapsed": 61.349,
+          "matchesUser": true,
+          "matchesLlm": false,
+          "tokensIn": 8329,
+          "tokensOut": 103
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            2
+          ],
+          "ranking": [
+            2,
+            0,
+            1,
+            3
+          ],
+          "reason": "Image 2 captures the 'blep' expression perfectly with the best overall focus and composition compared to the others.",
+          "elapsed": 689.909,
+          "matchesUser": true,
+          "matchesLlm": false,
+          "tokensIn": 1286,
+          "tokensOut": 58
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            2
+          ],
+          "ranking": [
+            2,
+            1,
+            0,
+            3
+          ],
+          "reason": "All photos are very similar, but Image 2 has the best combination of sharpness, clear expression, and good composition, capturing a distinct moment.",
+          "elapsed": 31.158,
+          "matchesUser": true,
+          "matchesLlm": false,
+          "tokensIn": 1286,
+          "tokensOut": 55
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0,
+            2
+          ],
+          "ranking": [
+            0,
+            2,
+            1,
+            3
+          ],
+          "reason": "Image 0 is the sharpest, most direct portrait of the cat with its tongue out. Image 2 captures a slightly different, more relaxed expression while being petted. Images 1 and 3 are less sharp or have awkward framing.",
+          "elapsed": 1.984,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 4456,
+          "tokensOut": 86
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2025-05-17-a0dcf1e12e8e",
+        "subgroupId": "g3",
+        "type": "burst",
+        "assetIds": [
+          "d7ea3113-71c8-4c16-b6a6-a106dfa10cdd",
+          "90844c7f-0e9e-4334-9323-8f26d098f540",
+          "4e933ea0-7385-4156-b772-e8a446e91365",
+          "aeaa1da7-92dd-494e-820c-0436327df18f",
+          "40fc9b02-6f78-4bca-b22f-b4c31e0666d2"
+        ],
+        "filenames": [
+          "20250517_101406(1).jpg",
+          "20250517_101433.jpg",
+          "20250517_101428.jpg",
+          "20250517_101421.jpg",
+          "20250517_101406.jpg"
+        ],
+        "llmKeepIds": [
+          "d7ea3113-71c8-4c16-b6a6-a106dfa10cdd",
+          "90844c7f-0e9e-4334-9323-8f26d098f540"
+        ],
+        "llmRanking": [
+          "d7ea3113-71c8-4c16-b6a6-a106dfa10cdd",
+          "90844c7f-0e9e-4334-9323-8f26d098f540",
+          "4e933ea0-7385-4156-b772-e8a446e91365",
+          "aeaa1da7-92dd-494e-820c-0436327df18f",
+          "40fc9b02-6f78-4bca-b22f-b4c31e0666d2"
+        ],
+        "userKeepIds": [
+          "d7ea3113-71c8-4c16-b6a6-a106dfa10cdd",
+          "90844c7f-0e9e-4334-9323-8f26d098f540"
+        ],
+        "userCullIds": [
+          "4e933ea0-7385-4156-b772-e8a446e91365",
+          "aeaa1da7-92dd-494e-820c-0436327df18f",
+          "40fc9b02-6f78-4bca-b22f-b4c31e0666d2"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            4,
+            1,
+            3,
+            2
+          ],
+          "reason": "Image 0 is the best choice because all three family members have their eyes open and are smiling directly at the camera, capturing a clear and happy moment. In the other frames, the father looks down (Image 2) or the child's eyes are closed (Images 1, 3, 4).",
+          "elapsed": 66.925,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 10350,
+          "tokensOut": 107
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            4,
+            1,
+            3,
+            2
+          ],
+          "reason": "Image 0 has the best composition and the clearest expressions on all three family members, with the child looking directly at the camera. In the other images, the composition is slightly shifted and the child's expression is less engaged.",
+          "elapsed": 244.816,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1556,
+          "tokensOut": 75
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            2
+          ],
+          "ranking": [
+            2,
+            1,
+            0,
+            3,
+            4
+          ],
+          "reason": "All photos are nearly identical, but Image 2 has the best overall sharpness, focus, and composition, making it the clearest memory.",
+          "elapsed": 44.011,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 1556,
+          "tokensOut": 56
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            4,
+            3,
+            1,
+            2
+          ],
+          "reason": "Image 0 is the only frame where everyone is looking at the camera with pleasant, natural expressions. The other frames show the father looking down or away.",
+          "elapsed": 4.867,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 5565,
+          "tokensOut": 68
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2024-11-09-f6f42e970ec7",
+        "subgroupId": "g1",
+        "type": "burst",
+        "assetIds": [
+          "8fdd4b86-9d65-4ab0-9bd1-0e6f0236e607",
+          "98c75fdc-3a3e-45c4-a4d6-519a3437f8c3",
+          "e716b822-111b-486b-beac-234e731f6d87",
+          "e6ad1009-10aa-4567-b545-58ef5550df64",
+          "f2beaadc-c0fe-492a-8f04-20c53121d32f",
+          "8ef2260f-1895-4e3f-b3d0-70fd243946c2"
+        ],
+        "filenames": [
+          "DSC_3284.NEF",
+          "DSC_3286.NEF",
+          "DSC_3283.NEF",
+          "DSC_3285.NEF",
+          "DSC_3287.NEF",
+          "DSC_3288.NEF"
+        ],
+        "llmKeepIds": [
+          "8fdd4b86-9d65-4ab0-9bd1-0e6f0236e607",
+          "98c75fdc-3a3e-45c4-a4d6-519a3437f8c3"
+        ],
+        "llmRanking": [
+          "8fdd4b86-9d65-4ab0-9bd1-0e6f0236e607",
+          "98c75fdc-3a3e-45c4-a4d6-519a3437f8c3",
+          "e716b822-111b-486b-beac-234e731f6d87",
+          "e6ad1009-10aa-4567-b545-58ef5550df64",
+          "f2beaadc-c0fe-492a-8f04-20c53121d32f",
+          "8ef2260f-1895-4e3f-b3d0-70fd243946c2"
+        ],
+        "userKeepIds": [
+          "8fdd4b86-9d65-4ab0-9bd1-0e6f0236e607",
+          "98c75fdc-3a3e-45c4-a4d6-519a3437f8c3",
+          "e6ad1009-10aa-4567-b545-58ef5550df64"
+        ],
+        "userCullIds": [
+          "e716b822-111b-486b-beac-234e731f6d87",
+          "f2beaadc-c0fe-492a-8f04-20c53121d32f",
+          "8ef2260f-1895-4e3f-b3d0-70fd243946c2"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            1,
+            4
+          ],
+          "ranking": [
+            1,
+            4,
+            5,
+            2,
+            3,
+            0
+          ],
+          "reason": "Image 1 is the best overall, capturing a clear, well-composed family portrait with the bride smiling and the full dress train visible. Image 4 is a strong second, showing a sweet, natural moment between the parents and child. Image 5 is also good but the groom's face is partially obscured. Image 2 is excluded due to the photographer blocking the view, and Image 3 is excluded due to motion blur.",
+          "elapsed": 76.507,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 12109,
+          "tokensOut": 122
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            5
+          ],
+          "ranking": [
+            5,
+            1,
+            4,
+            3,
+            0,
+            2
+          ],
+          "reason": "Image 5 has the best overall composition, with all three family members looking towards the camera with pleasant expressions and the full wedding dress train visible.",
+          "elapsed": 404.525,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 1794,
+          "tokensOut": 61
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            4
+          ],
+          "ranking": [
+            4,
+            2,
+            0,
+            1,
+            3,
+            5
+          ],
+          "reason": "All photos are nearly identical, but Image 4 has the best overall sharpness, focus, and composition, making it the clearest and most stable memory.",
+          "elapsed": 229.201,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 1794,
+          "tokensOut": 62
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            1,
+            4
+          ],
+          "ranking": [
+            1,
+            4,
+            3,
+            5,
+            0,
+            2
+          ],
+          "reason": "Image 1 is the best posed portrait of the family. Image 4 captures a sweet, candid interaction between the father and child while the mother holds the baby, offering a different, valuable moment.",
+          "elapsed": 2.672,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 6690,
+          "tokensOut": 83
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2026-01-31-3e202cb1b758",
+        "subgroupId": "g4",
+        "type": "burst",
+        "assetIds": [
+          "8e0a5c02-b9c4-45f6-8932-b40a8edfb84e",
+          "96f24e50-28ba-420d-a400-63911efe20d4",
+          "509fcbbd-fb89-481d-b0f1-506ff6ae4d1a",
+          "a52c037f-b8ba-447e-bab3-1337aa60021a",
+          "ba59834c-3159-4da3-a3a5-8eb0af6c3d3e",
+          "e60bb517-60ce-4f2d-a3dc-caeb85b3543b",
+          "c3da9366-3b8d-43c2-ba53-779fbb400e21"
+        ],
+        "filenames": [
+          "20260131_175647.jpg",
+          "20260131_175639.jpg",
+          "20260131_175649.jpg",
+          "20260131_175636.jpg",
+          "20260131_175643.jpg",
+          "20260131_175654.jpg",
+          "20260131_175659.jpg"
+        ],
+        "llmKeepIds": [
+          "8e0a5c02-b9c4-45f6-8932-b40a8edfb84e",
+          "96f24e50-28ba-420d-a400-63911efe20d4"
+        ],
+        "llmRanking": [
+          "8e0a5c02-b9c4-45f6-8932-b40a8edfb84e",
+          "96f24e50-28ba-420d-a400-63911efe20d4",
+          "509fcbbd-fb89-481d-b0f1-506ff6ae4d1a",
+          "a52c037f-b8ba-447e-bab3-1337aa60021a",
+          "ba59834c-3159-4da3-a3a5-8eb0af6c3d3e",
+          "e60bb517-60ce-4f2d-a3dc-caeb85b3543b",
+          "c3da9366-3b8d-43c2-ba53-779fbb400e21"
+        ],
+        "userKeepIds": [
+          "8e0a5c02-b9c4-45f6-8932-b40a8edfb84e",
+          "96f24e50-28ba-420d-a400-63911efe20d4"
+        ],
+        "userCullIds": [
+          "509fcbbd-fb89-481d-b0f1-506ff6ae4d1a",
+          "a52c037f-b8ba-447e-bab3-1337aa60021a",
+          "ba59834c-3159-4da3-a3a5-8eb0af6c3d3e",
+          "e60bb517-60ce-4f2d-a3dc-caeb85b3543b",
+          "c3da9366-3b8d-43c2-ba53-779fbb400e21"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            0,
+            4
+          ],
+          "ranking": [
+            0,
+            4,
+            2,
+            1,
+            3,
+            5
+          ],
+          "reason": "Image 0 is the best posed portrait with a great expression from the father. Image 4 is the best candid shot, capturing a sweet, genuine moment of interaction between the father and his children.",
+          "elapsed": 337.364,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 14431,
+          "tokensOut": 478
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            2,
+            4,
+            1,
+            3,
+            5,
+            6
+          ],
+          "reason": "Image 0 is the sharpest and has the best composition, with all three subjects looking towards the camera with clear expressions.",
+          "elapsed": 770.381,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 2102,
+          "tokensOut": 69
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            4
+          ],
+          "ranking": [
+            4
+          ],
+          "reason": "Image 4 is the sharpest and has the best overall composition, capturing the family moment clearly. The other images are very similar, but 4 maintains the best focus and framing.",
+          "elapsed": 337.24,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 2102,
+          "tokensOut": 54
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0,
+            6
+          ],
+          "ranking": [
+            0,
+            6,
+            2,
+            4,
+            1,
+            3,
+            5
+          ],
+          "reason": "Image 0 is the best portrait of the group with clear faces. Image 6 captures a sweet interaction where the father is pointing at something for the children, providing a different, meaningful moment.",
+          "elapsed": 5.122,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 7663,
+          "tokensOut": 85
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2025-11-10-d18139ccf2e5",
+        "subgroupId": "g1",
+        "type": "near_duplicate",
+        "assetIds": [
+          "70b81379-4786-42b0-b758-bf19c9808564",
+          "b745d483-e928-4850-8f17-83d73102f4d6",
+          "a5a68381-d5a8-4a98-baf0-ecf1f33c7083",
+          "0bf9792a-63af-4e8c-a7f8-447c81c67b3f",
+          "d76a7efa-da4a-48de-b599-3722555d86c0",
+          "00c5ba7b-538f-401e-8ab6-5ea1e2f6464d",
+          "29abd399-1b1b-4b0a-b321-ae75d18fa0a4",
+          "54012e1d-5673-406a-b24e-d1474d176d68"
+        ],
+        "filenames": [
+          "20251110_083132.jpg",
+          "20251110_083135.jpg",
+          "20251110_083139.jpg",
+          "20251110_083140.jpg",
+          "20251110_083140(0).jpg",
+          "20251110_083141.jpg",
+          "20251110_083141(0).jpg",
+          "20251110_083141(1).jpg"
+        ],
+        "llmKeepIds": [
+          "70b81379-4786-42b0-b758-bf19c9808564"
+        ],
+        "llmRanking": [
+          "70b81379-4786-42b0-b758-bf19c9808564",
+          "b745d483-e928-4850-8f17-83d73102f4d6",
+          "a5a68381-d5a8-4a98-baf0-ecf1f33c7083",
+          "0bf9792a-63af-4e8c-a7f8-447c81c67b3f",
+          "d76a7efa-da4a-48de-b599-3722555d86c0",
+          "00c5ba7b-538f-401e-8ab6-5ea1e2f6464d",
+          "29abd399-1b1b-4b0a-b321-ae75d18fa0a4",
+          "54012e1d-5673-406a-b24e-d1474d176d68"
+        ],
+        "userKeepIds": [
+          "70b81379-4786-42b0-b758-bf19c9808564",
+          "00c5ba7b-538f-401e-8ab6-5ea1e2f6464d"
+        ],
+        "userCullIds": [
+          "b745d483-e928-4850-8f17-83d73102f4d6",
+          "a5a68381-d5a8-4a98-baf0-ecf1f33c7083",
+          "0bf9792a-63af-4e8c-a7f8-447c81c67b3f",
+          "d76a7efa-da4a-48de-b599-3722555d86c0",
+          "29abd399-1b1b-4b0a-b321-ae75d18fa0a4"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            2,
+            3,
+            4,
+            5,
+            6,
+            1,
+            7
+          ],
+          "reason": "Image 0 is the best because it is the only one with a complete, well-composed shot that includes the chandelier and all the wall art, providing full context. The family is posed and looking at the camera, capturing a clear family portrait moment. The other images are either blurry, show the child making a face, or are cropped too tightly.",
+          "elapsed": 99.659,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 16465,
+          "tokensOut": 110
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0,
+            1
+          ],
+          "ranking": [
+            0,
+            1,
+            5,
+            6,
+            2,
+            3,
+            4,
+            7
+          ],
+          "reason": "Image 0 is the best overall composition and the only one with everyone looking relatively towards the camera. Image 1 is a great alternative as it captures a sweet moment between the father and baby, though the mother's expression is more neutral.",
+          "elapsed": 661.589,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 2374,
+          "tokensOut": 90
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            4
+          ],
+          "ranking": [
+            4,
+            2,
+            6,
+            0,
+            1,
+            3,
+            5,
+            7
+          ],
+          "reason": "Image 4 captures the best combination of clear focus, genuine smiles, and good composition. The whole family looks engaged and happy.",
+          "elapsed": 110.809,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 2374,
+          "tokensOut": 64
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "reason": "Image 0 is the only frame where everyone is looking at the camera with clear, pleasant expressions. The other frames feature motion blur on the child, closed eyes, or awkward mid-speech expressions.",
+          "elapsed": 2.518,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 8732,
+          "tokensOut": 86
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2026-01-01-4e7da09b7e60",
+        "subgroupId": "g3",
+        "type": "burst",
+        "assetIds": [
+          "a3fb077d-2eba-47dd-b20f-b4b1caf9e850",
+          "fb3590fc-2a32-4d6b-b6b4-ebd2e4111c1e",
+          "8d3e1c21-99db-4312-a077-baa86abbec87",
+          "3dba2310-2f0c-46cc-aea8-95989d9bb114",
+          "2882c2bc-a95c-4aba-a01f-4d49c8e1bd8e",
+          "3d75e31f-4806-43fe-b7ed-994da37508ac",
+          "da3af258-1bf3-4bd3-a8b7-12b7a9284e99",
+          "17e27336-c686-4284-98e6-31453aed13d7",
+          "bf23c853-908f-40f6-bf38-2c4ab3984d0e"
+        ],
+        "filenames": [
+          "20260101_144951.jpg",
+          "20260101_144943.jpg",
+          "20260101_144938.jpg",
+          "20260101_144947.jpg",
+          "20260101_144953.jpg",
+          "20260101_144957.jpg",
+          "20260101_144959.jpg",
+          "20260101_145000.jpg",
+          "20260101_145001.jpg"
+        ],
+        "llmKeepIds": [
+          "a3fb077d-2eba-47dd-b20f-b4b1caf9e850",
+          "fb3590fc-2a32-4d6b-b6b4-ebd2e4111c1e"
+        ],
+        "llmRanking": [
+          "a3fb077d-2eba-47dd-b20f-b4b1caf9e850",
+          "fb3590fc-2a32-4d6b-b6b4-ebd2e4111c1e",
+          "8d3e1c21-99db-4312-a077-baa86abbec87",
+          "3dba2310-2f0c-46cc-aea8-95989d9bb114",
+          "2882c2bc-a95c-4aba-a01f-4d49c8e1bd8e",
+          "3d75e31f-4806-43fe-b7ed-994da37508ac",
+          "da3af258-1bf3-4bd3-a8b7-12b7a9284e99",
+          "17e27336-c686-4284-98e6-31453aed13d7",
+          "bf23c853-908f-40f6-bf38-2c4ab3984d0e"
+        ],
+        "userKeepIds": [
+          "a3fb077d-2eba-47dd-b20f-b4b1caf9e850",
+          "fb3590fc-2a32-4d6b-b6b4-ebd2e4111c1e",
+          "17e27336-c686-4284-98e6-31453aed13d7"
+        ],
+        "userCullIds": [
+          "8d3e1c21-99db-4312-a077-baa86abbec87",
+          "3dba2310-2f0c-46cc-aea8-95989d9bb114",
+          "2882c2bc-a95c-4aba-a01f-4d49c8e1bd8e",
+          "3d75e31f-4806-43fe-b7ed-994da37508ac",
+          "da3af258-1bf3-4bd3-a8b7-12b7a9284e99",
+          "bf23c853-908f-40f6-bf38-2c4ab3984d0e"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            4,
+            0,
+            5
+          ],
+          "ranking": [
+            4,
+            0,
+            5,
+            6,
+            7,
+            8,
+            1,
+            3,
+            2
+          ],
+          "reason": "Image 4 is the clear winner, capturing the perfect moment of connection as both babies reach for the toy simultaneously. Image 0 is a strong runner-up with a similar composition but slightly less synchronized action. Image 5 is kept as a third option showing the immediate follow-up action.",
+          "elapsed": 206.892,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 18499,
+          "tokensOut": 117
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0,
+            8
+          ],
+          "ranking": [
+            0,
+            8,
+            4,
+            5,
+            6,
+            7,
+            2,
+            1,
+            3
+          ],
+          "reason": "Image 0 captures a sweet moment of interaction between the two children over a toy, while Image 8 shows a distinct later stage where the child on the right is exploring the toy with their mouth, providing a variety of expressions and a clear sequence of the interaction.",
+          "elapsed": 617.601,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 2646,
+          "tokensOut": 97
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            7
+          ],
+          "ranking": [
+            7,
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            8
+          ],
+          "reason": "All photos are nearly identical, capturing the same moment of interaction. Image 7 is the sharpest and has the best, most engaged expressions from both children.",
+          "elapsed": 374.651,
+          "matchesUser": true,
+          "matchesLlm": false,
+          "tokensIn": 2646,
+          "tokensOut": 73
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0,
+            8
+          ],
+          "ranking": [
+            0,
+            8,
+            7,
+            6,
+            5,
+            4,
+            3,
+            2,
+            1
+          ],
+          "reason": "Image 0 captures the sweet, clear moment of interaction before the toy is put in the mouth. Image 8 captures the subsequent stage of the action sequence where the baby is chewing on the toy, providing a nice narrative progression.",
+          "elapsed": 8.455,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 9801,
+          "tokensOut": 98
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2026-03-15-e79b398b7825",
+        "subgroupId": "g1",
+        "type": "burst",
+        "assetIds": [
+          "813694bd-0344-4db1-9a27-6ea437586d7d",
+          "b68bc9e8-4edf-4d47-8fde-e8497055c563",
+          "4a9ad270-290e-4ab3-a1c6-0afad3d9e113",
+          "27a8230e-2d95-462a-847d-2fd3b654373a",
+          "47ff006f-cb55-4bd1-a84e-9dee6da6006d",
+          "4ca8eb9f-fe16-44d7-b062-01ba7c8a326e",
+          "c7eaecab-fcda-42c4-95d6-4eec93f3444d",
+          "d07ab15b-540e-47d3-8244-14cb0ddb4fbf",
+          "969dc8d8-41ff-40c8-bfe6-012c6e345238",
+          "969c4c7d-bec7-4e68-bfa4-2600d4774cbb",
+          "c867ca78-db90-463c-8ccb-07312db78078",
+          "cd9ec621-3368-49dc-bb5e-8610832fe6e7",
+          "037c40a6-331b-496a-8111-259f1dcab329",
+          "3712b73e-c7a9-463c-95a2-2c8e90728443"
+        ],
+        "filenames": [
+          "20260315_170542.jpg",
+          "20260315_170546.jpg",
+          "20260315_170548.jpg",
+          "20260315_170550.jpg",
+          "20260315_170558.jpg",
+          "20260315_170614.jpg",
+          "20260315_170631.jpg",
+          "20260315_170642.jpg",
+          "20260315_170645.jpg",
+          "20260315_170646.jpg",
+          "20260315_170653.jpg",
+          "20260315_170659.jpg",
+          "20260315_170725.jpg",
+          "20260315_170739.jpg"
+        ],
+        "llmKeepIds": [
+          "813694bd-0344-4db1-9a27-6ea437586d7d",
+          "969c4c7d-bec7-4e68-bfa4-2600d4774cbb",
+          "cd9ec621-3368-49dc-bb5e-8610832fe6e7",
+          "3712b73e-c7a9-463c-95a2-2c8e90728443"
+        ],
+        "llmRanking": [
+          "813694bd-0344-4db1-9a27-6ea437586d7d",
+          "b68bc9e8-4edf-4d47-8fde-e8497055c563",
+          "4a9ad270-290e-4ab3-a1c6-0afad3d9e113",
+          "27a8230e-2d95-462a-847d-2fd3b654373a",
+          "47ff006f-cb55-4bd1-a84e-9dee6da6006d",
+          "4ca8eb9f-fe16-44d7-b062-01ba7c8a326e",
+          "c7eaecab-fcda-42c4-95d6-4eec93f3444d",
+          "d07ab15b-540e-47d3-8244-14cb0ddb4fbf",
+          "969dc8d8-41ff-40c8-bfe6-012c6e345238",
+          "969c4c7d-bec7-4e68-bfa4-2600d4774cbb",
+          "c867ca78-db90-463c-8ccb-07312db78078",
+          "cd9ec621-3368-49dc-bb5e-8610832fe6e7",
+          "037c40a6-331b-496a-8111-259f1dcab329",
+          "3712b73e-c7a9-463c-95a2-2c8e90728443"
+        ],
+        "userKeepIds": [
+          "813694bd-0344-4db1-9a27-6ea437586d7d",
+          "47ff006f-cb55-4bd1-a84e-9dee6da6006d",
+          "969c4c7d-bec7-4e68-bfa4-2600d4774cbb",
+          "3712b73e-c7a9-463c-95a2-2c8e90728443"
+        ],
+        "userCullIds": [
+          "b68bc9e8-4edf-4d47-8fde-e8497055c563",
+          "4a9ad270-290e-4ab3-a1c6-0afad3d9e113",
+          "27a8230e-2d95-462a-847d-2fd3b654373a",
+          "4ca8eb9f-fe16-44d7-b062-01ba7c8a326e",
+          "c7eaecab-fcda-42c4-95d6-4eec93f3444d",
+          "d07ab15b-540e-47d3-8244-14cb0ddb4fbf",
+          "969dc8d8-41ff-40c8-bfe6-012c6e345238",
+          "c867ca78-db90-463c-8ccb-07312db78078",
+          "cd9ec621-3368-49dc-bb5e-8610832fe6e7",
+          "037c40a6-331b-496a-8111-259f1dcab329"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            8
+          ],
+          "ranking": [
+            8,
+            5,
+            1,
+            9,
+            13,
+            12,
+            7,
+            11,
+            10,
+            4,
+            3,
+            2,
+            6,
+            0
+          ],
+          "reason": "Image 8 is the best choice because it captures a clear, happy expression from the baby while showing the context of the bath time routine (drying hair). It is sharp and well-composed compared to the other options.",
+          "elapsed": 736.034,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 28674,
+          "tokensOut": 155
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            2,
+            5,
+            8,
+            13
+          ],
+          "ranking": [
+            2,
+            5,
+            8,
+            13,
+            1,
+            10,
+            9,
+            7,
+            4,
+            3,
+            12,
+            11,
+            0,
+            6
+          ],
+          "reason": "Captures a sequence of the bath time routine: the baby's curious expression while playing with toys, the baby's face during the washing process, a happy moment of the baby looking up, and a final portrait of the older child.",
+          "elapsed": 668.684,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 4011,
+          "tokensOut": 128
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            12
+          ],
+          "ranking": [
+            12
+          ],
+          "reason": "Image 12 captures the child with the most engaged and natural expression, making it the best single memory shot. The other images are either too blurry, too similar, or show less distinct moments.",
+          "elapsed": 216.553,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 4011,
+          "tokensOut": 59
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [],
+          "ranking": [],
+          "reason": "PARSE ERROR: ",
+          "elapsed": 3.94,
+          "matchesUser": null,
+          "matchesLlm": false,
+          "tokensIn": 0,
+          "tokensOut": 0
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2025-05-17-346e6c34065b",
+        "subgroupId": "g3",
+        "type": "burst",
+        "assetIds": [
+          "4731eb9b-d1a3-4e36-a8b1-d8d9dabd6bb3",
+          "5b32c5ae-8aa4-45a1-8b5c-896cfafdecb8",
+          "04cce8fc-a09f-4808-a61d-cb8dc75b82ab"
+        ],
+        "filenames": [
+          "20250517_145616.jpg",
+          "20250517_145616(2).jpg",
+          "20250517_145616(1).jpg"
+        ],
+        "llmKeepIds": [
+          "4731eb9b-d1a3-4e36-a8b1-d8d9dabd6bb3",
+          "5b32c5ae-8aa4-45a1-8b5c-896cfafdecb8"
+        ],
+        "llmRanking": [
+          "4731eb9b-d1a3-4e36-a8b1-d8d9dabd6bb3",
+          "5b32c5ae-8aa4-45a1-8b5c-896cfafdecb8",
+          "04cce8fc-a09f-4808-a61d-cb8dc75b82ab"
+        ],
+        "userKeepIds": [
+          "4731eb9b-d1a3-4e36-a8b1-d8d9dabd6bb3",
+          "5b32c5ae-8aa4-45a1-8b5c-896cfafdecb8",
+          "04cce8fc-a09f-4808-a61d-cb8dc75b82ab"
+        ],
+        "userCullIds": []
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            1,
+            2
+          ],
+          "reason": "Image 0 captures the peak action moment of the jump with excellent sharpness and a humorous narrative element (the 'No Diving' sign). Image 1 is a clear follow-up shot of him exiting the water, and Image 3 shows him swimming, but Image 0 is the most dynamic and memorable frame of the sequence.",
+          "elapsed": 156.856,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 6331,
+          "tokensOut": 104
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0,
+            1,
+            2
+          ],
+          "ranking": [
+            0,
+            1,
+            2
+          ],
+          "reason": "This is an action sequence showing a man jumping in (ironically ignoring a 'No Diving' sign), climbing out, and swimming. Each frame captures a distinct stage of the activity.",
+          "elapsed": 235.18,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1008,
+          "tokensOut": 66
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            2
+          ],
+          "ranking": [
+            2,
+            0,
+            1
+          ],
+          "reason": "Image 2 captures the clearest moment with the best expression and composition, while Image 0 is slightly blurry and Image 1 is a bit more awkward.",
+          "elapsed": 225.656,
+          "matchesUser": true,
+          "matchesLlm": false,
+          "tokensIn": 1008,
+          "tokensOut": 54
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0,
+            1,
+            2
+          ],
+          "ranking": [
+            0,
+            2,
+            1
+          ],
+          "reason": "These are three distinct stages of a swimming activity: jumping in, swimming, and exiting the water.",
+          "elapsed": 2.727,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 3495,
+          "tokensOut": 57
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2025-06-01-6df53df88ee8",
+        "subgroupId": "g4",
+        "type": "burst",
+        "assetIds": [
+          "bc13b2a1-c334-4de2-a1ad-f327ac3705ea",
+          "277d45a9-065c-4162-89fe-6c9efc44635b",
+          "78acc17b-ecf0-4f15-a51a-aaa9cb048a0d",
+          "16730ded-3d93-4108-8589-ba6ece7adbd8"
+        ],
+        "filenames": [
+          "20250601_140755.jpg",
+          "20250601_140755(1).jpg",
+          "20250601_140754.jpg",
+          "20250601_140756.jpg"
+        ],
+        "llmKeepIds": [
+          "bc13b2a1-c334-4de2-a1ad-f327ac3705ea",
+          "277d45a9-065c-4162-89fe-6c9efc44635b"
+        ],
+        "llmRanking": [
+          "bc13b2a1-c334-4de2-a1ad-f327ac3705ea",
+          "277d45a9-065c-4162-89fe-6c9efc44635b",
+          "78acc17b-ecf0-4f15-a51a-aaa9cb048a0d",
+          "16730ded-3d93-4108-8589-ba6ece7adbd8"
+        ],
+        "userKeepIds": [
+          "bc13b2a1-c334-4de2-a1ad-f327ac3705ea"
+        ],
+        "userCullIds": [
+          "277d45a9-065c-4162-89fe-6c9efc44635b",
+          "78acc17b-ecf0-4f15-a51a-aaa9cb048a0d",
+          "16730ded-3d93-4108-8589-ba6ece7adbd8"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            1,
+            0
+          ],
+          "ranking": [
+            1,
+            0,
+            3,
+            2
+          ],
+          "reason": "Image 1 is the best for its tight, dynamic framing of the child's joyful run. Image 0 is the second best as it captures a lovely family moment with both the child and mother in focus.",
+          "elapsed": 79.672,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 8311,
+          "tokensOut": 336
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            3,
+            1,
+            2
+          ],
+          "reason": "Image 0 has the best balance of sharpness and the most natural expression on the child's face, with the adult in the background providing a complete family context. Image 1 is a tighter crop, and Images 2 and 3 have slightly less ideal expressions or timing of the movement.",
+          "elapsed": 455.9,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1284,
+          "tokensOut": 94
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            2
+          ],
+          "ranking": [
+            2
+          ],
+          "reason": "Image 2 captures the best moment with the child running and the adults walking, all in sharp focus and good composition. The other images are too similar or slightly less focused.",
+          "elapsed": 83.955,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 1284,
+          "tokensOut": 52
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "reason": "Image 0 captures the best expression and action, with the child looking directly at the camera with a joyful smile. The other frames show the child looking away or with less engaging expressions.",
+          "elapsed": 3.331,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 4470,
+          "tokensOut": 71
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2026-04-02-593563f6ea4b",
+        "subgroupId": "g8",
+        "type": "burst",
+        "assetIds": [
+          "521fed10-aad0-4db0-9872-f39cda5810a2",
+          "bafa474c-9a97-4889-a4b3-436fc04e410f",
+          "7c8823d3-8ce2-4f3f-9dc7-74fdb7f618d9",
+          "09a3d02e-3ad2-4e75-8f70-74a807a99a23",
+          "b3eb0807-d656-4b98-87fc-e127a3c65aa3"
+        ],
+        "filenames": [
+          "20260402_141240.jpg",
+          "20260402_141307.jpg",
+          "20260402_141248.jpg",
+          "20260402_141253.jpg",
+          "20260402_141335.jpg"
+        ],
+        "llmKeepIds": [
+          "521fed10-aad0-4db0-9872-f39cda5810a2"
+        ],
+        "llmRanking": [
+          "521fed10-aad0-4db0-9872-f39cda5810a2",
+          "bafa474c-9a97-4889-a4b3-436fc04e410f",
+          "7c8823d3-8ce2-4f3f-9dc7-74fdb7f618d9",
+          "09a3d02e-3ad2-4e75-8f70-74a807a99a23",
+          "b3eb0807-d656-4b98-87fc-e127a3c65aa3"
+        ],
+        "userKeepIds": [
+          "521fed10-aad0-4db0-9872-f39cda5810a2",
+          "b3eb0807-d656-4b98-87fc-e127a3c65aa3"
+        ],
+        "userCullIds": [
+          "bafa474c-9a97-4889-a4b3-436fc04e410f",
+          "7c8823d3-8ce2-4f3f-9dc7-74fdb7f618d9",
+          "09a3d02e-3ad2-4e75-8f70-74a807a99a23"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            2
+          ],
+          "ranking": [
+            2,
+            0,
+            4,
+            3,
+            1
+          ],
+          "reason": "Image 2 is the best overall shot. It captures the entire group in a well-composed frame, showing the interaction between the adults and children in the sandbox. The lighting is bright and clear, and the background with the red house and hills provides good context. Image 0 is a strong runner-up but is slightly tighter and less complete. Image 4 is a great close-up of the children's expressions but lacks the group context of the others.",
+          "elapsed": 64.738,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 10363,
+          "tokensOut": 134
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            2,
+            3,
+            1,
+            4
+          ],
+          "reason": "Image 0 is the most complete family shot, capturing all members (including the mother in the background) and the interaction between the father and children in the sandbox. It has the good composition and clear focus.",
+          "elapsed": 565.842,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1558,
+          "tokensOut": 71
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            4
+          ],
+          "ranking": [
+            4,
+            2,
+            1,
+            3,
+            0
+          ],
+          "reason": "Image 4 captures the entire group in a clear, well-composed moment with everyone engaged in the activity. The focus is sharp, and the expressions are natural.",
+          "elapsed": 80.478,
+          "matchesUser": true,
+          "matchesLlm": false,
+          "tokensIn": 1558,
+          "tokensOut": 62
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0,
+            4
+          ],
+          "ranking": [
+            0,
+            4,
+            2,
+            3,
+            1
+          ],
+          "reason": "Image 0 captures the whole family group in a clear, well-composed moment. Image 4 provides a nice close-up interaction between the children, offering a different perspective.",
+          "elapsed": 4.322,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 5525,
+          "tokensOut": 76
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2006-12-31-aa403e41ba29",
+        "subgroupId": "g1",
+        "type": "burst",
+        "assetIds": [
+          "3d17ffee-b7e6-4443-8957-be671ea05599",
+          "acde34fb-b3ad-4b61-bd36-8dd2dd043c36",
+          "f69ddfe8-7209-4694-a270-45fa083fa5cb",
+          "992053a5-d262-4c41-a9a5-b66ced118f04",
+          "d2ded32b-9cf7-4aea-b3ce-3458181813ca",
+          "e5b66dd7-d296-49b2-a8fd-aeded27868a1"
+        ],
+        "filenames": [
+          "DSC_9839.JPG",
+          "DSC_9838.JPG",
+          "DSC_9842.JPG",
+          "DSC_9837.JPG",
+          "DSC_9841.JPG",
+          "DSC_9843.JPG"
+        ],
+        "llmKeepIds": [
+          "3d17ffee-b7e6-4443-8957-be671ea05599",
+          "acde34fb-b3ad-4b61-bd36-8dd2dd043c36"
+        ],
+        "llmRanking": [
+          "3d17ffee-b7e6-4443-8957-be671ea05599",
+          "acde34fb-b3ad-4b61-bd36-8dd2dd043c36",
+          "f69ddfe8-7209-4694-a270-45fa083fa5cb",
+          "992053a5-d262-4c41-a9a5-b66ced118f04",
+          "d2ded32b-9cf7-4aea-b3ce-3458181813ca",
+          "e5b66dd7-d296-49b2-a8fd-aeded27868a1"
+        ],
+        "userKeepIds": [
+          "3d17ffee-b7e6-4443-8957-be671ea05599",
+          "f69ddfe8-7209-4694-a270-45fa083fa5cb"
+        ],
+        "userCullIds": [
+          "acde34fb-b3ad-4b61-bd36-8dd2dd043c36"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            5,
+            2,
+            1,
+            4,
+            3
+          ],
+          "reason": "Image 0 is the best choice because it captures a genuine, joyful expression with the subject looking directly at the camera. While there is motion blur from the skirt, the face is clear and the moment is lively. Image 5 is a close runner-up for its beautiful lighting and smile, but the heavy flare obscures details. Image 2 is a good portrait but has a more neutral expression.",
+          "elapsed": 70.197,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 12109,
+          "tokensOut": 126
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            2,
+            3,
+            1,
+            4,
+            5
+          ],
+          "reason": "Image 0 has the best combination of sharpness, a genuine happy expression, and composition. Other images are either blurry, have closed/looking-away eyes, or are too tightly cropped.",
+          "elapsed": 429.108,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1794,
+          "tokensOut": 70
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            1
+          ],
+          "ranking": [
+            1,
+            3,
+            0,
+            2,
+            4,
+            5
+          ],
+          "reason": "Image 1 captures the best combination of clear focus, genuine smile, and good composition. The other images are either too blurry, show less expressive moments, or have poorer lighting/composition.",
+          "elapsed": 93.415,
+          "matchesUser": false,
+          "matchesLlm": true,
+          "tokensIn": 1794,
+          "tokensOut": 70
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0,
+            2
+          ],
+          "ranking": [
+            0,
+            2,
+            3,
+            4,
+            1,
+            5
+          ],
+          "reason": "Image 0 captures a genuine, joyful laugh. Image 2 is the sharpest portrait-style shot with a clear, pleasant expression. The others are either blurry, poorly composed, or show awkward mid-motion expressions.",
+          "elapsed": 4.39,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 6852,
+          "tokensOut": 88
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2026-01-10-9ed58f5447f0",
+        "subgroupId": "g4",
+        "type": "burst",
+        "assetIds": [
+          "3d3b5a6e-967c-4aa2-8a66-0d52796bb28f",
+          "b6fb1ecb-0e2a-4b73-b967-18a1509b132c",
+          "12c33311-ef10-4030-ad7f-17ca480f8c04",
+          "83f83ae1-30a4-497b-a637-44525652b377",
+          "8f28775e-9427-4d17-9df5-598183797960",
+          "7f4c0115-84d4-46ee-8535-c0a40867ddf3",
+          "6f15daea-a3f2-495c-9cbf-5faa64fba1c0"
+        ],
+        "filenames": [
+          "20260110_134903.jpg",
+          "20260110_134925.jpg",
+          "20260110_134914.jpg",
+          "20260110_134920.jpg",
+          "20260110_134928.jpg",
+          "20260110_134935.jpg",
+          "20260110_134942.jpg"
+        ],
+        "llmKeepIds": [
+          "3d3b5a6e-967c-4aa2-8a66-0d52796bb28f",
+          "b6fb1ecb-0e2a-4b73-b967-18a1509b132c"
+        ],
+        "llmRanking": [
+          "3d3b5a6e-967c-4aa2-8a66-0d52796bb28f",
+          "b6fb1ecb-0e2a-4b73-b967-18a1509b132c",
+          "12c33311-ef10-4030-ad7f-17ca480f8c04",
+          "83f83ae1-30a4-497b-a637-44525652b377",
+          "8f28775e-9427-4d17-9df5-598183797960",
+          "7f4c0115-84d4-46ee-8535-c0a40867ddf3",
+          "6f15daea-a3f2-495c-9cbf-5faa64fba1c0"
+        ],
+        "userKeepIds": [
+          "3d3b5a6e-967c-4aa2-8a66-0d52796bb28f",
+          "b6fb1ecb-0e2a-4b73-b967-18a1509b132c",
+          "6f15daea-a3f2-495c-9cbf-5faa64fba1c0"
+        ],
+        "userCullIds": [
+          "12c33311-ef10-4030-ad7f-17ca480f8c04",
+          "83f83ae1-30a4-497b-a637-44525652b377",
+          "8f28775e-9427-4d17-9df5-598183797960",
+          "7f4c0115-84d4-46ee-8535-c0a40867ddf3"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            0,
+            6
+          ],
+          "ranking": [
+            0,
+            6,
+            2,
+            5,
+            4,
+            1,
+            3
+          ],
+          "reason": "These two frames are the best because they are tight close-ups that capture the most engaging and expressive moments. Image 0 has a perfectly sharp focus on the baby's face with a charming expression, while Image 6 captures a joyful, candid smile from the father. The other frames are wider shots that include a second child and a sled, which, while part of the scene, distract from the primary subjects and reduce the overall impact of the portrait.",
+          "elapsed": 81.719,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 14403,
+          "tokensOut": 128
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            4
+          ],
+          "ranking": [
+            4,
+            0,
+            6,
+            1,
+            5,
+            3,
+            2
+          ],
+          "reason": "",
+          "elapsed": 456.702,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 2144,
+          "tokensOut": 159
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            5
+          ],
+          "ranking": [
+            5,
+            2,
+            4,
+            1,
+            3,
+            0,
+            6
+          ],
+          "reason": "Image 5 is the clearest and most composed shot, capturing the best expressions and moments for both subjects. The others are either too blurry, have poor composition, or are nearly identical.",
+          "elapsed": 101.429,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 2144,
+          "tokensOut": 72
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            1,
+            5
+          ],
+          "ranking": [
+            1,
+            5,
+            3,
+            4,
+            2,
+            0,
+            6
+          ],
+          "reason": "Image 1 captures the full scene with the older child in the frame, while Image 5 provides a slightly better angle of the older child's expression. The others are either redundant or have less ideal framing.",
+          "elapsed": 3.565,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 7831,
+          "tokensOut": 89
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2025-10-25-88408d7b0da0",
+        "subgroupId": "g1",
+        "type": "near_duplicate",
+        "assetIds": [
+          "85dfbeb2-af21-4e5b-bac4-80fa2168f3c5",
+          "0443c537-d3dd-4ce7-8df8-e2d57aa676d0",
+          "f47103c5-481a-4073-a9bc-87898fccab92",
+          "63508e07-9396-4a53-b00e-c3c9e73159f0",
+          "c7da4a5a-bded-42c5-88cc-c194548893cc",
+          "d90c8555-1ddc-46e2-a868-627768f3e1ce",
+          "7b2379ee-a94d-470b-a658-7baefd86a5af",
+          "b49cb70d-e752-4fc9-a086-229a050e39ae"
+        ],
+        "filenames": [
+          "20251025_094543.jpg",
+          "20251025_094547.jpg",
+          "20251025_094554.jpg",
+          "20251025_094555.jpg",
+          "20251025_094601.jpg",
+          "20251025_094604.jpg",
+          "20251025_094605.jpg",
+          "20251025_094612.jpg"
+        ],
+        "llmKeepIds": [
+          "85dfbeb2-af21-4e5b-bac4-80fa2168f3c5",
+          "0443c537-d3dd-4ce7-8df8-e2d57aa676d0",
+          "63508e07-9396-4a53-b00e-c3c9e73159f0",
+          "d90c8555-1ddc-46e2-a868-627768f3e1ce"
+        ],
+        "llmRanking": [
+          "85dfbeb2-af21-4e5b-bac4-80fa2168f3c5",
+          "0443c537-d3dd-4ce7-8df8-e2d57aa676d0",
+          "f47103c5-481a-4073-a9bc-87898fccab92",
+          "63508e07-9396-4a53-b00e-c3c9e73159f0",
+          "c7da4a5a-bded-42c5-88cc-c194548893cc",
+          "d90c8555-1ddc-46e2-a868-627768f3e1ce",
+          "7b2379ee-a94d-470b-a658-7baefd86a5af",
+          "b49cb70d-e752-4fc9-a086-229a050e39ae"
+        ],
+        "userKeepIds": [
+          "0443c537-d3dd-4ce7-8df8-e2d57aa676d0",
+          "63508e07-9396-4a53-b00e-c3c9e73159f0",
+          "d90c8555-1ddc-46e2-a868-627768f3e1ce",
+          "b49cb70d-e752-4fc9-a086-229a050e39ae"
+        ],
+        "userCullIds": [
+          "85dfbeb2-af21-4e5b-bac4-80fa2168f3c5",
+          "f47103c5-481a-4073-a9bc-87898fccab92",
+          "c7da4a5a-bded-42c5-88cc-c194548893cc",
+          "7b2379ee-a94d-470b-a658-7baefd86a5af"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            5,
+            6,
+            3
+          ],
+          "ranking": [
+            5,
+            6,
+            3,
+            4,
+            7,
+            2,
+            1,
+            0
+          ],
+          "reason": "The burst captures a clear progression of moments. Images 5 and 6 are the best as they show both children looking at the camera with happy, engaged expressions. Image 3 is a strong third choice, capturing a sweet, tender moment of the older sister kissing the baby's head.",
+          "elapsed": 87.035,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 16465,
+          "tokensOut": 116
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            5,
+            4
+          ],
+          "ranking": [
+            5,
+            4,
+            6,
+            3,
+            0,
+            7,
+            2,
+            1
+          ],
+          "reason": "Image 5 is the strongest overall with both children looking at the camera with a sweet expression from the older child. Image 4 is a great alternative as it captures a more candid, curious expression from the baby.",
+          "elapsed": 620.723,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 2374,
+          "tokensOut": 93
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            4
+          ],
+          "ranking": [
+            4,
+            3,
+            2,
+            1,
+            0
+          ],
+          "reason": "Image 4 captures the best combination of sharpness, clear expressions (especially the older child's smile), and a sweet, engaged moment. The subsequent images are either slightly less focused or capture less distinct expressions.",
+          "elapsed": 84.885,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 2374,
+          "tokensOut": 71
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            4,
+            7
+          ],
+          "ranking": [
+            4,
+            7,
+            6,
+            5,
+            3,
+            0,
+            1,
+            2
+          ],
+          "reason": "Image 4 is the sharpest and most composed shot where both children are looking at the camera. Image 7 captures a sweet, candid moment of laughter that is distinct from the posed shots.",
+          "elapsed": 4.499,
+          "matchesUser": true,
+          "matchesLlm": false,
+          "tokensIn": 8732,
+          "tokensOut": 104
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2025-05-10-d5606fbaabc7",
+        "subgroupId": "g1",
+        "type": "burst",
+        "assetIds": [
+          "b52417ce-b3d0-4cdb-aa30-44924941ed10",
+          "3e891200-6348-478a-ab70-ac9a16f5a636",
+          "1bb7c468-3fd1-4786-b543-87f269492f25"
+        ],
+        "filenames": [
+          "20250510_151137.jpg",
+          "20250510_151135.jpg",
+          "20250510_151142.jpg"
+        ],
+        "llmKeepIds": [
+          "b52417ce-b3d0-4cdb-aa30-44924941ed10"
+        ],
+        "llmRanking": [
+          "b52417ce-b3d0-4cdb-aa30-44924941ed10",
+          "3e891200-6348-478a-ab70-ac9a16f5a636",
+          "1bb7c468-3fd1-4786-b543-87f269492f25"
+        ],
+        "userKeepIds": [
+          "b52417ce-b3d0-4cdb-aa30-44924941ed10"
+        ],
+        "userCullIds": [
+          "3e891200-6348-478a-ab70-ac9a16f5a636",
+          "1bb7c468-3fd1-4786-b543-87f269492f25"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            1,
+            2
+          ],
+          "reason": "Image 0 is the best because the father is looking directly at the camera with a warm, engaging smile, creating a classic family portrait moment. The children are also looking towards the camera, making it a cohesive group shot. Image 1 is a tender moment but the father's eyes are closed, which is less ideal for a photo. Image 3 has the baby on the left making a scrunched-up face, which is less flattering than the calm expression in Image 0.",
+          "elapsed": 175.271,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 6295,
+          "tokensOut": 135
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            2,
+            1
+          ],
+          "reason": "Image 0 has the best overall expressions: the father is smiling at the camera, and the baby is looking forward with a clear face. In Image 1, the father is looking down, and in Image 2, the baby has their hand over their mouth.",
+          "elapsed": 295.087,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1014,
+          "tokensOut": 77
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            1
+          ],
+          "ranking": [
+            1,
+            0,
+            2
+          ],
+          "reason": "Image 1 is the sharpest and has the best overall composition, capturing the family moment clearly. Image 0 is slightly softer, and Image 2 is too cropped and less focused on the faces.",
+          "elapsed": 373.966,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 1014,
+          "tokensOut": 64
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            1,
+            2
+          ],
+          "reason": "Image 0 is the only frame where everyone is looking toward the camera or engaged in a clear, pleasant portrait pose, making it the strongest family memory.",
+          "elapsed": 2.494,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 3387,
+          "tokensOut": 62
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2025-05-17-346e6c34065b",
+        "subgroupId": "g1",
+        "type": "burst",
+        "assetIds": [
+          "e6eb0fa1-523e-42b3-992f-a1084e409744",
+          "843f396b-bff7-46d0-bd3b-d3b79aef473d",
+          "d14dc01a-ecc4-41b4-a745-a1c52aed7363",
+          "39a6e4f6-4a80-45cc-bdec-d6c2792975fb"
+        ],
+        "filenames": [
+          "20250517_133031.jpg",
+          "20250517_133026.jpg",
+          "20250517_133032(1).jpg",
+          "20250517_133032.jpg"
+        ],
+        "llmKeepIds": [
+          "e6eb0fa1-523e-42b3-992f-a1084e409744",
+          "843f396b-bff7-46d0-bd3b-d3b79aef473d"
+        ],
+        "llmRanking": [
+          "e6eb0fa1-523e-42b3-992f-a1084e409744",
+          "843f396b-bff7-46d0-bd3b-d3b79aef473d",
+          "d14dc01a-ecc4-41b4-a745-a1c52aed7363",
+          "39a6e4f6-4a80-45cc-bdec-d6c2792975fb"
+        ],
+        "userKeepIds": [
+          "e6eb0fa1-523e-42b3-992f-a1084e409744",
+          "843f396b-bff7-46d0-bd3b-d3b79aef473d"
+        ],
+        "userCullIds": [
+          "d14dc01a-ecc4-41b4-a745-a1c52aed7363",
+          "39a6e4f6-4a80-45cc-bdec-d6c2792975fb"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            0,
+            1
+          ],
+          "ranking": [
+            0,
+            1,
+            3,
+            2
+          ],
+          "reason": "Image 0 is the best portrait with a clear, happy expression and good focus. Image 1 is a great candid shot capturing the action of eating the ice cream. Images 2 and 3 are very similar to Image 0 but slightly less sharp or engaging.",
+          "elapsed": 254.717,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 8302,
+          "tokensOut": 83
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0,
+            1
+          ],
+          "ranking": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "reason": "Image 0 captures a cute, direct gaze with a messy face, and Image 1 shows a candid moment of her eating the ice cream. Images 2 and 3 are nearly identical and the ice cream blocks her face.",
+          "elapsed": 239.584,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1270,
+          "tokensOut": 75
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            2
+          ],
+          "ranking": [
+            2,
+            0,
+            1,
+            3
+          ],
+          "reason": "Image 2 captures the best combination of focus, clear expression, and good composition. The girl is looking directly at the camera, making it the most engaging and memorable shot.",
+          "elapsed": 321.239,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 1270,
+          "tokensOut": 61
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0,
+            1
+          ],
+          "ranking": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "reason": "Image 0 captures a clear, charming portrait with the ice cream mess on her nose. Image 1 captures a candid, playful moment of her licking the ice cream, providing a nice variety.",
+          "elapsed": 3.268,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 4463,
+          "tokensOut": 76
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2026-03-31-410cc3bce89e",
+        "subgroupId": "g3",
+        "type": "burst",
+        "assetIds": [
+          "ad9000e6-06d8-4e12-ab88-2f8567e1ab9c",
+          "0ff3e293-3f4b-49ed-adeb-6f582c555087",
+          "a447e148-83fd-4f31-9eaf-9106d69c1ac9",
+          "aa8d965d-b9d1-4cec-ae79-be3f1a5da47d",
+          "d74b2823-c496-4cf5-aadb-7dda5621786f"
+        ],
+        "filenames": [
+          "20260331_084542.jpg",
+          "20260331_084532.jpg",
+          "20260331_084536.jpg",
+          "20260331_084538.jpg",
+          "20260331_084540.jpg"
+        ],
+        "llmKeepIds": [
+          "ad9000e6-06d8-4e12-ab88-2f8567e1ab9c"
+        ],
+        "llmRanking": [
+          "ad9000e6-06d8-4e12-ab88-2f8567e1ab9c",
+          "0ff3e293-3f4b-49ed-adeb-6f582c555087",
+          "a447e148-83fd-4f31-9eaf-9106d69c1ac9",
+          "aa8d965d-b9d1-4cec-ae79-be3f1a5da47d",
+          "d74b2823-c496-4cf5-aadb-7dda5621786f"
+        ],
+        "userKeepIds": [
+          "ad9000e6-06d8-4e12-ab88-2f8567e1ab9c"
+        ],
+        "userCullIds": [
+          "0ff3e293-3f4b-49ed-adeb-6f582c555087",
+          "a447e148-83fd-4f31-9eaf-9106d69c1ac9",
+          "aa8d965d-b9d1-4cec-ae79-be3f1a5da47d",
+          "d74b2823-c496-4cf5-aadb-7dda5621786f"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            4,
+            3,
+            2,
+            1
+          ],
+          "reason": "Image 0 captures the best expression with a genuine, joyful smile that makes for a wonderful family memory. It is also very sharp and well-composed.",
+          "elapsed": 69.985,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 10363,
+          "tokensOut": 74
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            4,
+            2,
+            3,
+            1
+          ],
+          "reason": "Image 0 has the best expression (a happy smile) and is sharp, making it the most heartwarming family memory.",
+          "elapsed": 492.809,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1558,
+          "tokensOut": 53
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0
+          ],
+          "reason": "All photos are very similar, but Image 0 has the best combination of focus, expression, and composition, capturing a clear, engaged moment.",
+          "elapsed": 77.846,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1558,
+          "tokensOut": 46
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            4,
+            2,
+            3,
+            1
+          ],
+          "reason": "Image 0 is the only frame with a genuine, happy smile. The others show the child with a neutral or slightly confused expression.",
+          "elapsed": 2.682,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 5525,
+          "tokensOut": 64
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2026-03-31-410cc3bce89e",
+        "subgroupId": "g2",
+        "type": "burst",
+        "assetIds": [
+          "b4a468c9-a688-4e53-b4b0-b5f6dc70a136",
+          "bcf0840e-3db4-4079-885b-03394afb91dc",
+          "f1be88f0-61da-4422-91c5-b2855e40cab3",
+          "fc719424-678f-4437-96f9-91096eb7d198",
+          "65a10c85-0c8e-4a39-9d91-2f85b3e0f63d",
+          "cfeb2174-6b83-4e11-8c02-3675ea4e87af"
+        ],
+        "filenames": [
+          "20260331_083254.jpg",
+          "20260331_083230.jpg",
+          "20260331_083233.jpg",
+          "20260331_083234.jpg",
+          "20260331_083236.jpg",
+          "20260331_083253.jpg"
+        ],
+        "llmKeepIds": [
+          "b4a468c9-a688-4e53-b4b0-b5f6dc70a136",
+          "bcf0840e-3db4-4079-885b-03394afb91dc"
+        ],
+        "llmRanking": [
+          "b4a468c9-a688-4e53-b4b0-b5f6dc70a136",
+          "bcf0840e-3db4-4079-885b-03394afb91dc",
+          "f1be88f0-61da-4422-91c5-b2855e40cab3",
+          "fc719424-678f-4437-96f9-91096eb7d198",
+          "65a10c85-0c8e-4a39-9d91-2f85b3e0f63d",
+          "cfeb2174-6b83-4e11-8c02-3675ea4e87af"
+        ],
+        "userKeepIds": [
+          "b4a468c9-a688-4e53-b4b0-b5f6dc70a136",
+          "bcf0840e-3db4-4079-885b-03394afb91dc"
+        ],
+        "userCullIds": [
+          "f1be88f0-61da-4422-91c5-b2855e40cab3",
+          "fc719424-678f-4437-96f9-91096eb7d198",
+          "65a10c85-0c8e-4a39-9d91-2f85b3e0f63d",
+          "cfeb2174-6b83-4e11-8c02-3675ea4e87af"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            5,
+            4,
+            1,
+            3,
+            2
+          ],
+          "reason": "Image 0 is the best because it is a clear, sharp selfie that captures the father's happy expression and includes both children in the frame. The other images are either blurry, have a finger obstructing the lens, or fail to capture the father's face.",
+          "elapsed": 68.077,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 12389,
+          "tokensOut": 99
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0,
+            1
+          ],
+          "ranking": [
+            0,
+            1,
+            5,
+            4,
+            2,
+            3
+          ],
+          "reason": "Image 0 is the best selfie of the father and children. Image 1 captures a genuine moment of interaction between the two children in the back, which is a distinct and valuable family memory.",
+          "elapsed": 409.479,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1842,
+          "tokensOut": 74
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            4
+          ],
+          "ranking": [
+            4,
+            2,
+            0,
+            1,
+            3,
+            5
+          ],
+          "reason": "All photos capture the same moment and composition. Image 4 is the sharpest and has the best, most natural expressions from the family.",
+          "elapsed": 104.467,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 1842,
+          "tokensOut": 60
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            5,
+            1,
+            2,
+            3,
+            4
+          ],
+          "reason": "Image 0 is the only frame where the adult is looking at the camera with eyes open, providing the best composition and connection for a family memory.",
+          "elapsed": 3,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 6642,
+          "tokensOut": 70
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2025-12-26-f24fdc28c38c",
+        "subgroupId": "g1",
+        "type": "burst",
+        "assetIds": [
+          "e78204a8-5593-4447-8f64-ee7cf7011666",
+          "58c134f8-0c12-4fc0-b61e-22327559b46a",
+          "93023ea2-4da3-4626-a8b6-98ff9d48d954",
+          "f4e55c0a-0613-4dc4-9f73-b67d384cf343",
+          "f5417b54-d730-4433-b4b4-12a0f9f0ba19",
+          "f1b97665-d099-47df-be37-08c26afeaabd",
+          "6d612f7e-90dc-4486-af6d-6ab23ce559bf"
+        ],
+        "filenames": [
+          "20251226_130157.jpg",
+          "20251226_130158.jpg",
+          "20251226_130208.jpg",
+          "20251226_130211.jpg",
+          "20251226_130231.jpg",
+          "20251226_130236.jpg",
+          "20251226_130147.jpg"
+        ],
+        "llmKeepIds": [
+          "6d612f7e-90dc-4486-af6d-6ab23ce559bf"
+        ],
+        "llmRanking": [
+          "e78204a8-5593-4447-8f64-ee7cf7011666",
+          "58c134f8-0c12-4fc0-b61e-22327559b46a",
+          "93023ea2-4da3-4626-a8b6-98ff9d48d954",
+          "f4e55c0a-0613-4dc4-9f73-b67d384cf343",
+          "f5417b54-d730-4433-b4b4-12a0f9f0ba19",
+          "f1b97665-d099-47df-be37-08c26afeaabd",
+          "6d612f7e-90dc-4486-af6d-6ab23ce559bf"
+        ],
+        "userKeepIds": [
+          "f4e55c0a-0613-4dc4-9f73-b67d384cf343",
+          "6d612f7e-90dc-4486-af6d-6ab23ce559bf"
+        ],
+        "userCullIds": [
+          "e78204a8-5593-4447-8f64-ee7cf7011666",
+          "58c134f8-0c12-4fc0-b61e-22327559b46a",
+          "93023ea2-4da3-4626-a8b6-98ff9d48d954",
+          "f5417b54-d730-4433-b4b4-12a0f9f0ba19",
+          "f1b97665-d099-47df-be37-08c26afeaabd"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "reason": "Image 0 is the best choice. It captures a clear, well-composed moment of the mother and child roasting marshmallows. The subjects are in focus, their expressions are natural and engaging, and the framing is tight enough to feel intimate without being cluttered. The other images are either too wide (4, 5, 6), have the child turned away (1), or are obscured by smoke (2, 3).",
+          "elapsed": 79.022,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 14431,
+          "tokensOut": 126
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            1,
+            2,
+            3,
+            5,
+            4,
+            6
+          ],
+          "reason": "Image 0 is the only frame where both the adult and child are clearly visible and looking towards the activity with a natural expression, and it has the best composition for a close-up of the moment.",
+          "elapsed": 802.18,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 2102,
+          "tokensOut": 76
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            5
+          ],
+          "ranking": [
+            5,
+            4,
+            3,
+            2,
+            1,
+            0
+          ],
+          "reason": "Image 5 captures the entire family in a clear, well-composed moment, with good focus and natural lighting, making it the most complete memory shot.",
+          "elapsed": 121.04,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 2102,
+          "tokensOut": 63
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0,
+            6
+          ],
+          "ranking": [
+            0,
+            3,
+            2,
+            1,
+            6,
+            4,
+            5
+          ],
+          "reason": "Image 0 is the best portrait of the mother and child roasting marshmallows. Image 6 captures a different, wider scene with more family members, providing a nice context to the memory.",
+          "elapsed": 3.395,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 7663,
+          "tokensOut": 83
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2025-12-27-945bbe0252bf",
+        "subgroupId": "g1",
+        "type": "burst",
+        "assetIds": [
+          "3c357a43-be69-4d8b-8c33-a93ea7b62272",
+          "3b2cc16e-3831-4fa6-92ac-96769e5c2295",
+          "76f50453-3a2d-43e0-9089-abb91fe534f2",
+          "87b36f26-aee5-401c-9d5f-80c69e165f15",
+          "4f6ce2ff-2414-4257-8528-eeb74cea0920",
+          "5dfc3134-9708-4489-87d4-b879e917d180",
+          "47cb8b9e-9d0e-4747-af25-8fa2faa7f396",
+          "9d4de897-cb85-417e-a58f-9d8f6ce89792"
+        ],
+        "filenames": [
+          "20251227_113423.jpg",
+          "20251227_113501.jpg",
+          "20251227_113421.jpg",
+          "20251227_113439.jpg",
+          "20251227_113410.jpg",
+          "20251227_113444.jpg",
+          "20251227_113453.jpg",
+          "20251227_113456.jpg"
+        ],
+        "llmKeepIds": [
+          "3c357a43-be69-4d8b-8c33-a93ea7b62272",
+          "4f6ce2ff-2414-4257-8528-eeb74cea0920"
+        ],
+        "llmRanking": [
+          "3c357a43-be69-4d8b-8c33-a93ea7b62272",
+          "3b2cc16e-3831-4fa6-92ac-96769e5c2295",
+          "76f50453-3a2d-43e0-9089-abb91fe534f2",
+          "87b36f26-aee5-401c-9d5f-80c69e165f15",
+          "4f6ce2ff-2414-4257-8528-eeb74cea0920",
+          "5dfc3134-9708-4489-87d4-b879e917d180",
+          "47cb8b9e-9d0e-4747-af25-8fa2faa7f396",
+          "9d4de897-cb85-417e-a58f-9d8f6ce89792"
+        ],
+        "userKeepIds": [
+          "3c357a43-be69-4d8b-8c33-a93ea7b62272",
+          "3b2cc16e-3831-4fa6-92ac-96769e5c2295",
+          "4f6ce2ff-2414-4257-8528-eeb74cea0920"
+        ],
+        "userCullIds": [
+          "76f50453-3a2d-43e0-9089-abb91fe534f2",
+          "87b36f26-aee5-401c-9d5f-80c69e165f15",
+          "5dfc3134-9708-4489-87d4-b879e917d180",
+          "47cb8b9e-9d0e-4747-af25-8fa2faa7f396",
+          "9d4de897-cb85-417e-a58f-9d8f6ce89792"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            0,
+            6
+          ],
+          "ranking": [
+            0,
+            6,
+            2,
+            3,
+            5,
+            7,
+            1,
+            4
+          ],
+          "reason": "Image 0 captures a sweet sibling interaction with great expressions and composition. Image 6 is a beautiful, sharp portrait of the baby's reaction, making it a perfect companion shot.",
+          "elapsed": 267.558,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 16465,
+          "tokensOut": 519
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0,
+            3,
+            6
+          ],
+          "ranking": [
+            0,
+            3,
+            6,
+            2,
+            1,
+            5,
+            7,
+            4
+          ],
+          "reason": "I've selected three distinct moments: the interaction between the two children (Image 0), a clear and focused portrait of the baby (Image 3), and a candid, sweet expression of the baby (Image 6).",
+          "elapsed": 416.426,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 2374,
+          "tokensOut": 100
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            5
+          ],
+          "ranking": [
+            5,
+            2,
+            1,
+            0,
+            3,
+            4,
+            6,
+            7
+          ],
+          "reason": "Image 5 is the sharpest and captures the best, most engaged moment from both children. The little one has a clear, curious expression, and the older child is smiling and interacting with the leaf.",
+          "elapsed": 210.933,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 2374,
+          "tokensOut": 79
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            3,
+            0
+          ],
+          "ranking": [
+            3,
+            0,
+            2,
+            7,
+            1,
+            5,
+            6,
+            4
+          ],
+          "reason": "Image 3 is the best portrait of the baby with clear focus and expression. Image 0 captures the sweet interaction between the two children.",
+          "elapsed": 3.037,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 8732,
+          "tokensOut": 77
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2025-05-10-d5606fbaabc7",
+        "subgroupId": "g2",
+        "type": "burst",
+        "assetIds": [
+          "0fbaa491-c951-484f-9669-cc73b28d20d0",
+          "bfccfb6f-b7d7-4d21-af7c-2242752023ee",
+          "c8fbb255-c7c1-4e93-8c00-9209ebd09572"
+        ],
+        "filenames": [
+          "20250510_152847.jpg",
+          "20250510_152846.jpg",
+          "20250510_152848.jpg"
+        ],
+        "llmKeepIds": [
+          "0fbaa491-c951-484f-9669-cc73b28d20d0"
+        ],
+        "llmRanking": [
+          "0fbaa491-c951-484f-9669-cc73b28d20d0",
+          "bfccfb6f-b7d7-4d21-af7c-2242752023ee",
+          "c8fbb255-c7c1-4e93-8c00-9209ebd09572"
+        ],
+        "userKeepIds": [
+          "0fbaa491-c951-484f-9669-cc73b28d20d0"
+        ],
+        "userCullIds": [
+          "bfccfb6f-b7d7-4d21-af7c-2242752023ee",
+          "c8fbb255-c7c1-4e93-8c00-9209ebd09572"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            2
+          ],
+          "ranking": [
+            2,
+            0,
+            1
+          ],
+          "reason": "Image 2 is the best because the father is smiling, creating a warmer and more engaging family moment. The composition is also slightly better as it includes more of the background building, providing better context than the other frames.",
+          "elapsed": 188.149,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 6295,
+          "tokensOut": 81
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            2,
+            1
+          ],
+          "reason": "Image 0 has the best overall composition and the most natural expressions. The child in the red shirt is more centered and the child in yellow pants is walking more confidently. In Image 1, the child in yellow pants is slightly out of focus and there is a bit more motion blur. In Image 2, the child in yellow pants' expression is more hesitant. ",
+          "elapsed": 591.218,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1014,
+          "tokensOut": 107
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            1,
+            2
+          ],
+          "reason": "All three photos capture the same moment and pose, but Image 0 is the sharpest and has the best overall composition, making it the best keeper.",
+          "elapsed": 176.366,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1014,
+          "tokensOut": 54
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            1
+          ],
+          "ranking": [
+            1,
+            2,
+            0
+          ],
+          "reason": "These are nearly identical shutter-bursts. Image 1 is the best choice as the father is looking forward and the child being held has a slightly more relaxed posture compared to the others.",
+          "elapsed": 2.982,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 3387,
+          "tokensOut": 69
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2007-12-12-e29af2e245f2",
+        "subgroupId": "g4",
+        "type": "burst",
+        "assetIds": [
+          "2b56c00e-b601-411f-93e2-01c8611e8fac",
+          "9db7f97f-0a64-4c2d-8d28-a0bbe6387e12",
+          "e81ff77d-adde-4e41-be21-7bbf8aa12d43",
+          "6739eae5-0ae2-49c9-bd06-7bc68fa7651e"
+        ],
+        "filenames": [
+          "DSC_3408.JPG",
+          "DSC_3410.JPG",
+          "DSC_3406.JPG",
+          "DSC_3407.JPG"
+        ],
+        "llmKeepIds": [
+          "2b56c00e-b601-411f-93e2-01c8611e8fac"
+        ],
+        "llmRanking": [
+          "2b56c00e-b601-411f-93e2-01c8611e8fac",
+          "9db7f97f-0a64-4c2d-8d28-a0bbe6387e12",
+          "e81ff77d-adde-4e41-be21-7bbf8aa12d43",
+          "6739eae5-0ae2-49c9-bd06-7bc68fa7651e"
+        ],
+        "userKeepIds": [
+          "2b56c00e-b601-411f-93e2-01c8611e8fac",
+          "9db7f97f-0a64-4c2d-8d28-a0bbe6387e12"
+        ],
+        "userCullIds": []
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "reason": "Image 0 is the only clear, well-focused portrait. Image 1 is a distinct moment but suffers from motion blur on the hand and poor lighting. Images 2 and 3 are unusable due to severe motion blur.",
+          "elapsed": 148.7,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 8357,
+          "tokensOut": 86
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "reason": "Image 0 is the only sharp, well-composed portrait. Image 1 has a distracting foreground element (the hand), Image 2 and 3 are heavily motion-blurred.",
+          "elapsed": 267.002,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1262,
+          "tokensOut": 72
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            1
+          ],
+          "ranking": [
+            1,
+            0,
+            2,
+            3
+          ],
+          "reason": "Image 1 is the clearest and best captures the subject's expression and moment. Image 0 is good but slightly less sharp than 1, and Images 2 and 3 are too blurry or show the subject in a less engaging moment.",
+          "elapsed": 198.698,
+          "matchesUser": true,
+          "matchesLlm": false,
+          "tokensIn": 1262,
+          "tokensOut": 76
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "reason": "Image 0 is the only sharp, well-composed frame. Images 1, 2, and 3 suffer from significant motion blur or focus issues.",
+          "elapsed": 2.53,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 4520,
+          "tokensOut": 66
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2026-03-30-6529c2b88b32",
+        "subgroupId": "g1",
+        "type": "burst",
+        "assetIds": [
+          "4229ac8a-af1b-4a4c-b706-ff13c6683baa",
+          "8c16dd5f-020d-44c2-bc55-fee179059ba9",
+          "b6a83fea-8a28-4bdb-99dc-8600ab9ef42b",
+          "f15c779b-386d-4fbd-9e1b-b0d1147bb4ae",
+          "9c229954-5eb2-4f7a-a3eb-ec746dff64bd"
+        ],
+        "filenames": [
+          "20260330_085817.jpg",
+          "20260330_085818.jpg",
+          "20260330_085950.jpg",
+          "20260330_085809.jpg",
+          "20260330_085946.jpg"
+        ],
+        "llmKeepIds": [
+          "4229ac8a-af1b-4a4c-b706-ff13c6683baa",
+          "b6a83fea-8a28-4bdb-99dc-8600ab9ef42b",
+          "f15c779b-386d-4fbd-9e1b-b0d1147bb4ae"
+        ],
+        "llmRanking": [
+          "4229ac8a-af1b-4a4c-b706-ff13c6683baa",
+          "8c16dd5f-020d-44c2-bc55-fee179059ba9",
+          "b6a83fea-8a28-4bdb-99dc-8600ab9ef42b",
+          "f15c779b-386d-4fbd-9e1b-b0d1147bb4ae",
+          "9c229954-5eb2-4f7a-a3eb-ec746dff64bd"
+        ],
+        "userKeepIds": [
+          "4229ac8a-af1b-4a4c-b706-ff13c6683baa",
+          "b6a83fea-8a28-4bdb-99dc-8600ab9ef42b",
+          "9c229954-5eb2-4f7a-a3eb-ec746dff64bd"
+        ],
+        "userCullIds": [
+          "8c16dd5f-020d-44c2-bc55-fee179059ba9",
+          "f15c779b-386d-4fbd-9e1b-b0d1147bb4ae"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            4,
+            3,
+            1,
+            2
+          ],
+          "reason": "Image 0 is the best choice because it captures a sharp, clear, and joyful close-up of the girl's face. The other images suffer from motion blur (1, 4), are too wide to be impactful (2), or show the subject looking down (3).",
+          "elapsed": 204.46,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 10363,
+          "tokensOut": 100
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0,
+            2
+          ],
+          "ranking": [
+            0,
+            2,
+            4,
+            1,
+            3
+          ],
+          "reason": "Image 0 captures a joyful, sharp expression of the child. Image 2 provides a wider context of the scene, including other people and the environment, making it a distinct moment.",
+          "elapsed": 452.157,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1558,
+          "tokensOut": 69
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0
+          ],
+          "reason": "Image 0 captures the clearest, most natural, and happiest expression of the child, making it the best single memory shot.",
+          "elapsed": 215.887,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1558,
+          "tokensOut": 42
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0,
+            2,
+            3
+          ],
+          "ranking": [
+            0,
+            2,
+            3,
+            1,
+            4
+          ],
+          "reason": "Image 0 is the best portrait of the child. Image 2 captures a wider scene with another child and adult. Image 3 captures a distinct candid moment of the child fixing her hair.",
+          "elapsed": 3.482,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 5525,
+          "tokensOut": 82
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2026-03-24-c134af4ce67d",
+        "subgroupId": "g1",
+        "type": "burst",
+        "assetIds": [
+          "a8196232-5cc0-4a3c-8cad-e8ac0c3ddf12",
+          "404eb331-25ab-4cb0-b529-fb466302a63c",
+          "a0c1f078-a540-4596-aed7-5296071fabd0",
+          "5f7cccf6-7306-4f04-a7bc-cf96af3223ff",
+          "1dfa4e3d-5878-45bc-9ad3-b00787872f62",
+          "711d31be-0b52-4566-b1ef-37b2d2e3058a"
+        ],
+        "filenames": [
+          "20260324_164911.jpg",
+          "20260324_164916.jpg",
+          "20260324_164908.jpg",
+          "20260324_164920.jpg",
+          "20260324_164930.jpg",
+          "20260324_164915.jpg"
+        ],
+        "llmKeepIds": [
+          "a8196232-5cc0-4a3c-8cad-e8ac0c3ddf12",
+          "404eb331-25ab-4cb0-b529-fb466302a63c",
+          "a0c1f078-a540-4596-aed7-5296071fabd0"
+        ],
+        "llmRanking": [
+          "a8196232-5cc0-4a3c-8cad-e8ac0c3ddf12",
+          "404eb331-25ab-4cb0-b529-fb466302a63c",
+          "a0c1f078-a540-4596-aed7-5296071fabd0",
+          "5f7cccf6-7306-4f04-a7bc-cf96af3223ff",
+          "1dfa4e3d-5878-45bc-9ad3-b00787872f62",
+          "711d31be-0b52-4566-b1ef-37b2d2e3058a"
+        ],
+        "userKeepIds": [
+          "a8196232-5cc0-4a3c-8cad-e8ac0c3ddf12",
+          "404eb331-25ab-4cb0-b529-fb466302a63c"
+        ],
+        "userCullIds": [
+          "a0c1f078-a540-4596-aed7-5296071fabd0",
+          "5f7cccf6-7306-4f04-a7bc-cf96af3223ff",
+          "1dfa4e3d-5878-45bc-9ad3-b00787872f62"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            1
+          ],
+          "ranking": [
+            1,
+            0,
+            4,
+            3,
+            5,
+            2
+          ],
+          "reason": "Image 1 is the best choice because it captures the core moment of the activity (applying the temporary tattoo) with a clear, happy expression from the child. It is sharp and well-composed, unlike the blurry Image 2 or the overly tight crop of Image 5. Image 0 is a good wide shot but lacks the emotional connection of Image 1.",
+          "elapsed": 83.103,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 12397,
+          "tokensOut": 121
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0,
+            1,
+            3
+          ],
+          "ranking": [
+            0,
+            1,
+            3,
+            4,
+            5,
+            2
+          ],
+          "reason": "These three images capture the sequence of applying temporary tattoos: the wide shot of the family interaction (0), the close-up of the application process (1), and a focused moment of the mother and daughter (3). Image 2 is blurry, and images 4 and 5 are too zoomed out or focused on just hands, losing the emotional connection of the faces.",
+          "elapsed": 371.782,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1830,
+          "tokensOut": 113
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            2
+          ],
+          "ranking": [
+            2
+          ],
+          "reason": "Image 2 captures the best combination of focus, clear expressions, and a good moment of interaction. The other images are either too blurry, too close-up on hands, or show less engaging moments.",
+          "elapsed": 55.651,
+          "matchesUser": false,
+          "matchesLlm": true,
+          "tokensIn": 1830,
+          "tokensOut": 58
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0,
+            1
+          ],
+          "ranking": [
+            0,
+            1,
+            3,
+            2,
+            4,
+            5
+          ],
+          "reason": "Image 0 captures the full scene and the joy of the younger child. Image 1 is a great close-up of the activity, showing the interaction clearly.",
+          "elapsed": 2.811,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 6594,
+          "tokensOut": 76
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2025-12-21-4229a9dbeb60",
+        "subgroupId": "g5",
+        "type": "burst",
+        "assetIds": [
+          "30f8afb2-a236-4121-8261-f0f5eceeb022",
+          "540c98ea-3a19-4e13-9e7e-f6fc70f4cfe8",
+          "64589fcd-e6a9-4d19-b7ed-fce33b29a852",
+          "b5a5cde4-81f3-4a1b-af66-a008909a1bac",
+          "0f96b5de-8392-46da-b51b-a5bbf4f31ce9",
+          "4c04128f-d771-4065-9ecd-d509da410e53",
+          "3218609c-23fe-46cc-ae42-4b41f0ce9541"
+        ],
+        "filenames": [
+          "20251221_141832.jpg",
+          "20251221_141830.jpg",
+          "20251221_141833.jpg",
+          "20251221_141836.jpg",
+          "20251221_141840.jpg",
+          "20251221_141911.jpg",
+          "20251221_141915.jpg"
+        ],
+        "llmKeepIds": [
+          "30f8afb2-a236-4121-8261-f0f5eceeb022"
+        ],
+        "llmRanking": [
+          "30f8afb2-a236-4121-8261-f0f5eceeb022",
+          "540c98ea-3a19-4e13-9e7e-f6fc70f4cfe8",
+          "64589fcd-e6a9-4d19-b7ed-fce33b29a852",
+          "b5a5cde4-81f3-4a1b-af66-a008909a1bac",
+          "0f96b5de-8392-46da-b51b-a5bbf4f31ce9",
+          "4c04128f-d771-4065-9ecd-d509da410e53",
+          "3218609c-23fe-46cc-ae42-4b41f0ce9541"
+        ],
+        "userKeepIds": [
+          "30f8afb2-a236-4121-8261-f0f5eceeb022"
+        ],
+        "userCullIds": [
+          "64589fcd-e6a9-4d19-b7ed-fce33b29a852",
+          "b5a5cde4-81f3-4a1b-af66-a008909a1bac",
+          "3218609c-23fe-46cc-ae42-4b41f0ce9541"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            0,
+            3,
+            2
+          ],
+          "ranking": [
+            0,
+            3,
+            2,
+            1,
+            4,
+            5
+          ],
+          "reason": "Image 0 is the best choice with a clear, sharp portrait of the baby and a lovely background. Image 3 is a strong second, capturing a dynamic moment with the sibling on the scooter. Image 2 is a good alternative to Image 0, showing a slightly different expression.",
+          "elapsed": 86.08,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 14431,
+          "tokensOut": 113
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0,
+            2,
+            3
+          ],
+          "ranking": [
+            0,
+            2,
+            3,
+            1,
+            6,
+            4,
+            5
+          ],
+          "reason": "Image 0 is the best overall with a clear, happy expression and great composition. Image 2 and 3 capture different gaze directions and a candid moment with the child in the background, providing a variety of images from the same scene.",
+          "elapsed": 331.888,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 2102,
+          "tokensOut": 89
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            2,
+            3,
+            5
+          ],
+          "ranking": [
+            2,
+            3,
+            5
+          ],
+          "reason": "Images 2, 3, and 5 capture the child with the best expressions and moments. Image 2 is sharp and engaging, Image 3 has a good composition with the background, and Image 5 captures a beautiful, bright moment, even if the light is harsh.",
+          "elapsed": 52.099,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 2102,
+          "tokensOut": 86
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0,
+            2
+          ],
+          "ranking": [
+            0,
+            2,
+            3,
+            1,
+            6,
+            5,
+            4
+          ],
+          "reason": "Image 0 is the sharpest, most well-composed shot with the baby looking directly at the camera. Image 2 captures a nice alternative moment with the baby looking to the side. The other frames are either blurry, poorly lit, or have the baby looking away.",
+          "elapsed": 3.113,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 7663,
+          "tokensOut": 102
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2025-04-19-3bc3a8930feb",
+        "subgroupId": "g3",
+        "type": "burst",
+        "assetIds": [
+          "f45c9df1-7322-4a2c-8705-8003a191d461",
+          "fc57a5f3-864f-43b2-901b-e664fa3848fe",
+          "09517f61-c94a-44f0-a87b-bf6c4ab7026f"
+        ],
+        "filenames": [
+          "20250419_150838.jpg",
+          "20250419_150836.jpg",
+          "20250419_150840.jpg"
+        ],
+        "llmKeepIds": [
+          "f45c9df1-7322-4a2c-8705-8003a191d461",
+          "fc57a5f3-864f-43b2-901b-e664fa3848fe"
+        ],
+        "llmRanking": [
+          "f45c9df1-7322-4a2c-8705-8003a191d461",
+          "fc57a5f3-864f-43b2-901b-e664fa3848fe",
+          "09517f61-c94a-44f0-a87b-bf6c4ab7026f"
+        ],
+        "userKeepIds": [
+          "f45c9df1-7322-4a2c-8705-8003a191d461",
+          "fc57a5f3-864f-43b2-901b-e664fa3848fe"
+        ],
+        "userCullIds": [
+          "09517f61-c94a-44f0-a87b-bf6c4ab7026f"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            2,
+            1
+          ],
+          "reason": "Image 0 captures the best expression with a genuine smile and direct eye contact, making it the most engaging family memory. Image 2 is a close second with a similar pose but a slightly less expressive face. Image 1 is the weakest as the child is looking away.",
+          "elapsed": 48.475,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 6295,
+          "tokensOut": 92
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            1
+          ],
+          "ranking": [
+            1,
+            0,
+            2
+          ],
+          "reason": "Image 1 has the best composition and expression; the child is looking forward with a clear, focused gaze, and the framing is more balanced than in the other two shots.",
+          "elapsed": 330.229,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1014,
+          "tokensOut": 58
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            1,
+            2
+          ],
+          "reason": "All three photos are nearly identical, capturing the same moment with the child looking to the side. Image 0 is the sharpest and has the best overall composition.",
+          "elapsed": 41.894,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1014,
+          "tokensOut": 56
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            1,
+            2
+          ],
+          "reason": "Image 0 is the only frame where the child is looking toward the camera with a clear, happy expression. The other frames show her looking away or squinting.",
+          "elapsed": 2.854,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 3387,
+          "tokensOut": 64
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2026-04-08-cfcf5cdaab3c",
+        "subgroupId": "g1",
+        "type": "near_duplicate",
+        "assetIds": [
+          "6b7b54d4-e979-46dc-8d42-b67db425b8c2",
+          "256e2806-1505-45f1-9564-d6ad22ef6af9",
+          "3d637a3b-1827-417d-a2d6-f168101f39ed",
+          "d4b17073-255a-414e-ae09-cd5c848d1eb7"
+        ],
+        "filenames": [
+          "Screenshot_20260408_064853_Firefox.jpg",
+          "Screenshot_20260408_065410_Firefox.jpg",
+          "Screenshot_20260408_065702_Firefox.jpg",
+          "Screenshot_20260408_065829_Firefox.jpg"
+        ],
+        "llmKeepIds": [],
+        "llmRanking": [
+          "6b7b54d4-e979-46dc-8d42-b67db425b8c2",
+          "256e2806-1505-45f1-9564-d6ad22ef6af9",
+          "3d637a3b-1827-417d-a2d6-f168101f39ed",
+          "d4b17073-255a-414e-ae09-cd5c848d1eb7"
+        ],
+        "userKeepIds": [],
+        "userCullIds": [
+          "6b7b54d4-e979-46dc-8d42-b67db425b8c2",
+          "256e2806-1505-45f1-9564-d6ad22ef6af9",
+          "3d637a3b-1827-417d-a2d6-f168101f39ed",
+          "d4b17073-255a-414e-ae09-cd5c848d1eb7"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            3
+          ],
+          "ranking": [
+            3,
+            0,
+            2,
+            1
+          ],
+          "reason": "Image 3 is the best because it clearly shows the user's problem (the system incorrectly setting the wake time to 06:00) and the solution (the 'Endra vaknetid' dialog to fix it). It captures the complete 'problem and resolution' moment of the sequence. Image 0 is also good as it shows the initial setup, but Image 3 tells a more complete story.",
+          "elapsed": 59.181,
+          "matchesUser": null,
+          "matchesLlm": false,
+          "tokensIn": 8057,
+          "tokensOut": 110
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "ranking": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "reason": "These are not family photos, but a sequence of screenshots from a baby sleep tracking app showing a user's feedback/complaints about the system's logic. Each screen represents a distinct stage of a different interaction or error state, making it an action sequence of a software UI flow.",
+          "elapsed": 377.871,
+          "matchesUser": null,
+          "matchesLlm": false,
+          "tokensIn": 1262,
+          "tokensOut": 93
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            1
+          ],
+          "ranking": [
+            1,
+            0,
+            2,
+            3
+          ],
+          "reason": "The photos are nearly identical, showing the same moment and expression. Image 1 is the sharpest and clearest capture of the moment.",
+          "elapsed": 42.267,
+          "matchesUser": null,
+          "matchesLlm": false,
+          "tokensIn": 1262,
+          "tokensOut": 53
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "ranking": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "reason": "These are screenshots of a software interface documenting different states and error reports, not a burst of family photos.",
+          "elapsed": 2.628,
+          "matchesUser": null,
+          "matchesLlm": false,
+          "tokensIn": 4568,
+          "tokensOut": 64
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2026-03-19-829fc1d834e3",
+        "subgroupId": "g4",
+        "type": "burst",
+        "assetIds": [
+          "4ea0670e-972c-4622-8358-087f297a0217",
+          "9bca27ab-5748-468f-9fbb-ac54e3c32a2b",
+          "d68d2dcf-c227-4145-b333-b7f07ba3846b",
+          "73360bfb-4ad3-42b3-9000-92268072ee7e",
+          "3f8f83e0-b71a-4165-bcd6-d42837343301"
+        ],
+        "filenames": [
+          "20260319_095610.jpg",
+          "20260319_095605.jpg",
+          "20260319_095609.jpg",
+          "20260319_095612.jpg",
+          "20260319_095603.jpg"
+        ],
+        "llmKeepIds": [
+          "4ea0670e-972c-4622-8358-087f297a0217",
+          "9bca27ab-5748-468f-9fbb-ac54e3c32a2b"
+        ],
+        "llmRanking": [
+          "4ea0670e-972c-4622-8358-087f297a0217",
+          "9bca27ab-5748-468f-9fbb-ac54e3c32a2b",
+          "d68d2dcf-c227-4145-b333-b7f07ba3846b",
+          "73360bfb-4ad3-42b3-9000-92268072ee7e",
+          "3f8f83e0-b71a-4165-bcd6-d42837343301"
+        ],
+        "userKeepIds": [
+          "4ea0670e-972c-4622-8358-087f297a0217",
+          "9bca27ab-5748-468f-9fbb-ac54e3c32a2b"
+        ],
+        "userCullIds": [
+          "d68d2dcf-c227-4145-b333-b7f07ba3846b",
+          "73360bfb-4ad3-42b3-9000-92268072ee7e",
+          "3f8f83e0-b71a-4165-bcd6-d42837343301"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            0,
+            2
+          ],
+          "ranking": [
+            0,
+            2,
+            1,
+            3,
+            4
+          ],
+          "reason": "The first two images capture the most engaging and joyful expressions. Image 0 is the clear winner with a perfect, genuine laugh and excellent sharpness. Image 2 is a close second with a sweet smile. Image 1 is a good neutral expression but less dynamic. Image 3 is a profile shot which is less ideal for a portrait. Image 4 is a wider shot that loses the emotional connection of the close-ups.",
+          "elapsed": 66.937,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 10363,
+          "tokensOut": 132
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0,
+            1,
+            2
+          ],
+          "ranking": [
+            0,
+            2,
+            1,
+            3,
+            4
+          ],
+          "reason": "Image 0 captures a joyful, laughing expression; Image 1 captures a curious, neutral expression; Image 2 captures a happy, smiling expression. These three distinct emotional states are worth keeping for family memories.",
+          "elapsed": 361.993,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1558,
+          "tokensOut": 77
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0
+          ],
+          "reason": "Image 0 captures the best combination of sharp focus, a genuine, happy expression, and good composition. The child is smiling widely and looking engaged.",
+          "elapsed": 40.865,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1558,
+          "tokensOut": 47
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0,
+            3
+          ],
+          "ranking": [
+            0,
+            3,
+            2,
+            1,
+            4
+          ],
+          "reason": "Image 0 captures a beautiful, genuine laughing expression. Image 3 captures a different, joyful moment looking off-camera. The others are either less expressive or have less ideal framing.",
+          "elapsed": 3.093,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 5525,
+          "tokensOut": 77
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2026-03-23-9b798021f614",
+        "subgroupId": "g3",
+        "type": "burst",
+        "assetIds": [
+          "e865dc6d-8b7d-4a58-850e-b96343ec94e3",
+          "21b43f33-6a8b-4990-a11b-a538ba09e0b6",
+          "916ceb1e-c85b-4e88-a781-e7913fc69054",
+          "b9c031e8-73e5-4c91-a2b6-59bc16122b4e",
+          "739e9a89-fcc8-430f-94ec-905fb7ea0599",
+          "a91590dc-896f-46c8-854f-eae5fc4b26ac"
+        ],
+        "filenames": [
+          "20260323_114312(0).jpg",
+          "20260323_114308.jpg",
+          "20260323_114311.jpg",
+          "20260323_114312.jpg",
+          "20260323_114313.jpg",
+          "20260323_114313(0).jpg"
+        ],
+        "llmKeepIds": [
+          "e865dc6d-8b7d-4a58-850e-b96343ec94e3",
+          "21b43f33-6a8b-4990-a11b-a538ba09e0b6"
+        ],
+        "llmRanking": [
+          "e865dc6d-8b7d-4a58-850e-b96343ec94e3",
+          "21b43f33-6a8b-4990-a11b-a538ba09e0b6",
+          "916ceb1e-c85b-4e88-a781-e7913fc69054",
+          "b9c031e8-73e5-4c91-a2b6-59bc16122b4e",
+          "739e9a89-fcc8-430f-94ec-905fb7ea0599",
+          "a91590dc-896f-46c8-854f-eae5fc4b26ac"
+        ],
+        "userKeepIds": [
+          "21b43f33-6a8b-4990-a11b-a538ba09e0b6",
+          "a91590dc-896f-46c8-854f-eae5fc4b26ac"
+        ],
+        "userCullIds": [
+          "e865dc6d-8b7d-4a58-850e-b96343ec94e3",
+          "916ceb1e-c85b-4e88-a781-e7913fc69054",
+          "b9c031e8-73e5-4c91-a2b6-59bc16122b4e",
+          "739e9a89-fcc8-430f-94ec-905fb7ea0599"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            5
+          ],
+          "ranking": [
+            5,
+            0,
+            4,
+            3,
+            2,
+            1
+          ],
+          "reason": "Image 5 captures the most genuine and joyful expression, with a wide, happy smile that perfectly conveys the emotion of the moment. It is sharp and well-composed, making it the clear winner.",
+          "elapsed": 74.838,
+          "matchesUser": true,
+          "matchesLlm": false,
+          "tokensIn": 12397,
+          "tokensOut": 102
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            5,
+            1
+          ],
+          "ranking": [
+            5,
+            4,
+            0,
+            3,
+            2,
+            1
+          ],
+          "reason": "Image 5 is the best overall shot with a bright, happy expression and clear focus. Image 1 captures a distinct, candid moment of the child looking down at the chick, which is a different emotional beat than the looking-up shots.",
+          "elapsed": 466.17,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1830,
+          "tokensOut": 84
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            4
+          ],
+          "ranking": [
+            4,
+            2,
+            3,
+            1,
+            0,
+            5
+          ],
+          "reason": "Image 4 captures the clearest, most genuine smile and the best overall moment, while maintaining good focus and composition. The other images are nearly identical, with minor variations in expression or focus.",
+          "elapsed": 42.656,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 1830,
+          "tokensOut": 70
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            4,
+            5
+          ],
+          "ranking": [
+            4,
+            5,
+            0,
+            3,
+            2,
+            1
+          ],
+          "reason": "Image 4 and 5 capture the best expressions of the child looking up with a smile, while the other frames show her looking down or with less engaging expressions.",
+          "elapsed": 2.944,
+          "matchesUser": true,
+          "matchesLlm": false,
+          "tokensIn": 6594,
+          "tokensOut": 76
+        }
+      ]
+    },
+    {
+      "group": {
+        "batchId": "2026-04-05-d22b6fbcbd41",
+        "subgroupId": "g2",
+        "type": "burst",
+        "assetIds": [
+          "3508de8b-1fc1-4aae-9c55-98b3cf0ac527",
+          "38c269f5-0d43-4063-b50c-8d507b1a8f87",
+          "09ebae0a-4134-42f2-8d15-fc1ecabdf6a3"
+        ],
+        "filenames": [
+          "20260405_134016.jpg",
+          "20260405_134024.jpg",
+          "20260405_134033.jpg"
+        ],
+        "llmKeepIds": [
+          "3508de8b-1fc1-4aae-9c55-98b3cf0ac527"
+        ],
+        "llmRanking": [
+          "3508de8b-1fc1-4aae-9c55-98b3cf0ac527",
+          "38c269f5-0d43-4063-b50c-8d507b1a8f87",
+          "09ebae0a-4134-42f2-8d15-fc1ecabdf6a3"
+        ],
+        "userKeepIds": [
+          "3508de8b-1fc1-4aae-9c55-98b3cf0ac527"
+        ],
+        "userCullIds": [
+          "38c269f5-0d43-4063-b50c-8d507b1a8f87",
+          "09ebae0a-4134-42f2-8d15-fc1ecabdf6a3"
+        ]
+      },
+      "variants": [
+        {
+          "variant": "qwen36_a3b_terse_v3_adaptive",
+          "bestPicks": [
+            1
+          ],
+          "ranking": [
+            1,
+            0,
+            2
+          ],
+          "reason": "Image 1 is the best choice because it captures the complete family moment with the best composition and clarity. It shows the interaction between the grandfather, grandmother, and children in a natural, candid way. Image 0 is a tighter shot that cuts off the grandmother and feels more like a detail shot. Image 2 is a different angle focusing only on the children and is slightly less sharp.",
+          "elapsed": 47.635,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 6295,
+          "tokensOut": 115
+        },
+        {
+          "variant": "gemma4_31b_v3_adaptive",
+          "bestPicks": [
+            0
+          ],
+          "ranking": [
+            0,
+            1,
+            2
+          ],
+          "reason": "Image 0 captures the most emotional and heartwarming moment of the grandfather hugging the children, with clear expressions of joy. Image 1 is a bit more cluttered and the composition is less intimate. Image 2 is a bit too zoomed in and the composition is slightly off.",
+          "elapsed": 292.626,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 1014,
+          "tokensOut": 77
+        },
+        {
+          "variant": "gemma4_e4b_v3_adaptive",
+          "bestPicks": [
+            2
+          ],
+          "ranking": [
+            2,
+            1,
+            0
+          ],
+          "reason": "Image 2 captures the best moment with the clearest focus and the most engaging interaction between the father and children. Image 0 is slightly blurry, and Image 1 is a very similar, slightly less focused shot.",
+          "elapsed": 37.152,
+          "matchesUser": false,
+          "matchesLlm": false,
+          "tokensIn": 1014,
+          "tokensOut": 66
+        },
+        {
+          "variant": "31flashlite_v3_adaptive",
+          "bestPicks": [
+            0,
+            1
+          ],
+          "ranking": [
+            0,
+            1,
+            2
+          ],
+          "reason": "Image 0 captures a joyful, candid interaction between the grandfather and the children. Image 1 shows a wider family moment including the grandmother. Image 2 is a different composition but less engaging than the others.",
+          "elapsed": 3.087,
+          "matchesUser": true,
+          "matchesLlm": true,
+          "tokensIn": 3387,
+          "tokensOut": 76
+        }
+      ]
+    }
+  ]
+}

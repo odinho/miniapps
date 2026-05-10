@@ -6,6 +6,7 @@ import Fastify from "fastify";
 import { resolve, dirname } from "path";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { ImmichApiAdapter } from "./db/immich-api-adapter.js";
+import { ImmichFaceFetcher } from "./db/immich-face-fetcher.js";
 import { Asset } from "./shared/types.js";
 import { fileURLToPath } from "url";
 import { StateDb, batchFingerprint } from "./db/state-db.js";
@@ -13,6 +14,7 @@ import { batchBySession, SessionBatch } from "./batching/session-batcher.js";
 import { LlmClient, DEFAULT_LLM_CONFIG, expandCompactResponse } from "./ranking/llm-client.js";
 import { mapLlmStarsToWriteback } from "./ranking/types.js";
 import { classifyBatchForAutoCull, type AutoCullSummary } from "./ranking/auto-cull.js";
+import { applyFaceCoveragePostCheck } from "./ranking/face-coverage.js";
 import { classifyBurstAutoCull } from "./ranking/burst-auto-cull.js";
 import { ImmichWriteback } from "./db/immich-writeback.js";
 import { config as loadEnv } from "dotenv";
@@ -65,6 +67,12 @@ async function loadData() {
   }
   console.log(`Connecting to Immich API at ${url}...`);
   immichApiAdapter = new ImmichApiAdapter({ serverUrl: url, apiKey: key });
+  if (faceCoverageEnabled) {
+    faceFetcher = new ImmichFaceFetcher(url, key);
+    console.log(`Face-coverage post-check enabled (set DISABLE_FACE_COVERAGE=1 to bypass)`);
+  } else {
+    console.log(`Face-coverage post-check DISABLED via env`);
+  }
 
   // Cache asset list to disk — only fetch new/updated assets on subsequent starts
   const cachePath = resolve(__dirname, "../data/immich-assets-cache.json");
@@ -184,14 +192,20 @@ app.get<{ Querystring: { id: string } }>("/api/full", async (req, reply) => {
 let sessionBatches: SessionBatch[] = [];
 let llmClient: LlmClient | null = null;
 
-// Auto-cull classification cache, keyed by LLM run ID (immutable per run)
+// Face-coverage post-check. Enabled by default; set DISABLE_FACE_COVERAGE=1 to bypass.
+// Validated on 80 graded batches: 96.2% → 97.5% acceptable-rate, 3 → 2 sev-2.
+let faceFetcher: ImmichFaceFetcher | null = null;
+const faceCoverageEnabled = process.env.DISABLE_FACE_COVERAGE !== "1";
+
+// Auto-cull classification cache, keyed by LLM run ID (immutable per run).
+// Face-cover applied lazily inside getAutoCullSummary and reflected in this cache.
 const autoCullCache = new Map<number, AutoCullSummary>();
 
-function getAutoCullSummary(
+async function getAutoCullSummary(
   batch: SessionBatch,
   llmRunId?: number,
   model?: string,
-): AutoCullSummary | null {
+): Promise<AutoCullSummary | null> {
   const fp = batchFingerprint(batch.assets.map((a) => a.id));
   const cached = model ? stateDb.getLlmRun(batch.id, fp, model) : stateDb.getLlmRun(batch.id, fp);
   if (!cached) return null;
@@ -200,7 +214,22 @@ function getAutoCullSummary(
   try {
     const raw = JSON.parse(cached.responseJson);
     const expanded = expandCompactResponse(raw, batch);
-    const summary = classifyBatchForAutoCull(expanded.images, expanded.similaritySubgroups);
+
+    // Face-coverage post-check: promote culls to keeps when needed to cover named people.
+    // Non-blocking failures — we'd rather classify without face-cover than 500.
+    let images = expanded.images;
+    if (faceCoverageEnabled && faceFetcher) {
+      try {
+        const assetIds = images.map((i) => i.imageId);
+        const people = await faceFetcher.fetchPeopleForAssets(assetIds);
+        const fc = applyFaceCoveragePostCheck(images, people);
+        images = fc.images;
+      } catch (err) {
+        console.warn(`face-coverage skipped for batch ${batch.id}:`, err);
+      }
+    }
+
+    const summary = classifyBatchForAutoCull(images, expanded.similaritySubgroups);
     autoCullCache.set(runId, summary);
     return summary;
   } catch {
@@ -356,11 +385,11 @@ function checkAndAutoMarkBatch(batchId: string) {
 app.get("/api/batches", async () => {
   const recentlyReviewed = stateDb.getRecentlyReviewed("batch", 3);
   const modelCounts = stateDb.getBatchModelCounts();
-  const items = sessionBatches
-    .map((b) => {
+  const items = await Promise.all(
+    sessionBatches.map(async (b) => {
       const fp = batchFingerprint(b.assets.map((a) => a.id));
       const cached = stateDb.getLlmRun(b.id, fp);
-      const acSummary = cached ? getAutoCullSummary(b, cached.id) : null;
+      const acSummary = cached ? await getAutoCullSummary(b, cached.id) : null;
       // Get keep/cull counts: user decisions first, fall back to LLM recommendations
       const decisions = stateDb.getPhotoDecisions(b.assets.map((a) => a.id));
       let keeps = 0;
@@ -418,23 +447,24 @@ app.get("/api/batches", async () => {
             }
           : null,
       };
-    })
-    // Sort: full-agreement first, then partial, then single-model, then unrated
-    .toSorted((a: any, b: any) => {
-      const tierOrder: Record<string, number> = {
-        "full-agreement": 0,
-        "partial-agreement": 1,
-        "single-model": 2,
-        unrated: 3,
-      };
-      const aTier = a.agreement?.tier ?? (a.hasLlmResult ? "single-model" : "unrated");
-      const bTier = b.agreement?.tier ?? (b.hasLlmResult ? "single-model" : "unrated");
-      const aOrd = tierOrder[aTier] ?? 3;
-      const bOrd = tierOrder[bTier] ?? 3;
-      if (aOrd !== bOrd) return aOrd - bOrd;
-      return 0; // preserve date order within tier
-    });
-  return { batches: items, recentlyReviewed };
+    }),
+  );
+  // Sort: full-agreement first, then partial, then single-model, then unrated
+  const sorted = items.toSorted((a: any, b: any) => {
+    const tierOrder: Record<string, number> = {
+      "full-agreement": 0,
+      "partial-agreement": 1,
+      "single-model": 2,
+      unrated: 3,
+    };
+    const aTier = a.agreement?.tier ?? (a.hasLlmResult ? "single-model" : "unrated");
+    const bTier = b.agreement?.tier ?? (b.hasLlmResult ? "single-model" : "unrated");
+    const aOrd = tierOrder[aTier] ?? 3;
+    const bOrd = tierOrder[bTier] ?? 3;
+    if (aOrd !== bOrd) return aOrd - bOrd;
+    return 0; // preserve date order within tier
+  });
+  return { batches: sorted, recentlyReviewed };
 });
 
 /** Get a batch with its LLM results (if available). ?model=xxx to get a specific model's result. */
@@ -450,15 +480,28 @@ app.get<{ Params: { id: string }; Querystring: { model?: string } }>(
       : stateDb.getLlmRun(batch.id, fp);
     const llmModels = stateDb.getLlmModels(batch.id, fp);
     let llmResult: any = null;
+    let faceCoverPromoted: string[] = [];
     if (cached) {
       try {
         const raw = JSON.parse(cached.responseJson);
         const expanded = expandCompactResponse(raw, batch);
-        llmResult = { model: cached.model, ...expanded };
+        // Apply face-coverage so the UI shows the same picks the auto-cull pipeline uses.
+        let images = expanded.images;
+        if (faceCoverageEnabled && faceFetcher) {
+          try {
+            const people = await faceFetcher.fetchPeopleForAssets(images.map((i) => i.imageId));
+            const fc = applyFaceCoveragePostCheck(images, people);
+            images = fc.images;
+            faceCoverPromoted = fc.promoted;
+          } catch (err) {
+            console.warn(`face-coverage skipped for batch detail ${batch.id}:`, err);
+          }
+        }
+        llmResult = { model: cached.model, ...expanded, images };
       } catch {}
     }
 
-    const acSummary = cached ? getAutoCullSummary(batch, cached.id, req.query.model) : null;
+    const acSummary = cached ? await getAutoCullSummary(batch, cached.id, req.query.model) : null;
 
     return {
       id: batch.id,
@@ -485,6 +528,7 @@ app.get<{ Params: { id: string }; Querystring: { model?: string } }>(
       llm: llmResult,
       llmModels,
       autoCull: acSummary,
+      faceCoverPromoted,
       photoAgreement: (() => {
         const agree = computeBatchAgreement(batch);
         return agree && agree.modelCount >= 2 ? agree.photos : null;
@@ -706,7 +750,8 @@ app.post<{
       continue;
     }
 
-    const summary = getAutoCullSummary(batch, llmRun.id, req.body.model);
+    // eslint-disable-next-line no-await-in-loop -- serial is fine; face-cache hits are fast and state writes must be sequential
+    const summary = await getAutoCullSummary(batch, llmRun.id, req.body.model);
     if (!summary) {
       results.push({
         batchId,
@@ -774,7 +819,8 @@ app.post<{
       : stateDb.getLlmRun(batchId, fp);
     if (!llmRun) continue;
 
-    const summary = getAutoCullSummary(batch, llmRun.id, req.body.model);
+    // eslint-disable-next-line no-await-in-loop -- same as auto-approve above
+    const summary = await getAutoCullSummary(batch, llmRun.id, req.body.model);
     if (!summary) continue;
 
     const existing = stateDb.getPhotoDecisions(batch.assets.map((a) => a.id));
@@ -1640,11 +1686,27 @@ app.get<{ Querystring: { ids: string } }>("/api/assets/details", async (req) => 
 
 app.get("/api/experiments", async () => {
   if (!existsSync(experimentsDir)) return { experiments: [] };
+  const archivePath = resolve(experimentsDir, "archived.json");
+  const archived = new Set<string>();
+  if (existsSync(archivePath)) {
+    try {
+      const parsed = JSON.parse(readFileSync(archivePath, "utf-8")) as { archived?: string[] };
+      for (const id of parsed.archived ?? []) archived.add(id);
+    } catch {
+      // fall through with empty archive
+    }
+  }
   const files = readdirSync(experimentsDir)
-    .filter((f) => f.endsWith(".json") && !f.endsWith("-grades.json"))
+    .filter((f) => f.endsWith(".json") && !f.endsWith("-grades.json") && f !== "archived.json")
     .toSorted()
     .toReversed();
-  return { experiments: files.map((f) => ({ id: f.replace(/\.json$/, "") })) };
+  const entries = files.map((f) => {
+    const id = f.replace(/\.json$/, "");
+    return { id, archived: archived.has(id) };
+  });
+  // Active first, archived last — preserves sort within each bucket.
+  entries.sort((a, b) => (a.archived ? 1 : 0) - (b.archived ? 1 : 0));
+  return { experiments: entries };
 });
 
 app.get<{ Params: { id: string } }>("/api/experiments/:id", async (req, reply) => {
@@ -1685,6 +1747,33 @@ app.put<{
   const gradesPath = resolve(experimentsDir, `${req.params.id}-grades.json`);
   writeFileSync(gradesPath, JSON.stringify(req.body.grades, null, 2));
   return { ok: true };
+});
+
+// Aggregate grades from ALL experiment files. Returned as grade-key -> {grade, sourceExperiment}.
+// When the same grade-key exists in multiple experiments, the most recently updated wins.
+// Used by the grader to inherit grades across experiments when (group, picks) match exactly.
+app.get("/api/grades/all", async () => {
+  if (!existsSync(experimentsDir)) return { grades: {} };
+  const files = readdirSync(experimentsDir).filter((f) => f.endsWith("-grades.json"));
+  const merged: Record<string, { grade: any; sourceExperiment: string }> = {};
+  for (const f of files) {
+    const expId = f.replace(/-grades\.json$/, "");
+    try {
+      const g = JSON.parse(readFileSync(resolve(experimentsDir, f), "utf-8"));
+      for (const [key, val] of Object.entries(g)) {
+        if (!val || typeof val !== "object") continue;
+        const existing = merged[key];
+        const thisTs = (val as any).updatedAt ?? "";
+        const existingTs = existing?.grade?.updatedAt ?? "";
+        if (!existing || thisTs > existingTs) {
+          merged[key] = { grade: val, sourceExperiment: expId };
+        }
+      }
+    } catch {
+      // skip broken files
+    }
+  }
+  return { grades: merged };
 });
 
 app.get("/", async (_, reply) => {
