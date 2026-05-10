@@ -17,17 +17,15 @@
 
 	let { activeSleep, prediction, todayWakeUp, todaySleeps, targetBedtime = null, nowMs, onEditStart }: Props = $props();
 
-	let now = $state(Date.now());
+	let _now = $state(Date.now());
+	const now = $derived(nowMs !== undefined ? nowMs : _now);
 
 	// Tick every second when sleeping (need precise timer), every 10s otherwise
 	$effect(() => {
-		if (nowMs !== undefined) {
-			now = nowMs;
-			return;
-		}
+		if (nowMs !== undefined) return;
 		const ms = activeSleep ? 1000 : 10_000;
 		const iv = setInterval(() => {
-			now = Date.now();
+			_now = Date.now();
 		}, ms);
 		return () => clearInterval(iv);
 	});

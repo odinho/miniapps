@@ -52,7 +52,7 @@ export function getTimerMode(input: TimerInput): TimerMode {
 		const pauses: SleepPauseRow[] = (activeSleep.pauses as SleepPauseRow[]) ?? [];
 		const isPaused = pauses.length > 0 && !pauses[pauses.length - 1].resume_time;
 		const start = new Date(activeSleep.start_time).getTime();
-		const elapsed = Math.max(0, now - start - calcPauseMs(pauses));
+		const elapsed = Math.max(0, now - start - calcPauseMs(pauses, now));
 
 		let label: string;
 		if (isPaused) label = '⏸️ Pause';

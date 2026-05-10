@@ -60,15 +60,13 @@
 	const r = 130;
 	const trackWidth = 14;
 
-	let now = $state(new Date());
+	let _now = $state(new Date());
+	const now = $derived(nowMs != null ? new Date(nowMs) : _now);
 
 	$effect(() => {
-		if (nowMs != null) {
-			now = new Date(nowMs);
-			return;
-		}
+		if (nowMs != null) return;
 		const interval = setInterval(() => {
-			now = new Date();
+			_now = new Date();
 		}, 10_000);
 		return () => clearInterval(interval);
 	});
@@ -363,7 +361,7 @@
 				stroke="var(--peach-dark)"
 				stroke-width={trackWidth * 2.4}
 				stroke-linecap="round"
-				opacity="0.12"
+				opacity="0.3"
 			/>
 		{/if}
 	{/each}

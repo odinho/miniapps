@@ -182,15 +182,15 @@
 				nowMs: n,
 				activeSleep: makeSleep({ start_time: o(-45), type: 'nap' }),
 				prediction: makePrediction({ nextNap: o(+90), bedtime: o(+480) }),
-				todayWakeUp: { wake_time: o(-120) },
+				todayWakeUp: { wake_time: o(-300) },
 				todaySleeps: [makeSleep({ start_time: o(-45), type: 'nap' })],
-				arcSleeps: [prevNap],
+				arcSleeps: [{ start_time: o(-240), end_time: o(-150), type: 'nap' }],
 				arcActive: { start_time: o(-45), type: 'nap' },
 				arcPred: { nextNap: o(+90), bedtime: o(+480) },
 				arcIsNight: false,
-				arcWakeUpTime: o(-120),
-				arcStartLabel: hm(o(-120)),
-				arcEndLabel: hm(o(+480)),
+				arcWakeUpTime: o(-300),
+				arcStartLabel: hm(o(-300)),
+				arcEndLabel: hm(o(+420)),
 				arcBands: [],
 			},
 			{
@@ -318,7 +318,10 @@
 				todaySleeps: [makeSleep({ start_time: o(-180), end_time: o(-90), type: 'nap' })],
 				arcSleeps: [{ start_time: o(-180), end_time: o(-90), type: 'nap' }],
 				arcActive: null,
-				arcPred: { nextNap: o(+60), bedtime: o(+420) },
+				arcPred: {
+					nextNap: o(+60), bedtime: o(+420),
+					predictedNaps: [{ startTime: o(+60), endTime: o(+150) }, { startTime: o(+240), endTime: o(+330) }],
+				},
 				arcIsNight: false,
 				arcStartLabel: hm(o(-90)),
 				arcEndLabel: hm(o(+420)),
@@ -561,12 +564,12 @@
 
 <div class="dev-page">
 	<header class="dev-header">
-		<h1>Widget Playground <span class="dev-badge">dev only</span></h1>
+		<h1>Widget Playground</h1>
 
 		<div class="dev-controls">
 			<label class="ctrl-group">
 				<span>No</span>
-				<input type="time" bind:value={nowStr} />
+				<input type="text" bind:value={nowStr} placeholder="HH:MM" class="ctrl-short" />
 			</label>
 			<div class="ctrl-divider"></div>
 			<span class="ctrl-section-label">Leggetid-kort:</span>
@@ -653,17 +656,6 @@
 		margin: 0 0 12px;
 	}
 
-	.dev-badge {
-		font-size: 0.65rem;
-		background: #e55;
-		color: #fff;
-		padding: 2px 6px;
-		border-radius: 6px;
-		vertical-align: middle;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
-
 	.dev-controls {
 		display: flex;
 		flex-wrap: wrap;
@@ -682,7 +674,6 @@
 		cursor: pointer;
 	}
 
-	.ctrl-group input[type="time"],
 	.ctrl-group input[type="text"] {
 		padding: 2px 6px;
 		border: 1px solid var(--lavender-dark, #c8bedb);

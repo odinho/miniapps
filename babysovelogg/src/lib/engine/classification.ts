@@ -49,11 +49,12 @@ export function shouldReclassifyAsNight(startTime: string, endTime: string): boo
 }
 
 /** Total pause duration in milliseconds. */
-export function calcPauseMs(pauses: SleepPauseRow[]): number {
+export function calcPauseMs(pauses: SleepPauseRow[], nowMs?: number): number {
+  const resolvedNow = nowMs ?? Date.now();
   let total = 0;
   for (const p of pauses) {
     const start = new Date(p.pause_time).getTime();
-    const end = p.resume_time ? new Date(p.resume_time).getTime() : Date.now();
+    const end = p.resume_time ? new Date(p.resume_time).getTime() : resolvedNow;
     total += end - start;
   }
   return total;
