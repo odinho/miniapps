@@ -9,9 +9,11 @@ test('dev playground: all scenario groups visible and visual snapshot', async ({
 	await timeInput.press('Tab');
 
 	// All 5 groups must render
-	for (const group of ['Søver', 'Vaken', 'Leggetid', 'Nyfødde', 'Spesialtilfelle']) {
-		await expect(page.getByRole('heading', { name: group, level: 2 })).toBeVisible();
-	}
+	await Promise.all(
+		['Søver', 'Vaken', 'Leggetid', 'Nyfødde', 'Spesialtilfelle'].map((group) =>
+			expect(page.getByRole('heading', { name: group, level: 2 })).toBeVisible(),
+		),
+	);
 
 	// At least one arc SVG and one Timer must be rendered
 	await expect(page.locator('.sleep-arc').first()).toBeVisible();
