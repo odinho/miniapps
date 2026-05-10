@@ -1,0 +1,212 @@
+{
+  "2025-10-25-88408d7b0da0::g3::picks=1": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-19T20:49:47.574Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2025-06-02-d97c0edf5b59::g1::picks=2": {
+    "severity": 0,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T20:51:01.479Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2025-05-17-a0dcf1e12e8e::g3::picks=0": {
+    "severity": 1,
+    "keepBias": null,
+    "note": "image 0 is just a crop of image 4. So there's that.",
+    "updatedAt": "2026-04-19T20:55:27.687Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2024-11-09-f6f42e970ec7::g1::picks=4": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-19T20:57:17.720Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2026-01-31-3e202cb1b758::g4::picks=4": {
+    "severity": 1,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T20:58:10.334Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2026-01-31-3e202cb1b758::g4::picks=0": {
+    "severity": 0,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T20:59:53.149Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2026-01-31-3e202cb1b758::g4::picks=0,4": {
+    "severity": 0,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T20:59:42.746Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2025-11-10-d18139ccf2e5::g1::picks=0": {
+    "severity": 0,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T21:00:50.075Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2026-01-01-4e7da09b7e60::g3::picks=7": {
+    "severity": 1,
+    "keepBias": -1,
+    "note": "",
+    "updatedAt": "2026-04-19T21:02:17.128Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2026-01-01-4e7da09b7e60::g3::picks=0,8": {
+    "severity": 0,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T21:02:55.348Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2026-03-15-e79b398b7825::g1::picks=8": {
+    "severity": 1,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T21:06:11.172Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2025-05-17-346e6c34065b::g3::picks=0": {
+    "severity": 0,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T21:07:36.524Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2025-06-01-6df53df88ee8::g4::picks=0": {
+    "severity": 0,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T21:10:47.321Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2026-04-02-593563f6ea4b::g8::picks=4": {
+    "severity": 0,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T21:15:55.476Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2026-04-02-593563f6ea4b::g8::picks=0": {
+    "severity": 1,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T21:17:01.023Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2006-12-31-aa403e41ba29::g1::picks=1": {
+    "severity": 2,
+    "keepBias": -1,
+    "note": "either 2 or 5 would be good to have in addition",
+    "updatedAt": "2026-04-19T21:20:10.496Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2006-12-31-aa403e41ba29::g1::picks=0": {
+    "severity": 1,
+    "keepBias": null,
+    "note": "either 2 or 5 would be good to have in addition",
+    "updatedAt": "2026-04-19T21:19:59.194Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2026-01-10-9ed58f5447f0::g4::picks=5": {
+    "severity": 1,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T21:24:42.733Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2025-05-10-d5606fbaabc7::g1::picks=0": {
+    "severity": 1,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T21:25:42.513Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2026-03-31-410cc3bce89e::g3::picks=0": {
+    "severity": 0,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T21:26:32.515Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2026-03-31-410cc3bce89e::g2::picks=4": {
+    "severity": 2,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T21:26:43.363Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2026-03-31-410cc3bce89e::g2::picks=0": {
+    "severity": 0,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T21:26:53.248Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2025-12-26-f24fdc28c38c::g1::picks=0": {
+    "severity": 2,
+    "keepBias": -1,
+    "note": "",
+    "updatedAt": "2026-04-19T21:30:11.795Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2025-12-27-945bbe0252bf::g1::picks=0,3": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-19T21:31:47.346Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2025-05-10-d5606fbaabc7::g2::picks=2": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-19T21:32:17.205Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2025-05-10-d5606fbaabc7::g2::picks=0": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-19T21:32:42.994Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2007-12-12-e29af2e245f2::g4::picks=0": {
+    "severity": 1,
+    "keepBias": -1,
+    "note": "this is a photo of me, the no1 is more interesting, even if 0 is better. So I'd keep both tbh. But this is fine.",
+    "updatedAt": "2026-04-19T21:34:33.675Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2026-03-30-6529c2b88b32::g1::picks=0": {
+    "severity": 2,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T21:34:58.821Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2026-03-24-c134af4ce67d::g1::picks=1": {
+    "severity": 1,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-19T21:35:26.286Z",
+    "inheritedFrom": "2026-04-19-stageA"
+  },
+  "2024-11-09-f6f42e970ec7::g1::picks=5": {
+    "severity": 2,
+    "keepBias": 0,
+    "note": "father is actually looking away, none of these are great, hence the pick is only 'meh'. I'd have kept 1 or ever 4 instead. But sure.",
+    "updatedAt": "2026-04-19T20:19:23.006Z",
+    "inheritedFrom": "2026-04-19-stageB4"
+  }
+}

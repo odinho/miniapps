@@ -1,0 +1,1395 @@
+{
+  "count": 30,
+  "results": [
+    {
+      "batchId": "2024-05-18-d5a9d94a03cd",
+      "n": 18,
+      "oldKeepCount": 6,
+      "newKeepCount": 6,
+      "oldPicks": [
+        0,
+        10,
+        11,
+        12,
+        15,
+        17
+      ],
+      "newPicks": [
+        0,
+        10,
+        11,
+        15,
+        16,
+        17
+      ],
+      "onlyOld": [
+        12
+      ],
+      "onlyNew": [
+        16
+      ],
+      "oldSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          10,
+          11,
+          12
+        ],
+        "g3": [
+          15
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          10,
+          11
+        ],
+        "g3": [
+          15,
+          16
+        ]
+      },
+      "elapsed": 10.587,
+      "newRaw": "{\n  \"sum\": \"A family outing featuring a waterfall visit and a quiet moment reading together.\",\n  \"img\": [\n    [0, 1, \"lan\", \"Waterfall view with sun flare\", \"g1\", \"k\"],\n    [1, 0, \"lan\", \"Extreme lens flare, out of focus\", \"g1\", \"c\"],\n    [2, 0, \"lan\", \"Extreme lens flare, out of focus\", \"g1\", \"c\"],\n    [3, 0, \"lan\", \"Extreme lens flare, out of focus\", \"g1\", \"c\"],\n    [4, 0, \"lan\", \"Extreme lens flare, out of focus\", \"g1\", \"c\"],\n    [5, 0, \"lan\", \"Extreme lens flare, out of focus\", \"g1\", \"c\"],\n    [6, 0, \"lan\", \"Extreme lens flare, out of focus\", \"g1\", \"c\"],\n    [7, 0, \"lan\", \"Extreme lens flare, out of focus\", \"g1\", \"c\"],\n    [8, 0, \"lan\", \"Extreme lens flare, out of focus\", \"g1\", \"c\"],\n    [9, 0, \"lan\", \"Extreme lens flare, out of focus\", \"g1\", \"c\"],\n    [10, 1, \"lan\", \"Path leading to waterfall\", \"g2\", \"k\"],\n    [11, 2, \"lan\", \"Waterfall cascading over rocks\", \"g2\", \"k\"],\n    [12, 1, \"lan\", \"Waterfall framed by trees\", \"g2\", \"c\"],\n    [13, 1, \"lan\", \"Waterfall framed by trees\", \"g2\", \"c\"],\n    [14, 0, \"lan\", \"Out of focus foliage\", \"g2\", \"c\"],\n    [15, 2, \"por\", \"Mother holding daughter outdoors\", \"g3\", \"k\"],\n    [16, 2, \"por\", \"Mother holding daughter, looking away\", \"g3\", \"k\"],\n    [17, 3, \"por\", \"Mother and daughter reading book\", null, \"k\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"burst\",\n      \"all\": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],\n      \"keep\": [0],\n      \"why\": \"Most are blurry lens flares; only the first has clear composition.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"scene\",\n      \"all\": [11, 10, 12, 13, 14],\n      \"keep\": [11, 10],\n      \"why\": \"Best waterfall detail and path perspective.\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"dup\",\n      \"all\": [15, 16],\n      \"keep\": [15, 16],\n      \"why\": \"Both show nice candid expressions of mother and child.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2024-12-01-e6b030258bd3",
+      "n": 4,
+      "oldKeepCount": 2,
+      "newKeepCount": 2,
+      "oldPicks": [
+        0,
+        1
+      ],
+      "newPicks": [
+        0,
+        1
+      ],
+      "onlyOld": [],
+      "onlyNew": [],
+      "oldSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          1
+        ]
+      },
+      "newSg": {
+        "g1": [
+          1
+        ]
+      },
+      "elapsed": 3.005,
+      "newRaw": "{\n  \"sum\": \"A birthday party celebration with a group photo and subsequent shots of a child at the table.\",\n  \"img\": [\n    [0, 3, \"grp\", \"Group gathered around birthday table\", null, \"k\"],\n    [1, 1, \"por\", \"Child sitting alone at table\", \"g1\", \"k\"],\n    [2, 0, \"por\", \"Child at table, similar pose\", \"g1\", \"c\"],\n    [3, 0, \"por\", \"Child at table, looking away\", \"g1\", \"c\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"burst\",\n      \"all\": [1, 2, 3],\n      \"keep\": [1],\n      \"why\": \"Near-identical burst of child at table; keeping the best one.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2020-03-24-1dbaa591e165",
+      "n": 18,
+      "oldKeepCount": 4,
+      "newKeepCount": 4,
+      "oldPicks": [
+        0,
+        1,
+        5,
+        17
+      ],
+      "newPicks": [
+        1,
+        3,
+        5,
+        17
+      ],
+      "onlyOld": [
+        0
+      ],
+      "onlyNew": [
+        3
+      ],
+      "oldSg": {
+        "g1": [
+          1,
+          5
+        ]
+      },
+      "newSg": {
+        "g1": [
+          1
+        ],
+        "g2": [
+          3,
+          5
+        ]
+      },
+      "elapsed": 8.864,
+      "newRaw": "{\n  \"sum\": \"A collection of technical screenshots, cozy moments with a cat, and a portrait.\",\n  \"img\": [\n    [0, 0, \"ss\", \"Task manager screenshot\", null, \"c\"],\n    [1, 2, \"por\", \"Man and cat sleeping\", \"g1\", \"k\"],\n    [2, 1, \"por\", \"Man and cat resting\", \"g1\", \"c\"],\n    [3, 1, \"pet\", \"Cat sleeping on bed\", \"g2\", \"k\"],\n    [4, 1, \"pet\", \"Cat sleeping close-up\", \"g2\", \"c\"],\n    [5, 2, \"pet\", \"Cat winking at camera\", \"g2\", \"k\"],\n    [6, 1, \"por\", \"Man and cat looking\", \"g1\", \"c\"],\n    [7, 1, \"por\", \"Man and cat resting\", \"g1\", \"c\"],\n    [8, 1, \"por\", \"Man and cat resting\", \"g1\", \"c\"],\n    [9, 1, \"por\", \"Man and cat resting\", \"g1\", \"c\"],\n    [10, 1, \"por\", \"Man and cat resting\", \"g1\", \"c\"],\n    [11, 1, \"por\", \"Man and cat resting\", \"g1\", \"c\"],\n    [12, 1, \"por\", \"Man and cat in bed\", \"g1\", \"c\"],\n    [13, 1, \"por\", \"Man and cat in bed\", \"g1\", \"c\"],\n    [14, 1, \"por\", \"Man and cat in bed\", \"g1\", \"c\"],\n    [15, 1, \"pet\", \"Cat sleeping on bed\", \"g2\", \"c\"],\n    [16, 0, \"oth\", \"Black screen\", null, \"c\"],\n    [17, 2, \"por\", \"Portrait in glasses shop\", null, \"k\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"burst\",\n      \"all\": [1, 2, 6, 7, 8, 9, 10, 11, 12, 13, 14],\n      \"keep\": [1],\n      \"why\": \"A long burst of the same moment; one is sufficient.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"burst\",\n      \"all\": [5, 3, 4, 15],\n      \"keep\": [5, 3],\n      \"why\": \"Best expressions of the cat; winking and sleeping.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2008-03-28-a8736e317ec9",
+      "n": 2,
+      "oldKeepCount": 1,
+      "newKeepCount": 2,
+      "oldPicks": [
+        0
+      ],
+      "newPicks": [
+        0,
+        1
+      ],
+      "onlyOld": [],
+      "onlyNew": [
+        1
+      ],
+      "oldSg": {
+        "g1": [
+          0
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0,
+          1
+        ]
+      },
+      "elapsed": 2.488,
+      "newRaw": "{\n  \"sum\": \"Two photos documenting people sleeping in sleeping bags on a classroom floor.\",\n  \"img\": [\n    [0, 1, \"rec\", \"People sleeping in classroom\", \"g1\", \"k\"],\n    [1, 1, \"rec\", \"Alternative angle of sleepers\", \"g1\", \"k\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"scene\",\n      \"all\": [0, 1],\n      \"keep\": [0, 1],\n      \"why\": \"Different angles of the same scene, both provide context for the memory.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2012-01-28-5dcdfc367548",
+      "n": 11,
+      "oldKeepCount": 8,
+      "newKeepCount": 8,
+      "oldPicks": [
+        0,
+        1,
+        2,
+        4,
+        5,
+        6,
+        8,
+        9
+      ],
+      "newPicks": [
+        0,
+        1,
+        2,
+        4,
+        5,
+        6,
+        8,
+        9
+      ],
+      "onlyOld": [],
+      "onlyNew": [],
+      "oldSg": {
+        "g1": [
+          0,
+          4
+        ],
+        "g2": [
+          6
+        ],
+        "g3": [
+          9
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          6
+        ],
+        "g3": [
+          9
+        ]
+      },
+      "elapsed": 7.046,
+      "newRaw": "{\n  \"sum\": \"A collection of candid indoor moments, including group study and casual hallway interactions.\",\n  \"img\": [\n    [0, 2, \"grp\", \"Two women studying on sofa\", \"g1\", \"k\"],\n    [1, 1, \"por\", \"Man reading in armchair\", null, \"k\"],\n    [2, 1, \"por\", \"Woman reading on sofa\", null, \"k\"],\n    [3, 1, \"grp\", \"Woman writing, hand on face\", \"g1\", \"c\"],\n    [4, 1, \"por\", \"Woman reading newspaper\", null, \"k\"],\n    [5, 1, \"por\", \"Man using tablet\", null, \"k\"],\n    [6, 2, \"act\", \"Woman organizing songbook\", \"g2\", \"k\"],\n    [7, 1, \"act\", \"Woman holding songbook page\", \"g2\", \"c\"],\n    [8, 1, \"por\", \"Woman reading document\", null, \"k\"],\n    [9, 2, \"grp\", \"Three people talking in hallway\", \"g3\", \"k\"],\n    [10, 1, \"grp\", \"Three people in hallway, drinking\", \"g3\", \"c\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"scene\",\n      \"all\": [0, 3],\n      \"keep\": [0],\n      \"why\": \"Better composition and clearer view of both subjects.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"burst\",\n      \"all\": [6, 7],\n      \"keep\": [6],\n      \"why\": \"Clearer action and better framing of the subject.\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"burst\",\n      \"all\": [9, 10],\n      \"keep\": [9],\n      \"why\": \"Better interaction and clearer facial expressions.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2014-03-22-628f7208ef7f",
+      "n": 1,
+      "oldKeepCount": 0,
+      "newKeepCount": 0,
+      "oldPicks": [],
+      "newPicks": [],
+      "onlyOld": [],
+      "onlyNew": [],
+      "oldSg": {},
+      "newSg": {},
+      "elapsed": 3.547,
+      "newRaw": "{\n  \"sum\": \"A single photo of a window sill with a glass and lantern.\",\n  \"img\": [\n    [0, 0, \"oth\", \"Glass and lantern on sill\", null, \"c\"]\n  ],\n  \"sg\": []\n}"
+    },
+    {
+      "batchId": "2015-01-01-fade2db4cc76",
+      "n": 1,
+      "oldKeepCount": 1,
+      "newKeepCount": 1,
+      "oldPicks": [
+        0
+      ],
+      "newPicks": [
+        0
+      ],
+      "onlyOld": [],
+      "onlyNew": [],
+      "oldSg": {},
+      "newSg": {},
+      "elapsed": 2.004,
+      "newRaw": "{\n  \"sum\": \"A candid shot of a woman walking through a city plaza.\",\n  \"img\": [\n    [0, 1, \"por\", \"Woman walking in plaza\", null, \"k\"]\n  ],\n  \"sg\": []\n}"
+    },
+    {
+      "batchId": "2011-07-10-128bf8d2b206",
+      "n": 7,
+      "oldKeepCount": 5,
+      "newKeepCount": 4,
+      "oldPicks": [
+        0,
+        1,
+        2,
+        4,
+        6
+      ],
+      "newPicks": [
+        0,
+        2,
+        4,
+        6
+      ],
+      "onlyOld": [
+        1
+      ],
+      "onlyNew": [],
+      "oldSg": {
+        "g1": [
+          2
+        ],
+        "g2": [
+          4,
+          6
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          2
+        ],
+        "g3": [
+          4,
+          6
+        ]
+      },
+      "elapsed": 3.558,
+      "newRaw": "{\n  \"sum\": \"A group of young people gathering outdoors with a banner.\",\n  \"img\": [\n    [0, 1, \"por\", \"Young woman smiling outdoors\", \"g1\", \"k\"],\n    [1, 1, \"por\", \"Young woman laughing with friends\", \"g1\", \"c\"],\n    [2, 2, \"grp\", \"Group of friends with bubbles\", \"g2\", \"k\"],\n    [3, 1, \"grp\", \"Group of friends looking away\", \"g2\", \"c\"],\n    [4, 2, \"grp\", \"Group holding banner, looking down\", \"g3\", \"k\"],\n    [5, 1, \"grp\", \"Group holding banner, looking up\", \"g3\", \"c\"],\n    [6, 3, \"grp\", \"Full group photo with banner\", \"g3\", \"k\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"scene\",\n      \"all\": [0, 1],\n      \"keep\": [0],\n      \"why\": \"Better focus and expression on the primary subject.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"scene\",\n      \"all\": [2, 3],\n      \"keep\": [2],\n      \"why\": \"Better composition and more people looking at the camera.\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"scene\",\n      \"all\": [6, 4, 5],\n      \"keep\": [6, 4],\n      \"why\": \"The best group shot plus a candid variation.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2009-11-07-e0b0197542b4",
+      "n": 4,
+      "oldKeepCount": 2,
+      "newKeepCount": 3,
+      "oldPicks": [
+        0,
+        3
+      ],
+      "newPicks": [
+        0,
+        2,
+        3
+      ],
+      "onlyOld": [],
+      "onlyNew": [
+        2
+      ],
+      "oldSg": {
+        "g1": [
+          0,
+          3
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0,
+          2,
+          3
+        ]
+      },
+      "elapsed": 2.764,
+      "newRaw": "{\n  \"sum\": \"Family gathering outside a house with bougainvillea.\",\n  \"img\": [\n    [0, 1, \"grp\", \"Young woman and person standing\", \"g1\", \"k\"],\n    [1, 1, \"grp\", \"Man gesturing, woman sitting\", \"g1\", \"c\"],\n    [2, 2, \"grp\", \"Man and young woman standing\", \"g1\", \"k\"],\n    [3, 3, \"grp\", \"Family portrait standing together\", \"g1\", \"k\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"scene\",\n      \"all\": [3, 2, 0, 1],\n      \"keep\": [3, 2, 0],\n      \"why\": \"Variations of family gathering; keep best portrait and candid interactions.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2007-03-18-b33f3e4b0272",
+      "n": 9,
+      "oldKeepCount": 3,
+      "newKeepCount": 6,
+      "oldPicks": [
+        0,
+        5,
+        7
+      ],
+      "newPicks": [
+        0,
+        2,
+        4,
+        5,
+        7,
+        8
+      ],
+      "onlyOld": [],
+      "onlyNew": [
+        2,
+        4,
+        8
+      ],
+      "oldSg": {
+        "g1": [
+          0,
+          5
+        ],
+        "g2": [
+          7
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0,
+          2
+        ],
+        "g2": [
+          4,
+          5
+        ],
+        "g3": [
+          7,
+          8
+        ]
+      },
+      "elapsed": 3.896,
+      "newRaw": "{\n  \"sum\": \"A group of friends posing and playing in the snow.\",\n  \"img\": [\n    [0, 1, \"grp\", \"Group posing in snow\", \"g1\", \"k\"],\n    [1, 0, \"grp\", \"Group posing, slightly blurry\", \"g1\", \"c\"],\n    [2, 1, \"grp\", \"Group posing, looking up\", \"g1\", \"k\"],\n    [3, 0, \"grp\", \"Group posing, similar to 2\", \"g1\", \"c\"],\n    [4, 2, \"grp\", \"Close group shot, smiling\", \"g2\", \"k\"],\n    [5, 3, \"grp\", \"Close group shot, laughing\", \"g2\", \"k\"],\n    [6, 1, \"grp\", \"Close group shot, candid\", \"g2\", \"c\"],\n    [7, 2, \"act\", \"Girl throwing snowball at group\", \"g3\", \"k\"],\n    [8, 1, \"act\", \"Girl mid-throw, group watching\", \"g3\", \"k\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"burst\",\n      \"all\": [0, 2, 1, 3],\n      \"keep\": [0, 2],\n      \"why\": \"Kept best two variations of the group pose.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"burst\",\n      \"all\": [5, 4, 6],\n      \"keep\": [5, 4],\n      \"why\": \"Kept the most natural and joyful expressions.\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"act\",\n      \"all\": [7, 8],\n      \"keep\": [7, 8],\n      \"why\": \"Both frames capture different stages of the snowball throw.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2008-06-22-ef2ae2fa4bae",
+      "n": 2,
+      "oldKeepCount": 1,
+      "newKeepCount": 1,
+      "oldPicks": [
+        1
+      ],
+      "newPicks": [
+        1
+      ],
+      "onlyOld": [],
+      "onlyNew": [],
+      "oldSg": {},
+      "newSg": {},
+      "elapsed": 2.096,
+      "newRaw": "{\n  \"sum\": \"Two individual portraits taken indoors on a couch.\",\n  \"img\": [\n    [0, 0, \"por\", \"Young man with eyes closed\", null, \"c\"],\n    [1, 1, \"por\", \"Young woman smiling at camera\", null, \"k\"]\n  ],\n  \"sg\": []\n}"
+    },
+    {
+      "batchId": "2015-06-21-ca865e30a2fc",
+      "n": 21,
+      "oldKeepCount": 3,
+      "newKeepCount": 6,
+      "oldPicks": [
+        2,
+        6,
+        10
+      ],
+      "newPicks": [
+        0,
+        2,
+        6,
+        8,
+        14,
+        20
+      ],
+      "onlyOld": [
+        10
+      ],
+      "onlyNew": [
+        0,
+        8,
+        14,
+        20
+      ],
+      "oldSg": {
+        "g1": [
+          2
+        ],
+        "g2": [
+          6
+        ],
+        "g3": [
+          10
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0,
+          2
+        ],
+        "g2": [
+          6,
+          20
+        ],
+        "g3": [
+          8,
+          14
+        ]
+      },
+      "elapsed": 11.293,
+      "newRaw": "{\n  \"sum\": \"A collection of portraits and traditional folk dance event photos.\",\n  \"img\": [\n    [0, 1, \"por\", \"Man in traditional attire\", \"g1\", \"k\"],\n    [1, 1, \"por\", \"Man smiling, full body\", \"g1\", \"c\"],\n    [2, 2, \"por\", \"Man smiling, medium shot\", \"g1\", \"k\"],\n    [3, 1, \"por\", \"Man smiling, close-up\", \"g1\", \"c\"],\n    [4, 1, \"por\", \"Man smiling, tight crop\", \"g1\", \"c\"],\n    [5, 0, \"por\", \"Person walking up stairs\", null, \"c\"],\n    [6, 2, \"evt\", \"Violinist performing on stage\", \"g2\", \"k\"],\n    [7, 1, \"evt\", \"Violinist, wider stage view\", \"g2\", \"c\"],\n    [8, 1, \"evt\", \"Group dancing in hall\", \"g3\", \"k\"],\n    [9, 1, \"evt\", \"Dancers holding hands\", \"g3\", \"c\"],\n    [10, 1, \"evt\", \"Dancers in circle\", \"g3\", \"c\"],\n    [11, 1, \"evt\", \"Dancers moving together\", \"g3\", \"c\"],\n    [12, 1, \"evt\", \"Dancers in formation\", \"g3\", \"c\"],\n    [13, 1, \"evt\", \"Dancers mid-step\", \"g3\", \"c\"],\n    [14, 2, \"evt\", \"Large group dance circle\", \"g3\", \"k\"],\n    [15, 1, \"evt\", \"Dancers in hall\", \"g3\", \"c\"],\n    [16, 1, \"evt\", \"Dancers moving\", \"g3\", \"c\"],\n    [17, 1, \"evt\", \"Dancers holding hands\", \"g3\", \"c\"],\n    [18, 1, \"evt\", \"Dancers in circle\", \"g3\", \"c\"],\n    [19, 1, \"evt\", \"Dancers in hall\", \"g3\", \"c\"],\n    [20, 2, \"evt\", \"Violinist performing, side view\", \"g2\", \"k\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"burst\",\n      \"all\": [2, 0, 1, 3, 4],\n      \"keep\": [2, 0],\n      \"why\": \"Best expressions and framing for the portrait.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"scene\",\n      \"all\": [6, 20, 7],\n      \"keep\": [6, 20],\n      \"why\": \"Different angles of the violinist performance.\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"act\",\n      \"all\": [14, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19],\n      \"keep\": [14, 8],\n      \"why\": \"Best wide shots capturing the full dance circle.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2022-07-30-a6f145d88557",
+      "n": 3,
+      "oldKeepCount": 2,
+      "newKeepCount": 2,
+      "oldPicks": [
+        0,
+        1
+      ],
+      "newPicks": [
+        0,
+        1
+      ],
+      "onlyOld": [],
+      "onlyNew": [],
+      "oldSg": {
+        "g1": [
+          1
+        ]
+      },
+      "newSg": {
+        "g1": [
+          1
+        ]
+      },
+      "elapsed": 2.682,
+      "newRaw": "{\n  \"sum\": \"A screenshot of vehicle warranty details and two photos of a cat resting.\",\n  \"img\": [\n    [0, 1, \"doc\", \"Tesla vehicle warranty details\", null, \"k\"],\n    [1, 2, \"pet\", \"Grey cat resting on floor\", \"g1\", \"k\"],\n    [2, 1, \"pet\", \"Grey cat resting, slightly different\", \"g1\", \"c\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"dup\",\n      \"all\": [1, 2],\n      \"keep\": [1],\n      \"why\": \"Near-identical shots of the cat; keeping the best one.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2023-05-20-4cfa5625d064",
+      "n": 5,
+      "oldKeepCount": 4,
+      "newKeepCount": 5,
+      "oldPicks": [
+        0,
+        1,
+        2,
+        4
+      ],
+      "newPicks": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "onlyOld": [],
+      "onlyNew": [
+        3
+      ],
+      "oldSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          2
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          2,
+          3
+        ]
+      },
+      "elapsed": 2.978,
+      "newRaw": "{\n  \"sum\": \"A collection of family memories featuring a child at a play area, cafe, and farm.\",\n  \"img\": [\n    [0, 2, \"por\", \"Child laughing in toy truck\", \"g1\", \"k\"],\n    [1, 1, \"food\", \"Child drinking at cafe\", null, \"k\"],\n    [2, 2, \"grp\", \"Mother and child with horse\", \"g2\", \"k\"],\n    [3, 3, \"grp\", \"Mother and child pointing at horse\", \"g2\", \"k\"],\n    [4, 1, \"por\", \"Close-up of child outdoors\", null, \"k\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"dup\",\n      \"all\": [0],\n      \"keep\": [0],\n      \"why\": \"Single shot of child in toy truck.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"scene\",\n      \"all\": [3, 2],\n      \"keep\": [3, 2],\n      \"why\": \"Both show different interactions with the horse.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2025-09-26-99192672e4ed",
+      "n": 3,
+      "oldKeepCount": 2,
+      "newKeepCount": 2,
+      "oldPicks": [
+        1,
+        2
+      ],
+      "newPicks": [
+        1,
+        2
+      ],
+      "onlyOld": [],
+      "onlyNew": [],
+      "oldSg": {},
+      "newSg": {},
+      "elapsed": 2.29,
+      "newRaw": "{\n  \"sum\": \"A collection of personal snapshots including a travel map, a meal at the cabin, and a baby's birthmark.\",\n  \"img\": [\n    [0, 0, \"ss\", \"Navigation map screenshot\", null, \"c\"],\n    [1, 1, \"food\", \"Pizza meal at cabin\", null, \"k\"],\n    [2, 3, \"por\", \"Baby Halldis and birthmark\", null, \"k\"]\n  ],\n  \"sg\": []\n}"
+    },
+    {
+      "batchId": "2014-05-17-99ca9eb0c3a0",
+      "n": 5,
+      "oldKeepCount": 3,
+      "newKeepCount": 3,
+      "oldPicks": [
+        0,
+        2,
+        4
+      ],
+      "newPicks": [
+        2,
+        3,
+        4
+      ],
+      "onlyOld": [
+        0
+      ],
+      "onlyNew": [
+        3
+      ],
+      "oldSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          2
+        ]
+      },
+      "newSg": {
+        "g1": [
+          2,
+          3
+        ]
+      },
+      "elapsed": 2.723,
+      "newRaw": "{\n  \"sum\": \"A series of portraits of a woman in traditional attire.\",\n  \"img\": [\n    [0, 0, \"por\", \"Woman looking down, eyes closed\", \"g1\", \"c\"],\n    [1, 0, \"por\", \"Blurry portrait of woman\", \"g1\", \"c\"],\n    [2, 3, \"por\", \"Woman smiling at camera\", \"g1\", \"k\"],\n    [3, 2, \"por\", \"Woman looking at camera\", \"g1\", \"k\"],\n    [4, 1, \"por\", \"Woman looking away, profile\", null, \"k\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"burst\",\n      \"all\": [2, 3, 0, 1],\n      \"keep\": [2, 3],\n      \"why\": \"Best expressions and focus in the sequence.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2015-06-20-6efb14a3cfcb",
+      "n": 12,
+      "oldKeepCount": 5,
+      "newKeepCount": 5,
+      "oldPicks": [
+        0,
+        3,
+        6,
+        7,
+        9
+      ],
+      "newPicks": [
+        0,
+        3,
+        6,
+        7,
+        10
+      ],
+      "onlyOld": [
+        9
+      ],
+      "onlyNew": [
+        10
+      ],
+      "oldSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          3
+        ],
+        "g3": [
+          7
+        ],
+        "g4": [
+          9
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          3
+        ],
+        "g3": [
+          6,
+          7
+        ],
+        "g4": [
+          10
+        ]
+      },
+      "elapsed": 8.388,
+      "newRaw": "{\n  \"sum\": \"A series of photos capturing a traditional wedding ceremony and the couple's exit.\",\n  \"img\": [\n    [0, 2, \"por\", \"Couple in traditional attire, priest blessing\", \"g1\", \"k\"],\n    [1, 1, \"por\", \"Couple in traditional attire, solemn\", \"g1\", \"c\"],\n    [2, 1, \"por\", \"Couple in traditional attire, looking\", \"g1\", \"c\"],\n    [3, 1, \"grp\", \"Guests in traditional clothing standing\", \"g2\", \"k\"],\n    [4, 1, \"grp\", \"Guests taking photos during ceremony\", \"g2\", \"c\"],\n    [5, 1, \"grp\", \"Guest taking photo, focused\", \"g2\", \"c\"],\n    [6, 1, \"por\", \"Couple standing at altar\", \"g3\", \"k\"],\n    [7, 2, \"por\", \"Couple smiling at each other\", \"g3\", \"k\"],\n    [8, 1, \"act\", \"Couple walking down aisle\", \"g4\", \"c\"],\n    [9, 1, \"act\", \"Couple walking down aisle\", \"g4\", \"c\"],\n    [10, 3, \"act\", \"Couple walking down aisle, smiling\", \"g4\", \"k\"],\n    [11, 1, \"act\", \"Couple walking down aisle, blurry\", \"g4\", \"c\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"burst\",\n      \"all\": [0, 1, 2],\n      \"keep\": [0],\n      \"why\": \"Best composition and clear interaction with the priest.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"scene\",\n      \"all\": [3, 4, 5],\n      \"keep\": [3],\n      \"why\": \"Best view of the guests in traditional attire.\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"scene\",\n      \"all\": [7, 6],\n      \"keep\": [7, 6],\n      \"why\": \"Captures the couple's interaction and standing position.\"\n    },\n    {\n      \"id\": \"g4\",\n      \"type\": \"burst\",\n      \"all\": [10, 8, 9, 11],\n      \"keep\": [10],\n      \"why\": \"Best focus and expression during the exit.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2007-01-01-471323d8b2d5",
+      "n": 24,
+      "oldKeepCount": 10,
+      "newKeepCount": 12,
+      "oldPicks": [
+        1,
+        2,
+        3,
+        4,
+        6,
+        8,
+        10,
+        15,
+        17,
+        22
+      ],
+      "newPicks": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        8,
+        9,
+        15,
+        16,
+        17,
+        22
+      ],
+      "onlyOld": [
+        10
+      ],
+      "onlyNew": [
+        5,
+        9,
+        16
+      ],
+      "oldSg": {
+        "g1": [
+          1
+        ],
+        "g2": [
+          4
+        ],
+        "g3": [
+          6,
+          8
+        ],
+        "g4": [
+          10
+        ],
+        "g5": [
+          15
+        ],
+        "g6": [
+          17
+        ],
+        "g7": [
+          22
+        ]
+      },
+      "newSg": {
+        "g1": [
+          1
+        ],
+        "g2": [
+          4,
+          5
+        ],
+        "g3": [
+          6,
+          8
+        ],
+        "g4": [
+          9
+        ],
+        "g5": [
+          15,
+          16,
+          22
+        ],
+        "g6": [
+          17
+        ]
+      },
+      "elapsed": 7.065,
+      "newRaw": "{\n  \"sum\": \"A collection of candid indoor portraits and playful moments featuring three young adults.\",\n  \"img\": [\n    [0, 0, \"por\", \"Blurry double exposure portrait\", \"g1\", \"c\"],\n    [1, 3, \"por\", \"Two women smiling together\", \"g1\", \"k\"],\n    [2, 1, \"por\", \"Young man in glasses\", null, \"k\"],\n    [3, 2, \"grp\", \"Three friends making faces\", null, \"k\"],\n    [4, 2, \"por\", \"Woman kissing friend's cheek\", \"g2\", \"k\"],\n    [5, 2, \"por\", \"Two women posing together\", \"g2\", \"k\"],\n    [6, 1, \"por\", \"Two women laughing loudly\", \"g3\", \"k\"],\n    [7, 1, \"por\", \"Two women looking at camera\", \"g3\", \"c\"],\n    [8, 2, \"por\", \"Two women laughing together\", \"g3\", \"k\"],\n    [9, 1, \"por\", \"Two women posing seriously\", \"g4\", \"k\"],\n    [10, 1, \"por\", \"Two women smiling\", \"g4\", \"c\"],\n    [11, 1, \"por\", \"Two women looking at each other\", \"g4\", \"c\"],\n    [12, 1, \"por\", \"Two women smiling at each other\", \"g4\", \"c\"],\n    [13, 1, \"por\", \"Two women laughing\", \"g4\", \"c\"],\n    [14, 1, \"act\", \"Woman dancing in skirt\", \"g5\", \"c\"],\n    [15, 2, \"act\", \"Woman posing in skirt\", \"g5\", \"k\"],\n    [16, 2, \"act\", \"Woman spinning in skirt\", \"g5\", \"k\"],\n    [17, 2, \"por\", \"Woman looking over shoulder\", \"g6\", \"k\"],\n    [18, 1, \"por\", \"Woman laughing looking up\", \"g6\", \"c\"],\n    [19, 1, \"por\", \"Woman looking away\", \"g6\", \"c\"],\n    [20, 1, \"act\", \"Woman spinning in skirt\", \"g5\", \"c\"],\n    [21, 1, \"por\", \"Woman looking at camera\", \"g6\", \"c\"],\n    [22, 2, \"act\", \"Woman dancing and smiling\", \"g5\", \"k\"],\n    [23, 0, \"por\", \"Blurry motion portrait\", \"g6\", \"c\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"dup\",\n      \"all\": [1, 0],\n      \"keep\": [1],\n      \"why\": \"Clear, sharp portrait vs blurry double exposure.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"scene\",\n      \"all\": [4, 5],\n      \"keep\": [4, 5],\n      \"why\": \"Both capture distinct, sweet interactions.\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"burst\",\n      \"all\": [8, 6, 7],\n      \"keep\": [8, 6],\n      \"why\": \"Best candid laughter moments.\"\n    },\n    {\n      \"id\": \"g4\",\n      \"type\": \"burst\",\n      \"all\": [9, 10, 11, 12, 13],\n      \"keep\": [9],\n      \"why\": \"Best composed portrait of the pair.\"\n    },\n    {\n      \"id\": \"g5\",\n      \"type\": \"act\",\n      \"all\": [16, 15, 22, 14, 20],\n      \"keep\": [16, 15, 22],\n      \"why\": \"Captures different stages of the dance/spin.\"\n    },\n    {\n      \"id\": \"g6\",\n      \"type\": \"burst\",\n      \"all\": [17, 18, 19, 21, 23],\n      \"keep\": [17],\n      \"why\": \"Best sharp portrait of the subject.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2011-07-29-c2ab151353c9",
+      "n": 2,
+      "oldKeepCount": 1,
+      "newKeepCount": 1,
+      "oldPicks": [
+        1
+      ],
+      "newPicks": [
+        1
+      ],
+      "onlyOld": [],
+      "onlyNew": [],
+      "oldSg": {
+        "g1": [
+          1
+        ]
+      },
+      "newSg": {
+        "g1": [
+          1
+        ]
+      },
+      "elapsed": 2.345,
+      "newRaw": "{\n  \"sum\": \"Two photos of a woman eating cake at a restaurant.\",\n  \"img\": [\n    [0, 0, \"food\", \"Woman looking down at cake\", \"g1\", \"c\"],\n    [1, 2, \"por\", \"Woman smiling at camera\", \"g1\", \"k\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"dup\",\n      \"all\": [1, 0],\n      \"keep\": [1],\n      \"why\": \"Better expression and eye contact in the second shot.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2018-08-04-9504a725bff6",
+      "n": 21,
+      "oldKeepCount": 7,
+      "newKeepCount": 9,
+      "oldPicks": [
+        0,
+        4,
+        6,
+        7,
+        8,
+        14,
+        16
+      ],
+      "newPicks": [
+        0,
+        2,
+        4,
+        6,
+        7,
+        8,
+        14,
+        16,
+        20
+      ],
+      "onlyOld": [],
+      "onlyNew": [
+        2,
+        20
+      ],
+      "oldSg": {
+        "g1": [
+          2
+        ],
+        "g2": [
+          4
+        ],
+        "g3": [
+          6
+        ],
+        "g4": [
+          7
+        ],
+        "g5": [
+          8,
+          10
+        ],
+        "g6": [
+          14
+        ],
+        "g7": [
+          20
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0,
+          2
+        ],
+        "g2": [
+          4
+        ],
+        "g3": [
+          6
+        ],
+        "g4": [
+          7
+        ],
+        "g5": [
+          8,
+          10
+        ],
+        "g6": [
+          14
+        ],
+        "g7": [
+          16,
+          20
+        ]
+      },
+      "elapsed": 7.163,
+      "newRaw": "{\n  \"sum\": \"A family outing to a geothermal pool followed by a walk and parking lot gathering.\",\n  \"img\": [\n    [0, 1, \"grp\", \"Four women in pool\", \"g1\", \"k\"],\n    [1, 1, \"grp\", \"Four women in pool\", \"g1\", \"c\"],\n    [2, 2, \"grp\", \"Four women in pool\", \"g1\", \"k\"],\n    [3, 0, \"grp\", \"Blurry group in pool\", \"g1\", \"c\"],\n    [4, 2, \"por\", \"Woman in pool\", \"g2\", \"k\"],\n    [5, 1, \"por\", \"Woman in pool\", \"g2\", \"c\"],\n    [6, 2, \"grp\", \"Two women talking in pool\", \"g3\", \"k\"],\n    [7, 2, \"por\", \"Woman smiling in pool\", \"g4\", \"k\"],\n    [8, 2, \"por\", \"Man relaxing in pool\", \"g5\", \"k\"],\n    [9, 0, \"por\", \"Finger blocking man\", \"g5\", \"c\"],\n    [10, 2, \"por\", \"Man smiling in pool\", \"g5\", \"c\"],\n    [11, 1, \"por\", \"Man in pool\", \"g5\", \"c\"],\n    [12, 1, \"por\", \"Man in pool\", \"g5\", \"c\"],\n    [13, 1, \"por\", \"Man in pool\", \"g5\", \"c\"],\n    [14, 1, \"grp\", \"Two women walking\", \"g6\", \"k\"],\n    [15, 1, \"grp\", \"Two women walking\", \"g6\", \"c\"],\n    [16, 1, \"grp\", \"Family gathering in lot\", \"g7\", \"k\"],\n    [17, 1, \"grp\", \"Family gathering in lot\", \"g7\", \"c\"],\n    [18, 1, \"grp\", \"Family gathering in lot\", \"g7\", \"c\"],\n    [19, 1, \"grp\", \"Family gathering in lot\", \"g7\", \"c\"],\n    [20, 2, \"grp\", \"Family gathering in lot\", \"g7\", \"k\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"dup\",\n      \"all\": [2, 0, 1, 3],\n      \"keep\": [2, 0],\n      \"why\": \"Best composition and clear expressions.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"dup\",\n      \"all\": [4, 5],\n      \"keep\": [4],\n      \"why\": \"Clearer focus on the subject.\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"dup\",\n      \"all\": [6],\n      \"keep\": [6],\n      \"why\": \"Nice candid interaction.\"\n    },\n    {\n      \"id\": \"g4\",\n      \"type\": \"dup\",\n      \"all\": [7],\n      \"keep\": [7],\n      \"why\": \"Good portrait of the subject.\"\n    },\n    {\n      \"id\": \"g5\",\n      \"type\": \"dup\",\n      \"all\": [8, 10, 11, 12, 13, 9],\n      \"keep\": [8, 10],\n      \"why\": \"Best expressions and framing of the subject.\"\n    },\n    {\n      \"id\": \"g6\",\n      \"type\": \"dup\",\n      \"all\": [14, 15],\n      \"keep\": [14],\n      \"why\": \"Better distance and composition.\"\n    },\n    {\n      \"id\": \"g7\",\n      \"type\": \"dup\",\n      \"all\": [20, 16, 17, 18, 19],\n      \"keep\": [20, 16],\n      \"why\": \"Best group interaction and visibility.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2013-05-18-a718fa55e273",
+      "n": 30,
+      "oldKeepCount": 13,
+      "newKeepCount": 13,
+      "oldPicks": [
+        0,
+        1,
+        2,
+        4,
+        6,
+        8,
+        10,
+        14,
+        17,
+        20,
+        23,
+        25,
+        28
+      ],
+      "newPicks": [
+        0,
+        1,
+        3,
+        4,
+        6,
+        7,
+        8,
+        9,
+        11,
+        13,
+        14,
+        17,
+        28
+      ],
+      "onlyOld": [
+        2,
+        10,
+        20,
+        23,
+        25
+      ],
+      "onlyNew": [
+        3,
+        7,
+        9,
+        11,
+        13
+      ],
+      "oldSg": {
+        "g1": [
+          2
+        ],
+        "g2": [
+          4
+        ],
+        "g3": [
+          8
+        ],
+        "g4": [
+          10
+        ],
+        "g5": [
+          14
+        ],
+        "g6": [
+          17
+        ],
+        "g7": [
+          20
+        ],
+        "g8": [
+          25
+        ],
+        "g9": [
+          28
+        ]
+      },
+      "newSg": {
+        "g1": [
+          7
+        ],
+        "g2": [
+          11
+        ],
+        "g3": [
+          13
+        ],
+        "g4": [
+          14
+        ],
+        "g5": [
+          17
+        ],
+        "g6": [],
+        "g7": [
+          28
+        ]
+      },
+      "elapsed": 7.856,
+      "newRaw": "{\n  \"sum\": \"A collection of photos from a social event, including queueing, indoor dining, and evening outdoor portraits.\",\n  \"img\": [\n    [0, 1, \"evt\", \"Crowd waiting outside venue\", null, \"k\"],\n    [1, 2, \"por\", \"Man talking to woman\", null, \"k\"],\n    [2, 0, \"grp\", \"Man and woman at table\", \"g1\", \"c\"],\n    [3, 1, \"por\", \"Woman looking away\", null, \"k\"],\n    [4, 1, \"por\", \"Woman with curly hair\", null, \"k\"],\n    [5, 0, \"evt\", \"Screen showing performance\", null, \"c\"],\n    [6, 2, \"por\", \"Man smiling with drink\", null, \"k\"],\n    [7, 2, \"grp\", \"Man and woman at table\", \"g1\", \"k\"],\n    [8, 1, \"por\", \"Woman writing at table\", null, \"k\"],\n    [9, 1, \"grp\", \"Group at table\", null, \"k\"],\n    [10, 0, \"grp\", \"Couple talking\", \"g2\", \"c\"],\n    [11, 1, \"grp\", \"Couple talking\", \"g2\", \"k\"],\n    [12, 0, \"grp\", \"Woman looking down\", \"g3\", \"c\"],\n    [13, 1, \"grp\", \"Woman gesturing while talking\", \"g3\", \"k\"],\n    [14, 2, \"por\", \"Woman with curly hair laughing\", \"g4\", \"k\"],\n    [15, 1, \"por\", \"Woman with curly hair looking\", \"g4\", \"c\"],\n    [16, 1, \"por\", \"Woman with curly hair smiling\", \"g4\", \"c\"],\n    [17, 2, \"grp\", \"Group clapping at table\", \"g5\", \"k\"],\n    [18, 1, \"grp\", \"Group clapping at table\", \"g5\", \"c\"],\n    [19, 1, \"grp\", \"Group clapping at table\", \"g5\", \"c\"],\n    [20, 1, \"grp\", \"Group clapping at table\", \"g5\", \"c\"],\n    [21, 1, \"grp\", \"Group clapping at table\", \"g5\", \"c\"],\n    [22, 1, \"grp\", \"Group clapping at table\", \"g5\", \"c\"],\n    [23, 1, \"grp\", \"Group clapping at table\", \"g5\", \"c\"],\n    [24, 0, \"grp\", \"Blue-tinted table scene\", \"g6\", \"c\"],\n    [25, 0, \"grp\", \"Blue-tinted table scene\", \"g6\", \"c\"],\n    [26, 0, \"grp\", \"Blue-tinted table scene\", \"g6\", \"c\"],\n    [27, 0, \"por\", \"Blurry blue-tinted portrait\", null, \"c\"],\n    [28, 2, \"grp\", \"Three friends standing outside\", \"g7\", \"k\"],\n    [29, 1, \"grp\", \"Three friends standing outside\", \"g7\", \"c\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"dup\",\n      \"all\": [7, 2],\n      \"keep\": [7],\n      \"why\": \"Better focus and expressions\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"dup\",\n      \"all\": [11, 10],\n      \"keep\": [11],\n      \"why\": \"Clearer view of subjects\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"dup\",\n      \"all\": [13, 12],\n      \"keep\": [13],\n      \"why\": \"Better interaction captured\"\n    },\n    {\n      \"id\": \"g4\",\n      \"type\": \"burst\",\n      \"all\": [14, 16, 15],\n      \"keep\": [14],\n      \"why\": \"Best laugh and expression\"\n    },\n    {\n      \"id\": \"g5\",\n      \"type\": \"burst\",\n      \"all\": [17, 18, 19, 20, 21, 22, 23],\n      \"keep\": [17],\n      \"why\": \"Best group composition\"\n    },\n    {\n      \"id\": \"g6\",\n      \"type\": \"dup\",\n      \"all\": [24, 25, 26],\n      \"keep\": [],\n      \"why\": \"Poor lighting and color cast\"\n    },\n    {\n      \"id\": \"g7\",\n      \"type\": \"dup\",\n      \"all\": [28, 29],\n      \"keep\": [28],\n      \"why\": \"Better expressions\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2011-06-09-746c0cb87f62",
+      "n": 7,
+      "oldKeepCount": 3,
+      "newKeepCount": 4,
+      "oldPicks": [
+        1,
+        3,
+        4
+      ],
+      "newPicks": [
+        1,
+        2,
+        4,
+        6
+      ],
+      "onlyOld": [
+        3
+      ],
+      "onlyNew": [
+        2,
+        6
+      ],
+      "oldSg": {
+        "g1": [
+          1
+        ],
+        "g2": [
+          3
+        ],
+        "g3": [
+          4
+        ]
+      },
+      "newSg": {
+        "g1": [
+          1
+        ],
+        "g2": [
+          2
+        ],
+        "g3": [
+          4,
+          6
+        ]
+      },
+      "elapsed": 7.858,
+      "newRaw": "{\n  \"sum\": \"A series of candid portraits and pub atmosphere shots.\",\n  \"img\": [\n    [0, 1, \"por\", \"Woman looking away, pensive\", \"g1\", \"c\"],\n    [1, 2, \"por\", \"Woman looking at camera\", \"g1\", \"k\"],\n    [2, 2, \"por\", \"Man resting chin, portrait\", \"g2\", \"k\"],\n    [3, 1, \"por\", \"Man looking at camera\", \"g2\", \"c\"],\n    [4, 1, \"evt\", \"Pub scene with band\", \"g3\", \"k\"],\n    [5, 0, \"evt\", \"Blurry pub scene\", \"g3\", \"c\"],\n    [6, 1, \"evt\", \"Pub scene, wider view\", \"g3\", \"k\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"dup\",\n      \"all\": [1, 0],\n      \"keep\": [1],\n      \"why\": \"Better eye contact and engagement.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"dup\",\n      \"all\": [2, 3],\n      \"keep\": [2],\n      \"why\": \"Stronger composition and focus.\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"scene\",\n      \"all\": [4, 6, 5],\n      \"keep\": [4, 6],\n      \"why\": \"Captures the pub atmosphere and live music.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2025-01-21-ce127005df74",
+      "n": 5,
+      "oldKeepCount": 2,
+      "newKeepCount": 3,
+      "oldPicks": [
+        0,
+        2
+      ],
+      "newPicks": [
+        0,
+        2,
+        3
+      ],
+      "onlyOld": [],
+      "onlyNew": [
+        3
+      ],
+      "oldSg": {
+        "g1": [
+          0
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0
+        ]
+      },
+      "elapsed": 2.771,
+      "newRaw": "{\n  \"sum\": \"A collection of technical screenshots and photos documenting a phone's display issues.\",\n  \"img\": [\n    [0, 1, \"tech\", \"Phone showing cat wallpaper\", \"g1\", \"k\"],\n    [1, 0, \"tech\", \"Browser menu on phone\", null, \"c\"],\n    [2, 1, \"ss\", \"Map lane closure notification\", null, \"k\"],\n    [3, 1, \"ss\", \"Firefox app prompt\", null, \"k\"],\n    [4, 1, \"tech\", \"Phone with green line defect\", \"g1\", \"c\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"dup\",\n      \"all\": [0, 4],\n      \"keep\": [0],\n      \"why\": \"Similar photos of phone display; keeping the clearest one.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2022-12-26-fe9da03eff5c",
+      "n": 8,
+      "oldKeepCount": 4,
+      "newKeepCount": 4,
+      "oldPicks": [
+        0,
+        1,
+        2,
+        5
+      ],
+      "newPicks": [
+        0,
+        1,
+        5,
+        7
+      ],
+      "onlyOld": [
+        2
+      ],
+      "onlyNew": [
+        7
+      ],
+      "oldSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          2
+        ],
+        "g3": [
+          5
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0,
+          1
+        ],
+        "g2": [
+          5,
+          7
+        ]
+      },
+      "elapsed": 5.221,
+      "newRaw": "{\n  \"sum\": \"Family beach outing captured in two distinct group portrait sessions.\",\n  \"img\": [\n    [0, 1, \"por\", \"Mother holding child, beach\", \"g1\", \"k\"],\n    [1, 2, \"grp\", \"Family group portrait, smiling\", \"g1\", \"k\"],\n    [2, 1, \"grp\", \"Family group, looking at child\", \"g1\", \"c\"],\n    [3, 1, \"grp\", \"Family group, slightly blurry\", \"g1\", \"c\"],\n    [4, 0, \"por\", \"Close-up of man, sky\", null, \"c\"],\n    [5, 2, \"grp\", \"Full family selfie, smiling\", \"g2\", \"k\"],\n    [6, 1, \"grp\", \"Full family selfie, looking down\", \"g2\", \"c\"],\n    [7, 2, \"grp\", \"Full family selfie, laughing\", \"g2\", \"k\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"scene\",\n      \"all\": [1, 0, 2, 3],\n      \"keep\": [1, 0],\n      \"why\": \"Best group composition and individual portrait of mother and child.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"burst\",\n      \"all\": [7, 5, 6],\n      \"keep\": [7, 5],\n      \"why\": \"Best expressions and interaction in the group selfie.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2015-06-20-16031b4fae20",
+      "n": 29,
+      "oldKeepCount": 23,
+      "newKeepCount": 24,
+      "oldPicks": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        12,
+        14,
+        15,
+        16,
+        17,
+        18,
+        20,
+        21,
+        24,
+        25,
+        26,
+        28
+      ],
+      "newPicks": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        20,
+        21,
+        23,
+        25,
+        26,
+        28
+      ],
+      "onlyOld": [
+        24
+      ],
+      "onlyNew": [
+        13,
+        23
+      ],
+      "oldSg": {
+        "g1": [
+          10
+        ],
+        "g2": [
+          16
+        ],
+        "g3": [
+          21
+        ],
+        "g4": [
+          24
+        ],
+        "g5": [
+          25
+        ]
+      },
+      "newSg": {
+        "g1": [
+          10
+        ],
+        "g2": [
+          16
+        ],
+        "g3": [
+          21
+        ],
+        "g4": [
+          23
+        ],
+        "g5": [
+          25
+        ]
+      },
+      "elapsed": 14.574,
+      "newRaw": "{\n  \"sum\": \"A collection of portraits and candid moments from a formal family gathering.\",\n  \"img\": [\n    [0, 1, \"por\", \"Woman in traditional attire\", null, \"k\"],\n    [1, 1, \"por\", \"Man in suit, profile\", null, \"k\"],\n    [2, 2, \"por\", \"Woman holding plate, smiling\", null, \"k\"],\n    [3, 1, \"por\", \"Older man with beard\", null, \"k\"],\n    [4, 2, \"por\", \"Woman smiling, hands clasped\", null, \"k\"],\n    [5, 1, \"por\", \"Man in suit, hand on face\", null, \"k\"],\n    [6, 2, \"por\", \"Man with long beard waving\", null, \"k\"],\n    [7, 1, \"por\", \"Woman in traditional dress\", null, \"k\"],\n    [8, 1, \"por\", \"Man in suit, thoughtful\", null, \"k\"],\n    [9, 2, \"por\", \"Woman in green shawl smiling\", null, \"k\"],\n    [10, 2, \"por\", \"Man with hands clasped\", \"g1\", \"k\"],\n    [11, 1, \"por\", \"Man with hands clasped\", \"g1\", \"c\"],\n    [12, 2, \"por\", \"Woman holding paper, smiling\", null, \"k\"],\n    [13, 1, \"por\", \"Man with hands clasped\", null, \"k\"],\n    [14, 1, \"por\", \"Woman reading paper\", null, \"k\"],\n    [15, 1, \"por\", \"Man in red vest\", null, \"k\"],\n    [16, 2, \"por\", \"Woman with white hair\", \"g2\", \"k\"],\n    [17, 1, \"por\", \"Woman in green shawl\", null, \"k\"],\n    [18, 1, \"por\", \"Man in green vest\", null, \"k\"],\n    [19, 1, \"por\", \"Woman with white hair\", \"g2\", \"c\"],\n    [20, 1, \"por\", \"Older man in suit\", null, \"k\"],\n    [21, 2, \"por\", \"Woman in blue shawl\", \"g3\", \"k\"],\n    [22, 1, \"por\", \"Woman in blue shawl\", \"g3\", \"c\"],\n    [23, 2, \"por\", \"Man in blue suit\", \"g4\", \"k\"],\n    [24, 1, \"por\", \"Man in blue suit\", \"g4\", \"c\"],\n    [25, 2, \"por\", \"Woman with blonde hair\", \"g5\", \"k\"],\n    [26, 1, \"por\", \"Man with mustache\", null, \"k\"],\n    [27, 1, \"por\", \"Woman with blonde hair\", \"g5\", \"c\"],\n    [28, 2, \"por\", \"Woman in red vest\", null, \"k\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"dup\",\n      \"all\": [10, 11],\n      \"keep\": [10],\n      \"why\": \"Better focus and expression\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"dup\",\n      \"all\": [16, 19],\n      \"keep\": [16],\n      \"why\": \"Clearer view of subject\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"dup\",\n      \"all\": [21, 22],\n      \"keep\": [21],\n      \"why\": \"Better expression\"\n    },\n    {\n      \"id\": \"g4\",\n      \"type\": \"dup\",\n      \"all\": [23, 24],\n      \"keep\": [23],\n      \"why\": \"Better focus\"\n    },\n    {\n      \"id\": \"g5\",\n      \"type\": \"dup\",\n      \"all\": [25, 27],\n      \"keep\": [25],\n      \"why\": \"Better composition\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2006-03-24-26b6b4280b7c",
+      "n": 30,
+      "oldKeepCount": 4,
+      "newKeepCount": 8,
+      "oldPicks": [
+        2,
+        4,
+        12,
+        24
+      ],
+      "newPicks": [
+        0,
+        2,
+        4,
+        12,
+        15,
+        22,
+        26,
+        29
+      ],
+      "onlyOld": [
+        24
+      ],
+      "onlyNew": [
+        0,
+        15,
+        22,
+        26,
+        29
+      ],
+      "oldSg": {
+        "g1": [
+          2,
+          4
+        ],
+        "g2": [],
+        "g3": [
+          12
+        ],
+        "g4": [
+          24
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0,
+          2
+        ],
+        "g2": [
+          4,
+          12
+        ],
+        "g3": [],
+        "g4": [
+          15
+        ],
+        "g5": [
+          22
+        ],
+        "g6": [
+          26,
+          29
+        ]
+      },
+      "elapsed": 7.889,
+      "newRaw": "{\n  \"sum\": \"A series of portraits and a book presentation featuring a man and a young woman.\",\n  \"img\": [\n    [0, 1, \"por\", \"Man and woman close-up\", \"g1\", \"k\"],\n    [1, 1, \"por\", \"Man and woman, neutral expressions\", \"g1\", \"c\"],\n    [2, 2, \"por\", \"Man and woman, smiling\", \"g1\", \"k\"],\n    [3, 1, \"por\", \"Man and woman, soft smiles\", \"g1\", \"c\"],\n    [4, 1, \"grp\", \"Full body shot, standing\", \"g2\", \"k\"],\n    [5, 0, \"grp\", \"Full body, slightly distant\", \"g2\", \"c\"],\n    [6, 0, \"por\", \"Low angle, man and woman\", \"g3\", \"c\"],\n    [7, 0, \"por\", \"Low angle, smiling\", \"g3\", \"c\"],\n    [8, 0, \"por\", \"Low angle, looking down\", \"g3\", \"c\"],\n    [9, 0, \"por\", \"Low angle, neutral\", \"g3\", \"c\"],\n    [10, 0, \"por\", \"Low angle, close-up\", \"g3\", \"c\"],\n    [11, 1, \"grp\", \"Full body, woman eyes closed\", \"g2\", \"c\"],\n    [12, 2, \"grp\", \"Full body, both smiling\", \"g2\", \"k\"],\n    [13, 1, \"grp\", \"Full body, slightly soft\", \"g2\", \"c\"],\n    [14, 1, \"grp\", \"Full body, overcast sky\", \"g2\", \"c\"],\n    [15, 1, \"por\", \"Close-up, man and woman\", \"g4\", \"k\"],\n    [16, 1, \"por\", \"Close-up, man and woman\", \"g4\", \"c\"],\n    [17, 1, \"por\", \"Close-up, man and woman\", \"g4\", \"c\"],\n    [18, 1, \"por\", \"Close-up, man and woman\", \"g4\", \"c\"],\n    [19, 1, \"por\", \"Close-up, man and woman\", \"g4\", \"c\"],\n    [20, 1, \"por\", \"Close-up, man and woman\", \"g4\", \"c\"],\n    [21, 1, \"grp\", \"Full body, standing together\", \"g2\", \"c\"],\n    [22, 2, \"rec\", \"Man handing book to woman\", \"g5\", \"k\"],\n    [23, 1, \"rec\", \"Man and woman holding book\", \"g5\", \"c\"],\n    [24, 1, \"rec\", \"Man and woman holding book\", \"g5\", \"c\"],\n    [25, 1, \"rec\", \"Man and woman holding book\", \"g5\", \"c\"],\n    [26, 1, \"por\", \"Man holding book, woman standing\", \"g6\", \"k\"],\n    [27, 1, \"por\", \"Man holding book, woman smiling\", \"g6\", \"c\"],\n    [28, 1, \"por\", \"Man holding book, woman looking\", \"g6\", \"c\"],\n    [29, 2, \"por\", \"Man holding book, woman smiling\", \"g6\", \"k\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"dup\",\n      \"all\": [2, 0, 1, 3],\n      \"keep\": [2, 0],\n      \"why\": \"Best expressions and framing for the close-up portrait.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"scene\",\n      \"all\": [12, 4, 11, 13, 14, 21],\n      \"keep\": [12, 4],\n      \"why\": \"Best full-body shots with clear expressions.\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"burst\",\n      \"all\": [6, 7, 8, 9, 10],\n      \"keep\": [],\n      \"why\": \"Low angle shots are unflattering; culling all.\"\n    },\n    {\n      \"id\": \"g4\",\n      \"type\": \"dup\",\n      \"all\": [15, 16, 17, 18, 19, 20],\n      \"keep\": [15],\n      \"why\": \"Near-identical burst; keeping the first for the memory.\"\n    },\n    {\n      \"id\": \"g5\",\n      \"type\": \"act\",\n      \"all\": [22, 23, 24, 25],\n      \"keep\": [22],\n      \"why\": \"The moment of exchange is best captured in the first frame.\"\n    },\n    {\n      \"id\": \"g6\",\n      \"type\": \"dup\",\n      \"all\": [29, 26, 27, 28],\n      \"keep\": [29, 26],\n      \"why\": \"Best poses with the book.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2005-06-26-7d827f77d703",
+      "n": 26,
+      "oldKeepCount": 6,
+      "newKeepCount": 8,
+      "oldPicks": [
+        0,
+        5,
+        8,
+        14,
+        23,
+        24
+      ],
+      "newPicks": [
+        0,
+        3,
+        5,
+        6,
+        12,
+        14,
+        19,
+        23
+      ],
+      "onlyOld": [
+        8,
+        24
+      ],
+      "onlyNew": [
+        3,
+        6,
+        12,
+        19
+      ],
+      "oldSg": {
+        "g1": [
+          0
+        ],
+        "g2": [
+          8,
+          14
+        ],
+        "g3": [
+          24
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0,
+          3
+        ],
+        "g2": [
+          6
+        ],
+        "g3": [
+          12,
+          14,
+          19
+        ],
+        "g4": [
+          23
+        ]
+      },
+      "elapsed": 7.321,
+      "newRaw": "{\n  \"sum\": \"Two children playing and eating snacks under a trampoline.\",\n  \"img\": [\n    [0, 2, \"grp\", \"Children sitting under trampoline\", \"g1\", \"k\"],\n    [1, 1, \"grp\", \"Children interacting under trampoline\", \"g1\", \"c\"],\n    [2, 1, \"grp\", \"Children playing under trampoline\", \"g1\", \"c\"],\n    [3, 2, \"grp\", \"Children with colorful socks\", \"g1\", \"k\"],\n    [4, 1, \"grp\", \"Child crawling under trampoline\", \"g1\", \"c\"],\n    [5, 2, \"act\", \"Child running from trampoline\", null, \"k\"],\n    [6, 2, \"por\", \"Child laughing under trampoline\", \"g2\", \"k\"],\n    [7, 1, \"grp\", \"Child watching friend under trampoline\", \"g2\", \"c\"],\n    [8, 1, \"por\", \"Child eating snack\", \"g3\", \"c\"],\n    [9, 1, \"por\", \"Child looking at snack\", \"g3\", \"c\"],\n    [10, 1, \"por\", \"Child leaning on trampoline\", \"g3\", \"c\"],\n    [11, 1, \"por\", \"Child looking at snack\", \"g3\", \"c\"],\n    [12, 2, \"por\", \"Child holding snack container\", \"g3\", \"k\"],\n    [13, 1, \"por\", \"Child with hands up\", \"g3\", \"c\"],\n    [14, 2, \"por\", \"Child laughing with hand\", \"g3\", \"k\"],\n    [15, 1, \"por\", \"Child looking down\", \"g3\", \"c\"],\n    [16, 1, \"por\", \"Child touching chin\", \"g3\", \"c\"],\n    [17, 1, \"por\", \"Child hand to mouth\", \"g3\", \"c\"],\n    [18, 1, \"por\", \"Child looking at hand\", \"g3\", \"c\"],\n    [19, 2, \"por\", \"Child eating with spoon\", \"g3\", \"k\"],\n    [20, 1, \"por\", \"Child holding spoon\", \"g3\", \"c\"],\n    [21, 1, \"por\", \"Child eating from container\", \"g3\", \"c\"],\n    [22, 1, \"por\", \"Child sticking tongue out\", \"g3\", \"c\"],\n    [23, 2, \"por\", \"Child with snack dripping\", \"g4\", \"k\"],\n    [24, 1, \"por\", \"Child with snack dripping\", \"g4\", \"c\"],\n    [25, 1, \"por\", \"Child with snack dripping\", \"g4\", \"c\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"scene\",\n      \"all\": [0, 3, 1, 2, 4],\n      \"keep\": [0, 3],\n      \"why\": \"Best composition and clear view of both children.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"scene\",\n      \"all\": [6, 7],\n      \"keep\": [6],\n      \"why\": \"Best expression of the child laughing.\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"burst\",\n      \"all\": [12, 14, 19, 8, 9, 10, 11, 13, 15, 16, 17, 18, 20, 21, 22],\n      \"keep\": [12, 14, 19],\n      \"why\": \"Selected best expressions and clear eating moments.\"\n    },\n    {\n      \"id\": \"g4\",\n      \"type\": \"burst\",\n      \"all\": [23, 24, 25],\n      \"keep\": [23],\n      \"why\": \"Best capture of the funny snack moment.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2003-10-01-97c2aca860d4",
+      "n": 1,
+      "oldKeepCount": 1,
+      "newKeepCount": 1,
+      "oldPicks": [
+        0
+      ],
+      "newPicks": [
+        0
+      ],
+      "onlyOld": [],
+      "onlyNew": [],
+      "oldSg": {},
+      "newSg": {},
+      "elapsed": 2.715,
+      "newRaw": "{\n  \"sum\": \"A candid night portrait of a woman talking on a phone.\",\n  \"img\": [\n    [0, 1, \"por\", \"Woman smiling while on phone\", null, \"k\"]\n  ],\n  \"sg\": []\n}"
+    },
+    {
+      "batchId": "2014-12-31-c0a97e62da4a",
+      "n": 11,
+      "oldKeepCount": 4,
+      "newKeepCount": 6,
+      "oldPicks": [
+        1,
+        3,
+        5,
+        8
+      ],
+      "newPicks": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        8
+      ],
+      "onlyOld": [],
+      "onlyNew": [
+        2,
+        4
+      ],
+      "oldSg": {
+        "g1": [
+          1
+        ],
+        "g2": [
+          5
+        ],
+        "g3": [
+          8
+        ]
+      },
+      "newSg": {
+        "g1": [
+          1,
+          2
+        ],
+        "g2": [
+          5
+        ],
+        "g3": [
+          8
+        ]
+      },
+      "elapsed": 4.825,
+      "newRaw": "{\n  \"sum\": \"A collection of candid moments, including a girl reading, a park gathering, and street scenes.\",\n  \"img\": [\n    [0, 1, \"por\", \"Girl reading under hoodie\", \"g1\", \"c\"],\n    [1, 3, \"por\", \"Girl smiling under hoodie\", \"g1\", \"k\"],\n    [2, 2, \"por\", \"Girl laughing under hoodie\", \"g1\", \"k\"],\n    [3, 2, \"grp\", \"People relaxing in park\", null, \"k\"],\n    [4, 1, \"rec\", \"Couchsurfing sign and gear\", null, \"k\"],\n    [5, 1, \"act\", \"Group cleaning up street\", \"g2\", \"k\"],\n    [6, 1, \"act\", \"Group cleaning up street\", \"g2\", \"c\"],\n    [7, 1, \"act\", \"Group cleaning up street\", \"g2\", \"c\"],\n    [8, 1, \"lan\", \"View down parking tunnel\", \"g3\", \"k\"],\n    [9, 1, \"lan\", \"View down parking tunnel\", \"g3\", \"c\"],\n    [10, 1, \"lan\", \"View down parking tunnel\", \"g3\", \"c\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"burst\",\n      \"all\": [1, 2, 0],\n      \"keep\": [1, 2],\n      \"why\": \"Best expressions of the girl reading.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"type\": \"burst\",\n      \"all\": [5, 6, 7],\n      \"keep\": [5],\n      \"why\": \"Near-identical action shots of cleaning.\"\n    },\n    {\n      \"id\": \"g3\",\n      \"type\": \"dup\",\n      \"all\": [8, 9, 10],\n      \"keep\": [8],\n      \"why\": \"Repetitive landscape shots of the tunnel.\"\n    }\n  ]\n}"
+    },
+    {
+      "batchId": "2013-03-15-000b7374559b",
+      "n": 2,
+      "oldKeepCount": 2,
+      "newKeepCount": 2,
+      "oldPicks": [
+        0,
+        1
+      ],
+      "newPicks": [
+        0,
+        1
+      ],
+      "onlyOld": [],
+      "onlyNew": [],
+      "oldSg": {
+        "g1": [
+          0,
+          1
+        ]
+      },
+      "newSg": {
+        "g1": [
+          0,
+          1
+        ]
+      },
+      "elapsed": 2.55,
+      "newRaw": "{\n  \"sum\": \"Two candid shots of a man and a girl sitting on a bench.\",\n  \"img\": [\n    [0, 1, \"grp\", \"Girl checking pocket, man sitting\", \"g1\", \"k\"],\n    [1, 1, \"grp\", \"Man looking at phone\", \"g1\", \"k\"]\n  ],\n  \"sg\": [\n    {\n      \"id\": \"g1\",\n      \"type\": \"scene\",\n      \"all\": [0, 1],\n      \"keep\": [0, 1],\n      \"why\": \"Different subjects and actions captured in the same setting.\"\n    }\n  ]\n}"
+    }
+  ]
+}

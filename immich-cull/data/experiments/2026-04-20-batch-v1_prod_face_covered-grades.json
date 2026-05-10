@@ -1,0 +1,614 @@
+{
+  "2025-11-10-d18139ccf2e5::whole-batch::picks=0,8,9,13": {
+    "severity": 0,
+    "keepBias": 1,
+    "note": "0 is the most important keep. 8 is nice, 9 and 13 not really needed. But sure, no problem! This was a good one.",
+    "updatedAt": "2026-04-20T20:28:33.632Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2025-10-25-88408d7b0da0::whole-batch::picks=0,1,3,5,9,11,14,15,16,17,19,20,21": {
+    "severity": 2,
+    "keepBias": 1,
+    "note": "way too many pictures kept IMO.",
+    "updatedAt": "2026-04-20T20:34:26.038Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2025-04-18-044e17943212::whole-batch::picks=0,3,4,5,6,7,8,9,13,14,15,16,17,18": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "I'd have kept 2, and only kept one of 3-6. 7 and 9 are okay keeps but may also go. The rest is keepers.",
+    "updatedAt": "2026-04-20T20:44:15.647Z",
+    "inheritedFrom": "2026-04-20-batch-batch_prod"
+  },
+  "2025-10-15-138f8e804baa::whole-batch::picks=0,3,6,7,8": {
+    "severity": 0,
+    "keepBias": 1,
+    "note": "don't need so many versions of the same picture 6,7,8 when also 3 is the same.",
+    "updatedAt": "2026-04-20T20:46:13.203Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2025-06-09-785eb964c444::whole-batch::picks=0,2,5,6,8,10,11,13,14,18,19,20": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "A bit many kept, but nothing missed.",
+    "updatedAt": "2026-04-20T20:47:20.866Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2025-06-02-d97c0edf5b59::whole-batch::picks=0,1,3,5,6,7,9": {
+    "severity": 0,
+    "keepBias": 1,
+    "note": "I'd have kept only one cat photo, and cull 6 the note, but sure.",
+    "updatedAt": "2026-04-20T20:48:12.040Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2025-06-01-6df53df88ee8::whole-batch::picks=0,2,4,6,7,8,9,12,13,15,16,17": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "Too many dupes, 0+2 would have been enough. But it's a good idea with 4 being different. 13 is the same photo as 12 just cropped. 15+16 could probably be culled.",
+    "updatedAt": "2026-04-20T21:28:27.532Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2025-05-17-346e6c34065b::whole-batch::picks=0,1,2,6,8,10,11,13,15,17": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-20T20:51:12.820Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2025-05-17-a0dcf1e12e8e::whole-batch::picks=0,1,4,5,8,10,12,15,16,17,18,21,22,26": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "only keeping the cropped 12 instead of the full 11,  but sure.",
+    "updatedAt": "2026-04-20T20:52:50.776Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2025-05-10-d5606fbaabc7::whole-batch::picks=0,1,3,6,9,10,11": {
+    "severity": 1,
+    "keepBias": 0,
+    "note": "1 should be culled, and 8 kept. But fine-fine.",
+    "updatedAt": "2026-04-20T20:53:41.615Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2025-04-19-3bc3a8930feb::whole-batch::picks=0,2,4,5,7,8,11,12,15,17,18,21,22,23,24,26": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "Too many variants kept.",
+    "updatedAt": "2026-04-20T20:54:14.120Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2007-12-12-e29af2e245f2::whole-batch::picks=0,2,3,6": {
+    "severity": 1,
+    "keepBias": -1,
+    "note": "I'd have kept 8 as well (it being me, and a funny pic).",
+    "updatedAt": "2026-04-20T20:54:55.224Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2006-12-31-aa403e41ba29::whole-batch::picks=1,2,3,8,9,10,12,13": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "I like 5 or 6 too. 11 shows a girl not represented in the other pics, though 13 could probably go since I don't know him, lol. But this is fine.",
+    "updatedAt": "2026-04-20T20:56:08.618Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2003-07-29-4ee9a4e15d13::whole-batch::picks=0,2,9,10,11,13,14": {
+    "severity": 2,
+    "keepBias": -1,
+    "note": "not 'my' photos. I'd have kept most of these except the 7-8 pair, only one of those.",
+    "updatedAt": "2026-04-20T20:57:15.432Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2026-04-11-6270afe85a15::whole-batch::picks=4,6,9": {
+    "severity": 0,
+    "keepBias": -1,
+    "note": "I'd have kept one of 7/8 to get both angles. But not important.",
+    "updatedAt": "2026-04-20T20:57:56.104Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2026-04-10-6314eac7c1c6::whole-batch::picks=0,1,2,3,4,5,6,8": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "I'd have culled them all. Temporary work-files, ephemral. No use for later.",
+    "updatedAt": "2026-04-20T20:58:37.267Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2026-04-07-33d3c8ea5b1f::whole-batch::picks=3,4,5,12,13": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "Good, but a bit weird to keep all of 3,4,5. 5 is probably enough, or 5+4. 3 not needed.",
+    "updatedAt": "2026-04-20T20:59:32.983Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2026-04-06-1fa6225e0f48::whole-batch::picks=3,4,6,8,9,11": {
+    "severity": 1,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-20T21:00:01.260Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2026-04-05-d22b6fbcbd41::whole-batch::picks=3,5,8,9": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "Now when I see the entire batch, I agree that 6 should be culled! (in the subgroup voting I said not-to-cull, but both 9 and 3 are better picks (or 4)).",
+    "updatedAt": "2026-04-20T21:01:34.184Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2026-04-03-aea62a25b7a7::whole-batch::picks=5,9,12,13": {
+    "severity": 2,
+    "keepBias": 0,
+    "note": "Thomas is missing from all the breakfast-table pictures. keeping one of 7,8,10,11 would have fixed. Don't need both 12 and 13.",
+    "updatedAt": "2026-04-20T21:04:37.764Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2026-04-02-593563f6ea4b::whole-batch::picks=1,4,6,8,11,12,14,15,17,20,21,22,27,28": {
+    "severity": 1,
+    "keepBias": 0,
+    "note": "This is a good cull/pick! I'd have wanted to keep one of 25-26 as well though, but not that important, plus cull 27,28.",
+    "updatedAt": "2026-04-20T21:06:49.991Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2026-03-31-410cc3bce89e::whole-batch::picks=4,9,14,17": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "Would have kept 18 as well, but just since I'm a bit afraid. To have both sides in for checking. Probably an OCD thing. I wouldn't miss it.",
+    "updatedAt": "2026-04-20T21:08:11.876Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2026-03-30-6529c2b88b32::whole-batch::picks=1,2,5,6,8,10,11,13,14": {
+    "severity": 0,
+    "keepBias": 1,
+    "note": "could cull 1,10,11,13, prefer 9 over 8, but still nothing lost.",
+    "updatedAt": "2026-04-20T21:09:20.577Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2026-03-29-3acb3f05e0e4::whole-batch::picks=6,7,8,14,16,17,18,20,21,22,23": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "I like 9 better than 8 (more face), but the choice is good anyway. I'd have kept 13 too, those girls I don't have an image for. Also 19 over 17 (just has moer data). But NO REGRETS.",
+    "updatedAt": "2026-04-20T21:10:49.092Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2026-03-28-130ad45724a4::whole-batch::picks=2,6,8": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "3 is more fun than 2. 5 is funny. tbh 6+7 could be culled, but I wouldn't have done it myself either, lol.",
+    "updatedAt": "2026-04-20T21:11:33.897Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2026-03-28-f6fadbb9e8a2::whole-batch::picks=0,8": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "cull all.",
+    "updatedAt": "2026-04-20T21:11:47.895Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2026-03-25-62e01019c3e7::whole-batch::picks=0,2,3,4,6,7": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "feels a bit many, but then I would have issues culling too. No, hm, I'd have done 4. Also 5 may be better than 3? At least cleaner. But still perfect suggestions.",
+    "updatedAt": "2026-04-20T21:13:15.661Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2026-03-24-c134af4ce67d::whole-batch::picks=0,1,3,6,7,9,10,13,16,18,19": {
+    "severity": 0,
+    "keepBias": 1,
+    "note": "could cull a bit more aggresively here. The images of the tree are for my brother, could all cull (but hard to know ofc). The no0 pic could be culled, unfocused and 1 is already better even if no face.",
+    "updatedAt": "2026-04-20T21:14:27.827Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2026-03-23-9b798021f614::whole-batch::picks=1,4,5,6,9,10,13,16,17": {
+    "severity": 1,
+    "keepBias": 0,
+    "note": "I'd have kept 14 instead of 10+13. But fine.",
+    "updatedAt": "2026-04-20T21:15:21.073Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2026-03-20-d029cf5e2210::whole-batch::picks=0,2,3,4,5,6,8": {
+    "severity": 0,
+    "keepBias": null,
+    "note": "",
+    "updatedAt": "2026-04-20T21:15:41.902Z",
+    "inheritedFrom": "2026-04-20-batch-batch_adaptive"
+  },
+  "2025-10-25-88408d7b0da0::whole-batch::picks=0,1,2,3,5,9,11,14,15,16,17,19,20,21": {
+    "severity": 2,
+    "keepBias": 1,
+    "note": "even more duplicates kept!",
+    "updatedAt": "2026-04-21T19:03:13.118Z"
+  },
+  "2025-04-18-044e17943212::whole-batch::picks=0,3,4,5,6,7,8,9,11,13,14,15,16,17,18": {
+    "severity": 2,
+    "keepBias": 1,
+    "note": "too many kept, only one of 3-6, we don't need both 9 and 11, probably don't need any of them really since 8 is better.",
+    "updatedAt": "2026-04-21T19:04:47.943Z"
+  },
+  "2003-07-29-4ee9a4e15d13::whole-batch::picks=0,2,7,9,10,11,13,14": {
+    "severity": 2,
+    "keepBias": -1,
+    "note": "A bit better than what we had, but still killing 1 and 3 which would have been nice to keep, so it's not dragging the grade up to a fine sadly.",
+    "updatedAt": "2026-04-21T19:09:10.185Z"
+  },
+  "2026-04-05-d22b6fbcbd41::whole-batch::picks=3,4,5,8,9": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "Hmm, how is tihs useful? This new added picture is a near duplicate and should been culled, -- or it should have culled 3 and then added this. Not seeing how this was adding a missing face. Doesn't look like it to me.",
+    "updatedAt": "2026-04-21T19:10:55.124Z"
+  },
+  "2006-12-31-aa403e41ba29::whole-batch::picks=1,2,3,8,9,10,11,12,13": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "Here it actually worked, it did add Inga, which previously wasn't added.",
+    "updatedAt": "2026-04-21T19:12:12.748Z"
+  },
+  "2026-04-03-aea62a25b7a7::whole-batch::picks=5,9,10,12,13": {
+    "severity": null,
+    "keepBias": null,
+    "note": "I find it interesting, and false that it says it added me (Odin), because I was already in 9, but *Thomas* however, is now in this 10. Not a great picture though, but ohwell. Potentially it'd be possible to look at all the ones that cover this person, and take the one with the highest score. May not have helped though.",
+    "updatedAt": "2026-04-21T19:14:07.542Z"
+  },
+  "2026-04-02-593563f6ea4b::whole-batch::picks=1,4,6,8,11,12,14,15,17,20,21,22,23,27,28": {
+    "severity": 2,
+    "keepBias": 1,
+    "note": "This new added image is a very duplicate. Feels like 22 already covers this angle very well. Other than that it looks the same.",
+    "updatedAt": "2026-04-21T19:15:39.895Z"
+  },
+  "2026-03-31-410cc3bce89e::whole-batch::picks=4,7,9,14,17": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "I'm in the pic 9 already, so no need for adding this 7.",
+    "updatedAt": "2026-04-21T19:16:07.036Z"
+  },
+  "2026-03-29-3acb3f05e0e4::whole-batch::picks=6,7,8,10,11,12,14,16,17,18,19,20,21,22,23": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "This is an interesting case. It did seem to add a lot more faces here to cover. But it'd be nice if it could have culled some others then. Also, since there's *so many* people in the picture, I'm not so sure the faces are worth so much anyway. It goes down the value, the more people are in it. If it was a group photo, I'd expect that one (the best one) to be a 'keep' already.",
+    "updatedAt": "2026-04-21T19:19:07.372Z"
+  },
+  "2026-03-19-829fc1d834e3::whole-batch::picks=3,5,9,11,13,16": {
+    "severity": 1,
+    "keepBias": 0,
+    "note": "I'd have kept 10 instead of 11, since it is both wide-angle + has diff expression than 14.",
+    "updatedAt": "2026-04-21T19:21:21.122Z"
+  },
+  "2026-03-17-cce2fd35c6cc::whole-batch::picks=0,3,4,8,9,12,15,16,17": {
+    "severity": 1,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:22:15.358Z"
+  },
+  "2026-03-15-e79b398b7825::whole-batch::picks=0,2,11,13,15": {
+    "severity": 1,
+    "keepBias": 0,
+    "note": "two more of the screenshots should have been kept here.",
+    "updatedAt": "2026-04-21T19:23:08.551Z"
+  },
+  "2026-03-15-e79b398b7825::whole-batch::picks=0,2,6,11,13,15": {
+    "severity": 1,
+    "keepBias": 0,
+    "note": "That's not another face, it's still Halldis. Wonder if we should ignore all name-less faces.",
+    "updatedAt": "2026-04-21T19:24:07.277Z"
+  },
+  "2026-03-08-231cf2243e12::whole-batch::picks=1,4,5,7": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:24:55.694Z"
+  },
+  "2026-03-06-08a1bda59c07::whole-batch::picks=2,4,8,11,12,13,14,15": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "dunno, more partial to 7 and 9 rather than 8. But it's fine. ",
+    "updatedAt": "2026-04-21T19:26:32.438Z"
+  },
+  "2026-03-02-9b7edf649413::whole-batch::picks=0,3,4,8": {
+    "severity": 1,
+    "keepBias": 0,
+    "note": "cull 8.",
+    "updatedAt": "2026-04-21T19:28:24.381Z"
+  },
+  "2026-03-01-4825f1bb4d9a::whole-batch::picks=1,3,6,10,11,12": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:27:46.345Z"
+  },
+  "2026-02-26-9c82f482e005::whole-batch::picks=0,1,6,8": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "",
+    "updatedAt": "2026-04-21T19:28:28.679Z"
+  },
+  "2026-02-25-276f55082f3f::whole-batch::picks=0,2,8,9,10,12,21,22,23,24": {
+    "severity": 1,
+    "keepBias": 0,
+    "note": "I'd have kept one more of the documentation of the drain pics. Jsut in case I'm at the plumbers and they need to see the outlets.",
+    "updatedAt": "2026-04-21T19:29:32.427Z"
+  },
+  "2026-02-19-d6bd154595df::whole-batch::picks=1,3,5,7": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "I find 4 the better picture for 5, but sure.",
+    "updatedAt": "2026-04-21T19:30:16.895Z"
+  },
+  "2026-02-18-210b695cb51e::whole-batch::picks=0,1,3,8,9": {
+    "severity": 1,
+    "keepBias": 0,
+    "note": "Kinda missing the documentation picture of the house improvement, but not sure I'll ever use it either though.",
+    "updatedAt": "2026-04-21T19:31:17.646Z"
+  },
+  "2026-02-18-210b695cb51e::whole-batch::picks=0,1,3,7,8,9": {
+    "severity": 1,
+    "keepBias": null,
+    "note": "Kinda missing the documentation picture of the house improvement, but not sure I'll ever use it either though.",
+    "updatedAt": "2026-04-21T19:31:23.897Z"
+  },
+  "2026-02-14-a7a96fd5fcfd::whole-batch::picks=1,5,6,10,13,14,24,25": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "would cull 1, 5+6 and 13.",
+    "updatedAt": "2026-04-21T19:32:49.958Z"
+  },
+  "2026-02-10-25ac71fc9f68::whole-batch::picks=2,3,7,8,9,10,11": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "I'd have deleted 7-9, the ephemral. Don't need pic 3 since we have pic2. For diversity could use a wide-shot like 0 or 1 instead. But OOnly pic 2 is probably enough for that sequence.",
+    "updatedAt": "2026-04-21T19:34:11.801Z"
+  },
+  "2026-02-07-e0e5556a1f72::whole-batch::picks=0,1,3,5,6,7": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:34:36.017Z"
+  },
+  "2026-02-06-2d8ca6fb04f9::whole-batch::picks=3,6,9,11,19,23": {
+    "severity": 1,
+    "keepBias": -1,
+    "note": "documenting the cabin, I think this is culling a bit aggressively. The last pics 16+ are from neighbour so could cull. But I'd like at least one roof overview image too. But this is fine sill though. Not that important.",
+    "updatedAt": "2026-04-21T19:35:49.258Z"
+  },
+  "2026-02-06-9af3c7aab158::whole-batch::picks=0,12,15": {
+    "severity": 1,
+    "keepBias": -1,
+    "note": "Some of the documentation pictures would be good to have come summer. But ... I'm not sure for what, lol. So probably fine. I'd have been more careful culling these documentation photos though.",
+    "updatedAt": "2026-04-21T19:36:44.900Z"
+  },
+  "2026-02-05-ce81b9d9b034::whole-batch::picks=0,4,6,7": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "",
+    "updatedAt": "2026-04-21T19:37:01.723Z"
+  },
+  "2026-02-04-8b1f61e52fe2::whole-batch::picks=1,3,4,7,8": {
+    "severity": 0,
+    "keepBias": 1,
+    "note": "could cull 7 too.",
+    "updatedAt": "2026-04-21T19:37:31.892Z"
+  },
+  "2026-02-02-1b4fb4da1f26::whole-batch::picks=0,1,2,3,5,8": {
+    "severity": 0,
+    "keepBias": 1,
+    "note": "0 and 1 could be culled.",
+    "updatedAt": "2026-04-21T19:38:06.982Z"
+  },
+  "2026-01-31-3e202cb1b758::whole-batch::picks=0,1,3,5,7,9,12,13,15,20,24,25": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "",
+    "updatedAt": "2026-04-21T19:39:48.030Z"
+  },
+  "2026-01-31-3e202cb1b758::whole-batch::picks=0,1,3,5,7,9,12,13,15,17,19,20,24,25": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "unnamed people added, not reallly needed those two etra images.",
+    "updatedAt": "2026-04-21T19:39:52.081Z"
+  },
+  "2026-01-27-a066a8344b9f::whole-batch::picks=0,1,3,5,6,7": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "would also cull 0, 3, 7.",
+    "updatedAt": "2026-04-21T19:40:34.908Z"
+  },
+  "2026-01-19-382bc0e0eb59::whole-batch::picks=5,8": {
+    "severity": 1,
+    "keepBias": 0,
+    "note": "would need 0 as well probably. but yeah, i can delete these once I do the work of sending hem in. lol.",
+    "updatedAt": "2026-04-21T19:41:39.536Z"
+  },
+  "2026-01-18-dbb297373c03::whole-batch::picks=0,4,6,9,11,12,13,14": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:42:08.530Z"
+  },
+  "2026-01-16-c5e5bfaeb0af::whole-batch::picks=0,1,2,3,4,6,7": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "she was already covered in 2, no need to add her again in 3.",
+    "updatedAt": "2026-04-21T19:42:57.986Z"
+  },
+  "2026-01-16-c5e5bfaeb0af::whole-batch::picks=0,1,2,4,6,7": {
+    "severity": 1,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:43:06.702Z"
+  },
+  "2026-01-12-ba4cd9eab0de::whole-batch::picks=1,2,3,7": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:43:34.161Z"
+  },
+  "2026-01-11-a5d8b0f4eba0::whole-batch::picks=0,1,5": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "cull 0. I'd also only keep one of these. Or maybe even + lol, I think I've sold it already so.",
+    "updatedAt": "2026-04-21T19:44:25.926Z"
+  },
+  "2026-01-10-9ed58f5447f0::whole-batch::picks=0,2,4,6,8,12,15": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:44:55.102Z"
+  },
+  "2026-01-03-41dc3952417d::whole-batch::picks=6,15,16,19,20,21": {
+    "severity": 0,
+    "keepBias": null,
+    "note": "could cull 6 too.",
+    "updatedAt": "2026-04-21T19:45:53.731Z"
+  },
+  "2026-01-02-8b149f8ec549::whole-batch::picks=2,3,4,5,6,7,8": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:46:07.711Z"
+  },
+  "2026-01-01-4e7da09b7e60::whole-batch::picks=0,4,5,7,8,10,12,19,21,23,24,26,28": {
+    "severity": 1,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:46:58.848Z"
+  },
+  "2025-12-31-d9fdf52a8613::whole-batch::picks=0,1,2,3,6": {
+    "severity": null,
+    "keepBias": null,
+    "note": "why both 2 and 3 kept? looks very similar to me.",
+    "updatedAt": "2026-04-21T19:47:51.514Z"
+  },
+  "2025-12-30-8aaa9e082e48::whole-batch::picks=0,4,6,7,9,11,12,16,19,20": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:48:19.455Z"
+  },
+  "2025-12-30-8aaa9e082e48::whole-batch::picks=0,4,6,7,8,9,11,12,16,19,20": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "lol this sis an image of immich. But sure.",
+    "updatedAt": "2026-04-21T19:49:22.152Z"
+  },
+  "2025-12-29-3aa78a35f702::whole-batch::picks=1,6,10,11,12,13": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:50:39.502Z"
+  },
+  "2025-12-27-945bbe0252bf::whole-batch::picks=0,1,3,9": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:51:24.487Z"
+  },
+  "2025-12-26-bbe547bd58b7::whole-batch::picks=1,2,6,7,11,13,15,18,20,21": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "",
+    "updatedAt": "2026-04-21T19:51:37.696Z"
+  },
+  "2025-12-26-f24fdc28c38c::whole-batch::picks=0,3,6,10,13,14": {
+    "severity": 1,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:52:09.999Z"
+  },
+  "2025-12-26-f24fdc28c38c::whole-batch::picks=0,1,3,6,10,13,14": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:52:25.562Z"
+  },
+  "2025-12-26-ed1a10760fab::whole-batch::picks=0,3,4,5,7,10,12,16,17": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "Seems a bit too many pictures, they're all basicially just walking with a winter suite on, in diff parts of the trip, but still.",
+    "updatedAt": "2026-04-21T19:53:36.797Z"
+  },
+  "2025-12-22-76d23937c16d::whole-batch::picks=0,2,4": {
+    "severity": 1,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:54:16.451Z"
+  },
+  "2025-12-21-4229a9dbeb60::whole-batch::picks=0,2,3,5,7,13,16,24": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:54:25.115Z"
+  },
+  "2025-12-19-4c2e38fe74b7::whole-batch::picks=1,3,4,6,8,9,10": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:54:33.439Z"
+  },
+  "2025-12-18-ef91139931e8::whole-batch::picks=0,5,6,7,8,9": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:54:44.067Z"
+  },
+  "2025-12-18-31b6e1cba64b::whole-batch::picks=0,1,2,5,7,11": {
+    "severity": 0,
+    "keepBias": 1,
+    "note": "Ole-Anders is still in the other picture. Don't need no-name. But I enerally liked img1 better anyway though.",
+    "updatedAt": "2026-04-21T19:55:40.603Z"
+  },
+  "2025-12-18-31b6e1cba64b::whole-batch::picks=0,2,5,7,11": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:55:37.783Z"
+  },
+  "2025-12-13-4733f2196ed7::whole-batch::picks=0,2,3,5,7,9,12,13,16,17,18": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "could delete both 12 and 13, -- 15 however is me and should be kept. 17 deleted.",
+    "updatedAt": "2026-04-21T19:56:58.402Z"
+  },
+  "2025-12-11-4c9e339021c9::whole-batch::picks=0,1,2,4,5,7": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "",
+    "updatedAt": "2026-04-21T19:57:07.282Z"
+  },
+  "2025-12-03-900e0843c654::whole-batch::picks=0,2,4,6,7": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:57:17.220Z"
+  },
+  "2025-11-30-a5ffecb5c152::whole-batch::picks=0,2,4,5,9,10,12,14,17,21,22": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:57:36.841Z"
+  },
+  "2025-11-30-a5ffecb5c152::whole-batch::picks=0,2,4,5,9,10,12,14,16,17,21,22": {
+    "severity": 1,
+    "keepBias": 1,
+    "note": "no-name added. Is it aslak? Not necessary, plus we actually already have it.",
+    "updatedAt": "2026-04-21T19:58:10.021Z"
+  },
+  "2025-11-26-d7ecd1e2ff2d::whole-batch::picks=2,3,7,9,11,12,13,14": {
+    "severity": 1,
+    "keepBias": null,
+    "note": "could cull 14. I like 5 better than having both of 2 and 4.",
+    "updatedAt": "2026-04-21T19:58:46.373Z"
+  },
+  "2025-11-19-c5b1accb9a11::whole-batch::picks=3,4,5,7,9,11": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:58:57.489Z"
+  },
+  "2025-11-08-a09beaeebbdf::whole-batch::picks=0,3,7": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "",
+    "updatedAt": "2026-04-21T19:59:09.715Z"
+  },
+  "2025-11-01-5f8c6aceb164::whole-batch::picks=0,2,3,6,7,8": {
+    "severity": 0,
+    "keepBias": 0,
+    "note": "img 7 could easily be culled. I did keep it myself too though to remember an app name, but well. Why should I.",
+    "updatedAt": "2026-04-21T20:00:07.782Z"
+  }
+}

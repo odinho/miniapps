@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>immich-cull</title>
+<style>
+  :root { --sidebar-w:200px; --header-h:34px; --bar-h:40px; --gap:4px;
+    --bg:#0e1014; --panel:#16181c; --line:#2a2e36; --text:#e0e4ea; --muted:#7a8294;
+    --accent:#f0a040; --good:#4caf50; --bad:#e53935; --blue:#2196F3; }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;overflow:hidden;}
+  body{font:13px/1.4 system-ui,sans-serif;color:var(--text);background:var(--bg);}
+
+  .app{display:grid;grid-template-columns:var(--sidebar-w) minmax(0,1fr);grid-template-rows:var(--header-h) minmax(0,1fr) var(--bar-h);height:100dvh;}
+  .header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid var(--line);background:#111319;}
+  .header h1{font-size:14px;font-weight:600;color:var(--accent);}
+  .stats{font-size:12px;color:var(--muted);display:flex;gap:14px;} .stats .v{color:var(--text);font-weight:600;}
+  .sidebar{grid-row:2/4;min-height:0;overflow-y:auto;border-right:1px solid var(--line);background:#12141a;font-size:12px;}
+  .gi{padding:5px 8px;cursor:pointer;border-bottom:1px solid #1e2028;border-left:3px solid transparent;}
+  .gi:hover{background:#1c1f27;} .gi.active{background:#1f2330;border-left-color:var(--accent);} .gi.decided{opacity:.35;}
+  .gi .t{font-weight:500;} .gi .m{color:#666;font-size:11px;}
+
+  .main{min-width:0;min-height:0;overflow:hidden;position:relative;}
+
+  /* Justified grid: absolutely positioned images */
+  .jgrid{position:relative;width:100%;height:100%;overflow:hidden;}
+  .jgrid .cell{position:absolute;overflow:hidden;cursor:pointer;border:3px solid transparent;transition:border-color .12s,opacity .12s;}
+  .jgrid .cell:hover{border-color:#555;}
+  .jgrid .cell.keep{border-color:var(--good);}
+  .jgrid .cell.cull{border-color:var(--bad);opacity:.4;}
+  .jgrid .cell.sel{border-color:var(--accent)!important;box-shadow:0 0 8px rgba(240,160,64,.5);}
+  .jgrid .cell img{width:100%;height:100%;object-fit:contain;display:block;background:#0b0d11;}
+  .jgrid .cell .lbl{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.8));padding:10px 5px 3px;font-size:9px;color:#bbb;display:flex;justify-content:space-between;}
+  .jgrid .cell .bdg{position:absolute;top:3px;left:3px;font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;color:white;}
+  .bdg.kb{background:var(--good);} .bdg.cb{background:var(--bad);}
+  .jgrid .cell .st{position:absolute;top:3px;right:3px;font-size:11px;color:#ffd700;text-shadow:0 1px 2px #000;}
+
+  /* Detail view */
+  .detail{display:flex;flex-direction:column;width:100%;height:100%;}
+  .filmstrip{display:flex;gap:3px;padding:3px;overflow-x:auto;background:#111319;border-bottom:1px solid var(--line);flex-shrink:0;height:80px;align-items:stretch;}
+  .ft{flex-shrink:0;cursor:pointer;border:2px solid transparent;border-radius:3px;height:100%;position:relative;}
+  .ft.keep{border-color:var(--good);} .ft.cull{border-color:var(--bad);opacity:.4;}
+  .ft.active{border-color:var(--accent)!important;}
+  .ft img{height:100%;width:auto;display:block;object-fit:contain;}
+  .bigp{flex:1;min-height:0;display:grid;place-items:center;background:#090b0f;position:relative;}
+  .bigp img{max-width:100%;max-height:100%;object-fit:contain;}
+  .bigp .info{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);padding:4px 12px;border-radius:5px;font-size:12px;white-space:nowrap;}
+  .bigp .stag{position:absolute;top:8px;left:8px;font-size:13px;font-weight:700;padding:2px 10px;border-radius:4px;}
+  .stag.keep{background:var(--good);color:white;} .stag.cull{background:var(--bad);color:white;}
+
+  /* Action bar */
+  .bar{grid-column:2;display:flex;gap:10px;padding:0 14px;border-top:1px solid var(--line);background:rgba(17,19,25,.95);align-items:center;}
+  .bar button{padding:5px 14px;border:none;border-radius:5px;cursor:pointer;font-size:13px;font-weight:500;}
+  .bar button:hover{opacity:.85;}
+  .bk{background:var(--good);color:white;} .bc{background:var(--bad);color:white;}
+  .bb{background:var(--blue);color:white;} .ba{background:var(--accent);color:#1a1a1a;font-weight:700;}
+  .bs{background:#333;color:#aaa;} .bh{background:none;color:var(--muted);border:1px solid var(--line)!important;padding:3px 9px;font-size:12px;}
+  .spacer{flex:1;} .bmeta{font-size:11px;color:var(--muted);}
+
+  /* Preview overlay: filmstrip + big image */
+  .preview-ov{position:fixed;top:var(--header-h);left:var(--sidebar-w);right:0;bottom:var(--bar-h);
+    background:#090b0f;z-index:50;display:flex;flex-direction:column;}
+  .pv-strip{display:flex;gap:3px;padding:3px;overflow-x:auto;background:#111319;
+    border-bottom:1px solid var(--line);flex-shrink:0;align-items:stretch;}
+  .pv-strip .pvt{flex-shrink:0;cursor:pointer;border:2px solid transparent;border-radius:3px;position:relative;overflow:hidden;}
+  .pvt.active{border-color:var(--accent)!important;}
+  .pvt.keep{border-color:var(--good);} .pvt.cull{border-color:var(--bad);opacity:.4;}
+  .pvt img{height:100%;width:auto;display:block;object-fit:contain;}
+  .pvt .pvb{position:absolute;top:1px;left:1px;font-size:8px;font-weight:700;padding:0 3px;border-radius:2px;color:white;}
+  .pvb.kb{background:var(--good);} .pvb.cb{background:var(--bad);}
+  .pv-main{flex:1;min-height:0;position:relative;overflow:hidden;}
+  .pv-main img{width:100%;height:100%;object-fit:contain;display:block;}
+  .pv-main .pinfo{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+    background:rgba(0,0,0,.8);padding:4px 14px;border-radius:5px;font-size:12px;white-space:nowrap;transition:background .15s;}
+  .pv-main .pinfo-keep{background:rgba(76,175,80,.7);}
+  .pv-main .pinfo-cull{background:rgba(229,57,53,.7);}
+  .pv-main .ptag{position:absolute;top:10px;left:10px;font-size:14px;font-weight:700;padding:2px 10px;border-radius:4px;}
+  .ptag.keep{background:var(--good);color:white;} .ptag.cull{background:var(--bad);color:white;}
+
+  /* Help */
+  /* LLM mode: star badge on images */
+  .llm-star{position:absolute;top:3px;left:3px;font-size:11px;color:#ffd700;text-shadow:0 1px 2px #000;background:rgba(0,0,0,.6);padding:1px 4px;border-radius:3px;}
+  .llm-note{position:absolute;bottom:14px;left:0;right:0;text-align:center;font-size:9px;color:#ddd;text-shadow:0 1px 2px #000;padding:0 4px;}
+  .llm-sg-border{outline:2px dashed rgba(240,160,64,.4);outline-offset:-2px;}
+  .llm-cull-suggest{opacity:.35;} .llm-cull-suggest:hover{opacity:.7;}
+  .llm-keep-suggest{outline:2px solid rgba(76,175,80,.5);outline-offset:-2px;}
+  .sg-header{padding:6px 8px;font-size:11px;color:var(--accent);border-bottom:1px solid var(--line);background:rgba(240,160,64,.08);}
+  .run-btn{padding:4px 12px;border:none;border-radius:4px;background:#7c4dff;color:white;cursor:pointer;font-size:12px;}
+  .run-btn:hover{opacity:.85;}
+
+  .help-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center;}
+  .help-box{background:#1a1d24;border:1px solid var(--line);border-radius:10px;padding:20px 24px;width:min(420px,90vw);}
+  .help-box h2{font-size:16px;margin-bottom:16px;color:var(--accent);}
+  .help-box h3{font-size:11px;color:var(--muted);margin:14px 0 4px;text-transform:uppercase;letter-spacing:.5px;}
+  .help-box table{width:100%;border-collapse:collapse;}
+  .help-box td{padding:3px 0;font-size:13px;} .help-box td:first-child{width:110px;white-space:nowrap;}
+  .help-box kbd{display:inline-block;min-width:20px;text-align:center;padding:1px 6px;border:1px solid #444;border-radius:4px;background:#252830;color:#ddd;font:11px/1.5 monospace;}
+  .help-box .note{margin-top:16px;font-size:11px;color:#666;line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <h1>immich-cull</h1>
+    <div style="display:flex;gap:4px">
+      <button onclick="switchMode('groups')" id="modeGroups" style="padding:2px 10px;border:1px solid var(--line);border-radius:4px;background:var(--accent);color:#1a1a1a;font-size:12px;cursor:pointer;font-weight:600">Groups</button>
+      <button onclick="switchMode('llm')" id="modeLlm" style="padding:2px 10px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--muted);font-size:12px;cursor:pointer">LLM Batches</button>
+    </div>
+    <div class="stats" id="stats"></div>
+  </header>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main" id="main"></div>
+  <footer class="bar" id="bar"></footer>
+</div>
+<div id="previewOv"></div>
+<div id="helpRoot"></div>
+
+<script>
+let groups=[], ci=-1, si=-1, states={}, mode='grid', groupDetail=null;
+// Undo stack: [{groupIdx, prevDecided, prevStates:{assetId->state}, prevSi}]
+let undoStack=[];
+
+function fmt(b){return b>=1e9?(b/1e9).toFixed(1)+' GB':b>=1e6?(b/1e6).toFixed(1)+' MB':b>=1e3?(b/1e3).toFixed(0)+' KB':b+' B';}
+
+// === Justified layout: pack images into rows filling a container ===
+function justifiedLayout(items, containerW, containerH, gap) {
+  // items: [{w,h,...}]  (natural pixel dimensions)
+  // Returns: [{x,y,w,h}] for each item, scaled to fill container
+  if (!items.length) return [];
+  const aspects = items.map(it => it.w / it.h);
+
+  // Try different row counts, pick the one that fills the most area
+  let bestLayout = null, bestFill = 0;
+  const maxRows = Math.min(items.length, Math.ceil(Math.sqrt(items.length) + 1));
+
+  for (let nRows = 1; nRows <= maxRows; nRows++) {
+    const layout = computeRows(aspects, containerW, containerH, gap, nRows, items);
+    if (layout && layout.fill > bestFill) { bestLayout = layout; bestFill = layout.fill; }
+  }
+  return bestLayout ? bestLayout.rects : items.map((_,i) => ({x:0,y:i*100,w:100,h:100}));
+}
+
+function computeRows(aspects, W, H, gap, nRows, items) {
+  const n = aspects.length;
+  const totalAspect = aspects.reduce((s,a) => s+a, 0);
+  const targetPerRow = totalAspect / nRows;
+
+  const rows = [];
+  let cur = [], curAspect = 0;
+  for (let i = 0; i < n; i++) {
+    cur.push(i);
+    curAspect += aspects[i];
+    // Split if we've accumulated enough and have rows left
+    if (rows.length < nRows - 1 && curAspect >= targetPerRow * 0.8 && cur.length > 0) {
+      rows.push(cur);
+      cur = []; curAspect = 0;
+    }
+  }
+  if (cur.length) rows.push(cur);
+
+  // Compute actual row heights
+  const totalGapH = gap * (rows.length - 1);
+  const availH = H - totalGapH;
+  if (availH <= 0) return null;
+
+  // For each row: row aspect = sum of image aspects, row height = availW / rowAspect
+  const rowData = rows.map(indices => {
+    const rowAspect = indices.reduce((s,i) => s + aspects[i], 0);
+    const rowGapW = gap * (indices.length - 1);
+    return { indices, rowAspect, rowGapW };
+  });
+
+  // Each row wants height = (W - rowGapW) / rowAspect
+  // Scale all to fit in availH
+  const rawHeights = rowData.map(r => (W - r.rowGapW) / r.rowAspect);
+  const totalRawH = rawHeights.reduce((s,h) => s+h, 0);
+  const scale = Math.min(1, availH / totalRawH); // don't upscale beyond natural
+
+  // Don't restrict row height by individual image native sizes —
+  // allow bigger cells, images will be centered via object-fit:contain.
+  // This avoids one small image shrinking the whole row.
+  const rects = [];
+  let y = 0;
+  let usedArea = 0;
+  for (let r = 0; r < rows.length; r++) {
+    const rowH = rawHeights[r] * scale;
+    let x = 0;
+    for (const i of rows[r]) {
+      const imgW = rowH * aspects[i];
+      rects[i] = { x, y, w: imgW, h: rowH };
+      usedArea += imgW * rowH;
+      x += imgW + gap;
+    }
+    y += rowH + gap;
+  }
+
+  return { rects, fill: usedArea / (W * H) };
+}
+
+// === Data loading ===
+async function load(){
+  groups = await(await fetch('/api/groups')).json();
+  renderSidebar(); updateStats();
+  if(groups.length) selectGroup(0);
+}
+
+function renderSidebar(){
+  document.getElementById('sidebar').innerHTML=groups.map((g,i)=>{
+    const d=new Date(g.earliestDate);
+    const ds=d.getFullYear()>2000?d.toLocaleDateString('no',{day:'numeric',month:'short',year:'2-digit'}):'?';
+    return`<div class="gi ${i===ci?'active':''} ${g.decided?'decided':''}" onclick="selectGroup(${i})" id="gi-${i}">
+      <div class="t">${g.count} photos &middot; ${ds}</div>
+      <div class="m">${g.timeSpanMinutes}min &middot; ${fmt(g.totalBytes)}</div></div>`;
+  }).join('');
+}
+
+async function selectGroup(idx, keepPreview=false){
+  ci=idx; si=0; if(!keepPreview){mode='grid';showPreview=false;}
+  groupDetail = await(await fetch(`/api/groups/group-${idx}`)).json();
+  // Rehydrate decisions from server if present
+  if(groupDetail.decision && !groupDetail.decision.skipped){
+    for(const id of groupDetail.decision.keep) states[id]='keep';
+    for(const id of groupDetail.decision.cull) states[id]='cull';
+  }
+  for(const a of groupDetail.assets) if(!(a.id in states)) states[a.id]=null;
+  render(); renderSidebar(); renderBar();
+  if(showPreview) renderPreview();
+  else document.getElementById('previewOv').innerHTML='';
+  document.getElementById('gi-'+idx)?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+function render(){
+  if(!groupDetail) return;
+  if(mode==='grid') renderGrid();
+  else renderDetail();
+}
+
+function renderGrid(){
+  const g = groupDetail;
+  const main = document.getElementById('main');
+  const W = main.clientWidth;
+  const H = main.clientHeight;
+
+  const rects = justifiedLayout(g.assets, W, H, parseInt(getComputedStyle(document.documentElement).getPropertyValue('--gap'))||4);
+
+  main.innerHTML = `<div class="jgrid">${g.assets.map((a,i)=>{
+    const r=rects[i]; const s=states[a.id];
+    return`<div class="cell ${s||''} ${i===si?'sel':''}" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px" onclick="clickGrid(${i})">
+      <img src="/api/preview?id=${encodeURIComponent(a.id)}" loading="lazy">
+      ${s==='keep'?'<div class="bdg kb">KEEP</div>':''}${s==='cull'?'<div class="bdg cb">CULL</div>':''}
+      ${a.rating>0?`<div class="st">${'★'.repeat(a.rating)}</div>`:''}
+      <div class="lbl"><span>${a.filename}</span><span>${fmt(a.bytes||0)}</span></div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function renderDetail(){
+  const g=groupDetail, a=g.assets[si], s=states[a.id];
+  document.getElementById('main').innerHTML=`<div class="detail">
+    <div class="filmstrip">${g.assets.map((a,i)=>{
+      const s=states[a.id];
+      return`<div class="ft ${i===si?'active':''} ${s||''}" onclick="si=${i};render();renderBar()">
+        <img src="/api/preview?id=${encodeURIComponent(a.id)}"></div>`;
+    }).join('')}</div>
+    <div class="bigp">
+      <img src="/api/preview?id=${encodeURIComponent(a.id)}">
+      ${s?`<div class="stag ${s}">${s.toUpperCase()}</div>`:''}
+      <div class="info"><strong>${a.filename}</strong> &middot; ${fmt(a.bytes||0)} &middot; ${new Date(a.date).toLocaleString('no')}${a.rating>0?' &middot; '+'★'.repeat(a.rating):''}${a.isFavorite?' &middot; ♥':''}</div>
+    </div></div>`;
+}
+
+function renderBar(){
+  if(!groupDetail) return;
+  const g=groupDetail;
+  let cb=0; for(const a of g.assets) if(states[a.id]==='cull') cb+=(a.bytes||0);
+  document.getElementById('bar').innerHTML=`
+    <button class="bk" onclick="doKeep()">Keep</button>
+    <button class="bc" onclick="doCull()">Cull</button>
+    <button class="bb" onclick="keepBestCullRest()">Best + Cull Rest</button>
+    <button class="ba" onclick="approveGroup()">Approve & Next</button>
+    <button class="bs" onclick="skipGroup()">Skip</button>
+    <span class="spacer"></span>
+    <span class="bmeta">${g.count} photos &middot; ${g.timeSpanMinutes}min${cb>0?' &middot; saves '+fmt(cb):''}</span>
+    <button class="bh" onclick="toggleHelp()">?</button>`;
+}
+
+let showPreview=false;
+
+function clickGrid(i){
+  if(si===i){showPreview=true;renderPreview();} // click selected = open preview
+  else{si=i;render();renderBar();}
+}
+function enterDetail(i){si=i;mode='detail';render();renderBar();}
+function backToGrid(){mode='grid';showPreview=false;render();renderBar();}
+
+let _pvGroupId=null; // track which group the preview DOM was built for
+
+function renderPreview(){
+  const ov=document.getElementById('previewOv');
+  if(!showPreview||si<0||!groupDetail){ov.innerHTML='';_pvGroupId=null;return;}
+  const g=groupDetail, a=g.assets[si], s=states[a.id];
+  const previewUrl=`/api/preview?id=${encodeURIComponent(a.id)}`;
+  const fullUrl=`/api/full?id=${encodeURIComponent(a.id)}`;
+
+  // If the preview overlay already exists for this group, just update in place
+  const existingImg=document.getElementById('pvImg');
+  if(_pvGroupId===g.id && existingImg){
+    // Swap main image src (preview loads instantly from cache)
+    existingImg.dataset.assetId=a.id;
+    existingImg.src=previewUrl;
+    // Update filmstrip active states
+    ov.querySelectorAll('.pvt').forEach((el,i)=>{
+      el.classList.toggle('active',i===si);
+      const xs=states[g.assets[i].id];
+      el.classList.toggle('keep',xs==='keep');
+      el.classList.toggle('cull',xs==='cull');
+      const badge=el.querySelector('.pvb');
+      if(badge){
+        badge.className=xs==='keep'?'pvb kb':xs==='cull'?'pvb cb':'pvb';
+        badge.textContent=xs==='keep'?'K':xs==='cull'?'X':'';
+        badge.style.display=xs?'':'none';
+      }
+    });
+    // Update status tag
+    const tagEl=ov.querySelector('.ptag');
+    if(tagEl){tagEl.className=s?`ptag ${s}`:'ptag';tagEl.textContent=s?s.toUpperCase():'';tagEl.style.display=s?'':'none';}
+    // Update info
+    const infoEl=ov.querySelector('[class^="pinfo"]');
+    if(infoEl){
+      infoEl.className=`pinfo${s==='keep'?' pinfo-keep':''}${s==='cull'?' pinfo-cull':''}`;
+      infoEl.innerHTML=`<strong>${a.filename}</strong> &middot; ${fmt(a.bytes||0)} &middot; ${new Date(a.date).toLocaleString('no')}${a.rating>0?' &middot; '+'★'.repeat(a.rating):''}${a.isFavorite?' &middot; ♥':''}`;
+    }
+    // Preload full-res
+    const expectedId=a.id;
+    const pre=new Image();
+    pre.onload=()=>{const el=document.getElementById('pvImg');if(el&&el.dataset.assetId===expectedId)el.src=fullUrl;};
+    pre.src=fullUrl;
+    return;
+  }
+
+  // Full rebuild (first open or group changed)
+  _pvGroupId=g.id;
+  const ovW = window.innerWidth - 200;
+  const ovH = window.innerHeight - 34 - 40;
+  const totalAspect = g.assets.reduce((sum,x) => sum + (x.w/x.h), 0);
+  const gaps = (g.assets.length - 1) * 3 + 6;
+  const fitH = (ovW - gaps) / totalAspect;
+  const stripH = Math.min(ovH * 0.12, Math.max(50, fitH));
+
+  ov.innerHTML=`<div class="preview-ov">
+    <div class="pv-strip" style="height:${stripH + 6}px">
+      ${g.assets.map((x,i)=>{
+        const xs=states[x.id];
+        return`<div class="pvt ${i===si?'active':''} ${xs||''}" style="height:${stripH}px"
+                    onclick="si=${i};render();renderBar();renderPreview()">
+          <img src="/api/preview?id=${encodeURIComponent(x.id)}">
+          <div class="pvb ${xs==='keep'?'kb':xs==='cull'?'cb':''}" style="${xs?'':'display:none'}">${xs==='keep'?'K':xs==='cull'?'X':''}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="pv-main">
+      <img id="pvImg" data-asset-id="${a.id}" src="${previewUrl}">
+      <div class="ptag ${s||''}" style="${s?'':'display:none'}">${s?s.toUpperCase():''}</div>
+      <div class="pinfo${s==='keep'?' pinfo-keep':''}${s==='cull'?' pinfo-cull':''}"><strong>${a.filename}</strong> &middot; ${fmt(a.bytes||0)} &middot; ${new Date(a.date).toLocaleString('no')}${a.rating>0?' &middot; '+'★'.repeat(a.rating):''}${a.isFavorite?' &middot; ♥':''}</div>
+    </div>
+  </div>`;
+  const expectedId=a.id;
+  const pre=new Image();
+  pre.onload=()=>{const el=document.getElementById('pvImg');if(el&&el.dataset.assetId===expectedId)el.src=fullUrl;};
+  pre.src=fullUrl;
+}
+function ensureSel(){if(si<0){si=0;mode='detail';render();renderBar();}}
+function doKeep(){ensureSel();mark('keep');}
+function doCull(){ensureSel();mark('cull');}
+
+function mark(s){
+  ensureSel();const g=groupDetail,a=g.assets[si];
+  states[a.id]=states[a.id]===s?null:s;
+  if(si<g.assets.length-1)si++;
+  render();renderBar();if(showPreview)renderPreview();
+}
+
+function keepBestCullRest(){
+  ensureSel();const g=groupDetail;
+  for(let i=0;i<g.assets.length;i++)states[g.assets[i].id]=i===si?'keep':'cull';
+  render();renderBar();
+}
+
+function keepFirstN(n){
+  const g=groupDetail;
+  for(let i=0;i<g.assets.length;i++)states[g.assets[i].id]=i<n?'keep':'cull';
+  render();renderBar();
+}
+
+async function approveGroup(){
+  const g=groupDetail;
+  // Save undo state
+  const prevStates={};
+  for(const a of g.assets) prevStates[a.id]=states[a.id];
+  undoStack.push({groupIdx:ci,prevDecided:false,prevStates,prevSi:si});
+
+  for(const a of g.assets)if(!states[a.id])states[a.id]='keep';
+  await fetch(`/api/groups/${g.id}/decide`,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({keep:g.assets.filter(a=>states[a.id]==='keep').map(a=>a.id),cull:g.assets.filter(a=>states[a.id]==='cull').map(a=>a.id)})});
+  groups[ci].decided=true;updateStats();renderSidebar();nextUndecided();
+}
+
+async function skipGroup(){
+  const g=groupDetail;
+  const prevStates={};
+  for(const a of g.assets) prevStates[a.id]=states[a.id];
+  undoStack.push({groupIdx:ci,prevDecided:false,prevStates,prevSi:si});
+
+  await fetch(`/api/groups/${g.id}/decide`,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({keep:[],cull:[],skipped:true})});
+  groups[ci].decided=true;updateStats();renderSidebar();nextUndecided();
+}
+
+async function undo(){
+  if(!undoStack.length) return;
+  const u=undoStack.pop();
+  // Restore states
+  for(const [id,s] of Object.entries(u.prevStates)) states[id]=s;
+  // Un-decide the group
+  groups[u.groupIdx].decided=false;
+  // Tell server to delete the decision
+  await fetch(`/api/groups/group-${u.groupIdx}/decide`,{method:'DELETE'});
+  // Navigate back
+  await selectGroup(u.groupIdx, showPreview);
+  si=u.prevSi;
+  render();renderBar();updateStats();renderSidebar();
+  if(showPreview)renderPreview();
+}
+
+function nextUndecided(){
+  for(let i=ci+1;i<groups.length;i++)if(!groups[i].decided){selectGroup(i);return;}
+  for(let i=0;i<ci;i++)if(!groups[i].decided){selectGroup(i);return;}
+}
+
+async function updateStats(){
+  const s=await(await fetch('/api/stats')).json();
+  document.getElementById('stats').innerHTML=`
+    <span><span class="v">${s.decided}</span>/${s.totalGroups}</span>
+    <span style="color:var(--good)"><span class="v">${s.photosToKeep}</span> keep</span>
+    <span style="color:var(--bad)"><span class="v">${s.photosToCull}</span> cull</span>
+    <span style="color:var(--good)">save ${fmt(s.cullBytes)}</span>
+    <span><span class="v">${s.remaining}</span> left</span>`;
+}
+
+let helpOn=false;
+function toggleHelp(){
+  helpOn=!helpOn;
+  document.getElementById('helpRoot').innerHTML=helpOn?`
+  <div class="help-bg" onclick="toggleHelp()"><div class="help-box" onclick="event.stopPropagation()">
+    <h2>Keyboard Shortcuts</h2>
+    <h3>Navigation</h3><table>
+      <tr><td><kbd>&larr;</kbd> <kbd>&rarr;</kbd></td><td>Previous / next image</td></tr>
+      <tr><td><kbd>&uarr;</kbd> <kbd>&darr;</kbd></td><td>Previous / next group</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Back to grid</td></tr>
+    </table>
+    <h3>Actions</h3><table>
+      <tr><td><kbd>K</kbd> or <kbd>J</kbd></td><td>Keep image</td></tr>
+      <tr><td><kbd>X</kbd> or <kbd>F</kbd></td><td>Cull image</td></tr>
+      <tr><td><kbd>B</kbd></td><td>Keep selected, cull rest</td></tr>
+      <tr><td><kbd>A</kbd> or <kbd>Enter</kbd></td><td>Approve & next</td></tr>
+      <tr><td><kbd>S</kbd></td><td>Skip</td></tr>
+    </table>
+    <h3>Bulk</h3><table>
+      <tr><td><kbd>Shift</kbd>+<kbd>K</kbd></td><td>Keep all</td></tr>
+      <tr><td><kbd>Shift</kbd>+<kbd>X</kbd></td><td>Cull all</td></tr>
+      <tr><td><kbd>1</kbd>&ndash;<kbd>5</kbd></td><td>Keep first N, cull rest</td></tr>
+      <tr><td><kbd>Backspace</kbd></td><td>Undo last approve/skip</td></tr>
+    </table>
+    <div class="note">Undecided &rarr; <b>keep</b> on approve. Culled &rarr; Immich trash (30 days).</div>
+  </div></div>`:'';
+}
+
+// Recompute grid on resize
+window.addEventListener('resize', ()=>{ if(mode==='grid' && groupDetail) renderGrid(); });
+
+document.addEventListener('keydown',e=>{
+  if(helpOn){if(e.key==='Escape'||e.key==='?')toggleHelp();return;}
+  if(ci<0||!groupDetail) return;
+  const g=groupDetail;
+  switch(e.key){
+    case'ArrowRight':case'd':
+      e.preventDefault();
+      if(si<g.assets.length-1){si++;render();renderBar();if(showPreview)renderPreview();}
+      break;
+    case'ArrowLeft':case'g':
+      e.preventDefault();
+      if(si>0){si--;render();renderBar();if(showPreview)renderPreview();}
+      break;
+    case'ArrowDown':e.preventDefault();if(ci<groups.length-1)selectGroup(ci+1,showPreview);break;
+    case'ArrowUp':e.preventDefault();if(ci>0)selectGroup(ci-1,showPreview);break;
+    case'Escape':
+      if(showPreview){showPreview=false;renderPreview();}
+      else if(mode==='detail') backToGrid();
+      break;
+    case' ':e.preventDefault();if(si>=0){showPreview=!showPreview;renderPreview();}break;
+    case'k':case'j':mark('keep');break;
+    case'K':case'J':for(const a of g.assets)states[a.id]='keep';render();renderBar();if(showPreview)renderPreview();break;
+    case'x':case'f':mark('cull');break;
+    case'X':case'F':for(const a of g.assets)states[a.id]='cull';render();renderBar();if(showPreview)renderPreview();break;
+    case'b':case'B':keepBestCullRest();break;
+    case'a':case'Enter':e.preventDefault();approveGroup();break;
+    case's':if(!e.shiftKey)skipGroup();break;
+    case'Backspace':e.preventDefault();undo();break;
+    case'?':toggleHelp();break;
+    case'1':keepFirstN(1);break;case'2':keepFirstN(2);break;case'3':keepFirstN(3);break;
+    case'4':keepFirstN(4);break;case'5':keepFirstN(5);break;
+  }
+});
+
+// === LLM BATCH MODE ===
+let appMode = 'groups'; // 'groups' | 'llm'
+let batches = [];
+let currentBatch = null; // full batch data with llm results
+let currentBatchIdx = -1;
+
+function switchMode(m) {
+  appMode = m;
+  document.getElementById('modeGroups').style.background = m==='groups' ? 'var(--accent)' : 'transparent';
+  document.getElementById('modeGroups').style.color = m==='groups' ? '#1a1a1a' : 'var(--muted)';
+  document.getElementById('modeLlm').style.background = m==='llm' ? 'var(--accent)' : 'transparent';
+  document.getElementById('modeLlm').style.color = m==='llm' ? '#1a1a1a' : 'var(--muted)';
+  if (m==='groups') { renderSidebar(); render(); renderBar(); }
+  else { loadBatches(); }
+}
+
+async function loadBatches() {
+  batches = await(await fetch('/api/batches')).json();
+  renderBatchSidebar();
+  if (batches.length && currentBatchIdx < 0) selectBatch(0);
+}
+
+function renderBatchSidebar() {
+  document.getElementById('sidebar').innerHTML = batches.map((b, i) => {
+    const d = new Date(b.dateRange.start);
+    const ds = d.getFullYear()>2000 ? d.toLocaleDateString('no',{day:'numeric',month:'short',year:'2-digit'}) : '?';
+    return `<div class="gi ${i===currentBatchIdx?'active':''} ${b.hasLlmResult?'':''}}" onclick="selectBatch(${i})" id="bi-${i}">
+      <div class="t">${b.count} photos &middot; ${ds}</div>
+      <div class="m">${b.source} ${b.folderName||''} ${b.hasLlmResult?'✓ LLM':''}</div>
+    </div>`;
+  }).join('');
+}
+
+async function selectBatch(idx) {
+  currentBatchIdx = idx;
+  const b = batches[idx];
+  currentBatch = await(await fetch(`/api/batches/${b.id}`)).json();
+  renderBatchView();
+  renderBatchSidebar();
+  document.getElementById('bi-'+idx)?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+function renderBatchView() {
+  const b = currentBatch;
+  if (!b) return;
+  const main = document.getElementById('main');
+  const W = main.clientWidth;
+  const H = main.clientHeight;
+
+  // Build LLM annotation lookups
+  const llmMap = {};
+  if (b.llm?.images) for (const img of b.llm.images) llmMap[img.imageId] = img;
+  const sgKeep = new Set();
+  const sgCull = new Set();
+  if (b.llm?.similaritySubgroups) {
+    for (const sg of b.llm.similaritySubgroups) {
+      for (const id of sg.recommendedKeepIds) sgKeep.add(id);
+      for (const id of sg.cullIds) sgCull.add(id);
+    }
+  }
+
+  // Same justified layout as groups mode — fit into viewport
+  const rects = justifiedLayout(b.assets, W, H, 4);
+
+  main.innerHTML = `<div class="jgrid">
+    ${b.assets.map((a, i) => {
+      const r = rects[i];
+      const llm = llmMap[a.id];
+      const isKeep = sgKeep.has(a.id);
+      const isCull = sgCull.has(a.id);
+      const stars = llm ? '★'.repeat(llm.suggestedStars) + '☆'.repeat(3-llm.suggestedStars) : '';
+      const note = llm?.briefNote || '';
+      const sg = llm?.similaritySubgroupId;
+      return `<div class="cell ${isCull?'cull':''} ${isKeep?'keep':''}" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;${sg?'outline:2px dashed rgba(240,160,64,.4);outline-offset:-2px':''}">
+        <img src="/api/preview?id=${encodeURIComponent(a.id)}" loading="lazy">
+        ${stars ? `<div class="llm-star">${stars}</div>` : ''}
+        ${note ? `<div class="llm-note">${note}</div>` : ''}
+        <div class="lbl"><span>${a.filename}</span><span>${isCull?'CULL':isKeep?'KEEP':''} ${sg||''}</span></div>
+      </div>`;
+    }).join('')}
+  </div>`;
+
+  // Action bar with LLM summary
+  const llmInfo = b.llm ? `${b.llm.batchSummary||''} &middot; ${b.llm.images?.length||0} rated &middot; ${b.llm.similaritySubgroups?.length||0} subgroups` : '';
+  document.getElementById('bar').innerHTML = `
+    ${!b.llm ? `<button class="run-btn" onclick="runLlm()">Run LLM</button>` : ''}
+    ${llmInfo ? `<span class="bmeta" style="flex:1">${llmInfo}</span>` : '<span class="spacer"></span>'}
+    <span class="bmeta">${b.count} photos</span>
+    <button class="bh" onclick="toggleHelp()">?</button>
+  `;
+}
+
+async function runLlm() {
+  const b = batches[currentBatchIdx];
+  if (!b) return;
+  document.getElementById('bar').innerHTML = '<span style="color:var(--accent)">Running LLM... (may take 15-60s)</span>';
+  try {
+    const resp = await fetch(`/api/batches/${b.id}/rank`, { method: 'POST' });
+    const data = await resp.json();
+    if (data.error) { alert('LLM error: ' + data.error); return; }
+    b.hasLlmResult = true;
+    await selectBatch(currentBatchIdx); // reload with results
+  } catch (e) {
+    alert('LLM error: ' + e.message);
+  }
+}
+
+window.addEventListener('resize', () => {
+  if (appMode === 'groups' && mode === 'grid' && groupDetail) renderGrid();
+  if (appMode === 'llm' && currentBatch) renderBatchView();
+});
+
+// === Hash routing ===
+function updateHash() {
+  if (appMode === 'groups' && ci >= 0) {
+    history.replaceState(null, '', `#group/${ci}`);
+  } else if (appMode === 'llm' && currentBatchIdx >= 0 && batches[currentBatchIdx]) {
+    history.replaceState(null, '', `#batch/${batches[currentBatchIdx].id}`);
+  }
+}
+
+// Update hash on navigation
+const origSelectGroup = selectGroup;
+selectGroup = async function(idx, keepPreview) {
+  await origSelectGroup(idx, keepPreview);
+  updateHash();
+};
+const origSelectBatch = selectBatch;
+selectBatch = async function(idx) {
+  await origSelectBatch(idx);
+  updateHash();
+};
+const origSwitchMode = switchMode;
+switchMode = function(m) {
+  origSwitchMode(m);
+  updateHash();
+};
+
+async function initFromHash() {
+  const hash = location.hash.slice(1);
+  if (hash.startsWith('batch/')) {
+    const batchId = hash.slice(6);
+    await load(); // load groups first
+    switchMode('llm');
+    await loadBatches();
+    const idx = batches.findIndex(b => b.id === batchId);
+    if (idx >= 0) selectBatch(idx);
+  } else if (hash.startsWith('group/')) {
+    const groupIdx = parseInt(hash.slice(6));
+    await load();
+    if (!isNaN(groupIdx) && groupIdx < groups.length) selectGroup(groupIdx);
+  } else {
+    await load();
+  }
+}
+
+initFromHash();
+</script>
+</body>
+</html>
