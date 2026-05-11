@@ -55,6 +55,8 @@
 		arcStartLabel: string | null;
 		arcEndLabel: string | null;
 		arcBands: Array<{ lo: string; hi: string }>;
+		arcActiveWakeAt?: string | null;
+		arcActiveWakeBand?: { lo: string; hi: string } | null;
 	}
 
 	// --- Factories ---
@@ -84,6 +86,7 @@
 			napsAllDone: false,
 			expectedNapEnd: null,
 			expectedNightEnd: null,
+			expectedWakeRange: null,
 			confidence: null,
 			calibration: null,
 			sleepWindow: null,
@@ -163,6 +166,12 @@
 		// A completed nap earlier in the day (arc background)
 		const prevNap: ArcSleep = { start_time: o(-180), end_time: o(-120), type: 'nap' };
 
+		// Helper: build a ±sd band around a point time (minutes offset from now)
+		const wakeBand = (pointMins: number, sdMin: number) => ({
+			lo: o(pointMins - sdMin),
+			hi: o(pointMins + sdMin),
+		});
+
 		// Bedtime prediction with tweakable controls
 		const bdPred = makePrediction({
 			napsAllDone: true,
@@ -194,6 +203,25 @@
 				arcBands: [],
 			},
 			{
+				label: 'Lurar – nett starta, høg uvisse',
+				group: 'Søver',
+				modeKind: 'sleeping',
+				nowMs: n,
+				activeSleep: makeSleep({ start_time: o(-5), type: 'nap' }),
+				prediction: makePrediction({ expectedNapEnd: o(+85), nextNap: o(+180), bedtime: o(+480) }),
+				todayWakeUp: { wake_time: o(-90) },
+				todaySleeps: [makeSleep({ start_time: o(-5), type: 'nap' })],
+				arcSleeps: [prevNap],
+				arcActive: { start_time: o(-5), type: 'nap' },
+				arcPred: null,
+				arcIsNight: false,
+				arcStartLabel: hm(o(-90)),
+				arcEndLabel: hm(o(+480)),
+				arcBands: [],
+				arcActiveWakeAt: o(+85),
+				arcActiveWakeBand: wakeBand(+85, 25),
+			},
+			{
 				label: 'Lurar – vaknar om 15 min',
 				group: 'Søver',
 				modeKind: 'sleeping',
@@ -209,6 +237,8 @@
 				arcStartLabel: hm(o(-120)),
 				arcEndLabel: hm(o(+480)),
 				arcBands: [],
+				arcActiveWakeAt: o(+15),
+				arcActiveWakeBand: wakeBand(+15, 15),
 			},
 			{
 				label: 'Lurar – 20 min over forventa',
@@ -226,6 +256,9 @@
 				arcStartLabel: hm(o(-180)),
 				arcEndLabel: hm(o(+480)),
 				arcBands: [],
+				arcActiveWakeAt: o(-20),
+				// Band hi is in the past → Arc should hide it (overtime)
+				arcActiveWakeBand: wakeBand(-20, 15),
 			},
 			{
 				label: 'Lur på pause',
@@ -236,7 +269,7 @@
 					start_time: o(-60), type: 'nap',
 					pauses: [{ id: 1, sleep_id: 1, pause_time: o(-10), resume_time: null, created_by_event_id: null } satisfies SleepPauseRow],
 				}),
-				prediction: makePrediction({ nextNap: o(+90), bedtime: o(+480) }),
+				prediction: makePrediction({ expectedNapEnd: o(+30), nextNap: o(+90), bedtime: o(+480) }),
 				todayWakeUp: { wake_time: o(-180) },
 				todaySleeps: [makeSleep({ start_time: o(-60), type: 'nap' })],
 				arcSleeps: [],
@@ -246,6 +279,8 @@
 				arcStartLabel: hm(o(-180)),
 				arcEndLabel: hm(o(+480)),
 				arcBands: [],
+				arcActiveWakeAt: o(+30),
+				arcActiveWakeBand: wakeBand(+30, 20),
 			},
 			{
 				label: 'Nattesøvn – 6 timar',
@@ -263,6 +298,8 @@
 				arcStartLabel: hm(o(-360)),
 				arcEndLabel: hm(o(+120)),
 				arcBands: [],
+				arcActiveWakeAt: o(+120),
+				arcActiveWakeBand: wakeBand(+120, 30),
 			},
 			// ─── Vaken ───────────────────────────────────────────────────────
 			{
@@ -608,6 +645,8 @@
 								startTimeLabel={s.arcStartLabel}
 								endTimeLabel={s.arcEndLabel}
 								napConfidenceBands={s.arcBands}
+								activeWakeAt={s.arcActiveWakeAt ?? null}
+								activeWakeBand={s.arcActiveWakeBand ?? null}
 								nowMs={s.nowMs}
 							/>
 							<Timer

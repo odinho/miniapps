@@ -166,6 +166,22 @@
 		})) ?? [],
 	);
 
+	// Active-sleep progress meter: predicted wake + ±1 SD band.
+	// Falls back to expectedNapEnd/expectedNightEnd if the engine didn't supply
+	// a range (older app states / tests). No band in that fallback case.
+	const arcActiveWakeAt = $derived.by(() => {
+		if (!arcActiveSleep || !prediction) return null;
+		if (prediction.expectedWakeRange) return prediction.expectedWakeRange.point;
+		return arcActiveSleep.type === 'night'
+			? prediction.expectedNightEnd
+			: prediction.expectedNapEnd;
+	});
+	const arcActiveWakeBand = $derived(
+		arcActiveSleep && prediction?.expectedWakeRange
+			? { lo: prediction.expectedWakeRange.lo, hi: prediction.expectedWakeRange.hi }
+			: null,
+	);
+
 	// Arc endpoint time labels
 	const arcStartLabel = $derived.by(() => {
 		if (isNightMode) {
@@ -478,6 +494,8 @@
 				startTimeLabel={arcStartLabel}
 				endTimeLabel={arcEndLabel}
 				napConfidenceBands={arcNapConfidenceBands}
+				activeWakeAt={arcActiveWakeAt}
+				activeWakeBand={arcActiveWakeBand}
 				onSleepClick={onArcBubbleClick}
 				onStartClick={onArcStartClick}
 				onEndClick={onArcEndClick}

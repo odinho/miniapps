@@ -30,6 +30,14 @@
 		endTimeLabel?: string | null;
 		/** Confidence bands for predicted nap starts: lo/hi ISO timestamps spanning ~±1 SD */
 		napConfidenceBands?: Array<{ lo: string; hi: string }>;
+		/**
+		 * Predicted wake time for the active sleep. When set, the arc draws a faint
+		 * dashed "planned" track from sleep-start → activeWakeAt so the bright active
+		 * bubble (start → now) reads as a progress meter against the plan.
+		 */
+		activeWakeAt?: string | null;
+		/** ±1 SD band around activeWakeAt (lo/hi ISO). Translucent peach. */
+		activeWakeBand?: { lo: string; hi: string } | null;
 		/** Override internal clock (ms since epoch). Used by the dev playground. */
 		nowMs?: number;
 		onStartClick?: () => void;
@@ -47,6 +55,8 @@
 		startTimeLabel = null,
 		endTimeLabel = null,
 		napConfidenceBands = [],
+		activeWakeAt = null,
+		activeWakeBand = null,
 		nowMs,
 		onStartClick,
 		onEndClick,
@@ -253,6 +263,58 @@
 			return { d: describeArc(cx, cy, r, loFrac, hiFrac), visible: true };
 		});
 	});
+
+	// Planned-track for the active sleep: faint dashed arc from sleep-start
+	// to activeWakeAt. The bright active bubble (start → now) renders on top so
+	// the whole thing reads as progress: filled = elapsed, dashed = remaining.
+	// In overtime (now > wake) the bubble covers the dashed track, so we also
+	// emit a perpendicular wake tick that draws above the bubble — the target
+	// stays visible while the bubble overruns past it.
+	interface PlannedTrack {
+		d: string;
+		visible: boolean;
+		type: 'nap' | 'night';
+		wakeMarker: { x: number; y: number; label: string } | null;
+		wakeTick: { x1: number; y1: number; x2: number; y2: number } | null;
+	}
+
+	const plannedTrack = $derived.by((): PlannedTrack => {
+		const empty: PlannedTrack = { d: '', visible: false, type: 'nap', wakeMarker: null, wakeTick: null };
+		if (!activeSleep || !activeWakeAt) return empty;
+
+		const startFrac = timeToArcFraction(new Date(activeSleep.start_time), config);
+		const wakeFracRaw = timeToArcFractionRaw(new Date(activeWakeAt), config);
+		// Clamp the wake mark to the visible arc so an end-of-day overrun
+		// still shows a track terminating at the arc end.
+		const wakeFrac = Math.max(0, Math.min(1, wakeFracRaw));
+		if (wakeFrac - startFrac < 0.005) return empty;
+
+		const d = describeArc(cx, cy, r, startFrac, wakeFrac);
+		const markerPt = fracToPoint(wakeFrac, cx, cy, r + 24);
+		// Tick extends slightly outside the bubble's outer edge so it stays
+		// visible regardless of bubble strokeWidth.
+		const tickOuter = fracToPoint(wakeFrac, cx, cy, r + trackWidth / 2 + 6);
+		const tickInner = fracToPoint(wakeFrac, cx, cy, r - trackWidth / 2 - 6);
+		return {
+			d,
+			visible: true,
+			type: activeSleep.type,
+			wakeMarker: { x: markerPt.x, y: markerPt.y, label: formatTime(new Date(activeWakeAt)) },
+			wakeTick: { x1: tickOuter.x, y1: tickOuter.y, x2: tickInner.x, y2: tickInner.y },
+		};
+	});
+
+	// Active wake confidence band: translucent zone centered on activeWakeAt.
+	// Hidden once now > hi (the predicted window has passed — overtime mode).
+	const activeWakeBandPath = $derived.by((): { d: string; visible: boolean } => {
+		if (!activeSleep || !activeWakeBand) return { d: '', visible: false };
+		const hiMs = new Date(activeWakeBand.hi).getTime();
+		if (hiMs < now.getTime()) return { d: '', visible: false };
+		const loFrac = timeToArcFraction(new Date(activeWakeBand.lo), config);
+		const hiFrac = timeToArcFraction(new Date(activeWakeBand.hi), config);
+		if (hiFrac <= loFrac || hiFrac - loFrac < 0.005) return { d: '', visible: false };
+		return { d: describeArc(cx, cy, r, loFrac, hiFrac), visible: true };
+	});
 </script>
 
 <svg viewBox="0 0 {S} {S}" width="100%" class="sleep-arc">
@@ -352,6 +414,32 @@
 		/>
 	{/if}
 
+	<!-- Planned-track for active sleep (drawn under the bubble so the
+		 elapsed portion overprints as a progress meter) -->
+	{#if plannedTrack.visible}
+		<path
+			d={plannedTrack.d}
+			fill="none"
+			stroke={plannedTrack.type === 'night' ? 'var(--moon)' : 'var(--peach-dark)'}
+			stroke-width={trackWidth + 2}
+			stroke-linecap="round"
+			stroke-dasharray="6 4"
+			opacity="0.35"
+		/>
+	{/if}
+
+	<!-- Confidence band around the active sleep's predicted wake -->
+	{#if activeWakeBandPath.visible}
+		<path
+			d={activeWakeBandPath.d}
+			fill="none"
+			stroke="var(--peach-dark)"
+			stroke-width={trackWidth * 2.4}
+			stroke-linecap="round"
+			opacity="0.3"
+		/>
+	{/if}
+
 	<!-- Nap confidence bands (±1 SD zones, rendered beneath predicted naps) -->
 	{#each renderedBands as band}
 		{#if band.visible}
@@ -432,4 +520,30 @@
 			{/if}
 		</g>
 	{/each}
+
+	<!-- Wake target tick + label. Drawn after bubbles so the target stays
+		 visible when an active sleep overruns its predicted wake. -->
+	{#if plannedTrack.visible && plannedTrack.wakeTick}
+		<line
+			x1={plannedTrack.wakeTick.x1}
+			y1={plannedTrack.wakeTick.y1}
+			x2={plannedTrack.wakeTick.x2}
+			y2={plannedTrack.wakeTick.y2}
+			stroke={plannedTrack.type === 'night' ? 'var(--moon)' : 'var(--peach-dark)'}
+			stroke-width="2"
+			stroke-linecap="round"
+			opacity="0.8"
+		/>
+	{/if}
+	{#if plannedTrack.visible && plannedTrack.wakeMarker}
+		<text
+			x={plannedTrack.wakeMarker.x}
+			y={plannedTrack.wakeMarker.y}
+			text-anchor="middle"
+			dominant-baseline="middle"
+			fill="var(--text-light)"
+			font-size="9"
+			opacity="0.7">{plannedTrack.wakeMarker.label}</text
+		>
+	{/if}
 </svg>

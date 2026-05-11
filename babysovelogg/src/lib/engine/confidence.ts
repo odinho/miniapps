@@ -34,6 +34,26 @@ export interface ConfidenceResult {
 const MIN_SD_MINUTES = 10; // Even consistent babies vary by ±10 min
 
 /**
+ * Confidence range around an active sleep's predicted wake time. Built from
+ * the same per-sleep-type duration variance the schedule engine uses for
+ * predictions, so a baby with very consistent naps gets a tight band and
+ * a noisy one gets a wide one. Returns null when wakePoint is null.
+ */
+export function computeWakeRange(
+  wakePoint: string | null,
+  type: "nap" | "night",
+  ageMonths: number,
+  recentSleeps?: SleepEntry[],
+): PredictionRange | null {
+  if (!wakePoint) return null;
+  const durationSd =
+    type === "night"
+      ? getNightDurationStats(recentSleeps, ageMonths).sd
+      : getNapDurationStats(recentSleeps, ageMonths).sd;
+  return makeRange(wakePoint, Math.max(MIN_SD_MINUTES, durationSd));
+}
+
+/**
  * Compute confidence intervals for a set of predicted naps and bedtime.
  */
 export function computeConfidence(
@@ -224,6 +244,26 @@ function getNapDurationStats(
   if (durations.length < 3) return { sd: ageMonths < 6 ? 20 : 15 };
   // Floor the SD so a perfectly consistent baby doesn't get an absurdly tight
   // confidence interval (the model still has its own irreducible error).
+  return { sd: Math.max(MIN_SD_MINUTES, sd(durations)) };
+}
+
+function getNightDurationStats(
+  recentSleeps: SleepEntry[] | undefined,
+  ageMonths: number,
+): { sd: number } {
+  // Night sleep is the longest single sleep, so its variance dwarfs naps —
+  // ~45m SD for young infants, settling to ~30m once a rhythm forms.
+  const fallback = ageMonths < 6 ? 45 : 30;
+  if (!recentSleeps || recentSleeps.length < 3) return { sd: fallback };
+
+  // Match the 360–900 min plausibility window used by getLearnedNightDuration
+  // in schedule.ts so the variance samples align with the point estimate.
+  const durations = recentSleeps
+    .filter((s) => s.type === "night" && s.end_time)
+    .map((s) => (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60_000)
+    .filter((d) => d >= 360 && d <= 900);
+
+  if (durations.length < 3) return { sd: fallback };
   return { sd: Math.max(MIN_SD_MINUTES, sd(durations)) };
 }
 

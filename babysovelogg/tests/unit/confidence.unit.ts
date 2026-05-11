@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { computeConfidence } from "$lib/engine/confidence.js";
+import { computeConfidence, computeWakeRange } from "$lib/engine/confidence.js";
 import { predictDayNaps, recommendBedtime, calculateAgeMonths } from "$lib/engine/schedule.js";
 import type { DayRecord } from "$lib/engine/backtest.js";
 import type { SleepEntry, BabyContext } from "$lib/types.js";
@@ -146,5 +146,67 @@ describe("confidence intervals", () => {
     const censored = sd2(withCutShort);
     const uncensored = sd2(withoutLabels);
     expect(censored).toBeLessThan(uncensored);
+  });
+});
+
+describe("computeWakeRange (active-sleep progress meter)", () => {
+  const WAKE = "2026-04-29T11:00:00.000Z";
+
+  it("returns null when wakePoint is null", () => {
+    expect(computeWakeRange(null, "nap", 8)).toBeNull();
+    expect(computeWakeRange(null, "night", 8)).toBeNull();
+  });
+
+  it("falls back to age-default SD for naps with no data", () => {
+    const youngRange = computeWakeRange(WAKE, "nap", 4)!;
+    const olderRange = computeWakeRange(WAKE, "nap", 12)!;
+    // Young infants: fallback 20m; older: 15m (per getNapDurationStats).
+    expect(youngRange.sdMinutes).toBe(20);
+    expect(olderRange.sdMinutes).toBe(15);
+    // Range straddles the wake point symmetrically.
+    expect(youngRange.point).toBe(WAKE);
+    const wakeMs = new Date(WAKE).getTime();
+    expect(new Date(youngRange.lo).getTime()).toBe(wakeMs - 20 * 60_000);
+    expect(new Date(youngRange.hi).getTime()).toBe(wakeMs + 20 * 60_000);
+  });
+
+  it("uses wider SD for night sleep than nap", () => {
+    const napYoung = computeWakeRange(WAKE, "nap", 4)!;
+    const nightYoung = computeWakeRange(WAKE, "night", 4)!;
+    expect(nightYoung.sdMinutes).toBeGreaterThan(napYoung.sdMinutes);
+    // Older babies → tighter night SD than younger.
+    const nightOlder = computeWakeRange(WAKE, "night", 12)!;
+    expect(nightOlder.sdMinutes).toBeLessThan(nightYoung.sdMinutes);
+  });
+
+  it("floors SD at MIN_SD_MINUTES (10) even for a perfectly consistent baby", () => {
+    // 5 identical-length naps → variance 0, but the floor must keep SD ≥ 10.
+    const naps: SleepEntry[] = Array.from({ length: 5 }, (_, i) => ({
+      start_time: `2026-04-2${i + 1}T08:00:00Z`,
+      end_time: `2026-04-2${i + 1}T09:30:00Z`,
+      type: "nap",
+      woke_by: "self",
+    }));
+    const range = computeWakeRange(WAKE, "nap", 8, naps)!;
+    expect(range.sdMinutes).toBeGreaterThanOrEqual(10);
+  });
+
+  it("ignores implausible night durations outside 360–900 min", () => {
+    // 3 plausible 11h nights + 2 noise samples (45 min and 18 h). The filter
+    // must drop the noise so the SD reflects only the good nights.
+    const nights: SleepEntry[] = [
+      { start_time: "2026-04-22T19:00:00Z", end_time: "2026-04-23T06:00:00Z", type: "night", woke_by: null },
+      { start_time: "2026-04-23T19:00:00Z", end_time: "2026-04-24T06:00:00Z", type: "night", woke_by: null },
+      { start_time: "2026-04-24T19:00:00Z", end_time: "2026-04-25T06:00:00Z", type: "night", woke_by: null },
+      // 45 min "night" — data entry mistake
+      { start_time: "2026-04-25T19:00:00Z", end_time: "2026-04-25T19:45:00Z", type: "night", woke_by: null },
+      // 18 h "night" — partial-log artefact
+      { start_time: "2026-04-26T19:00:00Z", end_time: "2026-04-27T13:00:00Z", type: "night", woke_by: null },
+    ];
+    const range = computeWakeRange(WAKE, "night", 10, nights)!;
+    // With 3 identical nights the floor kicks in (SD === 10), but the call
+    // must not throw or produce NaN from the noisy samples.
+    expect(range.sdMinutes).toBeGreaterThanOrEqual(10);
+    expect(Number.isFinite(range.sdMinutes)).toBe(true);
   });
 });

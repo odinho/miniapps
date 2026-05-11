@@ -1,7 +1,7 @@
 import type { Baby, SleepLogRow, DayStartRow } from "$lib/types.js";
 import type { DayStats } from "$lib/engine/stats.js";
 import type { PredictedNap } from "$lib/engine/schedule.js";
-import type { ConfidenceResult } from "$lib/engine/confidence.js";
+import type { ConfidenceResult, PredictionRange } from "$lib/engine/confidence.js";
 import type { CalibrationReport } from "$lib/engine/calibration.js";
 import type { Strategy } from "$lib/engine/strategy.js";
 import type { RollingSleepStats, AgeNorms } from "$lib/engine/features.js";
@@ -22,6 +22,11 @@ export interface Prediction {
 	expectedNapEnd: string | null;
 	/** Expected end time for the current active night sleep (null when not in night sleep) */
 	expectedNightEnd: string | null;
+	/**
+	 * Range around the active sleep's predicted wake time (lo/hi ≈ ±1 SD of the
+	 * relevant duration). null when no active sleep or no point estimate.
+	 */
+	expectedWakeRange: PredictionRange | null;
 	/** Confidence intervals for nap/bedtime predictions (null when no data) */
 	confidence: ConfidenceResult | null;
 	/** Calibration report: what's learned vs age-default */

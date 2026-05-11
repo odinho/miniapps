@@ -60,6 +60,7 @@ function makePrediction(overrides: Partial<Prediction> = {}): Prediction {
     napsAllDone: false,
     expectedNapEnd: null,
     expectedNightEnd: null,
+    expectedWakeRange: null,
     confidence: null,
     calibration: null,
     sleepWindow: null,

@@ -15,7 +15,7 @@ import {
   estimateSleepCycleFromData,
 } from "./schedule.js";
 import { getTodayStats } from "./stats.js";
-import { computeConfidence } from "./confidence.js";
+import { computeConfidence, computeWakeRange } from "./confidence.js";
 import { calibrate } from "./calibration.js";
 import { computeStrategySignals } from "./features.js";
 import { selectStrategy } from "./strategy.js";
@@ -335,6 +335,7 @@ function assembleNewbornPrediction(
     napsAllDone: false,
     expectedNapEnd: null,
     expectedNightEnd: null,
+    expectedWakeRange: null,
     confidence: null,
     calibration: null,
     rescueNap: null,
@@ -488,6 +489,15 @@ function assembleEmergingPrediction(
     ? computeContinuationWindow(lastCutShort, lastCutShort.startMs, getLearnedNapDuration(ctx), now)
     : null;
 
+  const expectedWakeRange = activeSleep
+    ? computeWakeRange(
+        activeSleep.type === "night" ? expectedNightEnd : expectedNapEnd,
+        activeSleep.type === "night" ? "night" : "nap",
+        ctx.ageMonths,
+        ctx.recentSleeps,
+      )
+    : null;
+
   return {
     strategy: "emerging_rhythm",
     feasible: true,
@@ -498,6 +508,7 @@ function assembleEmergingPrediction(
     napsAllDone,
     expectedNapEnd,
     expectedNightEnd,
+    expectedWakeRange,
     confidence: null,
     calibration: null,
     rescueNap,
@@ -671,6 +682,15 @@ function assembleSchedulePrediction(
     ? computeContinuationWindow(lastCutShort, lastCutShort.startMs, getLearnedNapDuration(ctx), now)
     : null;
 
+  const expectedWakeRange = activeSleep
+    ? computeWakeRange(
+        activeSleep.type === "night" ? expectedNightEnd : expectedNapEnd,
+        activeSleep.type === "night" ? "night" : "nap",
+        ctx.ageMonths,
+        ctx.recentSleeps,
+      )
+    : null;
+
   return {
     strategy,
     feasible: selected?.feasible ?? true,
@@ -681,6 +701,7 @@ function assembleSchedulePrediction(
     napsAllDone,
     expectedNapEnd,
     expectedNightEnd,
+    expectedWakeRange,
     confidence,
     calibration,
     rescueNap,
