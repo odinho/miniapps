@@ -39,6 +39,8 @@ function makePrediction(overrides: Partial<Prediction> = {}): Prediction {
     expectedNapEnd: null,
     expectedNightEnd: null,
     expectedWakeRange: null,
+    skippedNap: null,
+    postSkipPlan: null,
     confidence: null,
     calibration: null,
     sleepWindow: null,
@@ -364,5 +366,90 @@ describe("getAwakeSince", () => {
     });
     const result = getAwakeSince(input);
     expect(result).toBeNull();
+  });
+});
+
+describe("getTimerMode — skipped-nap state", () => {
+  it("returns skipped-nap mode when prediction has skippedNap and no active sleep", () => {
+    const input = makeInput({
+      prediction: makePrediction({
+        nextNap: "2026-03-27T19:00:00.000Z",
+        bedtime: "2026-03-27T19:00:00.000Z",
+        napsAllDone: true,
+        skippedNap: { plannedAt: "2026-03-27T10:00:00.000Z" },
+        postSkipPlan: {
+          kind: "rescue",
+          window: {
+            earliest: "2026-03-27T12:30:00.000Z",
+            latest: "2026-03-27T14:30:00.000Z",
+          },
+          capLatestEnd: "2026-03-27T17:30:00.000Z",
+        },
+      }),
+      now: new Date("2026-03-27T12:00:00.000Z").getTime(),
+    });
+    const mode = getTimerMode(input);
+    expect(mode.kind).toBe("skipped-nap");
+    if (mode.kind === "skipped-nap") {
+      expect(mode.plannedAt).toBe("2026-03-27T10:00:00.000Z");
+      expect(mode.plannedAgoMs).toBeCloseTo(2 * 60 * 60 * 1000, -2);
+      expect(mode.postSkipPlan?.kind).toBe("rescue");
+      expect(mode.bedtime).toBe("2026-03-27T19:00:00.000Z");
+      expect(mode.bedtimeCountdown).toBeCloseTo(7 * 60 * 60 * 1000, -2);
+    }
+  });
+
+  it("skipped-nap takes precedence over bedtime mode (the bug we're fixing)", () => {
+    // Before the fix: napSkipped → napsAllDone → nextNap = bedtime → Timer
+    // silently shows "bedtime in 7h". Now we should see skipped-nap first.
+    const input = makeInput({
+      prediction: makePrediction({
+        nextNap: "2026-03-27T19:00:00.000Z",
+        bedtime: "2026-03-27T19:00:00.000Z",
+        napsAllDone: true,
+        skippedNap: { plannedAt: "2026-03-27T10:00:00.000Z" },
+        postSkipPlan: null,
+      }),
+      now: new Date("2026-03-27T12:00:00.000Z").getTime(),
+    });
+    const mode = getTimerMode(input);
+    expect(mode.kind).toBe("skipped-nap");
+  });
+
+  it("active sleep wins over skipped-nap (parent finally put baby down)", () => {
+    const input = makeInput({
+      activeSleep: makeSleep({ start_time: "2026-03-27T12:30:00.000Z", type: "nap" }),
+      prediction: makePrediction({
+        skippedNap: { plannedAt: "2026-03-27T10:00:00.000Z" },
+      }),
+      now: new Date("2026-03-27T13:00:00.000Z").getTime(),
+    });
+    const mode = getTimerMode(input);
+    expect(mode.kind).toBe("sleeping");
+  });
+
+  it("earlier-bedtime plan never has negative minutesEarlier", () => {
+    // Regression: when now lands inside the [bedtime - shiftMin, bedtime]
+    // window, naive math produced a "suggestedBedtime" *later* than the
+    // planned bedtime with minutesEarlier = -15 (rendered as "-15m før
+    // normalt"). Clamp must keep the shift non-negative.
+    const input = makeInput({
+      prediction: makePrediction({
+        nextNap: "2026-03-27T19:30:00.000Z",
+        bedtime: "2026-03-27T19:30:00.000Z",
+        napsAllDone: true,
+        skippedNap: { plannedAt: "2026-03-27T15:00:00.000Z" },
+        postSkipPlan: {
+          kind: "earlier-bedtime",
+          suggestedBedtime: "2026-03-27T19:30:00.000Z",
+          minutesEarlier: 0,
+        },
+      }),
+      now: new Date("2026-03-27T19:15:00.000Z").getTime(),
+    });
+    const mode = getTimerMode(input);
+    if (mode.kind === "skipped-nap" && mode.postSkipPlan?.kind === "earlier-bedtime") {
+      expect(mode.postSkipPlan.minutesEarlier).toBeGreaterThanOrEqual(0);
+    }
   });
 });

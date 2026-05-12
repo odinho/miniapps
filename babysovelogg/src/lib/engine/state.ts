@@ -24,7 +24,7 @@ import { predictEmerging } from "./emerging.js";
 import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry, BabyContext } from "$lib/types.js";
 import type { PredictedNap } from "./schedule.js";
 import type { Strategy, StrategyContext, StrategyOverride } from "./strategy.js";
-import type { Prediction } from "$lib/stores/app.svelte.js";
+import type { Prediction, PostSkipPlan } from "$lib/stores/app.svelte.js";
 
 export interface DayData {
   baby: Baby;
@@ -173,6 +173,86 @@ function compressComebackNap(
   return {
     startTime: new Date(newStartMs).toISOString(),
     endTime: new Date(newStartMs + napDurMs).toISOString(),
+  };
+}
+
+/**
+ * Decide what to recommend after a nap is skipped: try a rescue nap if there's
+ * still room before bedtime, otherwise propose an earlier bedtime to clear the
+ * sleep deficit. Rules:
+ *
+ *  - Rescue requires: room for a ≥30 min nap, starting in ≥30 min from now,
+ *    ending ≥90 min before bedtime (so the wake window after the rescue
+ *    doesn't break bedtime), and within 3 h from now (later naps are
+ *    counterproductive to a normal bedtime).
+ *  - When rescue isn't feasible, suggest 30 min earlier (45 min for <6 mo,
+ *    whose deficits are higher-stakes). Capped at 30 min before "now" so we
+ *    don't recommend a bedtime that's already passed.
+ *
+ * Doesn't mutate `nextNap` / `predictedNaps` — those still flip to bedtime
+ * via the existing napsAllDone path. This is additional surface for the UI.
+ */
+function computePostSkipPlan(
+  now: number,
+  bedtime: string,
+  ageMonths: number,
+): { kind: "rescue"; window: { earliest: string; latest: string }; capLatestEnd: string }
+  | { kind: "earlier-bedtime"; suggestedBedtime: string; minutesEarlier: number } {
+  const bedtimeMs = new Date(bedtime).getTime();
+  const RESCUE_MIN_DURATION_MS = 30 * 60_000;
+  const PRE_BEDTIME_BUFFER_MS = 90 * 60_000;
+  const MIN_START_DELAY_MS = 30 * 60_000;
+  const MAX_START_DELAY_MS = 3 * 60 * 60_000;
+
+  const earliestStart = now + MIN_START_DELAY_MS;
+  const latestStart = Math.min(
+    now + MAX_START_DELAY_MS,
+    bedtimeMs - PRE_BEDTIME_BUFFER_MS - RESCUE_MIN_DURATION_MS,
+  );
+
+  if (latestStart > earliestStart) {
+    return {
+      kind: "rescue",
+      window: {
+        earliest: new Date(earliestStart).toISOString(),
+        latest: new Date(latestStart).toISOString(),
+      },
+      capLatestEnd: new Date(bedtimeMs - PRE_BEDTIME_BUFFER_MS).toISOString(),
+    };
+  }
+
+  const shiftMin = ageMonths < 6 ? 45 : 30;
+  // Don't suggest a bedtime that's already past, and don't suggest one *later*
+  // than the day's planned bedtime — if the action floor (now+30m) is already
+  // past planned bedtime, the parent should just go to bedtime now. We still
+  // emit earlier-bedtime so the Timer can label the skip; minutesEarlier=0
+  // means "no shift, the planned time is the action."
+  const floorMs = Math.min(bedtimeMs, now + 30 * 60_000);
+  const suggestedMs = Math.max(bedtimeMs - shiftMin * 60_000, floorMs);
+  return {
+    kind: "earlier-bedtime",
+    suggestedBedtime: new Date(suggestedMs).toISOString(),
+    minutesEarlier: Math.max(0, Math.round((bedtimeMs - suggestedMs) / 60_000)),
+  };
+}
+
+/**
+ * Bundle the skipped-nap fields emitted on `Prediction`. Used by both the
+ * routine-schedule and emerging-rhythm branches so they stay in sync — the
+ * fields are coupled (postSkipPlan only makes sense alongside skippedNap)
+ * and we don't want the two strategies drifting on the contract.
+ */
+function buildSkippedNapFields(
+  napSkipped: boolean,
+  nextNap: string | null,
+  bedtime: string | null,
+  now: number,
+  ageMonths: number,
+): { skippedNap: { plannedAt: string } | null; postSkipPlan: PostSkipPlan | null } {
+  if (!napSkipped || !nextNap) return { skippedNap: null, postSkipPlan: null };
+  return {
+    skippedNap: { plannedAt: nextNap },
+    postSkipPlan: bedtime ? computePostSkipPlan(now, bedtime, ageMonths) : null,
   };
 }
 
@@ -336,6 +416,8 @@ function assembleNewbornPrediction(
     expectedNapEnd: null,
     expectedNightEnd: null,
     expectedWakeRange: null,
+    skippedNap: null,
+    postSkipPlan: null,
     confidence: null,
     calibration: null,
     rescueNap: null,
@@ -452,6 +534,14 @@ function assembleEmergingPrediction(
   const napsAllDone = consumedNaps >= expectedNapCount || napSkipped || collapsedToBedtime
     || activeSleep?.type === "night";
 
+  const { skippedNap, postSkipPlan } = buildSkippedNapFields(
+    napSkipped,
+    nextNap,
+    bedtime,
+    now,
+    ctx.ageMonths,
+  );
+
   if (napsAllDone) {
     nextNap = bedtime;
     predictedNaps = null;
@@ -509,6 +599,8 @@ function assembleEmergingPrediction(
     expectedNapEnd,
     expectedNightEnd,
     expectedWakeRange,
+    skippedNap,
+    postSkipPlan,
     confidence: null,
     calibration: null,
     rescueNap,
@@ -631,6 +723,16 @@ function assembleSchedulePrediction(
   const napsAllDone = consumedNaps >= expectedNapCount || napSkipped || collapsedToBedtime
     || activeSleep?.type === "night";
 
+  // Capture the missed slot *before* napsAllDone clears nextNap / predictedNaps,
+  // so the UI can preserve the "this should have happened at HH:MM" narrative.
+  const { skippedNap, postSkipPlan } = buildSkippedNapFields(
+    napSkipped,
+    nextNap,
+    bedtime,
+    now,
+    ctx.ageMonths,
+  );
+
   if (napsAllDone) {
     nextNap = bedtime;
     predictedNaps = null;
@@ -702,6 +804,8 @@ function assembleSchedulePrediction(
     expectedNapEnd,
     expectedNightEnd,
     expectedWakeRange,
+    skippedNap,
+    postSkipPlan,
     confidence,
     calibration,
     rescueNap,

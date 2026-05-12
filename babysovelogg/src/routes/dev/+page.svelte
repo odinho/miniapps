@@ -57,6 +57,8 @@
 		arcBands: Array<{ lo: string; hi: string }>;
 		arcActiveWakeAt?: string | null;
 		arcActiveWakeBand?: { lo: string; hi: string } | null;
+		arcSkippedNap?: { plannedAt: string } | null;
+		arcRescueWindow?: { earliest: string; latest: string } | null;
 	}
 
 	// --- Factories ---
@@ -87,6 +89,8 @@
 			expectedNapEnd: null,
 			expectedNightEnd: null,
 			expectedWakeRange: null,
+			skippedNap: null,
+			postSkipPlan: null,
 			confidence: null,
 			calibration: null,
 			sleepWindow: null,
@@ -545,6 +549,103 @@
 				arcEndLabel: null,
 				arcBands: [],
 			},
+			// ─── Hoppa over lur ────────────────────────────────────────────────
+			{
+				// Halldis-scenario: woke 06:25, predicted nap 09:53, now 10:59.
+				// Plenty of room before 19:00 bedtime → rescue suggestion.
+				label: 'Hoppa over lur – reddingslur mogeleg',
+				group: 'Hoppa over',
+				modeKind: 'skipped-nap',
+				nowMs: n,
+				activeSleep: null,
+				prediction: makePrediction({
+					nextNap: o(+480), // collapsed to bedtime by engine
+					bedtime: o(+480),
+					napsAllDone: true,
+					skippedNap: { plannedAt: o(-66) },
+					postSkipPlan: {
+						kind: 'rescue',
+						window: { earliest: o(+30), latest: o(+180) },
+						capLatestEnd: o(+390),
+					},
+					calibration: makeCalibration('learned'),
+				}),
+				todayWakeUp: { wake_time: o(-274) },
+				todaySleeps: [],
+				arcSleeps: [],
+				arcActive: null,
+				arcPred: { nextNap: o(+480), bedtime: o(+480) },
+				arcIsNight: false,
+				arcStartLabel: hm(o(-274)),
+				arcEndLabel: hm(o(+480)),
+				arcBands: [],
+				arcSkippedNap: { plannedAt: o(-66) },
+				arcRescueWindow: { earliest: o(+30), latest: o(+180) },
+			},
+			{
+				// Skipped nap late in day → bedtime is too close for a rescue.
+				// Engine recommends earlier bedtime instead.
+				label: 'Hoppa over lur – for seint, tidlegare leggetid',
+				group: 'Hoppa over',
+				modeKind: 'skipped-nap',
+				nowMs: n,
+				activeSleep: null,
+				prediction: makePrediction({
+					nextNap: o(+120),
+					bedtime: o(+120),
+					napsAllDone: true,
+					skippedNap: { plannedAt: o(-75) },
+					postSkipPlan: {
+						kind: 'earlier-bedtime',
+						suggestedBedtime: o(+90),
+						minutesEarlier: 30,
+					},
+					calibration: makeCalibration('learned'),
+				}),
+				todayWakeUp: { wake_time: o(-360) },
+				todaySleeps: [],
+				arcSleeps: [],
+				arcActive: null,
+				arcPred: { nextNap: o(+120), bedtime: o(+120) },
+				arcIsNight: false,
+				arcStartLabel: hm(o(-360)),
+				arcEndLabel: hm(o(+120)),
+				arcBands: [],
+				arcSkippedNap: { plannedAt: o(-75) },
+				arcRescueWindow: null,
+			},
+			{
+				// Toddler scenario: one nap, no rescue possible, parent should
+				// just go to an earlier bedtime. Long awake-stretch context.
+				label: 'Hoppa over lur – småbarn, 5h vaken',
+				group: 'Hoppa over',
+				modeKind: 'skipped-nap',
+				nowMs: n,
+				activeSleep: null,
+				prediction: makePrediction({
+					nextNap: o(+180),
+					bedtime: o(+180),
+					napsAllDone: true,
+					skippedNap: { plannedAt: o(-90) },
+					postSkipPlan: {
+						kind: 'earlier-bedtime',
+						suggestedBedtime: o(+150),
+						minutesEarlier: 30,
+					},
+					calibration: makeCalibration('partial'),
+				}),
+				todayWakeUp: { wake_time: o(-300) },
+				todaySleeps: [],
+				arcSleeps: [],
+				arcActive: null,
+				arcPred: { nextNap: o(+180), bedtime: o(+180) },
+				arcIsNight: false,
+				arcStartLabel: hm(o(-300)),
+				arcEndLabel: hm(o(+180)),
+				arcBands: [],
+				arcSkippedNap: { plannedAt: o(-90) },
+				arcRescueWindow: null,
+			},
 			// ─── Spesialtilfelle ──────────────────────────────────────────────
 			{
 				label: 'Idle – ingen prediksjon',
@@ -647,6 +748,8 @@
 								napConfidenceBands={s.arcBands}
 								activeWakeAt={s.arcActiveWakeAt ?? null}
 								activeWakeBand={s.arcActiveWakeBand ?? null}
+								skippedNap={s.arcSkippedNap ?? null}
+								rescueWindow={s.arcRescueWindow ?? null}
 								nowMs={s.nowMs}
 							/>
 							<Timer

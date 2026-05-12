@@ -120,6 +120,22 @@
 	{:else if mode.kind === 'after-bedtime'}
 		<div class="arc-center-label">Etter leggetid</div>
 		<span class="countdown-value">{formatTime(mode.bedtime)}</span>
+	{:else if mode.kind === 'skipped-nap'}
+		<div class="arc-center-label">Hoppa over lur</div>
+		<span class="countdown-value" style="font-size: 2.2rem;">{formatTime(mode.plannedAt)}</span>
+		<div class="arc-sub-label" style="opacity: 0.8;">{formatDuration(mode.plannedAgoMs)} sidan</div>
+		{#if mode.postSkipPlan?.kind === 'rescue'}
+			<div class="arc-sub-label rescue-tip" data-testid="post-skip-tip">
+				💡 Vurder ein reddingslur kl. {formatTime(mode.postSkipPlan.window.earliest)}–{formatTime(mode.postSkipPlan.window.latest)}
+			</div>
+		{:else if mode.postSkipPlan?.kind === 'earlier-bedtime'}
+			<div class="arc-sub-label rescue-tip" data-testid="post-skip-tip">
+				💡 Vurder tidlegare leggetid kl. {formatTime(mode.postSkipPlan.suggestedBedtime)}
+				<span style="opacity: 0.7;">({mode.postSkipPlan.minutesEarlier}m før normalt)</span>
+			</div>
+		{:else if mode.bedtime && mode.bedtimeCountdown != null && mode.bedtimeCountdown > 0}
+			<div class="arc-sub-label" style="opacity: 0.7;">Leggetid kl. {formatTime(mode.bedtime)} ({formatDuration(mode.bedtimeCountdown)})</div>
+		{/if}
 	{:else if mode.kind === 'sleep-window'}
 		{#if mode.pressure === 'high'}
 			<div class="arc-center-label">Søvnvindauge no</div>

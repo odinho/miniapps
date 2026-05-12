@@ -853,7 +853,7 @@ describe("assembleState", () => {
     expect(result.prediction!.nextNap).toBe(result.prediction!.bedtime);
   });
 
-  it("skipped nap: napsAllDone when predicted nap is >90 min overdue", () => {
+  it("skipped nap: napsAllDone when predicted nap is >60 min overdue", () => {
     // 9mo baby, 2 expected naps, only 1 done. At 18:17, the second predicted nap was hours ago.
     const wakeUp: DayStartRow = {
       id: 1, baby_id: 1, date: "2026-03-28",
@@ -878,6 +878,46 @@ describe("assembleState", () => {
     expect(result.prediction!.napsAllDone).toBe(true);
     expect(result.prediction!.nextNap).toBe(result.prediction!.bedtime);
     expect(result.prediction!.predictedNaps).toBeNull();
+    // The skipped slot should be preserved on the prediction so the UI can
+    // surface it instead of silently collapsing to bedtime mode.
+    expect(result.prediction!.skippedNap).not.toBeNull();
+    expect(result.prediction!.postSkipPlan).not.toBeNull();
+  });
+
+  it("skipped nap exposes plannedAt slot for the UI", () => {
+    // Same setup as the napsAllDone test above — assert the new fields are
+    // populated alongside napsAllDone, so the UI can preserve the day's
+    // narrative.
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-03-28",
+      wake_time: "2026-03-28T06:15:00.000Z",
+      created_at: "2026-03-28T06:15:00.000Z",
+      created_by_event_id: null,
+    };
+    const longNap = sleepRow({
+      start_time: "2026-03-28T09:46:00.000Z",
+      end_time: "2026-03-28T12:22:00.000Z",
+      type: "nap",
+    });
+
+    const result = assembleState(
+      dayData({
+        todaySleeps: [longNap],
+        todayWakeUp: wakeUp,
+        now: new Date("2026-03-28T18:17:00.000Z").getTime(),
+      }),
+    );
+
+    // plannedAt is a real ISO timestamp pointing into the past.
+    const plannedAt = result.prediction!.skippedNap?.plannedAt;
+    expect(plannedAt).toBeTruthy();
+    expect(new Date(plannedAt!).getTime()).toBeLessThan(
+      new Date("2026-03-28T18:17:00.000Z").getTime(),
+    );
+    // The post-skip plan must be one of the two supported kinds.
+    const planKind = result.prediction!.postSkipPlan?.kind;
+    expect(planKind).toBeTruthy();
+    expect(["rescue", "earlier-bedtime"]).toContain(planKind!);
   });
 
   it("stale predictions recalculated from actual wake time after long nap", () => {

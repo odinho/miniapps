@@ -27,6 +27,21 @@ export interface Prediction {
 	 * relevant duration). null when no active sleep or no point estimate.
 	 */
 	expectedWakeRange: PredictionRange | null;
+	/**
+	 * A planned nap that was missed: the engine predicted a nap at this time and
+	 * the window passed (>60 min overdue, no active sleep). Populated *in
+	 * addition to* the existing napsAllDone path so the UI can preserve the
+	 * day's narrative ("Hoppa over lur kl. 09:53") instead of silently swapping
+	 * to bedtime mode. Null when no nap was skipped today.
+	 */
+	skippedNap: { plannedAt: string } | null;
+	/**
+	 * What the engine recommends when a nap is skipped. `rescue` means there's
+	 * still room for a power nap before bedtime; `earlier-bedtime` means it's
+	 * too late and the sleep deficit should be paid down with an earlier night
+	 * sleep. Null when no nap is skipped (or when the day's plan is intact).
+	 */
+	postSkipPlan: PostSkipPlan | null;
 	/** Confidence intervals for nap/bedtime predictions (null when no data) */
 	confidence: ConfidenceResult | null;
 	/** Calibration report: what's learned vs age-default */
@@ -65,6 +80,22 @@ export interface Prediction {
 		capLatestEnd: string;
 	} | null;
 }
+
+export type PostSkipPlan =
+	| {
+			kind: "rescue";
+			/** Acceptable rescue-nap start window (earliest..latest ISO). */
+			window: { earliest: string; latest: string };
+			/** Latest end time so the rescue doesn't break bedtime (ISO). */
+			capLatestEnd: string;
+	  }
+	| {
+			kind: "earlier-bedtime";
+			/** Suggested bedtime, earlier than the day's planned bedtime (ISO). */
+			suggestedBedtime: string;
+			/** How many minutes earlier than the planned bedtime. */
+			minutesEarlier: number;
+	  };
 
 export interface LearnedSchedule {
 	/** Learned average nap duration in minutes */

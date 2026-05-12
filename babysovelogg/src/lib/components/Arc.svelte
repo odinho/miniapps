@@ -38,6 +38,18 @@
 		activeWakeAt?: string | null;
 		/** ±1 SD band around activeWakeAt (lo/hi ISO). Translucent peach. */
 		activeWakeBand?: { lo: string; hi: string } | null;
+		/**
+		 * A nap the engine predicted that didn't happen (parent skipped or baby
+		 * didn't fall asleep). Rendered as a faded dashed blob with a strikethrough
+		 * across it so the day's narrative stays intact instead of silently
+		 * collapsing to bedtime mode.
+		 */
+		skippedNap?: { plannedAt: string } | null;
+		/**
+		 * A recommended rescue-nap window after a skip. Rendered as a soft predicted
+		 * blob spanning earliest..latest, distinct from the strikethrough above.
+		 */
+		rescueWindow?: { earliest: string; latest: string } | null;
 		/** Override internal clock (ms since epoch). Used by the dev playground. */
 		nowMs?: number;
 		onStartClick?: () => void;
@@ -57,6 +69,8 @@
 		napConfidenceBands = [],
 		activeWakeAt = null,
 		activeWakeBand = null,
+		skippedNap = null,
+		rescueWindow = null,
 		nowMs,
 		onStartClick,
 		onEndClick,
@@ -315,6 +329,51 @@
 		if (hiFrac <= loFrac || hiFrac - loFrac < 0.005) return { d: '', visible: false };
 		return { d: describeArc(cx, cy, r, loFrac, hiFrac), visible: true };
 	});
+
+	// Skipped nap: faded dashed blob centered on plannedAt with a thin
+	// strikethrough across it. Width approximates a typical nap (45 min) since
+	// we only know the start; consumers pass the planned start time.
+	interface SkippedBlob {
+		d: string;
+		strikethrough: { x1: number; y1: number; x2: number; y2: number };
+		label: { x: number; y: number; text: string };
+		visible: boolean;
+	}
+	const skippedBlob = $derived.by((): SkippedBlob | null => {
+		if (!skippedNap) return null;
+		const plannedMs = new Date(skippedNap.plannedAt).getTime();
+		const halfWidthMs = 22 * 60_000; // ~45min wide window centered on plannedAt
+		const loFrac = timeToArcFraction(new Date(plannedMs - halfWidthMs), config);
+		const hiFrac = timeToArcFraction(new Date(plannedMs + halfWidthMs), config);
+		if (hiFrac - loFrac < 0.005) return null;
+		const d = describeArc(cx, cy, r, loFrac, hiFrac);
+		// Strikethrough: a chord across the blob's mid-point at slightly inner +
+		// outer radii so it reads as a "scratched out" mark.
+		const midFrac = (loFrac + hiFrac) / 2;
+		const outer = fracToPoint(midFrac, cx, cy, r + trackWidth / 2 + 4);
+		const inner = fracToPoint(midFrac, cx, cy, r - trackWidth / 2 - 4);
+		const labelPt = fracToPoint(midFrac, cx, cy, r + 24);
+		return {
+			d,
+			strikethrough: { x1: outer.x, y1: outer.y, x2: inner.x, y2: inner.y },
+			label: { x: labelPt.x, y: labelPt.y, text: formatTime(skippedNap.plannedAt) },
+			visible: true,
+		};
+	});
+
+	// Rescue window: faint predicted-style blob spanning the suggested rescue
+	// start window. Visually softer than a normal predicted nap to signal
+	// "this is a suggestion, not a hard plan."
+	const rescueBlob = $derived.by((): { d: string; visible: boolean } | null => {
+		if (!rescueWindow) return null;
+		const lo = new Date(rescueWindow.earliest);
+		const hi = new Date(rescueWindow.latest);
+		if (hi.getTime() < now.getTime()) return null;
+		const loFrac = timeToArcFraction(lo, config);
+		const hiFrac = timeToArcFraction(hi, config);
+		if (hiFrac - loFrac < 0.005) return null;
+		return { d: describeArc(cx, cy, r, loFrac, hiFrac), visible: true };
+	});
 </script>
 
 <svg viewBox="0 0 {S} {S}" width="100%" class="sleep-arc">
@@ -440,6 +499,20 @@
 		/>
 	{/if}
 
+	<!-- Rescue window: soft predicted-style blob for the suggested power-nap
+		 window after a skipped nap. Drawn under bubbles. -->
+	{#if rescueBlob?.visible}
+		<path
+			d={rescueBlob.d}
+			fill="none"
+			stroke="var(--peach-dark)"
+			stroke-width={trackWidth + 2}
+			stroke-linecap="round"
+			stroke-dasharray="4 6"
+			opacity="0.45"
+		/>
+	{/if}
+
 	<!-- Nap confidence bands (±1 SD zones, rendered beneath predicted naps) -->
 	{#each renderedBands as band}
 		{#if band.visible}
@@ -520,6 +593,41 @@
 			{/if}
 		</g>
 	{/each}
+
+	<!-- Skipped-nap blob: faded dashed peach arc + strikethrough chord +
+		 small time label. Rendered after bubbles so the strikethrough sits on
+		 top and reads as "this was the plan, didn't happen." -->
+	{#if skippedBlob?.visible}
+		<path
+			d={skippedBlob.d}
+			fill="none"
+			stroke="var(--peach-dark)"
+			stroke-width={trackWidth + 2}
+			stroke-linecap="round"
+			stroke-dasharray="3 5"
+			opacity="0.35"
+		/>
+		<line
+			x1={skippedBlob.strikethrough.x1}
+			y1={skippedBlob.strikethrough.y1}
+			x2={skippedBlob.strikethrough.x2}
+			y2={skippedBlob.strikethrough.y2}
+			stroke="var(--text-light)"
+			stroke-width="1.5"
+			stroke-linecap="round"
+			opacity="0.6"
+		/>
+		<text
+			x={skippedBlob.label.x}
+			y={skippedBlob.label.y}
+			text-anchor="middle"
+			dominant-baseline="middle"
+			fill="var(--text-light)"
+			font-size="9"
+			opacity="0.55"
+			style="text-decoration: line-through;">{skippedBlob.label.text}</text
+		>
+	{/if}
 
 	<!-- Wake target tick + label. Drawn after bubbles so the target stays
 		 visible when an active sleep overruns its predicted wake. -->

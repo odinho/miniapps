@@ -156,21 +156,28 @@ export function reconcileNotifications(state: ReconcileInput): void {
   // 30 min before predicted nap so the parent has time to wind down
   // (lower stim, get to where the baby naps, etc.). Skip when napsAllDone
   // (bedtime_approaching covers that case).
-  if (
-    prefs.nap_approaching &&
-    isAwake &&
-    pred?.nextNap &&
-    !pred.napsAllDone
-  ) {
-    const napMs = new Date(pred.nextNap).getTime();
+  //
+  // Rescue-after-skip exception: when napSkipped fires the engine sets
+  // napsAllDone=true and collapses nextNap to bedtime, so the normal nap
+  // notification would suppress. Fire a rescue-flavoured wind-down anchored
+  // on the rescue window's earliest start instead — otherwise the parent
+  // loses both the in-app skipped state and the push that would have nudged
+  // them to act on it.
+  const rescuePlan = pred?.postSkipPlan?.kind === "rescue" ? pred.postSkipPlan : null;
+  const napFireTarget = rescuePlan ? rescuePlan.window.earliest : pred?.nextNap;
+  const napCanFire = isAwake && (rescuePlan ? true : pred?.nextNap && !pred.napsAllDone);
+  if (prefs.nap_approaching && napCanFire && napFireTarget) {
+    const napMs = new Date(napFireTarget).getTime();
     const fireAt = napMs - NAP_APPROACH_MIN * 60_000;
-    // Dedup by the nap's start time so a re-anchor (e.g. cut-short comeback)
-    // overwrites the row instead of double-firing.
-    const dedupe = `nap_approaching:${pred.nextNap}`;
+    const dedupe = rescuePlan
+      ? `nap_approaching:rescue:${rescuePlan.window.earliest}`
+      : `nap_approaching:${napFireTarget}`;
     upsert(baby.id, "nap_approaching", fireAt, dedupe, {
-      title: "Snart lurtid",
-      body: `Forventa kl. ${formatTime(pred.nextNap)} — byrj å vinde ned.`,
-      data: { kind: "nap_approaching", nextNap: pred.nextNap },
+      title: rescuePlan ? "Reddingslur snart" : "Snart lurtid",
+      body: rescuePlan
+        ? `Hoppa over morgonluren. Vurder å legge henne ned ca. kl. ${formatTime(napFireTarget)}.`
+        : `Forventa kl. ${formatTime(napFireTarget)} — byrj å vinde ned.`,
+      data: { kind: "nap_approaching", nextNap: napFireTarget },
     });
   } else {
     cancelByKind(baby.id, "nap_approaching");

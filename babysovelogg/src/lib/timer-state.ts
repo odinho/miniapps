@@ -1,5 +1,5 @@
 import type { SleepLogRow, SleepPauseRow } from '$lib/types.js';
-import type { Prediction } from '$lib/stores/app.svelte.js';
+import type { Prediction, PostSkipPlan } from '$lib/stores/app.svelte.js';
 import { calcPauseMs } from '$lib/engine/classification.js';
 
 export interface CyclePhase {
@@ -32,6 +32,15 @@ export type TimerMode =
 	| { kind: 'bedtime'; countdown: number; bedtime: string }
 	| { kind: 'after-bedtime'; bedtime: string }
 	| { kind: 'sleep-window'; windowStart: number; windowEnd: number; pressure: 'low' | 'rising' | 'high' }
+	| {
+			kind: 'skipped-nap';
+			plannedAt: string;
+			plannedAgoMs: number;
+			postSkipPlan: PostSkipPlan | null;
+			/** Bedtime as already planned (for parents who want to fall back to "just bedtime"). */
+			bedtime: string | null;
+			bedtimeCountdown: number | null;
+	  }
 	| { kind: 'idle' };
 
 export interface TimerInput {
@@ -97,6 +106,23 @@ export function getTimerMode(input: TimerInput): TimerMode {
 		const windowStart = new Date(prediction!.sleepWindow!.earliest).getTime() - now;
 		const windowEnd = new Date(prediction!.sleepWindow!.latest).getTime() - now;
 		return { kind: 'sleep-window', windowStart, windowEnd, pressure: prediction!.sleepPressure! };
+	}
+
+	// Skipped-nap state takes precedence over silently flipping to bedtime mode.
+	// When the engine flagged a missed nap (no active sleep, >60 min overdue),
+	// surface that to the parent with the post-skip recommendation instead of
+	// the misleading "Leggetid om 8t" the regular bedtime branch would show.
+	if (prediction?.skippedNap) {
+		const plannedMs = new Date(prediction.skippedNap.plannedAt).getTime();
+		const bedtimeMs = prediction.bedtime ? new Date(prediction.bedtime).getTime() : null;
+		return {
+			kind: 'skipped-nap',
+			plannedAt: prediction.skippedNap.plannedAt,
+			plannedAgoMs: Math.max(0, now - plannedMs),
+			postSkipPlan: prediction.postSkipPlan,
+			bedtime: prediction.bedtime,
+			bedtimeCountdown: bedtimeMs != null ? bedtimeMs - now : null,
+		};
 	}
 
 	if (prediction?.nextNap) {

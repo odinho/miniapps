@@ -182,6 +182,14 @@
 			: null,
 	);
 
+	// Skipped-nap visuals: keep the missed slot on the arc + render the rescue
+	// window when the engine suggests one. Earlier-bedtime suggestions live in
+	// the Timer, not the arc (they're a time shift, not a new blob).
+	const arcSkippedNap = $derived(prediction?.skippedNap ?? null);
+	const arcRescueWindow = $derived(
+		prediction?.postSkipPlan?.kind === 'rescue' ? prediction.postSkipPlan.window : null,
+	);
+
 	// Arc endpoint time labels
 	const arcStartLabel = $derived.by(() => {
 		if (isNightMode) {
@@ -477,7 +485,7 @@
 				{todaySleeps}
 				{ageMonths}
 				{baby}
-				napsAllDone={prediction?.napsAllDone}
+				napsAllDone={prediction?.napsAllDone && prediction?.postSkipPlan?.kind !== 'rescue'}
 				{onSleepStarted}
 				{onSleepEnded}
 			/>
@@ -496,6 +504,8 @@
 				napConfidenceBands={arcNapConfidenceBands}
 				activeWakeAt={arcActiveWakeAt}
 				activeWakeBand={arcActiveWakeBand}
+				skippedNap={arcSkippedNap}
+				rescueWindow={arcRescueWindow}
 				onSleepClick={onArcBubbleClick}
 				onStartClick={onArcStartClick}
 				onEndClick={onArcEndClick}
