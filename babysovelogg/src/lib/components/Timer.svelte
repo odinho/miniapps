@@ -126,7 +126,8 @@
 		<div class="arc-sub-label" style="opacity: 0.8;">{formatDuration(mode.plannedAgoMs)} sidan</div>
 		{#if mode.postSkipPlan?.kind === 'rescue'}
 			<div class="arc-sub-label rescue-tip" data-testid="post-skip-tip">
-				💡 Vurder ein reddingslur kl. {formatTime(mode.postSkipPlan.window.earliest)}–{formatTime(mode.postSkipPlan.window.latest)}
+				💡 Vurder reddingslur ca. kl. {formatTime(mode.postSkipPlan.recommendedStart)}
+				<span style="opacity: 0.75; white-space: nowrap;">— vekk innan {formatTime(mode.postSkipPlan.wakeBy)}</span>
 			</div>
 		{:else if mode.postSkipPlan?.kind === 'earlier-bedtime'}
 			<div class="arc-sub-label rescue-tip" data-testid="post-skip-tip">

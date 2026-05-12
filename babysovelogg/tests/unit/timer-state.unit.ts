@@ -379,11 +379,9 @@ describe("getTimerMode — skipped-nap state", () => {
         skippedNap: { plannedAt: "2026-03-27T10:00:00.000Z" },
         postSkipPlan: {
           kind: "rescue",
-          window: {
-            earliest: "2026-03-27T12:30:00.000Z",
-            latest: "2026-03-27T14:30:00.000Z",
-          },
-          capLatestEnd: "2026-03-27T17:30:00.000Z",
+          recommendedStart: "2026-03-27T12:30:00.000Z",
+          latestStart: "2026-03-27T14:30:00.000Z",
+          wakeBy: "2026-03-27T13:30:00.000Z",
         },
       }),
       now: new Date("2026-03-27T12:00:00.000Z").getTime(),

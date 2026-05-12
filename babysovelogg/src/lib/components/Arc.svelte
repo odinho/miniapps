@@ -330,32 +330,31 @@
 		return { d: describeArc(cx, cy, r, loFrac, hiFrac), visible: true };
 	});
 
-	// Skipped nap: faded dashed blob centered on plannedAt with a thin
-	// strikethrough across it. Width approximates a typical nap (45 min) since
-	// we only know the start; consumers pass the planned start time.
+	// Skipped nap: faded dashed blob spanning plannedAt..plannedAt+45m,
+	// matching the geometry of a predicted-nap bubble so the user reads the
+	// label as the *start* time (like every other nap on the arc) — not the
+	// middle of an artificially centered blob. The line-through label is the
+	// strikethrough signal; no perpendicular tick (that pointed at the middle
+	// and looked like "the nap happened at HH:MM at the middle position").
 	interface SkippedBlob {
 		d: string;
-		strikethrough: { x1: number; y1: number; x2: number; y2: number };
 		label: { x: number; y: number; text: string };
 		visible: boolean;
 	}
 	const skippedBlob = $derived.by((): SkippedBlob | null => {
 		if (!skippedNap) return null;
 		const plannedMs = new Date(skippedNap.plannedAt).getTime();
-		const halfWidthMs = 22 * 60_000; // ~45min wide window centered on plannedAt
-		const loFrac = timeToArcFraction(new Date(plannedMs - halfWidthMs), config);
-		const hiFrac = timeToArcFraction(new Date(plannedMs + halfWidthMs), config);
+		const loFrac = timeToArcFraction(new Date(plannedMs), config);
+		const hiFrac = timeToArcFraction(new Date(plannedMs + 45 * 60_000), config);
 		if (hiFrac - loFrac < 0.005) return null;
 		const d = describeArc(cx, cy, r, loFrac, hiFrac);
-		// Strikethrough: a chord across the blob's mid-point at slightly inner +
-		// outer radii so it reads as a "scratched out" mark.
-		const midFrac = (loFrac + hiFrac) / 2;
-		const outer = fracToPoint(midFrac, cx, cy, r + trackWidth / 2 + 4);
-		const inner = fracToPoint(midFrac, cx, cy, r - trackWidth / 2 - 4);
-		const labelPt = fracToPoint(midFrac, cx, cy, r + 24);
+		// Label sits just past the start, like predicted-nap bubbles in
+		// renderedBubbles, so the time visually anchors to the bubble's left
+		// edge instead of floating over its middle.
+		const labelFrac = Math.min(loFrac + 0.02, hiFrac);
+		const labelPt = fracToPoint(labelFrac, cx, cy, r + 24);
 		return {
 			d,
-			strikethrough: { x1: outer.x, y1: outer.y, x2: inner.x, y2: inner.y },
 			label: { x: labelPt.x, y: labelPt.y, text: formatTime(skippedNap.plannedAt) },
 			visible: true,
 		};
@@ -594,9 +593,8 @@
 		</g>
 	{/each}
 
-	<!-- Skipped-nap blob: faded dashed peach arc + strikethrough chord +
-		 small time label. Rendered after bubbles so the strikethrough sits on
-		 top and reads as "this was the plan, didn't happen." -->
+	<!-- Skipped-nap blob: faded dashed peach arc + line-through time label
+		 at the start, matching the geometry of predicted-nap bubbles. -->
 	{#if skippedBlob?.visible}
 		<path
 			d={skippedBlob.d}
@@ -606,16 +604,6 @@
 			stroke-linecap="round"
 			stroke-dasharray="3 5"
 			opacity="0.35"
-		/>
-		<line
-			x1={skippedBlob.strikethrough.x1}
-			y1={skippedBlob.strikethrough.y1}
-			x2={skippedBlob.strikethrough.x2}
-			y2={skippedBlob.strikethrough.y2}
-			stroke="var(--text-light)"
-			stroke-width="1.5"
-			stroke-linecap="round"
-			opacity="0.6"
 		/>
 		<text
 			x={skippedBlob.label.x}

@@ -164,13 +164,13 @@ export function reconcileNotifications(state: ReconcileInput): void {
   // loses both the in-app skipped state and the push that would have nudged
   // them to act on it.
   const rescuePlan = pred?.postSkipPlan?.kind === "rescue" ? pred.postSkipPlan : null;
-  const napFireTarget = rescuePlan ? rescuePlan.window.earliest : pred?.nextNap;
+  const napFireTarget = rescuePlan ? rescuePlan.recommendedStart : pred?.nextNap;
   const napCanFire = isAwake && (rescuePlan ? true : pred?.nextNap && !pred.napsAllDone);
   if (prefs.nap_approaching && napCanFire && napFireTarget) {
     const napMs = new Date(napFireTarget).getTime();
     const fireAt = napMs - NAP_APPROACH_MIN * 60_000;
     const dedupe = rescuePlan
-      ? `nap_approaching:rescue:${rescuePlan.window.earliest}`
+      ? `nap_approaching:rescue:${rescuePlan.recommendedStart}`
       : `nap_approaching:${napFireTarget}`;
     upsert(baby.id, "nap_approaching", fireAt, dedupe, {
       title: rescuePlan ? "Reddingslur snart" : "Snart lurtid",

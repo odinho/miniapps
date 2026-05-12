@@ -14,6 +14,7 @@ import {
   getLearnedBedtimeWakeWindow,
   estimateSleepCycleFromData,
 } from "./schedule.js";
+import { RESCUE_NAP } from "./constants.js";
 import { getTodayStats } from "./stats.js";
 import { computeConfidence, computeWakeRange } from "./confidence.js";
 import { calibrate } from "./calibration.js";
@@ -182,9 +183,12 @@ function compressComebackNap(
  * sleep deficit. Rules:
  *
  *  - Rescue requires: room for a ≥30 min nap, starting in ≥30 min from now,
- *    ending ≥90 min before bedtime (so the wake window after the rescue
- *    doesn't break bedtime), and within 3 h from now (later naps are
- *    counterproductive to a normal bedtime).
+ *    waking ≥90 min before bedtime (preserves the wake window), starting
+ *    within 3 h from now (later naps risk overshooting bedtime).
+ *  - The rescue duration is capped at RESCUE_NAP.CAP_CEILING_MIN so the
+ *    parent gets a power nap, not a real nap. The Timer renders one concrete
+ *    start time and a "wake by" cap so 1h 55m start-ranges don't read as
+ *    1h 55m nap-durations to the parent.
  *  - When rescue isn't feasible, suggest 30 min earlier (45 min for <6 mo,
  *    whose deficits are higher-stakes). Capped at 30 min before "now" so we
  *    don't recommend a bedtime that's already passed.
@@ -196,14 +200,17 @@ function computePostSkipPlan(
   now: number,
   bedtime: string,
   ageMonths: number,
-): { kind: "rescue"; window: { earliest: string; latest: string }; capLatestEnd: string }
+): { kind: "rescue"; recommendedStart: string; latestStart: string; wakeBy: string }
   | { kind: "earlier-bedtime"; suggestedBedtime: string; minutesEarlier: number } {
   const bedtimeMs = new Date(bedtime).getTime();
   const RESCUE_MIN_DURATION_MS = 30 * 60_000;
-  const PRE_BEDTIME_BUFFER_MS = 90 * 60_000;
+  const RESCUE_CAP_MS = RESCUE_NAP.CAP_CEILING_MIN * 60_000; // ≤60 min
+  const PRE_BEDTIME_BUFFER_MS = RESCUE_NAP.MIN_PRE_BEDTIME_WAKE * 60_000; // ≥90 min
   const MIN_START_DELAY_MS = 30 * 60_000;
   const MAX_START_DELAY_MS = 3 * 60 * 60_000;
 
+  // Earliest start: 30 min from now (give parent time to wind down).
+  // Latest start: bedtime - 90 min (wake gap) - 30 min (nap duration).
   const earliestStart = now + MIN_START_DELAY_MS;
   const latestStart = Math.min(
     now + MAX_START_DELAY_MS,
@@ -211,13 +218,19 @@ function computePostSkipPlan(
   );
 
   if (latestStart > earliestStart) {
+    // Recommend the earliest sensible start — earlier rescues protect bedtime
+    // better than later ones. Wake-by is start + rescue cap, but never later
+    // than bedtime - 90 min so the wake window holds.
+    const recommendedMs = earliestStart;
+    const wakeByMs = Math.min(
+      recommendedMs + RESCUE_CAP_MS,
+      bedtimeMs - PRE_BEDTIME_BUFFER_MS,
+    );
     return {
       kind: "rescue",
-      window: {
-        earliest: new Date(earliestStart).toISOString(),
-        latest: new Date(latestStart).toISOString(),
-      },
-      capLatestEnd: new Date(bedtimeMs - PRE_BEDTIME_BUFFER_MS).toISOString(),
+      recommendedStart: new Date(recommendedMs).toISOString(),
+      latestStart: new Date(latestStart).toISOString(),
+      wakeBy: new Date(wakeByMs).toISOString(),
     };
   }
 

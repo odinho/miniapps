@@ -152,8 +152,14 @@ export function collectBubbles(
     }
   }
 
-  // Show bedtime ghost when no predicted nap bubbles remain
-  if (prediction?.bedtime && !hasPredictedNaps) {
+  // Show bedtime ghost only when the prediction is still pointing at *future*
+  // naps but a bedtime is set. When nextNap===bedtime (napsAllDone state) or
+  // there's no nextNap at all, the right-side moon endpoint already conveys
+  // bedtime; emitting a 45-min lavender ghost mid-arc just adds a mysterious
+  // "tiny purple nap" that doesn't represent any real event.
+  const bedtimeRedundantWithEndpoint =
+    !prediction?.nextNap || prediction.nextNap === prediction.bedtime;
+  if (prediction?.bedtime && !hasPredictedNaps && !bedtimeRedundantWithEndpoint) {
     const bedtime = new Date(prediction.bedtime);
     // Don't show bedtime ghost during active night sleep
     if (!(activeSleep && activeSleep.type === "night")) {

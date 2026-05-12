@@ -84,10 +84,15 @@ export interface Prediction {
 export type PostSkipPlan =
 	| {
 			kind: "rescue";
-			/** Acceptable rescue-nap start window (earliest..latest ISO). */
-			window: { earliest: string; latest: string };
-			/** Latest end time so the rescue doesn't break bedtime (ISO). */
-			capLatestEnd: string;
+			/** One concrete action: put baby down around this time (ISO). */
+			recommendedStart: string;
+			/** Latest acceptable start for parents who need flexibility (ISO). */
+			latestStart: string;
+			/**
+			 * Wake by this time so the rescue stays a *rescue* (≤ RESCUE_NAP cap)
+			 * and the pre-bedtime wake window is preserved.
+			 */
+			wakeBy: string;
 	  }
 	| {
 			kind: "earlier-bedtime";

@@ -565,8 +565,9 @@
 					skippedNap: { plannedAt: o(-66) },
 					postSkipPlan: {
 						kind: 'rescue',
-						window: { earliest: o(+30), latest: o(+180) },
-						capLatestEnd: o(+390),
+						recommendedStart: o(+30),
+						latestStart: o(+90),
+						wakeBy: o(+90),
 					},
 					calibration: makeCalibration('learned'),
 				}),
@@ -580,7 +581,7 @@
 				arcEndLabel: hm(o(+480)),
 				arcBands: [],
 				arcSkippedNap: { plannedAt: o(-66) },
-				arcRescueWindow: { earliest: o(+30), latest: o(+180) },
+				arcRescueWindow: { earliest: o(+30), latest: o(+90) },
 			},
 			{
 				// Skipped nap late in day → bedtime is too close for a rescue.

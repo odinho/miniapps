@@ -186,8 +186,12 @@
 	// window when the engine suggests one. Earlier-bedtime suggestions live in
 	// the Timer, not the arc (they're a time shift, not a new blob).
 	const arcSkippedNap = $derived(prediction?.skippedNap ?? null);
+	// Arc rescue blob spans the recommended start → wake-by cap, mirroring the
+	// "put down kl. X, vekk innan Y" Timer copy.
 	const arcRescueWindow = $derived(
-		prediction?.postSkipPlan?.kind === 'rescue' ? prediction.postSkipPlan.window : null,
+		prediction?.postSkipPlan?.kind === 'rescue'
+			? { earliest: prediction.postSkipPlan.recommendedStart, latest: prediction.postSkipPlan.wakeBy }
+			: null,
 	);
 
 	// Arc endpoint time labels

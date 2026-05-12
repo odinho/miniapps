@@ -196,8 +196,12 @@ describe("collectBubbles", () => {
     expect(bubbles[0].status).toBe("active");
   });
 
-  it("shows bedtime ghost only when no predicted nap bubbles", () => {
-    // With predicted naps: bedtime ghost should NOT appear (avoids double dashed arcs)
+  it("emits bedtime ghost when nextNap points to a real future nap distinct from bedtime", () => {
+    // Two situations the ghost is meant to surface bedtime in:
+    //  - When there ARE predicted nap bubbles, they cover the day — no ghost.
+    //  - When there are NO predicted naps and nextNap !== bedtime (e.g. a
+    //    next nap was inferred but never reached predictedNaps because it was
+    //    after a stale filter), the ghost gives the parent a bedtime anchor.
     const withNaps = collectBubbles([], null, {
       nextNap: "2026-03-27T13:00:00",
       bedtime: "2026-03-27T19:00:00",
@@ -205,28 +209,26 @@ describe("collectBubbles", () => {
         { startTime: "2026-03-27T13:00:00", endTime: "2026-03-27T13:45:00" },
       ],
     });
-    const nightBubbles = withNaps.filter((b) => b.type === "night");
-    expect(nightBubbles).toHaveLength(0);
+    expect(withNaps.filter((b) => b.type === "night")).toHaveLength(0);
 
-    // Without predicted naps: bedtime ghost SHOULD appear
-    const withoutNaps = collectBubbles([], null, {
-      nextNap: "2026-03-27T19:00:00",
+    const onlyBedtimeFuture = collectBubbles([], null, {
+      nextNap: "2026-03-27T13:00:00",
       bedtime: "2026-03-27T19:00:00",
     });
-    const nightBubbles2 = withoutNaps.filter((b) => b.type === "night");
-    expect(nightBubbles2).toHaveLength(1);
-    expect(nightBubbles2[0].status).toBe("predicted");
+    const nightBubbles = onlyBedtimeFuture.filter((b) => b.type === "night");
+    expect(nightBubbles).toHaveLength(1);
+    expect(nightBubbles[0].status).toBe("predicted");
   });
 
-  it("B5: no double bubble when nextNap === bedtime (naps all done)", () => {
-    // When napsAllDone, nextNap === bedtime. Should show exactly ONE
-    // predicted bubble (bedtime ghost), not both a nap ghost AND a bedtime ghost.
+  it("B5: no bedtime ghost when nextNap === bedtime — moon endpoint is enough", () => {
+    // When napsAllDone, the engine collapses nextNap to bedtime. The right
+    // moon endpoint already conveys bedtime; emitting an extra 45-min
+    // lavender ghost mid-arc just confused parents in playground scenarios
+    // (and on late-wake days in prod where bedtime sits inside arc bounds).
     const bubbles = collectBubbles([], null, {
       nextNap: "2026-03-27T18:30:00",
       bedtime: "2026-03-27T18:30:00",
     });
-    const predicted = bubbles.filter((b) => b.status === "predicted");
-    expect(predicted).toHaveLength(1);
-    expect(predicted[0].type).toBe("night");
+    expect(bubbles.filter((b) => b.status === "predicted")).toHaveLength(0);
   });
 });
