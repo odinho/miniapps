@@ -7,6 +7,8 @@ import {
   fracToPoint,
   describeArc,
   collectBubbles,
+  isAtArcEndpoint,
+  ARC_ENDPOINT_PROXIMITY,
 } from "$lib/arc-utils.js";
 
 describe("getDayArcConfig", () => {
@@ -230,5 +232,58 @@ describe("collectBubbles", () => {
       bedtime: "2026-03-27T18:30:00",
     });
     expect(bubbles.filter((b) => b.status === "predicted")).toHaveLength(0);
+  });
+});
+
+describe("isAtArcEndpoint — double-label regression guard", () => {
+  // This rule has regressed several times: when the planned-track wake time
+  // for an active sleep matches the arc end time (night mode: both derive
+  // from expectedNightEnd), the standalone wake-marker label paints over
+  // the endpoint icon's own label, producing a "06:00 / 06:03" double.
+  // The Arc component uses isAtArcEndpoint(wakeFrac) to suppress the marker
+  // — these tests pin both the threshold and the boolean.
+
+  it("true at the exact arc endpoints", () => {
+    expect(isAtArcEndpoint(0)).toBe(true);
+    expect(isAtArcEndpoint(1)).toBe(true);
+  });
+
+  it("true within ARC_ENDPOINT_PROXIMITY of either endpoint", () => {
+    expect(isAtArcEndpoint(ARC_ENDPOINT_PROXIMITY)).toBe(true);
+    expect(isAtArcEndpoint(1 - ARC_ENDPOINT_PROXIMITY)).toBe(true);
+    expect(isAtArcEndpoint(ARC_ENDPOINT_PROXIMITY - 0.001)).toBe(true);
+    expect(isAtArcEndpoint(1 - ARC_ENDPOINT_PROXIMITY + 0.001)).toBe(true);
+  });
+
+  it("false in the middle of the arc", () => {
+    expect(isAtArcEndpoint(0.5)).toBe(false);
+    expect(isAtArcEndpoint(0.3)).toBe(false);
+    expect(isAtArcEndpoint(0.7)).toBe(false);
+  });
+
+  it("false just past the proximity threshold", () => {
+    expect(isAtArcEndpoint(ARC_ENDPOINT_PROXIMITY + 0.001)).toBe(false);
+    expect(isAtArcEndpoint(1 - ARC_ENDPOINT_PROXIMITY - 0.001)).toBe(false);
+  });
+
+  it("night-mode wake time at the arc end maps to endpoint (the actual bug)", () => {
+    // Active night sleep with expectedNightEnd at 06:00. Night arc spans
+    // 18:00 → 06:00 (next day). The wake fraction lands at 1.0 → endpoint.
+    const cfg = getNightArcConfig();
+    // 06:00 next morning. Use a Date built locally so the fixture is tz-aware.
+    const wake = new Date();
+    wake.setHours(6, 0, 0, 0);
+    const frac = timeToArcFraction(wake, cfg);
+    expect(isAtArcEndpoint(frac)).toBe(true);
+  });
+
+  it("a nap wake mid-day does NOT collide with arc endpoint", () => {
+    // Active nap with expectedNapEnd at 11:00. Day arc spans 06:00 → 18:00.
+    // The wake fraction is ~0.42 — well clear of either endpoint.
+    const cfg = getDayArcConfig(); // 6 → 18
+    const wake = new Date();
+    wake.setHours(11, 0, 0, 0);
+    const frac = timeToArcFraction(wake, cfg);
+    expect(isAtArcEndpoint(frac)).toBe(false);
   });
 });

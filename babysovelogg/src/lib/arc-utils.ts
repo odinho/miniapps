@@ -41,6 +41,28 @@ export function timeToArcFractionRaw(d: Date, config: ArcConfig): number {
 const ARC_TOTAL_DEG = 270;
 const ARC_START_ANGLE_DEG = 225;
 
+/**
+ * Threshold under which an arc fraction is treated as "on the endpoint".
+ * On a 12 h day or 12 h night arc, 0.015 ≈ 11 min — anything within that of
+ * either endpoint paints over the endpoint icon's own time label, so any
+ * standalone marker label there is redundant and reads as a duplicate.
+ *
+ * Pinned by `isAtArcEndpoint` regression tests in arc-utils.unit.ts. Lifting
+ * it requires re-checking that night-mode active sleep doesn't get a second
+ * "06:00 / 06:03" wake-time label crammed against the wake-up sun endpoint.
+ */
+export const ARC_ENDPOINT_PROXIMITY = 0.015;
+
+/**
+ * Is the given fraction effectively on the arc's start or end endpoint?
+ * Used by overlay rendering (e.g. the planned-track wake-marker for active
+ * sleep) to avoid emitting a duplicate time label on top of the endpoint
+ * icon's existing label.
+ */
+export function isAtArcEndpoint(frac: number): boolean {
+  return frac <= ARC_ENDPOINT_PROXIMITY || frac >= 1 - ARC_ENDPOINT_PROXIMITY;
+}
+
 export function fracToPoint(
   frac: number,
   cx: number,

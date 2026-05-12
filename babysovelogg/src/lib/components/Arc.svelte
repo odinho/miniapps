@@ -7,6 +7,7 @@
 		fracToPoint,
 		describeArc,
 		collectBubbles,
+		isAtArcEndpoint,
 		type ArcConfig,
 	} from '$lib/arc-utils.js';
 	import { formatTime, formatDuration } from '$lib/utils.js';
@@ -303,6 +304,14 @@
 		const wakeFrac = Math.max(0, Math.min(1, wakeFracRaw));
 		if (wakeFrac - startFrac < 0.005) return empty;
 
+		// Suppress the standalone wake-marker + tick when the wake position
+		// coincides with an arc endpoint — the endpoint icon's own time label
+		// already shows that exact time. Without this guard, night-mode (where
+		// `endTimeLabel` and `activeWakeAt` both derive from expectedNightEnd)
+		// renders two overlapping "06:00 / 06:03"-style labels at the right
+		// endpoint, which has now regressed several times. See ARC_ENDPOINT_PROXIMITY.
+		const wakeAtEndpoint = isAtArcEndpoint(wakeFrac);
+
 		const d = describeArc(cx, cy, r, startFrac, wakeFrac);
 		const markerPt = fracToPoint(wakeFrac, cx, cy, r + 24);
 		// Tick extends slightly outside the bubble's outer edge so it stays
@@ -313,8 +322,12 @@
 			d,
 			visible: true,
 			type: activeSleep.type,
-			wakeMarker: { x: markerPt.x, y: markerPt.y, label: formatTime(new Date(activeWakeAt)) },
-			wakeTick: { x1: tickOuter.x, y1: tickOuter.y, x2: tickInner.x, y2: tickInner.y },
+			wakeMarker: wakeAtEndpoint
+				? null
+				: { x: markerPt.x, y: markerPt.y, label: formatTime(new Date(activeWakeAt)) },
+			wakeTick: wakeAtEndpoint
+				? null
+				: { x1: tickOuter.x, y1: tickOuter.y, x2: tickInner.x, y2: tickInner.y },
 		};
 	});
 
