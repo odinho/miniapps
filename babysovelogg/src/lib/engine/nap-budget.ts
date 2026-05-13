@@ -315,16 +315,28 @@ function computeBlendedTrend(
 }
 
 /**
- * "Today's frame" sleep total — what the parent mentally counts toward
- * today's sleep budget:
- *   1. The night sleep that ended this morning (started yesterday)
- *   2. Any completed naps anchored to today
- *   3. Elapsed time on the active nap (if napping)
+ * "Today's frame" sleep total, sleep-day-anchored.
  *
- * Earlier this was a rolling 24h window, but that included *yesterday's*
- * nap whenever the call happened in the morning — pushing banked >= trend
- * by construction even when the day's pattern hadn't really materialised
- * yet. The new frame matches how the parent reasons about it.
+ * Sleep-day anchor = the morning wake (= end_time of the most recent
+ * completed night before `now`). Everything sleeping after that wake counts
+ * toward today's banked, regardless of calendar-midnight boundaries.
+ * Captures three edge cases the previous midnight-anchored frame missed
+ * (Codex 2026-05-13 review §"Today's-frame banked"):
+ *
+ *   - **Split nights**: mid-night feeding logged as a separate entry. The
+ *     prior code only counted the first night that ended today and bailed
+ *     out with `break`. We now sum every night whose end falls in the same
+ *     overnight window (≤ 12h before the wake anchor).
+ *   - **Midnight-crossing naps**: a 23:40-00:30 nap starts on yesterday's
+ *     local date but obviously belongs to one sleep-day. Anchoring on the
+ *     morning wake puts it on the correct side of the boundary.
+ *   - **Day-shifted schedules**: families whose baby naps late into the
+ *     evening hit a midnight boundary that doesn't correspond to anything
+ *     the parent recognises. The morning-wake anchor is the natural
+ *     reference point.
+ *
+ * Fallback: when no completed night precedes `now` (true first day after
+ * onboarding), use local midnight as a conservative anchor.
  */
 function computeBankedToday(
   trendSleeps: SleepEntry[],
@@ -333,39 +345,65 @@ function computeBankedToday(
   tz: string,
   now: number,
 ): number {
-  const todayKey = isoToDateInTz(new Date(now).toISOString(), tz);
+  const allSleeps = [...trendSleeps, ...todaySleeps];
+
+  // Anchor: end_time of the most recent completed night before now.
+  let wakeAnchorMs: number | null = null;
+  for (const s of allSleeps) {
+    if (s.type !== "night" || !s.end_time) continue;
+    const endMs = new Date(s.end_time).getTime();
+    if (endMs >= now) continue;
+    if (wakeAnchorMs === null || endMs > wakeAnchorMs) wakeAnchorMs = endMs;
+  }
+  if (wakeAnchorMs === null) {
+    // No prior night logged — fall back to local midnight. Rare path (first
+    // day after install). The naive parse is fine because we just need a
+    // boundary, not a precise instant.
+    const todayKey = isoToDateInTz(new Date(now).toISOString(), tz);
+    wakeAnchorMs = new Date(`${todayKey}T00:00:00Z`).getTime();
+  }
+
+  // Limit night-fragment aggregation to a 12h window ending at the anchor —
+  // long enough to catch night-feed entries split out from the main night,
+  // short enough to exclude nights from older days.
+  const OVERNIGHT_WINDOW_MS = 12 * 3600_000;
+  const overnightStartMs = wakeAnchorMs - OVERNIGHT_WINDOW_MS;
   const seen = new Set<string>();
   let banked = 0;
 
-  // (1) The night sleep that ended today (started yesterday or today).
-  for (const s of [...trendSleeps, ...todaySleeps]) {
+  // (1) Overnight sleep — primary night plus any fragments inside the
+  //     12h window. Each contributes its own duration; no double-count
+  //     because intervals are disjoint by construction (log invariant).
+  for (const s of allSleeps) {
     if (s.type !== "night" || !s.end_time) continue;
     if (seen.has(s.start_time)) continue;
     seen.add(s.start_time);
-    const endKey = isoToDateInTz(s.end_time, tz);
-    if (endKey !== todayKey) continue;
-    const startMs = new Date(s.start_time).getTime();
     const endMs = new Date(s.end_time).getTime();
+    if (endMs > wakeAnchorMs || endMs < overnightStartMs) continue;
+    const startMs = new Date(s.start_time).getTime();
     banked += (endMs - startMs) / 60_000;
-    break; // one night per morning
   }
 
-  // (2) Today's completed naps (anchored to today by start_time).
-  for (const s of [...trendSleeps, ...todaySleeps]) {
+  // (2) Completed naps in the [wakeAnchorMs, now] interval. start_time
+  //     gates inclusion — a nap that started before the wake anchor was
+  //     part of yesterday's sleep-day.
+  for (const s of allSleeps) {
     if (s.type !== "nap" || !s.end_time) continue;
     if (seen.has(s.start_time)) continue;
     seen.add(s.start_time);
-    const startKey = isoToDateInTz(s.start_time, tz);
-    if (startKey !== todayKey) continue;
     const startMs = new Date(s.start_time).getTime();
     const endMs = new Date(s.end_time).getTime();
+    if (startMs < wakeAnchorMs) continue;
+    if (endMs > now) continue;
     banked += (endMs - startMs) / 60_000;
   }
 
   // (3) Active nap elapsed.
   if (activeNap) {
     const napStartMs = new Date(activeNap.start_time).getTime();
-    if (napStartMs < now) banked += (now - napStartMs) / 60_000;
+    if (napStartMs < now && napStartMs >= wakeAnchorMs) {
+      banked += (now - napStartMs) / 60_000;
+    }
   }
 
   return banked;

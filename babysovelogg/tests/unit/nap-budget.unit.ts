@@ -806,6 +806,97 @@ describe("computeNapBudget — Codex review regressions", () => {
     }
   });
 
+  it("split-night fragments both count toward banked", () => {
+    // Parent logged the night as TWO entries (a mid-night feeding session
+    // split out): 19:00-22:00 yesterday and 22:30-06:00 today. Old code's
+    // `break` after the first night-ended-today bailed out before
+    // including the earlier fragment — banked under-counted by 3h.
+    // Sleep-day anchor at 06:00 today picks up both because both end
+    // within the 12h overnight window.
+    const todayDateStr = "2026-05-13";
+    const todayStart = new Date(`${todayDateStr}T00:00:00Z`).getTime();
+    const trendSleeps: SleepEntry[] = [
+      {
+        // First night fragment: 17:00Z yesterday → 20:00Z yesterday (3h).
+        start_time: new Date(todayStart - 7 * 3600_000).toISOString(),
+        end_time: new Date(todayStart - 4 * 3600_000).toISOString(),
+        type: "night",
+        woke_by: "self",
+      },
+      {
+        // Second fragment: 20:30Z yesterday → 04:00Z today (7.5h).
+        start_time: new Date(todayStart - 3.5 * 3600_000).toISOString(),
+        end_time: new Date(todayStart + 4 * 3600_000).toISOString(),
+        type: "night",
+        woke_by: "self",
+      },
+      // Padding history for trend gate.
+      ...synthDays("2026-04-18", 24, 13 * 60),
+    ];
+    const out = computeNapBudget({
+      activeNap: { start_time: `${todayDateStr}T08:30:00.000Z` },
+      todaySleeps: [],
+      trendSleeps,
+      bedtime: `${todayDateStr}T17:00:00.000Z`,
+      isLastNapOfDay: true,
+      optedIn: true,
+      now: new Date(`${todayDateStr}T08:55:00.000Z`).getTime(),
+      ctx: ctx({ trendSleeps }),
+    });
+    if (out) {
+      // bankedMin should be ~10.5h (night) + 25 min (active) ≈ 655 min.
+      // The exact threshold for emit/suppress depends on trend math, but
+      // bankedMin being captured in context proves both fragments counted.
+      expect(out.context.bankedMin).toBeGreaterThanOrEqual(10 * 60);
+    }
+  });
+
+  it("midnight-crossing nap stays attributed to its sleep-day (not double-counted)", () => {
+    // Engine fires the next morning AFTER a 23:40 → 00:30 nap. The
+    // nap belonged to yesterday's sleep-day (started before tonight's
+    // bedtime). Today's banked must NOT include it — that would
+    // double-count when yesterday's napBudget already saw it.
+    const todayDateStr = "2026-05-13";
+    const yesterdayLateNapStart = new Date(`${todayDateStr}T00:00:00Z`).getTime() - 20 * 60_000;
+    const yesterdayLateNapEnd = new Date(`${todayDateStr}T00:00:00Z`).getTime() + 30 * 60_000;
+    const todayNightStart = new Date(`${todayDateStr}T00:00:00Z`).getTime() - 5 * 3600_000;
+    const todayNightEnd = todayNightStart + 720 * 60_000; // 12h
+    const trendSleeps: SleepEntry[] = [
+      {
+        start_time: new Date(yesterdayLateNapStart).toISOString(),
+        end_time: new Date(yesterdayLateNapEnd).toISOString(),
+        type: "nap",
+        woke_by: "self",
+      },
+      {
+        start_time: new Date(todayNightStart).toISOString(),
+        end_time: new Date(todayNightEnd).toISOString(),
+        type: "night",
+        woke_by: "self",
+      },
+      ...synthDays("2026-04-18", 24, 13 * 60),
+    ];
+    const activeNapStart = todayNightEnd + 2 * 3600_000; // 2h after wake
+    const now = activeNapStart + 25 * 60_000;
+    const out = computeNapBudget({
+      activeNap: { start_time: new Date(activeNapStart).toISOString() },
+      todaySleeps: [],
+      trendSleeps,
+      bedtime: new Date(todayNightEnd + 13 * 3600_000).toISOString(),
+      isLastNapOfDay: true,
+      optedIn: true,
+      now,
+      ctx: ctx({ trendSleeps }),
+    });
+    if (out) {
+      // Banked = 12h night + 25 min active = 745 min. The midnight-crossing
+      // nap (50 min) is NOT included because it started before the wake
+      // anchor — sleep-day anchor keeps it on yesterday's ledger.
+      expect(out.context.bankedMin).toBeLessThan(770);
+      expect(out.context.bankedMin).toBeGreaterThanOrEqual(740);
+    }
+  });
+
   it("bedtime-guard tightening does not re-introduce a past wakeBy", () => {
     // Parent has napped past bedtime - 90 min. The bedtime guard would
     // tighten cap to (bedtime - 90 min - napStart), which lands in the
