@@ -5,7 +5,7 @@
  * docs/sleep-science-research.md §12 and the constants.ts docblocks.
  */
 import { describe, it, expect } from "bun:test";
-import { computeNapBudget } from "$lib/engine/nap-budget.js";
+import { computeNapBudget, isDayOnTrend } from "$lib/engine/nap-budget.js";
 import type { SleepEntry, BabyContext } from "$lib/types.js";
 import { NAP_BUDGET, NAP_FLOOR_BY_AGE, findByAge } from "$lib/engine/constants.js";
 import halldisRealData from "../fixtures/halldis-real-2026-05-13.json";
@@ -585,5 +585,61 @@ describe("computeNapBudget — real Halldis data (regression net)", () => {
 
     // High-variance week should cause suppression.
     expect(out).toBeNull();
+  });
+});
+
+// ── isDayOnTrend — gate for continuationWindow / rescue paths ──────
+
+describe("isDayOnTrend — rescue suppression gate", () => {
+  // Real bug: 2026-05-13 morning. Halldis napped 67 min (08:38→09:46).
+  // Engine flagged it as cut-short and fired continuationWindow even
+  // though banked24h was already on trend. This test pins the fix.
+  it("returns true for Halldis's actual 2026-05-13 on-trend morning", () => {
+    const real = halldisRealData as SleepEntry[];
+    // The 2026-05-13 nap (08:38–09:46 = 67 min) had ended ~4 min before
+    // this scenario's `now`. Fixture is a prior snapshot so we add the
+    // nap explicitly via todaySleeps.
+    const todaysCutShort: SleepEntry = {
+      start_time: "2026-05-13T08:38:32.713Z",
+      end_time: "2026-05-13T09:46:00.000Z",
+      type: "nap",
+      woke_by: "woken",
+    };
+    const now = new Date("2026-05-13T09:50:00.000Z").getTime();
+    const onTrend = isDayOnTrend(real, [todaysCutShort], ctx({ trendSleeps: real }), now);
+    expect(onTrend).toBe(true);
+  });
+
+  it("returns false on a real off-trend day (small overnight + no nap yet)", () => {
+    // Same fixture but pretend "now" is right after a 9h short night,
+    // before any nap. banked24h ≈ 9h, way under 13h trend → not on trend.
+    const real = halldisRealData as SleepEntry[];
+    // Synthesise an under-banked day by trimming to a 9h overnight only.
+    const todayDateStr = "2026-05-13";
+    const yesterdayNightStart = new Date(`${todayDateStr}T00:00:00Z`).getTime() - 5 * 3600_000;
+    const shortNight: SleepEntry = {
+      start_time: new Date(yesterdayNightStart).toISOString(),
+      end_time: new Date(yesterdayNightStart + 9 * 3600_000).toISOString(),
+      type: "night",
+      woke_by: "self",
+    };
+    // Replace yesterday's night in the fixture with the short one.
+    const trimmed = real.filter((s) => {
+      if (s.type !== "night") return true;
+      const start = new Date(s.start_time).getTime();
+      return start < yesterdayNightStart;
+    });
+    trimmed.push(shortNight);
+    const now = new Date(yesterdayNightStart + 9 * 3600_000 + 30 * 60_000).getTime();
+    const onTrend = isDayOnTrend(trimmed, [], ctx({ trendSleeps: trimmed }), now);
+    expect(onTrend).toBe(false);
+  });
+
+  it("returns false when trend data is too sparse to trust", () => {
+    // With <7 days of completed data, the gate can't fire — preserve the
+    // existing rescue behavior rather than silently disabling it.
+    const sparse = (halldisRealData as SleepEntry[]).slice(0, 6);
+    const now = new Date("2026-05-13T09:50:00.000Z").getTime();
+    expect(isDayOnTrend(sparse, [], ctx({ trendSleeps: sparse }), now)).toBe(false);
   });
 });

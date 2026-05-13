@@ -11,6 +11,34 @@ multi-day testing, the unit-of-work flow — live in
 is for tracked product/engine/test work.
 
 
+## napBudget v2: dynamic woke-reason inference in censorCutShortNaps
+
+Source: 2026-05-13 nap-cap design discussion. v1 ships a real-time
+gate on `continuationWindow` (suppressed when `isDayOnTrend`). But
+`getLearnedNapDuration` still feeds through `censorCutShortNaps`,
+which drops parent-ended naps below the self-wake median from the
+learnable pool. So every cap-respecting nap gets censored, and the
+learned-typical stays at the pre-cap value forever — chicken-and-egg:
+`shortThreshold = learned - cycle*0.5` keeps the rescue path firing
+for *future* on-trend caps too, even after we suppress the current
+one.
+
+Concrete v2: extend `censorCutShortNaps(naps, median, ?onTrendByDate)`
+to take an optional `Map<localDate, boolean>` derived from the trend
+window. When `onTrendByDate.get(s.localDate) === true`, treat the nap
+as natural (don't censor), regardless of `woke_by`. This is the
+"infer wake reason dynamically" approach the user proposed instead of
+adding a new `woken_by_budget` enum value to the DB. No schema
+change. Over weeks of cap-respect, learned-typical drifts down
+naturally toward the budget-aligned duration; the rescue path stops
+firing redundantly.
+
+Caveats to think about before shipping: the trend map must use a
+look-back-only window (not today) so we don't censor with retroactive
+knowledge of an in-progress day; the threshold for "on trend" should
+maybe be tighter than the real-time gate so the learning loop is more
+conservative than the suggestion loop.
+
 ## napBudget v2: manual sick / travel / off-day marker
 
 Source: 2026-05-13 nap-cap design discussion. v1 of `napBudget` ships

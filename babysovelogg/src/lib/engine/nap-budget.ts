@@ -48,6 +48,32 @@ interface ComputeNapBudgetInput {
   ctx: BabyContext;
 }
 
+/**
+ * "Was today on-trend or above already, without needing more sleep?"
+ *
+ * Used by the rescue paths (continuationWindow, rescueNap) and by
+ * `censorCutShortNaps` to short-circuit cut-short detection when the
+ * day's total sleep already meets the trend. Without this, the engine
+ * told the parent to cap, then complained the cap was "too short" the
+ * moment the parent obliged — exactly the bug Halldis showed on
+ * 2026-05-13 (67 min nap flagged as cut-short, even though banked24h
+ * was already 13.5 h vs ~13 h trend).
+ *
+ * Returns false (no suppression) when trend data is too sparse or noisy
+ * to trust — the existing rescue behaviour stays in place by default.
+ */
+export function isDayOnTrend(
+  trendSleeps: SleepEntry[],
+  todaySleeps: SleepEntry[],
+  ctx: BabyContext,
+  now: number,
+): boolean {
+  const trend = computeBlendedTrend(trendSleeps, ctx.tz, now, ctx.ageMonths);
+  if (!trend) return false;
+  const banked = computeBankedToday(trendSleeps, todaySleeps, null, ctx.tz, now);
+  return banked >= trend.blendedTrendMin - NAP_BUDGET.TOLERANCE_MIN;
+}
+
 export function computeNapBudget(input: ComputeNapBudgetInput): NapBudget | null {
   const { activeNap, todaySleeps, trendSleeps, bedtime, isLastNapOfDay, optedIn, now, ctx } = input;
 
@@ -71,7 +97,7 @@ export function computeNapBudget(input: ComputeNapBudgetInput): NapBudget | null
   //    nap = 14 h vs 13 h trend"). The trend target comes from
   //    start-anchored daily averages, which in steady-state equal the
   //    rolling-24h mean, just shifted.
-  const bankedMin = computeBanked24h(trendSleeps, todaySleeps, activeNap, now);
+  const bankedMin = computeBankedToday(trendSleeps, todaySleeps, activeNap, ctx.tz, now);
   const projectedIfRunsFull = bankedMin + estimateRemainingNapMin(activeNap, now, ctx);
   if (projectedIfRunsFull <= trend.blendedTrendMin) {
     return null;
@@ -230,45 +256,59 @@ function computeBlendedTrend(
 }
 
 /**
- * Sum of sleep in the rolling 24 h window ending at `now`. Includes
- * yesterday's night (which the parent counts toward today's budget),
- * any completed naps today, and the active nap's elapsed time.
+ * "Today's frame" sleep total — what the parent mentally counts toward
+ * today's sleep budget:
+ *   1. The night sleep that ended this morning (started yesterday)
+ *   2. Any completed naps anchored to today
+ *   3. Elapsed time on the active nap (if napping)
  *
- * We pass `trendSleeps` here rather than `todaySleeps` so a night that
- * started yesterday gets included — it would otherwise drop out of a
- * "today only" filter.
+ * Earlier this was a rolling 24h window, but that included *yesterday's*
+ * nap whenever the call happened in the morning — pushing banked >= trend
+ * by construction even when the day's pattern hadn't really materialised
+ * yet. The new frame matches how the parent reasons about it.
  */
-function computeBanked24h(
+function computeBankedToday(
   trendSleeps: SleepEntry[],
   todaySleeps: SleepEntry[],
-  activeNap: { start_time: string },
+  activeNap: { start_time: string } | null,
+  tz: string,
   now: number,
 ): number {
-  const cutoffMs = now - 24 * 3600_000;
-  // Deduplicate by start_time — todaySleeps overlaps with the tail of
-  // trendSleeps, and we don't want to double-count.
+  const todayKey = isoToDateInTz(new Date(now).toISOString(), tz);
   const seen = new Set<string>();
   let banked = 0;
-  const accumulate = (s: SleepEntry) => {
-    if (!s.end_time) return;
-    if (seen.has(s.start_time)) return;
+
+  // (1) The night sleep that ended today (started yesterday or today).
+  for (const s of [...trendSleeps, ...todaySleeps]) {
+    if (s.type !== "night" || !s.end_time) continue;
+    if (seen.has(s.start_time)) continue;
     seen.add(s.start_time);
+    const endKey = isoToDateInTz(s.end_time, tz);
+    if (endKey !== todayKey) continue;
     const startMs = new Date(s.start_time).getTime();
     const endMs = new Date(s.end_time).getTime();
-    if (endMs <= cutoffMs) return;
-    if (startMs >= now) return;
-    const effStart = Math.max(startMs, cutoffMs);
-    const effEnd = Math.min(endMs, now);
-    banked += (effEnd - effStart) / 60_000;
-  };
-  for (const s of trendSleeps) accumulate(s);
-  for (const s of todaySleeps) accumulate(s);
-  // Active nap elapsed (clipped to 24h window).
-  const napStartMs = new Date(activeNap.start_time).getTime();
-  const napEffectiveStart = Math.max(napStartMs, cutoffMs);
-  if (napEffectiveStart < now) {
-    banked += (now - napEffectiveStart) / 60_000;
+    banked += (endMs - startMs) / 60_000;
+    break; // one night per morning
   }
+
+  // (2) Today's completed naps (anchored to today by start_time).
+  for (const s of [...trendSleeps, ...todaySleeps]) {
+    if (s.type !== "nap" || !s.end_time) continue;
+    if (seen.has(s.start_time)) continue;
+    seen.add(s.start_time);
+    const startKey = isoToDateInTz(s.start_time, tz);
+    if (startKey !== todayKey) continue;
+    const startMs = new Date(s.start_time).getTime();
+    const endMs = new Date(s.end_time).getTime();
+    banked += (endMs - startMs) / 60_000;
+  }
+
+  // (3) Active nap elapsed.
+  if (activeNap) {
+    const napStartMs = new Date(activeNap.start_time).getTime();
+    if (napStartMs < now) banked += (now - napStartMs) / 60_000;
+  }
+
   return banked;
 }
 

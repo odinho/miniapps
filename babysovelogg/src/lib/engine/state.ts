@@ -14,10 +14,10 @@ import {
   getLearnedBedtimeWakeWindow,
   estimateSleepCycleFromData,
 } from "./schedule.js";
-import { RESCUE_NAP } from "./constants.js";
+import { RESCUE_NAP, NAP_FLOOR_BY_AGE, findByAge } from "./constants.js";
 import { getTodayStats } from "./stats.js";
 import { computeConfidence, computeWakeRange } from "./confidence.js";
-import { computeNapBudget } from "./nap-budget.js";
+import { computeNapBudget, isDayOnTrend } from "./nap-budget.js";
 import { calibrate } from "./calibration.js";
 import { computeStrategySignals } from "./features.js";
 import { selectStrategy } from "./strategy.js";
@@ -598,7 +598,20 @@ function assembleEmergingPrediction(
     expectedNightEnd = predictNightEndTime(activeSleep.start_time, ctx, todayNapMin);
   }
 
-  const continuationWindow = !activeSleep && lastCutShort
+  // Gate continuationWindow on (a) the just-ended nap was meaningful (≥
+  // the age-band floor — a 5-min micro-nap didn't discharge any pressure,
+  // so rescue should still fire regardless of trend) AND (b) the day is
+  // on trend already. Without this, the engine recommends a napBudget
+  // cap, the parent obliges (woke_by = woken), and the moment the nap
+  // ends `mostRecentCutShort` flags it as too short and continuationWindow
+  // fires "forleng luren". See docs/sleep-science §12 and the 2026-05-13
+  // Halldis screenshot where this fired at 67 min after a 12.4 h
+  // overnight (banked24h ≈ 13.5 h vs ~13 h trend).
+  const cutShortWasMeaningful =
+    lastCutShort && lastCutShort.durMin >= findByAge(NAP_FLOOR_BY_AGE, ctx.ageMonths).floorMin;
+  const suppressContinuationOnTrend = cutShortWasMeaningful
+    && isDayOnTrend(ctx.trendSleeps ?? ctx.recentSleeps, todaySleeps.map(toSleepEntry), ctx, now);
+  const continuationWindow = !activeSleep && lastCutShort && !suppressContinuationOnTrend
     ? computeContinuationWindow(lastCutShort, lastCutShort.startMs, getLearnedNapDuration(ctx), now)
     : null;
 
@@ -823,7 +836,20 @@ function assembleSchedulePrediction(
     expectedNightEnd = predictNightEndTime(activeSleep.start_time, ctx, todayNapMin);
   }
 
-  const continuationWindow = !activeSleep && lastCutShort
+  // Gate continuationWindow on (a) the just-ended nap was meaningful (≥
+  // the age-band floor — a 5-min micro-nap didn't discharge any pressure,
+  // so rescue should still fire regardless of trend) AND (b) the day is
+  // on trend already. Without this, the engine recommends a napBudget
+  // cap, the parent obliges (woke_by = woken), and the moment the nap
+  // ends `mostRecentCutShort` flags it as too short and continuationWindow
+  // fires "forleng luren". See docs/sleep-science §12 and the 2026-05-13
+  // Halldis screenshot where this fired at 67 min after a 12.4 h
+  // overnight (banked24h ≈ 13.5 h vs ~13 h trend).
+  const cutShortWasMeaningful =
+    lastCutShort && lastCutShort.durMin >= findByAge(NAP_FLOOR_BY_AGE, ctx.ageMonths).floorMin;
+  const suppressContinuationOnTrend = cutShortWasMeaningful
+    && isDayOnTrend(ctx.trendSleeps ?? ctx.recentSleeps, todaySleeps.map(toSleepEntry), ctx, now);
+  const continuationWindow = !activeSleep && lastCutShort && !suppressContinuationOnTrend
     ? computeContinuationWindow(lastCutShort, lastCutShort.startMs, getLearnedNapDuration(ctx), now)
     : null;
 
