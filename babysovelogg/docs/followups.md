@@ -11,6 +11,45 @@ multi-day testing, the unit-of-work flow — live in
 is for tracked product/engine/test work.
 
 
+## Refactor: unify wake-recommendations into a `WakeRecommendation` union
+
+Source: 2026-05-13 napBudget commits. Four `Prediction` fields now
+carry wake-by recommendations with overlapping shape:
+
+- `rescueNap.recommendedWakeTime` (extra-nap / short-prior-nap cap)
+- `continuationWindow.{closesAt, capLatestEnd}` (after a cut-short)
+- `postSkipPlan.rescue.{recommendedStart, latestStart, wakeBy}` (after a missed nap)
+- `napBudget.{wakeBy, recommendedDurationMin, mode, urgency, context}` (trend cap)
+
+Each has its own notification-scheduler branch, in-app banner in
+`+page.svelte`, and tests. ~1000 LOC across the two files; expected
+deletion ~80-140 LOC.
+
+Proposed discriminant:
+```ts
+type WakeRecommendation =
+  | { kind: "rescue"; target: string; reason: "extra_nap" | "short_prior_nap" | "both" }
+  | { kind: "continuation-cap"; target: string; window: { closesAt: string } }
+  | { kind: "post-skip-rescue"; target: string; latestStart: string }
+  | { kind: "nap-budget"; target: string; mode: "first-contact" | "established";
+      urgency: "advisory" | "firm"; context: NapBudgetContext };
+```
+
+Migration steps:
+1. Add `Prediction.wakeRecommendations: WakeRecommendation[]` derived from
+   the existing four fields. Keep old fields populated for one release.
+2. Extract a shared `<WakeRecommendationBanner kind={...} target={...} />`
+   component used by all four banners; CSS already separated by kind.
+3. Extract a `scheduleWakeNotif()` helper in notification-scheduler.ts
+   that takes `{ pref, kind, target, leadMin, dedupe, copy }` and
+   replaces the four upsert/cancel blocks.
+4. Migrate consumers to read from `wakeRecommendations[]`. Delete the
+   four old fields. Test fixtures regenerated.
+
+Risks: regression in any of the four shipped flows (each is real and
+load-bearing). Code review by Codex must pin behavior before deletion.
+Probably one focused PR per consumer (banner, scheduler, dev playground).
+
 ## napBudget v2: dynamic woke-reason inference in censorCutShortNaps
 
 Source: 2026-05-13 nap-cap design discussion. v1 ships a real-time

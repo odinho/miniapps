@@ -89,6 +89,31 @@ export function reconcileNotifications(state: ReconcileInput): void {
   const isAwake = !active || !!active.end_time;
   const tz = baby.timezone ?? "Europe/Oslo";
 
+  // ── Nap budget cap (trend-anchored) ─────────────────────────────
+  // Fires when the engine recommends a cap and it's `firm` urgency
+  // (i.e. uncapped overshoot > tolerance). Fires 5 min before wakeBy so
+  // the parent has lead time to get to the baby. Skipped silently when
+  // pref is off — the in-app banner still renders (banner opt-out lives
+  // in followups.md as v2 work).
+  if (
+    prefs.nap_budget_cap &&
+    isNappingActive &&
+    active &&
+    pred?.napBudget &&
+    pred.napBudget.urgency === "firm"
+  ) {
+    const wakeByMs = new Date(pred.napBudget.wakeBy).getTime();
+    const fireAt = wakeByMs - 5 * 60_000;
+    const dedupe = `nap_budget_cap:${active.domain_id}:${pred.napBudget.wakeBy}`;
+    upsert(baby.id, "nap_budget_cap", fireAt, dedupe, {
+      title: "Vekk for å treffe trenden",
+      body: `Tilrådd kapping kl. ${formatTime(pred.napBudget.wakeBy)} – dagens søvn er på veg over snittet`,
+      data: { kind: "nap_budget_cap", sleepDomainId: active.domain_id },
+    });
+  } else {
+    cancelByKind(baby.id, "nap_budget_cap");
+  }
+
   // ── Rescue wake ─────────────────────────────────────────────────
   if (prefs.rescue_wake && isNappingActive && active && pred?.rescueNap) {
     const dedupe = `rescue_wake:${active.domain_id}`;

@@ -135,7 +135,8 @@ export type NotificationKind =
   | "bedtime_approaching"
   | "nap_overdue"
   | "continuation_open"
-  | "nap_approaching";
+  | "nap_approaching"
+  | "nap_budget_cap";
 
 export type NotificationPrefs = Record<NotificationKind, boolean>;
 
@@ -167,6 +168,10 @@ export const TRIGGER_LABELS: Record<NotificationKind, { title: string; hint: str
   nap_approaching: {
     title: "Snart lurtid",
     hint: "30 min før forventa lurstart, så de får roa ned i tide.",
+  },
+  nap_budget_cap: {
+    title: "Vekk for å treffe trenden",
+    hint: "5 min før tilrådd kapping, når dagens søvnsum er på veg over 7d/30d-trenden. Slå av om du ikkje vil ha trendrettleiing.",
   },
 };
 

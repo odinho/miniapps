@@ -484,3 +484,71 @@ describe("fireDueNotifications", () => {
     expect(row.sent_at).toBeNull();
   });
 });
+
+describe("reconcileNotifications – nap_budget_cap", () => {
+  const wakeBy = "2026-05-13T09:25:00.000Z";
+  const active = makeActiveSleep("2026-05-13T08:30:00.000Z");
+  const napBudget = {
+    wakeBy,
+    recommendedDurationMin: 55,
+    reason: "over_trend" as const,
+    mode: "first-contact" as const,
+    urgency: "firm" as const,
+    context: {
+      blendedTrendMin: 780,
+      bankedMin: 770,
+      toleranceMin: 20,
+      sourceLabel: "7d/30d-blanding",
+    },
+    cycleNudge: null,
+  };
+
+  it("schedules a push 5 min before wakeBy when urgency is firm", () => {
+    reconcileNotifications({
+      baby,
+      activeSleep: active,
+      prediction: makePrediction({ napBudget }),
+    });
+    const rows = rowsOf("nap_budget_cap");
+    expect(rows).toHaveLength(1);
+    const fireAt = new Date(rows[0].fire_at).getTime();
+    const wakeByMs = new Date(wakeBy).getTime();
+    expect(wakeByMs - fireAt).toBe(5 * 60_000);
+    const payload = JSON.parse(rows[0].payload_json);
+    expect(payload.title).toContain("trenden");
+  });
+
+  it("does NOT schedule when urgency is advisory (soft signal only)", () => {
+    reconcileNotifications({
+      baby,
+      activeSleep: active,
+      prediction: makePrediction({ napBudget: { ...napBudget, urgency: "advisory" } }),
+    });
+    expect(rowsOf("nap_budget_cap")).toHaveLength(0);
+  });
+
+  it("respects opt-out: prefs.nap_budget_cap=false suppresses push", () => {
+    setPrefs(baby.id, { nap_budget_cap: false });
+    reconcileNotifications({
+      baby,
+      activeSleep: active,
+      prediction: makePrediction({ napBudget }),
+    });
+    expect(rowsOf("nap_budget_cap")).toHaveLength(0);
+  });
+
+  it("cancels when baby wakes (no longer active)", () => {
+    reconcileNotifications({
+      baby,
+      activeSleep: active,
+      prediction: makePrediction({ napBudget }),
+    });
+    expect(rowsOf("nap_budget_cap")).toHaveLength(1);
+    reconcileNotifications({
+      baby,
+      activeSleep: null,
+      prediction: makePrediction({ napBudget: null }),
+    });
+    expect(rowsOf("nap_budget_cap")).toHaveLength(0);
+  });
+});

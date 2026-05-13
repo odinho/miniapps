@@ -96,6 +96,24 @@ Check:
 5. when learned-data semantics change, also check `getPositionalNapDurations`, `estimateSleepCycleFromData`, and `confidence.ts` — anything that consumes nap durations should respect the same data-quality filters (e.g. `censorCutShortNaps`)
 6. integration or E2E coverage if user-visible behavior changes
 
+### Wake-recommendation change (rescue / continuation / napBudget / postSkipPlan)
+
+Four fields on `Prediction` carry wake-by recommendations. They overlap
+in shape (target + reason) but differ in trigger and consumer. Touch
+these in order:
+
+1. `Prediction` type in [`src/lib/stores/app.svelte.ts`](../src/lib/stores/app.svelte.ts) — add/modify the field.
+2. Engine call site in [`src/lib/engine/state.ts`](../src/lib/engine/state.ts) — both `assembleSchedulePrediction` AND `assembleEmergingPrediction` must populate the field; newborn returns null.
+3. UI consumer: [`src/lib/components/Timer.svelte`](../src/lib/components/Timer.svelte) and the banners in [`src/routes/+page.svelte`](../src/routes/+page.svelte) (continuation-banner, rescue-nap-banner, nap-budget-banner).
+4. Notification scheduler in [`src/lib/server/notification-scheduler.ts`](../src/lib/server/notification-scheduler.ts) if a push fires.
+5. Update the Prediction-factory defaults in `tests/unit/*.unit.ts` and `src/routes/dev/+page.svelte` for the new field.
+6. `dailyTrendTotalMin` is also exposed at the Prediction level for the static [`SleepInsightsCard.svelte`](../src/lib/components/SleepInsightsCard.svelte) — when modifying the trend math, update the helper and re-test that card.
+
+The four wake-recommendation surfaces share enough structure that a
+`WakeRecommendation` discriminated union refactor is captured in
+[`followups.md`](./followups.md). Land it only when the in-flight
+napBudget feature has settled.
+
 ### API endpoint change
 
 Check:

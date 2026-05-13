@@ -361,6 +361,7 @@
 	let morningBusy = $state(false);
 	let morningDismissedDate = $state('');
 	let showMorningManualSleep = $state(false);
+	let showNapBudgetExplain = $state(false);
 
 	$effect(() => {
 		if (needsMorningPrompt && !morningDate) {
@@ -556,6 +557,45 @@
 				<div class="continuation-hint">
 					Lite stimuli, mørkt rom. Viss ho sov inn, vekk innan {formatTime(cw.capLatestEnd)} så dagen heng saman.
 				</div>
+			</div>
+		{/if}
+
+		{#if prediction?.napBudget && activeSleep && !activeSleep.end_time && activeSleep.type === 'nap'}
+			{@const nb = prediction.napBudget}
+			{@const wakeAt = new Date(nb.wakeBy)}
+			{@const wakeCountdown = wakeAt.getTime() - now}
+			<div class="nap-budget-banner" data-testid="nap-budget-banner">
+				<div class="nap-budget-row">
+					<div class="nap-budget-title">💡 Vekk for å treffe trenden</div>
+					<button
+						class="nap-budget-explain-btn"
+						onclick={() => (showNapBudgetExplain = !showNapBudgetExplain)}
+						aria-label="Forklar trendmål"
+					>?</button>
+				</div>
+				<div class="nap-budget-body">
+					{#if wakeCountdown > 0}
+						Vekk innan kl. {formatTime(nb.wakeBy)} ({formatDuration(wakeCountdown)})
+					{:else}
+						Vekk no — kappet er over.
+					{/if}
+					{#if nb.mode === 'established'}
+						<span class="nap-budget-mode">· presis modus</span>
+					{:else}
+						<span class="nap-budget-mode">· éin syklus</span>
+					{/if}
+				</div>
+				{#if showNapBudgetExplain}
+					<div class="nap-budget-explain">
+						{#if nb.cycleNudge}
+							Vekkjingsvindauget tek omsyn til hennar lærte syklus ({prediction.learnedSchedule?.sleepCycleMin ?? '~50'} min).
+							Vi kapper ved slutten av éin full syklus så ho vaknar i lett fase — mjukare oppvakning, mindre tilvenningsstress.
+						{:else}
+							Vi anbefaler å vakne litt før neste syklus startar så du får tid til å koma fram til henne. Trendmålet i dag er {Math.round(nb.context.blendedTrendMin / 60 * 10) / 10}t totalt søvn ({nb.context.sourceLabel}).
+						{/if}
+						<button class="nap-budget-explain-close" onclick={() => (showNapBudgetExplain = false)}>Lukk</button>
+					</div>
+				{/if}
 			</div>
 		{/if}
 

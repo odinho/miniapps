@@ -144,6 +144,51 @@ Backtest harness in `src/lib/engine/backtest.ts` replays historical data day-by-
 
 The 12-hour arc visualizes completed sleeps and predictions on a semicircular timeline.
 
+### Wake-time recommendations
+
+The Prediction shape carries four kinds of "wake by" recommendation, each
+emitted under different conditions:
+
+- `expectedNapEnd` / `expectedNightEnd` — point predictions for the active
+  sleep, derived from `getLearnedNapDuration` / `getLearnedNightDuration`.
+- `expectedWakeRange` — ±1 SD band around the active wake point. Drives
+  the active-sleep progress meter in `Arc.svelte`.
+- `rescueNap.recommendedWakeTime` — cycle-aware cap when the active nap
+  is an extra/rescue beyond the day's expected count (schedule.ts:914).
+- `continuationWindow.{closesAt,capLatestEnd}` — after a cut-short, a
+  ~25 min window during which re-induction is still likely to succeed,
+  plus a cap on the comeback's end. Gated by `isDayOnTrend` so an
+  already-on-trend day doesn't get pushed for more sleep.
+- `postSkipPlan.rescue.{recommendedStart,latestStart,wakeBy}` — after a
+  full nap is missed, recommend a rescue power-nap window.
+- `napBudget.{wakeBy,recommendedDurationMin,mode,urgency,context}` —
+  trend-anchored cap for the day's last nap when banked24h projects
+  over a blended 7d/30d trend. Two modes: `first-contact` (cap at end
+  of a full cycle, gentle introduction) and `established` (sub-cycle
+  cap with a 5 min lead-time buffer once the parent has been
+  cap-respecting for ~a week).
+
+The `napBudget` rationale and evidence base (Brooks & Lack 2006,
+Mednick 2003, Lassonde 2016, Nakagawa 2016, Akacem 2015, Trotti 2017)
+is documented in `docs/sleep-science-research.md` §12. The four
+recommendation surfaces have overlapping shape — a `WakeRecommendation
+= {kind, target, reason, urgency}` discriminated union is captured as
+a v2 refactor in `docs/followups.md`.
+
+### Trend math
+
+`dailyTrendTotalMin` on the Prediction is the blended 7d/30d daily-total
+sleep, computed via `computeTrendTotalMin` (a thin wrapper over
+`getWeekStats` from `stats.ts` — same numbers the stats page rows show).
+Age-norm clamped to the `SLEEP_NEEDS` range. Used by `napBudget` and
+rendered as a "Trendmål" row in `SleepInsightsCard` when it diverges
+from the learnedSchedule total by >30 min.
+
+The trend data fetch is a single 30-day window (server `state.ts:62`)
+shared by both the strategy-hysteresis 21-day slice and the trend
+math. `recentSleeps` (7-day) still drives the schedule engine's
+short-horizon learning.
+
 ## Themes
 
 Auto-switches between day (light pastels) and night (dark blue/purple with animated stars) based on time of day. Controlled via `data-theme` attribute on `<html>` and CSS custom properties. Both `[data-theme="day"]` and `[data-theme="night"]` selectors are defined explicitly.
