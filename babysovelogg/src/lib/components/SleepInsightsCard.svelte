@@ -91,7 +91,12 @@
 	</div>
 	{:else}
 	<div class="insights-collapsed-summary">
-		Lur {napDurLabel} · Natt {nightDurLabel} · Totalt {totalSleepLabel}
+		Lur {napDurLabel} · Natt {nightDurLabel} ·
+		{#if showTrendRow}
+			Trend {trendTotalLabel}
+		{:else}
+			Totalt {totalSleepLabel}
+		{/if}
 	</div>
 	{/if}
 </div>
