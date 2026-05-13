@@ -172,12 +172,6 @@ export function computeNapBudget(input: ComputeNapBudgetInput): NapBudget | null
   // minimum useful nap (Brooks & Lack 2006, Mednick 2003).
   cappedDurationMin = Math.max(cappedDurationMin, floorMin);
 
-  // Must-fix: wakeBy can't be in the past. If the parent is already past
-  // the computed cap (e.g. 70 min into a 55-min one-cycle cap), clamp the
-  // duration to at least elapsed + 1 min so the wakeBy is actionable.
-  // urgency stays firm — the engine is essentially saying "wake now".
-  cappedDurationMin = Math.max(cappedDurationMin, elapsedMin + 1);
-
   // ── Bedtime guard. The cap must leave room for the pre-bedtime wake
   //    window (90 min). If the cycle-aligned cap pushes past that, tighten
   //    so the wake-by sits at bedtime - 90 min. If even the floor would
@@ -196,6 +190,12 @@ export function computeNapBudget(input: ComputeNapBudgetInput): NapBudget | null
     // No longer cycle-aligned — clear cyclesCompleted bookkeeping.
     cyclesCompleted = 0;
   }
+
+  // wakeBy can't be in the past. Applied AFTER the bedtime guard so a
+  // tightened cap (bedtime - 90 min) doesn't re-introduce a past wake when
+  // the parent has napped into the wake window. Urgency stays firm — the
+  // engine is essentially saying "wake now".
+  cappedDurationMin = Math.max(cappedDurationMin, elapsedMin + 1);
 
   // ── Urgency. `firm` (push-eligible) when the *uncapped* overshoot is
   //    > TOLERANCE_MIN beyond trend. The cap may bring today close to

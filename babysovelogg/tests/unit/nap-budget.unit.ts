@@ -727,4 +727,28 @@ describe("computeNapBudget — Codex review regressions", () => {
     // Just assert that the override CHANGES the outcome (suppression vs. cap).
     expect(withDefault === null && withOverride === null).toBe(false);
   });
+
+  it("bedtime-guard tightening does not re-introduce a past wakeBy", () => {
+    // Parent has napped past bedtime - 90 min. The bedtime guard would
+    // tighten cap to (bedtime - 90 min - napStart), which lands in the
+    // past relative to now. The post-guard elapsed+1 floor must take over
+    // and produce a wake-now recommendation, not a past wake.
+    //
+    // Setup: nap started at 08:30Z, now is 15:35Z (425 min elapsed), bedtime
+    // 17:00Z. latestWakeMs = 15:30Z → bedtime guard wants 420 min cap, which
+    // is 5 min in the past. Final clamp must push cap to ≥ 426 min so
+    // wakeBy ≥ now + 1.
+    const s = halldisScenario();
+    const lateNow = new Date("2026-05-13T15:35:00.000Z").getTime();
+    const out = computeNapBudget({
+      ...s,
+      now: lateNow,
+      isLastNapOfDay: true,
+      optedIn: true,
+    });
+    if (out) {
+      const wakeByMs = new Date(out.wakeBy).getTime();
+      expect(wakeByMs).toBeGreaterThan(lateNow);
+    }
+  });
 });
