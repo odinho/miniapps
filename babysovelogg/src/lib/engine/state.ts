@@ -303,7 +303,17 @@ export function assembleState(data: DayData) {
   // Determine strategy (use extended lookback for hysteresis when available).
   // The same extended window also feeds the cut-short censor's self-wake
   // median so it can fire even when the 7-day window has < 3 self-wakes.
-  const strategyEntries = (data.strategySleeps ?? recentSleeps).map(toSleepEntry);
+  //
+  // strategySleeps is the 30d window now (consolidated with the trend
+  // fetch), but `determineStrategy`'s 6-day replay is calibrated on 21d.
+  // Slice back to the original 21d window so older history doesn't flip
+  // a recently-transitioning baby from emerging_rhythm to routine_schedule.
+  const STRATEGY_LOOKBACK_DAYS = 21;
+  const strategyCutoffMs = now - STRATEGY_LOOKBACK_DAYS * 86400_000;
+  const rawStrategySleeps = data.strategySleeps ?? recentSleeps;
+  const strategyEntries = rawStrategySleeps
+    .filter((s) => new Date(s.start_time).getTime() >= strategyCutoffMs)
+    .map(toSleepEntry);
   // Trend window for napBudget — prefer the 30-day fetch when present, then
   // fall back to whatever wider data we have. The helper itself gates on
   // ≥7 days of complete data.
@@ -638,6 +648,7 @@ function assembleEmergingPrediction(
         bedtime,
         isLastNapOfDay: isLastNapOfDayEmerging,
         optedIn: true,
+        learnedNapDurationMin: getLearnedNapDuration(ctx),
         now,
         ctx,
       })
@@ -876,6 +887,7 @@ function assembleSchedulePrediction(
         isLastNapOfDay,
         // v1: opt-in defaults to true. The per-baby setting will plug in here.
         optedIn: true,
+        learnedNapDurationMin: getLearnedNapDuration(ctx),
         now,
         ctx,
       })

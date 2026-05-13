@@ -42,6 +42,15 @@ interface ComputeNapBudgetInput {
   isLastNapOfDay: boolean;
   /** Per-baby opt-out: false suppresses the entire feature. */
   optedIn: boolean;
+  /**
+   * The baby's learned typical full-nap duration (minutes), used to project
+   * how long the active nap would run if uncapped. Passed in from
+   * `getLearnedNapDuration(ctx)` at the call site to avoid a circular
+   * import. Falls back to a conservative 90 / 75 min by age band when
+   * absent. A transitioning baby with learned=60 won't get false caps
+   * driven by a stale 90-min projection.
+   */
+  learnedNapDurationMin?: number;
   /** Now (epoch ms). */
   now: number;
   /** Baby context — age, tz. */
@@ -75,7 +84,7 @@ export function isDayOnTrend(
 }
 
 export function computeNapBudget(input: ComputeNapBudgetInput): NapBudget | null {
-  const { activeNap, todaySleeps, trendSleeps, bedtime, isLastNapOfDay, optedIn, now, ctx } = input;
+  const { activeNap, todaySleeps, trendSleeps, bedtime, isLastNapOfDay, optedIn, learnedNapDurationMin, now, ctx } = input;
 
   // ── Gate 1: per-baby opt-out and v1 scope (last nap only). ──────────
   if (!optedIn || !isLastNapOfDay) return null;
@@ -98,7 +107,7 @@ export function computeNapBudget(input: ComputeNapBudgetInput): NapBudget | null
   //    start-anchored daily averages, which in steady-state equal the
   //    rolling-24h mean, just shifted.
   const bankedMin = computeBankedToday(trendSleeps, todaySleeps, activeNap, ctx.tz, now);
-  const projectedIfRunsFull = bankedMin + estimateRemainingNapMin(activeNap, now, ctx);
+  const projectedIfRunsFull = bankedMin + estimateRemainingNapMin(activeNap, now, ctx, learnedNapDurationMin);
   if (projectedIfRunsFull <= trend.blendedTrendMin) {
     return null;
   }
@@ -145,6 +154,12 @@ export function computeNapBudget(input: ComputeNapBudgetInput): NapBudget | null
   // Apply age-band floor so we never recommend below the literature-backed
   // minimum useful nap (Brooks & Lack 2006, Mednick 2003).
   cappedDurationMin = Math.max(cappedDurationMin, floorMin);
+
+  // Must-fix: wakeBy can't be in the past. If the parent is already past
+  // the computed cap (e.g. 70 min into a 55-min one-cycle cap), clamp the
+  // duration to at least elapsed + 1 min so the wakeBy is actionable.
+  // urgency stays firm — the engine is essentially saying "wake now".
+  cappedDurationMin = Math.max(cappedDurationMin, elapsedMin + 1);
 
   // ── Bedtime guard. The cap must leave room for the pre-bedtime wake
   //    window (90 min). If the cycle-aligned cap pushes past that, tighten
@@ -223,10 +238,18 @@ function computeBlendedTrend(
   const stats30 = getWeekStats(within30, tz);
   const stats7 = getWeekStats(within7, tz);
 
-  // Drop today (incomplete) and gather per-day totals (nap + night).
-  const completedDays30 = stats30.days.filter((d) => d.date !== todayKey);
+  // Drop today (incomplete) and gather per-day totals (nap + night). A day
+  // counts as "complete" only when it carried a night entry — nap-only or
+  // night-fragment-only days would feed biased totals into the trend.
+  // (Naps without a same-day-anchored night are common when a parent
+  // forgot to log bedtime, or a fixture only has half a day.)
+  const completedDays30 = stats30.days.filter(
+    (d) => d.date !== todayKey && d.stats.totalNightMinutes > 0,
+  );
   if (completedDays30.length < NAP_BUDGET.MIN_TREND_DAYS) return null;
-  const completedDays7 = stats7.days.filter((d) => d.date !== todayKey);
+  const completedDays7 = stats7.days.filter(
+    (d) => d.date !== todayKey && d.stats.totalNightMinutes > 0,
+  );
 
   const totals30 = completedDays30.map((d) => d.stats.totalNapMinutes + d.stats.totalNightMinutes);
   const totals7 = completedDays7.map((d) => d.stats.totalNapMinutes + d.stats.totalNightMinutes);
@@ -321,14 +344,17 @@ function estimateRemainingNapMin(
   activeNap: { start_time: string },
   now: number,
   ctx: BabyContext,
+  learnedNapDurationMin?: number,
 ): number {
   const napStartMs = new Date(activeNap.start_time).getTime();
   const elapsedMin = (now - napStartMs) / 60_000;
-  // We don't import getLearnedNapDuration here to avoid a circular dependency
-  // risk; an age-band-typical upper estimate is fine for this projection.
-  // 90 min for under-14mo, 75 min beyond. Conservative so we don't
-  // underproject and miss real overshoots.
-  const typicalFullNapMin = ctx.ageMonths < 14 ? 90 : 75;
+  // Prefer the per-baby learned-typical when the caller supplies it — a
+  // baby transitioning to shorter naps won't get false caps driven by a
+  // stale 90-min projection. Fall back to an age-band-typical upper bound
+  // (90 min < 14mo, 75 min beyond) when absent.
+  const typicalFullNapMin = learnedNapDurationMin && learnedNapDurationMin > 0
+    ? learnedNapDurationMin
+    : ctx.ageMonths < 14 ? 90 : 75;
   return Math.max(0, typicalFullNapMin - elapsedMin);
 }
 
