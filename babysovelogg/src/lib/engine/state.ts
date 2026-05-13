@@ -17,7 +17,7 @@ import {
 import { RESCUE_NAP, NAP_FLOOR_BY_AGE, findByAge } from "./constants.js";
 import { getTodayStats } from "./stats.js";
 import { computeConfidence, computeWakeRange } from "./confidence.js";
-import { computeNapBudget, isDayOnTrend } from "./nap-budget.js";
+import { computeNapBudget, isDayOnTrend, computeTrendTotalMin } from "./nap-budget.js";
 import { calibrate } from "./calibration.js";
 import { computeStrategySignals } from "./features.js";
 import { selectStrategy } from "./strategy.js";
@@ -455,6 +455,7 @@ function assembleNewbornPrediction(
     rescueNap: null,
     continuationWindow: null,
     napBudget: null,
+    dailyTrendTotalMin: null,
     // Newborn fields
     sleepWindow: result.sleepWindow,
     sleepPressure: result.sleepPressure,
@@ -672,6 +673,7 @@ function assembleEmergingPrediction(
     rescueNap,
     continuationWindow,
     napBudget,
+    dailyTrendTotalMin: computeTrendTotalMin(ctx.trendSleeps ?? ctx.recentSleeps, ctx, now),
     sleepWindow: result.sleepWindow,
     sleepPressure: result.sleepPressure,
     totalSleep24h: result.rolling.totalSleep24h,
@@ -911,6 +913,7 @@ function assembleSchedulePrediction(
     rescueNap,
     continuationWindow,
     napBudget,
+    dailyTrendTotalMin: computeTrendTotalMin(ctx.trendSleeps ?? ctx.recentSleeps, ctx, now),
     // Newborn fields — null for schedule-based strategies
     sleepWindow: null,
     sleepPressure: null,

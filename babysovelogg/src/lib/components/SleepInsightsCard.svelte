@@ -6,9 +6,16 @@
 	interface Props {
 		schedule: LearnedSchedule;
 		calibration: CalibrationReport | null;
+		/**
+		 * Blended 7d/30d trend total (minutes). Shown alongside the
+		 * learned-typical total when it differs meaningfully — otherwise the
+		 * overview keeps advertising the stale `learnedSchedule` total even
+		 * when the engine is recommending a cap.
+		 */
+		dailyTrendTotalMin?: number | null;
 	}
 
-	let { schedule, calibration }: Props = $props();
+	let { schedule, calibration, dailyTrendTotalMin = null }: Props = $props();
 	let collapsed = $state(true);
 
 	const napDurLabel = $derived(formatDuration(schedule.napDurationMin * 60_000));
@@ -20,6 +27,15 @@
 	);
 	const totalSleepLabel = $derived(
 		`${(totalSleepMin / 60).toFixed(1)}t`,
+	);
+	const trendTotalLabel = $derived(
+		dailyTrendTotalMin != null ? `${(dailyTrendTotalMin / 60).toFixed(1)}t` : null,
+	);
+	/** Show the trend row when it diverges from the learned total by more
+	 *  than 30 min — otherwise the two are essentially the same and the
+	 *  extra row just adds noise. */
+	const showTrendRow = $derived(
+		dailyTrendTotalMin != null && Math.abs(totalSleepMin - dailyTrendTotalMin) > 30,
 	);
 	const trustLabel = $derived.by(() => {
 		if (!calibration) return null;
@@ -63,6 +79,12 @@
 				<span class="insights-detail">({schedule.expectedNapCount} {schedule.expectedNapCount === 1 ? 'lur' : 'lurar'})</span>
 			</span>
 		</div>
+		{#if showTrendRow}
+			<div class="insights-row insights-trend-row">
+				<span class="insights-label">Trendmål (7d/30d)</span>
+				<span class="insights-value">{trendTotalLabel}</span>
+			</div>
+		{/if}
 		{#if trustLabel}
 			<div class="insights-trust">{trustLabel} · {calibration?.daysWithData ?? 0} dagar med data</div>
 		{/if}
@@ -130,6 +152,12 @@
 		font-size: 0.75rem;
 		color: var(--text-light);
 		font-weight: 400;
+	}
+
+	.insights-trend-row {
+		border-top: 1px solid var(--lavender-dark, rgba(255, 255, 255, 0.08));
+		padding-top: 4px;
+		margin-top: 2px;
 	}
 
 	.insights-trust {

@@ -105,6 +105,7 @@
 			rescueNap: null,
 			continuationWindow: null,
 			napBudget: null,
+			dailyTrendTotalMin: null,
 			...o,
 		};
 	}

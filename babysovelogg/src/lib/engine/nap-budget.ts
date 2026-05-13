@@ -71,6 +71,23 @@ interface ComputeNapBudgetInput {
  * Returns false (no suppression) when trend data is too sparse or noisy
  * to trust — the existing rescue behaviour stays in place by default.
  */
+/**
+ * The blended 7d/30d daily-total trend in minutes, age-norm clamped. Same
+ * value napBudget uses internally; exposed here so UI surfaces (the static
+ * SleepInsightsCard) can show parents the trend goal instead of the
+ * potentially-stale learnedSchedule total.
+ *
+ * Returns null when the data is too sparse or noisy to trust.
+ */
+export function computeTrendTotalMin(
+  trendSleeps: SleepEntry[],
+  ctx: BabyContext,
+  now: number,
+): number | null {
+  const trend = computeBlendedTrend(trendSleeps, ctx.tz, now, ctx.ageMonths);
+  return trend ? Math.round(trend.blendedTrendMin) : null;
+}
+
 export function isDayOnTrend(
   trendSleeps: SleepEntry[],
   todaySleeps: SleepEntry[],

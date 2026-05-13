@@ -608,6 +608,7 @@
 			<SleepInsightsCard
 				schedule={prediction.learnedSchedule}
 				calibration={prediction.calibration}
+				dailyTrendTotalMin={prediction.dailyTrendTotalMin}
 			/>
 		{/if}
 

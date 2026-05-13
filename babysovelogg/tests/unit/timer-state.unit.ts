@@ -55,6 +55,7 @@ function makePrediction(overrides: Partial<Prediction> = {}): Prediction {
     rescueNap: null,
     continuationWindow: null,
     napBudget: null,
+    dailyTrendTotalMin: null,
     ...overrides,
   };
 }

@@ -99,6 +99,16 @@ export interface Prediction {
 	 * See docs/sleep-science-research.md §12.
 	 */
 	napBudget: NapBudget | null;
+	/**
+	 * Blended 7d/30d daily-total trend (minutes), age-norm clamped. Same number
+	 * the napBudget feature uses to decide whether to cap. Exposed at the
+	 * Prediction level so the static UI (SleepInsightsCard) can show it
+	 * alongside the learned-typical totals — otherwise the overview would
+	 * keep advertising "14.2 h tomorrow" even after the engine recommends
+	 * capping naps to land near 13 h. Null when trend data is too sparse
+	 * (<7 complete days) or too noisy (stdev/mean above threshold).
+	 */
+	dailyTrendTotalMin: number | null;
 }
 
 export interface NapBudget {
