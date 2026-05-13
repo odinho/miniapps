@@ -1,6 +1,7 @@
 import { db } from "./db.js";
 import { assembleState } from "$lib/engine/state.js";
 import { getPrefs } from "./notification-prefs.js";
+import { getNapBudgetState, setNapBudgetState } from "./nap-budget-state.js";
 import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow } from "$lib/types.js";
 import { todayInTz } from "$lib/tz.js";
 
@@ -110,8 +111,9 @@ export function getState(now?: number) {
   // dedicated per-baby column (decoupled from notifications) was considered
   // and rejected — see docs/napbudget-codex-review-2026-05-13.md.
   const napBudgetOptedIn = getPrefs(baby.id).nap_budget_cap;
+  const priorNapBudgetState = getNapBudgetState(baby.id);
 
-  return assembleState({
+  const result = assembleState({
     baby,
     activeSleep,
     todaySleeps,
@@ -123,6 +125,22 @@ export function getState(now?: number) {
     diaperCount: todayDiapers?.count ?? 0,
     lastDiaperTime: lastDiaper?.time ?? null,
     napBudgetOptedIn,
+    priorNapBudgetState,
     now,
   });
+
+  // Persist mode transitions. Only writes when the engine actually emitted
+  // a napBudget (no point recording state when nothing was computed) and
+  // only when the mode changed — keeps the entered_at stable across
+  // reconciles in steady state, so it remains a useful "how long has the
+  // family been in established mode" signal.
+  const emittedMode = result.prediction?.napBudget?.mode;
+  if (emittedMode && emittedMode !== priorNapBudgetState?.mode) {
+    setNapBudgetState(baby.id, {
+      mode: emittedMode,
+      enteredAt: new Date(now ?? Date.now()).toISOString(),
+    });
+  }
+
+  return result;
 }

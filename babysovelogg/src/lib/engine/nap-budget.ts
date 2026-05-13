@@ -51,6 +51,15 @@ interface ComputeNapBudgetInput {
    * driven by a stale 90-min projection.
    */
   learnedNapDurationMin?: number;
+  /**
+   * Last persisted mode for this baby (Codex 2026-05-13 review §"Mode
+   * hysteresis isn't real hysteresis"). When omitted (no history) the
+   * engine falls back to the pure data-driven check. When provided, the
+   * "established" mode is sticky: it stays until the 7d trend climbs back
+   * above the 30d (i.e. the parent has stopped capping), instead of
+   * self-terminating just because mean30 has caught up to mean7.
+   */
+  priorState?: { mode: "first-contact" | "established"; enteredAt: string } | null;
   /** Now (epoch ms). */
   now: number;
   /** Baby context — age, tz. */
@@ -101,7 +110,7 @@ export function isDayOnTrend(
 }
 
 export function computeNapBudget(input: ComputeNapBudgetInput): NapBudget | null {
-  const { activeNap, todaySleeps, trendSleeps, bedtime, isLastNapOfDay, optedIn, learnedNapDurationMin, now, ctx } = input;
+  const { activeNap, todaySleeps, trendSleeps, bedtime, isLastNapOfDay, optedIn, learnedNapDurationMin, priorState, now, ctx } = input;
 
   // ── Gate 1: per-baby opt-out and v1 scope (last nap only). ──────────
   if (!optedIn || !isLastNapOfDay) return null;
@@ -129,13 +138,23 @@ export function computeNapBudget(input: ComputeNapBudgetInput): NapBudget | null
     return null;
   }
 
-  // ── Mode detection. "Established" = the 7d trend has dropped at least
-  //    ESTABLISHED_TRACK_DELTA_MIN below the 30d trend, which is what you
-  //    get when the parent has been respecting cap advice for ~a week.
-  //    User wording: "once the parent has done a week or more of such
-  //    early wakeups and we still have too many minutes during the day,
-  //    this is the time where we don't give a full cycle".
-  const establishedMode = trend.mean30 - trend.mean7 >= NAP_BUDGET.ESTABLISHED_TRACK_DELTA_MIN;
+  // ── Mode detection with hysteresis.
+  //
+  //  Enter "established" when the 7d trend has dropped at least
+  //  ESTABLISHED_TRACK_DELTA_MIN below the 30d trend (the parent has been
+  //  respecting cap advice for ~a week).
+  //
+  //  *Stay* established as long as 30d ≥ 7d — even by a few minutes. After
+  //  ~30 days of cap-respect the two trends converge, and a pure
+  //  delta-≥-25 gate self-terminates established mode while the parent is
+  //  still capping (Codex 2026-05-13 review). The relaxed stay-gate keeps
+  //  the engine in established mode until 7d climbs back above 30d, which
+  //  is the actual signal that the parent has stopped capping.
+  const delta = trend.mean30 - trend.mean7;
+  const wasEstablished = priorState?.mode === "established";
+  const establishedMode = wasEstablished
+    ? delta >= 0
+    : delta >= NAP_BUDGET.ESTABLISHED_TRACK_DELTA_MIN;
 
   const remainingBudgetMin = Math.max(0, trend.blendedTrendMin - bankedMin);
   const cycleMin = estimateSleepCycleFromData(ctx);

@@ -48,6 +48,12 @@ export interface DayData {
    * for tests and historical callers that pre-date the wiring.
    */
   napBudgetOptedIn?: boolean;
+  /**
+   * Last persisted nap-budget mode (server reads from nap_budget_state).
+   * Drives hysteresis so "established" doesn't self-terminate after ~30
+   * days of cap-respect. Null = no prior state.
+   */
+  priorNapBudgetState?: { mode: "first-contact" | "established"; enteredAt: string } | null;
   /** Optional override for "now", used by tests. Defaults to Date.now(). */
   now?: number;
 }
@@ -362,11 +368,13 @@ export function assembleState(data: DayData) {
     prediction = assembleEmergingPrediction(
       ctx, recentEntries, todaySleeps, activeSleep, todayWakeUp, now,
       data.napBudgetOptedIn ?? true,
+      data.priorNapBudgetState ?? null,
     );
   } else {
     prediction = assembleSchedulePrediction(
       strategy, ctx, todaySleeps, activeSleep, todayWakeUp, now,
       data.napBudgetOptedIn ?? true,
+      data.priorNapBudgetState ?? null,
     );
   }
 
@@ -511,6 +519,7 @@ function assembleEmergingPrediction(
   todayWakeUp: DayStartRow | undefined,
   now: number,
   napBudgetOptedIn: boolean,
+  priorNapBudgetState: { mode: "first-contact" | "established"; enteredAt: string } | null,
 ): Prediction {
   // Find last completed sleep end time
   const allCompleted = [...todaySleeps, ...recentEntries.map((s) => ({ end_time: s.end_time }))]
@@ -681,6 +690,7 @@ function assembleEmergingPrediction(
         isLastNapOfDay: isLastNapOfDayEmerging,
         optedIn: napBudgetOptedIn,
         learnedNapDurationMin: getLearnedNapDuration(ctx),
+        priorState: priorNapBudgetState,
         now,
         ctx,
       })
@@ -731,6 +741,7 @@ function assembleSchedulePrediction(
   todayWakeUp: DayStartRow | undefined,
   now: number,
   napBudgetOptedIn: boolean,
+  priorNapBudgetState: { mode: "first-contact" | "established"; enteredAt: string } | null,
 ): Prediction | null {
   const lastCompleted = todaySleeps.find((s) => s.end_time);
   const wakeTimeForPrediction = lastCompleted?.end_time || todayWakeUp?.wake_time;
@@ -923,6 +934,7 @@ function assembleSchedulePrediction(
         isLastNapOfDay,
         optedIn: napBudgetOptedIn,
         learnedNapDurationMin: getLearnedNapDuration(ctx),
+        priorState: priorNapBudgetState,
         now,
         ctx,
       })

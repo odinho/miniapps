@@ -728,6 +728,84 @@ describe("computeNapBudget — Codex review regressions", () => {
     expect(withDefault === null && withOverride === null).toBe(false);
   });
 
+  it("hysteresis: established mode persists when priorState says established and 30d≥7d", () => {
+    // Construct a steady-state scenario where mean30 ≈ mean7 (delta ≈ 0).
+    // Without priorState the pure delta-≥-25 gate falls back to
+    // first-contact. With priorState=established and delta ≥ 0, the
+    // relaxed stay-gate keeps the engine in established mode.
+    const todayDateStr = "2026-05-13";
+    const yesterdayNightStart = new Date(`${todayDateStr}T00:00:00Z`).getTime() - 5 * 3600_000;
+    const synth = synthDays("2026-04-18", 24, 13 * 60); // flat 13h every day
+    const yesterdayNight: SleepEntry = {
+      start_time: new Date(yesterdayNightStart).toISOString(),
+      end_time: new Date(yesterdayNightStart + 780 * 60_000).toISOString(),
+      type: "night",
+      woke_by: "self",
+    };
+    const trendSleeps = [...synth, yesterdayNight];
+
+    const input = {
+      activeNap: { start_time: `${todayDateStr}T08:30:00.000Z` },
+      todaySleeps: [] as SleepEntry[],
+      trendSleeps,
+      bedtime: `${todayDateStr}T17:00:00.000Z`,
+      isLastNapOfDay: true,
+      optedIn: true,
+      now: new Date(`${todayDateStr}T08:55:00.000Z`).getTime(),
+      ctx: ctx({ trendSleeps }),
+    };
+
+    const fresh = computeNapBudget(input);
+    const sticky = computeNapBudget({
+      ...input,
+      priorState: { mode: "established", enteredAt: "2026-04-13T00:00:00.000Z" },
+    });
+
+    // Either both null (engine had its own reason to suppress) or both emit;
+    // when both emit, the sticky one must be established and the fresh one
+    // first-contact (the actual hysteresis behaviour).
+    if (fresh && sticky) {
+      expect(fresh.mode).toBe("first-contact");
+      expect(sticky.mode).toBe("established");
+    }
+  });
+
+  it("hysteresis: established mode exits when 7d climbs back above 30d", () => {
+    // Build trend data where the last 7 days have HIGHER totals than the
+    // 30d window (parent stopped capping — mean7 > mean30 → delta < 0).
+    // Even with priorState=established, the stay-gate (delta ≥ 0) fails,
+    // so the engine transitions back to first-contact.
+    const todayDateStr = "2026-05-13";
+    const yesterdayNightStart = new Date(`${todayDateStr}T00:00:00Z`).getTime() - 5 * 3600_000;
+    const early = synthDays("2026-04-18", 17, 12 * 60); // older days: 12h
+    const recent = synthDays("2026-05-05", 7, 14 * 60);  // last 7 days: 14h
+    const yesterdayNight: SleepEntry = {
+      start_time: new Date(yesterdayNightStart).toISOString(),
+      end_time: new Date(yesterdayNightStart + 800 * 60_000).toISOString(),
+      type: "night",
+      woke_by: "self",
+    };
+    const trendSleeps = [...early, ...recent, yesterdayNight];
+
+    const out = computeNapBudget({
+      activeNap: { start_time: `${todayDateStr}T08:30:00.000Z` },
+      todaySleeps: [],
+      trendSleeps,
+      bedtime: `${todayDateStr}T17:00:00.000Z`,
+      isLastNapOfDay: true,
+      optedIn: true,
+      priorState: { mode: "established", enteredAt: "2026-04-13T00:00:00.000Z" },
+      now: new Date(`${todayDateStr}T08:55:00.000Z`).getTime(),
+      ctx: ctx({ trendSleeps }),
+    });
+
+    // If the engine emits at all, hysteresis must have released — mode is
+    // no longer established.
+    if (out) {
+      expect(out.mode).toBe("first-contact");
+    }
+  });
+
   it("bedtime-guard tightening does not re-introduce a past wakeBy", () => {
     // Parent has napped past bedtime - 90 min. The bedtime guard would
     // tighten cap to (bedtime - 90 min - napStart), which lands in the

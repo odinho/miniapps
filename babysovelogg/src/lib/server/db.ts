@@ -171,6 +171,16 @@ function initSchema(database: SqliteDb) {
       baby_id INTEGER PRIMARY KEY REFERENCES baby(id),
       prefs_json TEXT NOT NULL DEFAULT '{}'
     );
+
+    -- Persisted nap-budget mode (Codex 2026-05-13 review §"Mode hysteresis
+    -- isn't real hysteresis"). The engine reads prior mode for hysteresis
+    -- so "established" doesn't self-terminate after ~30 days when mean30
+    -- catches up to mean7.
+    CREATE TABLE IF NOT EXISTS nap_budget_state (
+      baby_id INTEGER PRIMARY KEY REFERENCES baby(id),
+      mode TEXT NOT NULL,
+      entered_at TEXT NOT NULL
+    );
   `);
 }
 
