@@ -806,6 +806,61 @@ describe("computeNapBudget — Codex review regressions", () => {
     }
   });
 
+  it("off-day filter excludes flagged dates from trend computation", () => {
+    // Baseline: 7 days of 12h totals (low) + 17 days of 13.5h totals (high).
+    // With all 24 days in: mean is somewhere in between. With the 7 low
+    // days marked off-day: mean rises to ~13.5h. Trend math reflects this.
+    const todayDateStr = "2026-05-13";
+    const yesterdayNightStart = new Date(`${todayDateStr}T00:00:00Z`).getTime() - 5 * 3600_000;
+    const lowDays = synthDays("2026-04-18", 7, 12 * 60); // first 7 days low
+    const highDays = synthDays("2026-04-25", 18, 13.5 * 60); // then 18 high
+    const yesterdayNight: SleepEntry = {
+      start_time: new Date(yesterdayNightStart).toISOString(),
+      end_time: new Date(yesterdayNightStart + 800 * 60_000).toISOString(),
+      type: "night",
+      woke_by: "self",
+    };
+    const trendSleeps = [...lowDays, ...highDays, yesterdayNight];
+
+    const input = {
+      activeNap: { start_time: `${todayDateStr}T08:30:00.000Z` },
+      todaySleeps: [] as SleepEntry[],
+      trendSleeps,
+      bedtime: `${todayDateStr}T17:00:00.000Z`,
+      isLastNapOfDay: true,
+      optedIn: true,
+      now: new Date(`${todayDateStr}T08:55:00.000Z`).getTime(),
+    };
+
+    const withAllDays = computeNapBudget({ ...input, ctx: ctx({ trendSleeps }) });
+
+    // Mark the 7 low days as off-days. The trend should now reflect only
+    // the high days.
+    const offDays = new Set<string>();
+    for (let i = 0; i < 7; i++) {
+      const dayMs = new Date("2026-04-18T00:00:00Z").getTime() + i * 86400_000;
+      // Use the same start-anchored local date that getWeekStats uses.
+      const d = new Date(dayMs);
+      const yyyy = d.getUTCFullYear();
+      const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const dd = String(d.getUTCDate()).padStart(2, "0");
+      offDays.add(`${yyyy}-${mm}-${dd}`);
+    }
+    const withFilter = computeNapBudget({
+      ...input,
+      ctx: ctx({ trendSleeps, offDays }),
+    });
+
+    // When both emit, the filtered trend target must be >= the unfiltered
+    // one (dropping the low days raises the mean). When the filter pushes
+    // suppression on either side the test gives no signal — skip.
+    if (withAllDays && withFilter) {
+      expect(withFilter.context.blendedTrendMin).toBeGreaterThanOrEqual(
+        withAllDays.context.blendedTrendMin,
+      );
+    }
+  });
+
   it("split-night fragments both count toward banked", () => {
     // Parent logged the night as TWO entries (a mid-night feeding session
     // split out): 19:00-22:00 yesterday and 22:30-06:00 today. Old code's

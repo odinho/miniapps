@@ -337,6 +337,35 @@ export function applyEvent(event: AppEvent): void {
         .run(payload.babyId, payload.date);
       break;
     }
+
+    case "day.marked_off": {
+      // Insert-or-update: an off-day flag may be set before a day.started
+      // exists (parent marks before logging anything). wake_time uses
+      // the date's midnight as a placeholder — the engine's wake-derivation
+      // prefers night end_time anyway, so this is only read when no other
+      // wake signal exists, in which case the day was off and the value
+      // doesn't influence trend math (off-days are skipped).
+      const babyId = payload.babyId as number;
+      const date = payload.date as string;
+      const reason = (payload.reason as string | null | undefined) ?? null;
+      db.prepare(
+        `INSERT INTO day_start (baby_id, date, wake_time, off_day, off_day_reason, created_by_event_id)
+         VALUES (?, ?, ?, 1, ?, ?)
+         ON CONFLICT(baby_id, date) DO UPDATE SET
+           off_day = 1,
+           off_day_reason = excluded.off_day_reason,
+           created_by_event_id = excluded.created_by_event_id`,
+      ).run(babyId, date, `${date}T00:00:00.000Z`, reason, eventId);
+      break;
+    }
+
+    case "day.unmarked_off": {
+      db.prepare(
+        `UPDATE day_start SET off_day = 0, off_day_reason = NULL
+         WHERE baby_id = ? AND date = ?`,
+      ).run(payload.babyId, payload.date);
+      break;
+    }
   }
 }
 

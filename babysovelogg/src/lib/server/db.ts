@@ -137,9 +137,26 @@ function initSchema(database: SqliteDb) {
       wake_time TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       created_by_event_id INTEGER,
+      off_day INTEGER NOT NULL DEFAULT 0,
+      off_day_reason TEXT,
       UNIQUE(baby_id, date)
     );
   `);
+
+  // Migration: add off_day flag for sick/travel/spurt days (Codex
+  // 2026-05-13 review §"Sick / spurt / DST days" — promoted from v2 to
+  // v1). Trend math skips flagged days so a parent's worst week doesn't
+  // pull the engine's recommendations sideways.
+  try {
+    database.exec("ALTER TABLE day_start ADD COLUMN off_day INTEGER NOT NULL DEFAULT 0");
+  } catch {
+    // Column already exists — ignore
+  }
+  try {
+    database.exec("ALTER TABLE day_start ADD COLUMN off_day_reason TEXT");
+  } catch {
+    // Column already exists — ignore
+  }
 
   database.exec(`
     CREATE TABLE IF NOT EXISTS notification_subscriptions (

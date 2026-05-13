@@ -38,27 +38,32 @@ export function getState(now?: number) {
     )
     .all(baby.id, midnightIso) as SleepLogRow[];
 
-  // Derive wakeup: night sleep end_time takes precedence, day_start is fallback (onboarding)
-  let todayWakeUp: DayStartRow | undefined;
+  // Derive wakeup: night sleep end_time takes precedence, day_start is the
+  // onboarding fallback. The day_start row also carries the off-day flag,
+  // so we read it unconditionally and merge it onto whichever wake_time
+  // signal won out.
+  const dayStartRow = db
+    .prepare("SELECT * FROM day_start WHERE baby_id = ? AND date = ?")
+    .get(baby.id, todayDateStr) as DayStartRow | undefined;
   const overnightSleep = db
     .prepare(
       "SELECT end_time FROM sleep_log WHERE baby_id = ? AND type = 'night' AND start_time < ? AND end_time >= ? AND deleted = 0 ORDER BY end_time DESC LIMIT 1",
     )
     .get(baby.id, midnightIso, midnightIso) as { end_time: string } | undefined;
+  let todayWakeUp: DayStartRow | undefined;
   if (overnightSleep) {
     todayWakeUp = {
-      id: 0,
+      id: dayStartRow?.id ?? 0,
       baby_id: baby.id,
       date: todayDateStr,
       wake_time: overnightSleep.end_time,
       created_at: overnightSleep.end_time,
       created_by_event_id: null,
+      off_day: dayStartRow?.off_day ?? 0,
+      off_day_reason: dayStartRow?.off_day_reason ?? null,
     };
   } else {
-    // Fallback: explicit day.started from onboarding / manual morning prompt
-    todayWakeUp = db
-      .prepare("SELECT * FROM day_start WHERE baby_id = ? AND date = ?")
-      .get(baby.id, todayDateStr) as DayStartRow | undefined;
+    todayWakeUp = dayStartRow;
   }
 
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
@@ -113,6 +118,13 @@ export function getState(now?: number) {
   const napBudgetOptedIn = getPrefs(baby.id).nap_budget_cap;
   const priorNapBudgetState = getNapBudgetState(baby.id);
 
+  // Off-days from day_start. Pulled wider than the trend window so the
+  // engine can also skip them in any future per-day analysis.
+  const offDayRows = db
+    .prepare("SELECT date FROM day_start WHERE baby_id = ? AND off_day = 1")
+    .all(baby.id) as Array<{ date: string }>;
+  const offDays = new Set(offDayRows.map((r) => r.date));
+
   const result = assembleState({
     baby,
     activeSleep,
@@ -126,6 +138,7 @@ export function getState(now?: number) {
     lastDiaperTime: lastDiaper?.time ?? null,
     napBudgetOptedIn,
     priorNapBudgetState,
+    offDays,
     now,
   });
 

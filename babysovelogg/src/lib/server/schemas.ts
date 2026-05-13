@@ -134,6 +134,15 @@ const payloadSchemas: Record<string, v.BaseSchema<unknown, unknown, v.BaseIssue<
     babyId: v.number(),
     date: v.string(),
   }),
+  "day.marked_off": v.object({
+    babyId: v.number(),
+    date: v.string(),
+    reason: optStr,
+  }),
+  "day.unmarked_off": v.object({
+    babyId: v.number(),
+    date: v.string(),
+  }),
 };
 
 function summarizeIssues(issues: v.BaseIssue<unknown>[]): string {

@@ -93,7 +93,7 @@ export function computeTrendTotalMin(
   ctx: BabyContext,
   now: number,
 ): number | null {
-  const trend = computeBlendedTrend(trendSleeps, ctx.tz, now, ctx.ageMonths);
+  const trend = computeBlendedTrend(trendSleeps, ctx.tz, now, ctx.ageMonths, ctx.offDays);
   return trend ? Math.round(trend.blendedTrendMin) : null;
 }
 
@@ -103,7 +103,7 @@ export function isDayOnTrend(
   ctx: BabyContext,
   now: number,
 ): boolean {
-  const trend = computeBlendedTrend(trendSleeps, ctx.tz, now, ctx.ageMonths);
+  const trend = computeBlendedTrend(trendSleeps, ctx.tz, now, ctx.ageMonths, ctx.offDays);
   if (!trend) return false;
   const banked = computeBankedToday(trendSleeps, todaySleeps, null, ctx.tz, now);
   return banked >= trend.blendedTrendMin - NAP_BUDGET.TOLERANCE_MIN;
@@ -123,7 +123,7 @@ export function computeNapBudget(input: ComputeNapBudgetInput): NapBudget | null
 
   // ── Gate 3: trend stability. Need ≥7 days of complete data, and
   //    recent variance must be low enough that the trend is signal.
-  const trend = computeBlendedTrend(trendSleeps, ctx.tz, now, ctx.ageMonths);
+  const trend = computeBlendedTrend(trendSleeps, ctx.tz, now, ctx.ageMonths, ctx.offDays);
   if (!trend) return null;
 
   // ── Gate 4: today's projection. Uses a rolling 24h window so last
@@ -261,8 +261,10 @@ function computeBlendedTrend(
   tz: string,
   now: number,
   ageMonths: number,
+  offDays?: Set<string>,
 ): { blendedTrendMin: number; sourceLabel: string; mean7: number; mean30: number } | null {
   const todayKey = isoToDateInTz(new Date(now).toISOString(), tz);
+  const skip = offDays ?? new Set<string>();
 
   // Slice by start_time within the 30d window. getWeekStats groups by
   // start-anchored local date — same convention as the stats page.
@@ -279,12 +281,15 @@ function computeBlendedTrend(
   // night-fragment-only days would feed biased totals into the trend.
   // (Naps without a same-day-anchored night are common when a parent
   // forgot to log bedtime, or a fixture only has half a day.)
+  // Off-days (sick/travel/spurt/DST) are skipped — Codex 2026-05-13 review
+  // promoted this from v2 to v1 because variance gate fires AFTER noisy
+  // data accumulates, not on the first sick day.
   const completedDays30 = stats30.days.filter(
-    (d) => d.date !== todayKey && d.stats.totalNightMinutes > 0,
+    (d) => d.date !== todayKey && d.stats.totalNightMinutes > 0 && !skip.has(d.date),
   );
   if (completedDays30.length < NAP_BUDGET.MIN_TREND_DAYS) return null;
   const completedDays7 = stats7.days.filter(
-    (d) => d.date !== todayKey && d.stats.totalNightMinutes > 0,
+    (d) => d.date !== todayKey && d.stats.totalNightMinutes > 0 && !skip.has(d.date),
   );
 
   const totals30 = completedDays30.map((d) => d.stats.totalNapMinutes + d.stats.totalNightMinutes);

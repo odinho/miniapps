@@ -54,6 +54,11 @@ export interface DayData {
    * days of cap-respect. Null = no prior state.
    */
   priorNapBudgetState?: { mode: "first-contact" | "established"; enteredAt: string } | null;
+  /**
+   * Date keys (YYYY-MM-DD in baby tz) flagged as off-days. Threaded into
+   * BabyContext so the trend computation can skip them.
+   */
+  offDays?: Set<string>;
   /** Optional override for "now", used by tests. Defaults to Date.now(). */
   now?: number;
 }
@@ -311,6 +316,7 @@ function buildContext(
   now: number,
   extendedSleeps?: SleepEntry[],
   trendSleeps?: SleepEntry[],
+  offDays?: Set<string>,
 ): BabyContext {
   return {
     birthdate: baby.birthdate,
@@ -321,6 +327,7 @@ function buildContext(
     recentSleeps,
     extendedSleeps,
     trendSleeps,
+    offDays,
   };
 }
 
@@ -350,7 +357,7 @@ export function assembleState(data: DayData) {
   // fall back to whatever wider data we have. The helper itself gates on
   // ≥7 days of complete data.
   const trendEntries = (data.trendSleeps ?? data.strategySleeps ?? recentSleeps).map(toSleepEntry);
-  const ctx = buildContext(baby, recentEntries, now, strategyEntries, trendEntries);
+  const ctx = buildContext(baby, recentEntries, now, strategyEntries, trendEntries, data.offDays);
 
   const todaySleepsWithPauses = todaySleeps.map((s) => ({
     ...toSleepEntry(s),

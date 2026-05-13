@@ -408,6 +408,33 @@
 	function closeMorningManualSleep() {
 		showMorningManualSleep = false;
 	}
+
+	// Off-day toggle. Sick/travel/spurt/DST days that should be excluded
+	// from the napBudget trend so a bad week doesn't pull the engine's
+	// recommendations sideways. Reason is free-text for now (v1).
+	const isOffDay = $derived((todayWakeUp?.off_day ?? 0) === 1);
+	let offDayBusy = $state(false);
+	async function toggleOffDay() {
+		if (offDayBusy || !baby) return;
+		offDayBusy = true;
+		try {
+			const date = todayWakeUp?.date
+				?? new Date().toISOString().slice(0, 10);
+			if (isOffDay) {
+				await sync.sendEvents([{
+					type: 'day.unmarked_off',
+					payload: { babyId: baby.id, date },
+				}]);
+			} else {
+				await sync.sendEvents([{
+					type: 'day.marked_off',
+					payload: { babyId: baby.id, date, reason: null },
+				}]);
+			}
+		} finally {
+			offDayBusy = false;
+		}
+	}
 </script>
 
 {#if !loaded}
@@ -651,6 +678,23 @@
 				dailyTrendTotalMin={prediction.dailyTrendTotalMin}
 			/>
 		{/if}
+
+		<div class="off-day-row">
+			<button
+				class="off-day-btn"
+				class:active={isOffDay}
+				onclick={toggleOffDay}
+				disabled={offDayBusy}
+				data-testid="off-day-toggle"
+				aria-pressed={isOffDay}
+			>
+				{#if isOffDay}
+					✅ Dagen er markert som av · trekk frå trenden
+				{:else}
+					🤒 Marker som av (sjuk / reise)
+				{/if}
+			</button>
+		</div>
 
 		<!-- Spacer to push stats down -->
 		<div style="flex: 1;"></div>

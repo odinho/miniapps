@@ -62,6 +62,13 @@ export interface DayStartRow {
   wake_time: string;
   created_at: string;
   created_by_event_id: number | null;
+  /**
+   * Off-day flag (sick, travel, growth spurt, DST adjustment). 0 = normal
+   * day, 1 = off-day. Off-days are skipped from trend computation so a
+   * bad week doesn't pull the engine's recommendations sideways.
+   */
+  off_day?: number;
+  off_day_reason?: string | null;
 }
 
 /** Unified sleep entry used by both engine/schedule.ts and engine/stats.ts */
@@ -129,6 +136,12 @@ export interface BabyContext {
    * provided. Optional so existing callers and tests need not supply it.
    */
   trendSleeps?: SleepEntry[];
+  /**
+   * Local-date keys (YYYY-MM-DD in baby tz) the parent marked as off-days
+   * (sick, travel, growth spurt, DST). The trend computation skips these
+   * so a bad week doesn't pull the engine's recommendations sideways.
+   */
+  offDays?: Set<string>;
   /** User-set preferred bedtime ("HH:MM"), or null for follow-the-baby mode. */
   targetBedtime?: string | null;
   features?: Partial<PredictionFeatures>;
