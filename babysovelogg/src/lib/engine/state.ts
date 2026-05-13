@@ -279,6 +279,26 @@ function buildSkippedNapFields(
 }
 
 /** Build a BabyContext from a Baby record and recent sleep data. */
+/**
+ * Wake-recommendation priority: when napBudget is present it owns the
+ * decision. Suppressing rescueNap here means the same active nap can't
+ * render two banners with conflicting wake-by times — UI and the push
+ * scheduler both consume the post-arbitration value. Codex 2026-05-13
+ * review §"No priority arbitration between wake recommendations".
+ *
+ * `expectedWakeRange` is intentionally untouched — it's uncertainty
+ * around a prediction, not advice, and stays orthogonal.
+ *
+ * Exported so the rule has its own unit test.
+ */
+export function arbitrateRescueAgainstNapBudget(
+  rescueNap: Prediction["rescueNap"],
+  napBudget: Prediction["napBudget"],
+): Prediction["rescueNap"] {
+  if (napBudget) return null;
+  return rescueNap;
+}
+
 function buildContext(
   baby: Baby,
   recentSleeps: SleepEntry[],
@@ -666,6 +686,8 @@ function assembleEmergingPrediction(
       })
     : null;
 
+  rescueNap = arbitrateRescueAgainstNapBudget(rescueNap, napBudget);
+
   return {
     strategy: "emerging_rhythm",
     feasible: true,
@@ -905,6 +927,8 @@ function assembleSchedulePrediction(
         ctx,
       })
     : null;
+
+  rescueNap = arbitrateRescueAgainstNapBudget(rescueNap, napBudget);
 
   return {
     strategy,

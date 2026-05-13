@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { assembleState, type DayData } from "$lib/engine/state.js";
+import {
+  assembleState,
+  arbitrateRescueAgainstNapBudget,
+  type DayData,
+} from "$lib/engine/state.js";
 import { computeConfidence } from "$lib/engine/confidence.js";
 import type { Baby, SleepLogRow, DayStartRow, SleepEntry } from "$lib/types.js";
 
@@ -1199,6 +1203,50 @@ describe("assembleState", () => {
       const explicit = assembleState(napBudgetScenario(true));
       // Both should match — undefined defaults to opted-in.
       expect(!!defaulted.prediction?.napBudget).toBe(!!explicit.prediction?.napBudget);
+    });
+  });
+
+  describe("arbitrateRescueAgainstNapBudget", () => {
+    const fakeRescue = {
+      recommendedWakeTime: "2026-05-13T13:00:00.000Z",
+      reason: "short_prior_nap" as const,
+    };
+    const fakeNapBudget = {
+      wakeBy: "2026-05-13T12:30:00.000Z",
+      recommendedDurationMin: 55,
+      reason: "over_trend" as const,
+      mode: "first-contact" as const,
+      urgency: "firm" as const,
+      context: {
+        blendedTrendMin: 780,
+        bankedMin: 770,
+        toleranceMin: 20,
+        sourceLabel: "7d/30d-blanding",
+      },
+      cycleNudge: null,
+    };
+
+    it("suppresses rescueNap when napBudget is present", () => {
+      expect(arbitrateRescueAgainstNapBudget(fakeRescue, fakeNapBudget)).toBeNull();
+    });
+
+    it("preserves rescueNap when napBudget is null", () => {
+      expect(arbitrateRescueAgainstNapBudget(fakeRescue, null)).toEqual(fakeRescue);
+    });
+
+    it("returns null when both are null (vacuous)", () => {
+      expect(arbitrateRescueAgainstNapBudget(null, null)).toBeNull();
+    });
+
+    it("suppresses regardless of wake-time ordering — napBudget always wins", () => {
+      // rescueNap earlier than napBudget.wakeBy. Per Codex review the
+      // narrow rule is "napBudget wins" — the full ordering refactor lives
+      // in the deferred WakeRecommendation discriminated-union followup.
+      const earlierRescue = {
+        recommendedWakeTime: "2026-05-13T12:00:00.000Z",
+        reason: "short_prior_nap" as const,
+      };
+      expect(arbitrateRescueAgainstNapBudget(earlierRescue, fakeNapBudget)).toBeNull();
     });
   });
 });
