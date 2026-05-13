@@ -551,4 +551,59 @@ describe("reconcileNotifications – nap_budget_cap", () => {
     });
     expect(rowsOf("nap_budget_cap")).toHaveLength(0);
   });
+
+  it("stable dedupe: moving wakeBy across reconciles produces exactly one row + one send", async () => {
+    // Past-fire scenario: wakeBy clamped to now+1 keeps moving forward
+    // every reconcile. With timestamp in dedupe this spammed the parent.
+    // With stable dedupe (domain_id only) we get one row that updates
+    // fire_at, and once sent, ON CONFLICT WHERE sent_at IS NULL blocks
+    // re-firing.
+    const movingBudget1 = { ...napBudget, wakeBy: "2026-05-13T09:30:00.000Z" };
+    const movingBudget2 = { ...napBudget, wakeBy: "2026-05-13T09:31:00.000Z" };
+    const movingBudget3 = { ...napBudget, wakeBy: "2026-05-13T09:32:00.000Z" };
+
+    reconcileNotifications({
+      baby,
+      activeSleep: active,
+      prediction: makePrediction({ napBudget: movingBudget1 }),
+    });
+    reconcileNotifications({
+      baby,
+      activeSleep: active,
+      prediction: makePrediction({ napBudget: movingBudget2 }),
+    });
+    reconcileNotifications({
+      baby,
+      activeSleep: active,
+      prediction: makePrediction({ napBudget: movingBudget3 }),
+    });
+
+    // Three reconciles, three different wakeBy values, ONE row.
+    expect(rowsOf("nap_budget_cap")).toHaveLength(1);
+
+    // The row's fire_at reflects the latest wakeBy - 5 min.
+    const expectedFireAt = new Date(movingBudget3.wakeBy).getTime() - 5 * 60_000;
+    expect(new Date(rowsOf("nap_budget_cap")[0].fire_at).getTime()).toBe(expectedFireAt);
+
+    // Fire once (the fire_at is past relative to a far-future "now"), then
+    // try to reconcile again with another moving wakeBy. The sent row must
+    // not be replaced and no second row must appear.
+    await fireDueNotifications(new Date("2026-05-13T10:00:00.000Z"));
+    const afterSend = db
+      .prepare("SELECT sent_at FROM notification_schedule WHERE kind = 'nap_budget_cap'")
+      .all() as Array<{ sent_at: string | null }>;
+    expect(afterSend).toHaveLength(1);
+    expect(afterSend[0].sent_at).not.toBeNull();
+
+    reconcileNotifications({
+      baby,
+      activeSleep: active,
+      prediction: makePrediction({ napBudget: { ...napBudget, wakeBy: "2026-05-13T09:33:00.000Z" } }),
+    });
+    const finalRows = db
+      .prepare("SELECT * FROM notification_schedule WHERE kind = 'nap_budget_cap'")
+      .all() as Array<{ sent_at: string | null }>;
+    expect(finalRows).toHaveLength(1);
+    expect(finalRows[0].sent_at).not.toBeNull();
+  });
 });

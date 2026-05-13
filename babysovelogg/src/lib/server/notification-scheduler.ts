@@ -93,8 +93,15 @@ export function reconcileNotifications(state: ReconcileInput): void {
   // Fires when the engine recommends a cap and it's `firm` urgency
   // (i.e. uncapped overshoot > tolerance). Fires 5 min before wakeBy so
   // the parent has lead time to get to the baby. Skipped silently when
-  // pref is off — the in-app banner still renders (banner opt-out lives
-  // in followups.md as v2 work).
+  // pref is off.
+  //
+  // Dedupe is *stable per active nap* — keyed on domain_id, not wakeBy.
+  // wakeBy can drift forward across reconciles (engine recomputes), and
+  // when the elapsed-clamp pushes wakeBy to now+1 it becomes timestamp-
+  // valued garbage. With wakeBy in the dedupe, every reconcile inserts a
+  // fresh past-due row and fireDueNotifications spams the parent. With
+  // stable dedupe, ON CONFLICT updates fire_at on the same row, and once
+  // sent the WHERE sent_at IS NULL clause prevents re-firing.
   if (
     prefs.nap_budget_cap &&
     isNappingActive &&
@@ -104,7 +111,7 @@ export function reconcileNotifications(state: ReconcileInput): void {
   ) {
     const wakeByMs = new Date(pred.napBudget.wakeBy).getTime();
     const fireAt = wakeByMs - 5 * 60_000;
-    const dedupe = `nap_budget_cap:${active.domain_id}:${pred.napBudget.wakeBy}`;
+    const dedupe = `nap_budget_cap:${active.domain_id}`;
     upsert(baby.id, "nap_budget_cap", fireAt, dedupe, {
       title: "Vekk for å treffe trenden",
       body: `Tilrådd kapping kl. ${formatTime(pred.napBudget.wakeBy)} – dagens søvn er på veg over snittet`,
