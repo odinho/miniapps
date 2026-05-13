@@ -471,6 +471,66 @@ describe("getLearnedNapDuration: right-censors cut-short parent-ended naps", () 
     expect(getLearnedNapDuration(withLongWoken)).toBeGreaterThan(102);
   });
 
+  it("cap-respect carve-out: keeps last-of-day woken naps on near-trend days", () => {
+    // Halldis-flavoured scenario. Self-median is around 100 min from the
+    // older long naps, but recent days the parent has been capping at 60.
+    // Day total = 60 nap + 13h night = 13.5h, which clears the 9-12mo
+    // age-band min of 12h, so those cap-respect naps must NOT be censored.
+    // Previously: every cap-respect 60 min nap got dropped, learned stayed
+    // at ~120 forever → engine kept recommending cap from the same stale
+    // baseline.
+    const withCapRespect = napCtx([
+      { dur: 125, wokeBy: "self" },
+      { dur: 120, wokeBy: "self" },
+      { dur: 110, wokeBy: "self" },
+      { dur: 100, wokeBy: "self" },
+      // 4 cap-respect days — woken, last (only) nap, 60 min, with a
+      // 13h night each via napCtx. Day total = 13h + 60 min = 14h → ≥ age
+      // band min.
+      { dur:  60, wokeBy: "woken" },
+      { dur:  60, wokeBy: "woken" },
+      { dur:  60, wokeBy: "woken" },
+      { dur:  60, wokeBy: "woken" },
+    ]);
+    // Counterfactual: same data with the cap-respect naps stripped of
+    // their woke_by flag. The old behavior censored those 60 min naps and
+    // got a high mean. With the carve-out, the woken=cap-respect data is
+    // kept, so the learned mean drops to reflect routine duration.
+    const naturalOnly = napCtx([
+      { dur: 125, wokeBy: "self" },
+      { dur: 120, wokeBy: "self" },
+      { dur: 110, wokeBy: "self" },
+      { dur: 100, wokeBy: "self" },
+    ]);
+    expect(getLearnedNapDuration(withCapRespect)).toBeLessThan(
+      getLearnedNapDuration(naturalOnly),
+    );
+  });
+
+  it("cap-respect carve-out: drops short woken naps on sleep-deficit days", () => {
+    // Same shape as napCtx (one nap + ~13h night), but the 41-min nap
+    // means total day sleep ≈ 11h41m which is BELOW the 9-12mo age-band
+    // min (12h). Carve-out doesn't apply → still censored as cut-short.
+    // This is the original "obvious cut-short" semantic preserved.
+    const censored = napCtx([
+      { dur: 125, wokeBy: "self" },
+      { dur: 120, wokeBy: "self" },
+      { dur: 110, wokeBy: "self" },
+      { dur: 100, wokeBy: "self" },
+      { dur:  41, wokeBy: "woken" },  // car nap on a sleep-deficit day
+    ]);
+    const uncensored = napCtx([
+      { dur: 125, wokeBy: "self" },
+      { dur: 120, wokeBy: "self" },
+      { dur: 110, wokeBy: "self" },
+      { dur: 100, wokeBy: "self" },
+      { dur:  41, wokeBy: "self" },
+    ]);
+    expect(getLearnedNapDuration(censored)).toBeGreaterThan(
+      getLearnedNapDuration(uncensored),
+    );
+  });
+
   it("does not filter when there are too few self-wakes for a stable median", () => {
     // Only 2 self-wakes — fewer than the 3 needed for a stable median. The
     // censor should bow out and behave identically to having no woke_by data.

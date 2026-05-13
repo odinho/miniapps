@@ -181,7 +181,7 @@ describe("learned nap duration: scenario table", () => {
       10mo, 1-nap, 7×self×110m                 learned=113m  ends=11:22
       8mo, 2-nap, 14×self×60m                  learned= 60m  ends=10:29
       10mo, 1-nap, Halldis prod                learned=104m  ends=11:16
-      10mo, 1-nap, Halldis +censor             learned=118m  ends=11:26
+      10mo, 1-nap, Halldis +censor             learned=114m  ends=11:23
       10mo, 1-nap, no woke_by data             learned=104m  ends=11:16"
     `);
   });
