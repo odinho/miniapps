@@ -1,5 +1,6 @@
 import { db } from "./db.js";
 import { assembleState } from "$lib/engine/state.js";
+import { getPrefs } from "./notification-prefs.js";
 import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow } from "$lib/types.js";
 import { todayInTz } from "$lib/tz.js";
 
@@ -104,6 +105,12 @@ export function getState(now?: number) {
     )
     .get(baby.id) as { time: string } | undefined;
 
+  // napBudget reads its opt-in from the same pref the push uses, so the
+  // in-app banner respects the toggle parents already see in settings. A
+  // dedicated per-baby column (decoupled from notifications) was considered
+  // and rejected — see docs/napbudget-codex-review-2026-05-13.md.
+  const napBudgetOptedIn = getPrefs(baby.id).nap_budget_cap;
+
   return assembleState({
     baby,
     activeSleep,
@@ -115,6 +122,7 @@ export function getState(now?: number) {
     pausesBySleep,
     diaperCount: todayDiapers?.count ?? 0,
     lastDiaperTime: lastDiaper?.time ?? null,
+    napBudgetOptedIn,
     now,
   });
 }

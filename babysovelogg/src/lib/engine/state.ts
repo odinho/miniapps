@@ -42,6 +42,12 @@ export interface DayData {
   pausesBySleep: Map<number, SleepPauseRow[]>;
   diaperCount: number;
   lastDiaperTime: string | null;
+  /**
+   * Per-baby opt-in for the napBudget feature (banner + push). Reads from
+   * notification_preferences.nap_budget_cap server-side. Defaults to true
+   * for tests and historical callers that pre-date the wiring.
+   */
+  napBudgetOptedIn?: boolean;
   /** Optional override for "now", used by tests. Defaults to Date.now(). */
   now?: number;
 }
@@ -333,10 +339,14 @@ export function assembleState(data: DayData) {
   if (strategy === "newborn_guidance") {
     prediction = assembleNewbornPrediction(ctx, recentEntries, todaySleeps, now);
   } else if (strategy === "emerging_rhythm") {
-    prediction = assembleEmergingPrediction(ctx, recentEntries, todaySleeps, activeSleep, todayWakeUp, now);
+    prediction = assembleEmergingPrediction(
+      ctx, recentEntries, todaySleeps, activeSleep, todayWakeUp, now,
+      data.napBudgetOptedIn ?? true,
+    );
   } else {
     prediction = assembleSchedulePrediction(
       strategy, ctx, todaySleeps, activeSleep, todayWakeUp, now,
+      data.napBudgetOptedIn ?? true,
     );
   }
 
@@ -480,6 +490,7 @@ function assembleEmergingPrediction(
   activeSleep: SleepLogRow | undefined,
   todayWakeUp: DayStartRow | undefined,
   now: number,
+  napBudgetOptedIn: boolean,
 ): Prediction {
   // Find last completed sleep end time
   const allCompleted = [...todaySleeps, ...recentEntries.map((s) => ({ end_time: s.end_time }))]
@@ -648,7 +659,7 @@ function assembleEmergingPrediction(
         trendSleeps: ctx.trendSleeps ?? ctx.recentSleeps,
         bedtime,
         isLastNapOfDay: isLastNapOfDayEmerging,
-        optedIn: true,
+        optedIn: napBudgetOptedIn,
         learnedNapDurationMin: getLearnedNapDuration(ctx),
         now,
         ctx,
@@ -697,6 +708,7 @@ function assembleSchedulePrediction(
   activeSleep: SleepLogRow | undefined,
   todayWakeUp: DayStartRow | undefined,
   now: number,
+  napBudgetOptedIn: boolean,
 ): Prediction | null {
   const lastCompleted = todaySleeps.find((s) => s.end_time);
   const wakeTimeForPrediction = lastCompleted?.end_time || todayWakeUp?.wake_time;
@@ -887,8 +899,7 @@ function assembleSchedulePrediction(
         trendSleeps: ctx.trendSleeps ?? ctx.recentSleeps,
         bedtime,
         isLastNapOfDay,
-        // v1: opt-in defaults to true. The per-baby setting will plug in here.
-        optedIn: true,
+        optedIn: napBudgetOptedIn,
         learnedNapDurationMin: getLearnedNapDuration(ctx),
         now,
         ctx,
