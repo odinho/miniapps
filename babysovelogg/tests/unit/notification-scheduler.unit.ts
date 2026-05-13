@@ -76,6 +76,7 @@ function makePrediction(overrides: Partial<Prediction> = {}): Prediction {
     learnedSchedule: null,
     rescueNap: null,
     continuationWindow: null,
+    napBudget: null,
     ...overrides,
   };
 }

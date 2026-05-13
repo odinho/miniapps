@@ -348,3 +348,149 @@ where:
 ```
 
 This is essentially what Huckleberry and similar apps do, though with more data and more sophisticated pattern matching.
+
+## 12. Nap-Cap / Daily-Total Smoothing — Evidence Base
+
+Added 2026-05-13 to ground the `napBudget` engine feature. The earlier
+sections cover cycles and consolidation but not the literature on *short*
+naps, on slow-wave-activity (SWA) distribution between nap and night, or
+on the cost of waking mid-deep-sleep. Those are the gaps below.
+
+### Short naps restore alertness without a full cycle
+
+The folk-wisdom "wake at a cycle boundary" rule overstates the importance
+of completing a full 45–60 min infant cycle. Adult and infant evidence:
+
+- **Brooks & Lack 2006** (*SLEEP* 29:831-840). Compared 5/10/20/30 min nap
+  opportunities under sleep restriction. The 10-min nap produced the
+  largest, most durable benefits to alertness, vigilance, and cognition,
+  with effects visible 155 min post-nap. 20- and 30-min naps were also
+  effective but with more sleep inertia. The 5-min nap was useless —
+  subjects didn't reach N2. Practical floor for a useful adult nap: ~10
+  min of consolidated sleep, i.e. enough to reach N2.
+
+- **Mednick, Nakayama & Stickgold 2003** (*Nat Neurosci* 6:697-698, "A
+  nap is as good as a night"). **Stage 2 NREM alone is sufficient for
+  measurable cognitive restoration.** N3/SWS is not required for a nap
+  to be restorative.
+
+- **Friedrich et al. 2015** (*PNAS*, "Generalization of word meanings
+  during infant sleep" / "Timely sleep facilitates declarative memory
+  consolidation in infants"). Memory benefits demonstrated in 9- and
+  12-month-olds from naps as short as 30 min.
+
+- **Stages reached in a 20-30 min infant nap.** N1 in ~5 min, N2 by
+  ~10-15 min, early N3 possibly from ~25-30 min. Adult and infant cycle
+  architectures share this pattern (Grigg-Damberger 2016, *J Clin Sleep
+  Med* 12:1599). A 20-30 min nap is almost pure N1+N2 — exactly the
+  stage profile shown to restore alertness in adults and demonstrated
+  to support memory in infants.
+
+**Implication:** A "minimum useful nap" floor should be age-anchored
+around 20-25 min, not "learned cycle minus 5". The cycle-boundary
+heuristic is a soft preference, not a hard constraint.
+
+### SWA distribution: most slow-wave is night-loaded
+
+- **Achermann & Borbély 1993** (*J Sleep Res*). The two-process model:
+  slow-wave activity is highest in the first NREM cycle of the night,
+  declines exponentially across the night. ~50-70% of total nightly
+  SWA is discharged in the first 2-3 cycles. SWS clusters in the first
+  half of the night, REM dominates the second half.
+
+- **Kurth et al. 2016** (*J Sleep Res*, "Development of nap
+  neurophysiology"). Followed 2-, 3-, and 5-year-olds. **SWA in naps
+  decreases sharply across early childhood** — at 2 yr, naps carry
+  substantial SWA; by 5 yr, daytime SWA is greatly reduced. The
+  homeostatic build-up of sleep need across the day attenuates as the
+  child matures, which is why naps disappear without harm.
+
+- **Lassonde et al. 2016** (*Sleep Health*, "Sleep physiology in
+  toddlers: effects of missing a nap on subsequent night sleep").
+  **Missing a single nap in 2-year-olds produced a 13% increase in
+  nighttime SWA and a 25% bump in sleep efficiency.** Direct evidence
+  that missed daytime SWA is rapidly recouped at night.
+
+**Implication:** Capping an infant nap before significant N3 accrues
+doesn't create persistent SWA debt — the homeostatic system pushes it
+to that night's first cycle, which is where SWA is densest anyway.
+
+### Long naps demonstrably cost night sleep
+
+- **Nakagawa et al. 2016** (*Scientific Reports* 6:27246, "Daytime nap
+  controls toddlers' nighttime sleep"). Actigraphy + diary in 50
+  toddlers: clean negative correlation between nap duration and night
+  sleep — longer naps → later onset and shorter night.
+
+- **Akacem, LeBourgeois et al. 2015** (*PLOS One*). Napping toddlers had
+  **69 min less night sleep and 38 min later DLMO** than non-nappers.
+  Correlational, but the homeostatic mechanism is solid: a long nap
+  discharges Process S that would otherwise drive bedtime sleep onset.
+
+- **Pediatric consultant consensus** (Weissbluth, Mindell, Pantley)
+  anchors on bedtime preservation via the nap-to-bedtime gap (≥3-4 h
+  wake before bedtime). Not anchored to cycle physiology. The 90-min
+  pre-bedtime buffer used in `RESCUE_NAP.MIN_PRE_BEDTIME_WAKE` is in
+  this evidence-consistent range.
+
+**Implication:** Capping an over-budget nap to protect bedtime is
+evidence-consistent. The cap (driven by total-sleep-budget) is the
+real constraint; cycle-boundary math is decoration.
+
+### Sleep inertia from mid-N3 wakes is real but transient
+
+- **Trotti 2017** (*Sleep Med Rev*, "Waking up is the hardest thing I
+  do all day"). Forced waking from N3 produces 15-60 min of impaired
+  cognition and irritability; N1/N2/REM wakes produce far less.
+
+- The wake-cycle-phase rule is most relevant in the 6 mo – 2 yr window
+  when nap SWS is abundant and the infant is least able to
+  self-regulate the transition. Less relevant in newborns (sleep less
+  stage-differentiated) or after ~2-3 yr (declining nap SWS). An 11mo
+  is probably near the worst case for inertia from a badly-timed wake.
+
+**Implication:** Within an already-decided cap window, prefer waking
+during a likely lighter-sleep moment (the ±8 min boundary heuristic in
+`computeCyclePhase`). But never extend past the cap chasing a perfect
+boundary — the cap is the constraint.
+
+### Nap-floor table for engine constants
+
+Reading from the above, the literature-backed minimum useful nap by age:
+
+| Age (months) | Floor (min) | Source |
+| --- | --- | --- |
+| 4 | 20 | Brooks & Lack adult floor + Mednick N2-restoration; cycle ~45-50 min, N2 reached by ~10-15 min |
+| 11 | 22 | Friedrich 2015: memory benefits at 30 min, 12mo; N2 by ~15 min |
+| 18 | 28 | Cycle ~50-60 min; meaningful N3 contribution; below ~25 is drowsy time |
+| 36 | 30 | Kurth 2016: nap SWA declining but still useful; transition window |
+
+These are *floors*, not targets. Targets at 11mo remain 1-2 h total
+daytime sleep per Iglowstein/Galland normative data.
+
+### Where the literature is thin
+
+- Exact SWA discharge curves for infant naps under 2 yr (mostly
+  extrapolated from Kurth 2-3-5 yr data and adult Achermann/Borbély).
+- No RCT on capping at 30 vs 60 vs 90 min in <18mo (no head-to-head
+  trial exists).
+- Validity of accelerometer/movement-based cycle estimation in
+  infants (consumer smart-alarm validations are all adult).
+
+### Key sources
+
+Brooks & Lack 2006 *SLEEP* 29:831 ·
+Mednick et al. 2003 *Nat Neurosci* 6:697 ·
+Achermann & Borbély 1993 *J Sleep Res* ·
+Iglowstein et al. 2003 *Pediatrics* 111:302 ·
+Galland et al. 2012 *Sleep Med Rev* 16:213 ·
+Kurth et al. 2016 *J Sleep Res* ·
+Lassonde et al. 2016 *Sleep Health* ·
+Nakagawa et al. 2016 *Sci Reports* 6:27246 ·
+Akacem et al. 2015 *PLOS One* ·
+Friedrich et al. 2015 *PNAS* ·
+Trotti 2017 *Sleep Med Rev* ·
+Grigg-Damberger 2016 *J Clin Sleep Med* 12:1599 ·
+Paruthi et al. 2016 (AASM pediatric duration consensus) ·
+Hirshkowitz et al. 2015 (NSF duration recs).
+

@@ -123,6 +123,12 @@ export interface BabyContext {
    * window so the engine adapts quickly during transitions.
    */
   extendedSleeps?: SleepEntry[];
+  /**
+   * Long-horizon lookback (up to 30 days) used by the napBudget trend
+   * computation. Falls back to extendedSleeps then recentSleeps when not
+   * provided. Optional so existing callers and tests need not supply it.
+   */
+  trendSleeps?: SleepEntry[];
   /** User-set preferred bedtime ("HH:MM"), or null for follow-the-baby mode. */
   targetBedtime?: string | null;
   features?: Partial<PredictionFeatures>;

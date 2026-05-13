@@ -55,6 +55,74 @@ export const SLEEP_NEEDS: SleepNeed[] = [
   { minMonths: 18, maxMonths: 24, totalHours: 13, range: [11, 14] },
 ];
 
+/**
+ * Trend-anchored nap-budget cap thresholds. Used by `computeNapBudget` to
+ * recommend a "wake by" for the day's last nap when today is on pace to
+ * exceed the blended 7d/30d trend.
+ *
+ * Evidence base — see docs/sleep-science-research.md §12:
+ *  - Brooks & Lack 2006 / Mednick 2003: N2-only naps restore alertness;
+ *    minimum useful adult nap ≈ 10 min consolidated sleep (reaches N2).
+ *  - Friedrich 2015: memory benefits demonstrated at 30 min naps in 12mo.
+ *  - Lassonde 2016: even missed naps in 2yo compensated by 13% more
+ *    night SWA + 25% better sleep efficiency same night — capping a
+ *    long nap has modest, fast-correcting cost.
+ *  - Nakagawa 2016 / Akacem 2015: long naps demonstrably shorten night
+ *    sleep (69 min less night sleep, 38 min later DLMO in napping
+ *    toddlers). The cap is evidence-consistent.
+ *
+ * Floors are *minimum useful* nap durations by age, not targets. The
+ * engine never recommends a cap shorter than the age-band floor.
+ */
+export const NAP_BUDGET = {
+  /** Tolerance window (minutes). Overshoot beyond this promotes advisory → firm push. */
+  TOLERANCE_MIN: 20,
+  /** Lead time for the push notification before wakeBy. */
+  FIRM_PUSH_LEAD_MIN: 5,
+  /** Min elapsed nap time before emitting a cap (don't propose for a baby that just fell asleep). */
+  MIN_ELAPSED_BEFORE_CAP_MIN: 20,
+  /** Min recent-data days required for the trend target to be considered stable. */
+  MIN_TREND_DAYS: 7,
+  /** Stdev/mean above this means recent variance is too high — suppress to avoid bad days driving caps. */
+  MAX_STDEV_FRACTION: 0.12,
+  /** Blend weights for the trend target: 0.6·avg7d + 0.4·avg30d. */
+  BLEND_WEIGHT_7D: 0.6,
+  BLEND_WEIGHT_30D: 0.4,
+  /** Cycle-boundary nudge window — only nudge wakeBy inward within this. */
+  CYCLE_NUDGE_WINDOW_MIN: 10,
+  /**
+   * Lead time subtracted from the cap so the parent has a minute or two to
+   * physically get to the baby before the next cycle starts. Only applied
+   * in the established-track mode — for first-contact recommendations the
+   * cap aligns to the cycle boundary itself.
+   */
+  EARLY_WAKE_LEAD_MIN: 5,
+  /**
+   * When the 7d mean drops at least this many minutes below the 30d mean,
+   * we infer the parent has been actively capping naps for ~a week and
+   * the engine switches to the tighter "established" mode (sub-cycle cap
+   * minus lead time). Picked so it triggers after ~1 week of consistent
+   * 20-30 min/day cap savings — exactly the rhythm the user described.
+   */
+  ESTABLISHED_TRACK_DELTA_MIN: 25,
+} as const;
+
+/**
+ * Minimum useful nap duration by age. Floors, not targets. Sources cited
+ * in the NAP_BUDGET docblock above and in docs/sleep-science-research.md §12.
+ * `findByAge` interpolates between bands.
+ */
+export const NAP_FLOOR_BY_AGE: Array<{ minMonths: number; maxMonths: number; floorMin: number }> = [
+  // 0–6mo: N1+N2 reached by ~10-15 min; cycle ~45-50 min. Floor 20 min.
+  { minMonths: 0, maxMonths: 6, floorMin: 20 },
+  // 6–14mo: Friedrich 2015 shows memory benefits at 30 min in 12mo. Floor 22 min.
+  { minMonths: 6, maxMonths: 14, floorMin: 22 },
+  // 14–24mo: cycle lengthens (~50-60 min); N3 begins to contribute. Floor 28 min.
+  { minMonths: 14, maxMonths: 24, floorMin: 28 },
+  // 24mo+: nap SWA declining (Kurth 2016) but transition window. Floor 30 min.
+  { minMonths: 24, maxMonths: 999, floorMin: 30 },
+];
+
 /** Rescue nap thresholds (based on pediatric sleep consultant consensus + sleep cycle biology). */
 export const RESCUE_NAP = {
   /** Absolute floor for short-nap threshold (minutes) — avoids catching micro-naps from low data */

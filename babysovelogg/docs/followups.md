@@ -11,6 +11,26 @@ multi-day testing, the unit-of-work flow — live in
 is for tracked product/engine/test work.
 
 
+## napBudget v2: manual sick / travel / off-day marker
+
+Source: 2026-05-13 nap-cap design discussion. v1 of `napBudget` ships
+with inference-only edge-case handling — when recent variance is high
+(stdev/mean above a stability threshold), the budget recommendation
+silently suppresses. Good enough most of the time, but:
+
+- Doesn't help on the *first* sick day (the variance hasn't shown up yet).
+- Travel/DST/timezone-shift days get judged on stale local-trend data
+  for the whole window, when the parent already knows they're off-rhythm.
+- Growth spurts are real but invisible to the engine.
+
+Concrete v2: per-day "off day" toggle (sick / travel / spurt /
+other) that (a) suppresses napBudget advisory for the day, (b)
+optionally excludes the day from trend stats so it doesn't poison
+future targets. UI: a small chip-style menu on the day's log entry
+in `/logg` or the bottom of `+page.svelte`. Schema: new table
+`day_marker(baby_id, date, kind, note)` or a column on `day_start`.
+Notification scheduler should respect the same suppression.
+
 ## UX: "give up and try later" guidance after sticking too long
 
 Source: same 2026-05-07 conversation. User's pattern: they sometimes spend

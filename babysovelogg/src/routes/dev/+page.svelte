@@ -104,6 +104,7 @@
 			learnedSchedule: null,
 			rescueNap: null,
 			continuationWindow: null,
+			napBudget: null,
 			...o,
 		};
 	}

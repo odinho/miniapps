@@ -17,6 +17,7 @@ import {
 import { RESCUE_NAP } from "./constants.js";
 import { getTodayStats } from "./stats.js";
 import { computeConfidence, computeWakeRange } from "./confidence.js";
+import { computeNapBudget } from "./nap-budget.js";
 import { calibrate } from "./calibration.js";
 import { computeStrategySignals } from "./features.js";
 import { selectStrategy } from "./strategy.js";
@@ -35,6 +36,8 @@ export interface DayData {
   recentSleeps: SleepLogRow[];
   /** Extended sleeps (21-day lookback) for strategy hysteresis. Falls back to recentSleeps. */
   strategySleeps?: SleepLogRow[];
+  /** Long-horizon sleeps (30-day lookback) for daily-total trend math in napBudget. Falls back to strategySleeps if absent. */
+  trendSleeps?: SleepLogRow[];
   todayWakeUp: DayStartRow | undefined;
   pausesBySleep: Map<number, SleepPauseRow[]>;
   diaperCount: number;
@@ -275,6 +278,7 @@ function buildContext(
   recentSleeps: SleepEntry[],
   now: number,
   extendedSleeps?: SleepEntry[],
+  trendSleeps?: SleepEntry[],
 ): BabyContext {
   return {
     birthdate: baby.birthdate,
@@ -284,6 +288,7 @@ function buildContext(
     targetBedtime: baby.target_bedtime ?? null,
     recentSleeps,
     extendedSleeps,
+    trendSleeps,
   };
 }
 
@@ -299,7 +304,11 @@ export function assembleState(data: DayData) {
   // The same extended window also feeds the cut-short censor's self-wake
   // median so it can fire even when the 7-day window has < 3 self-wakes.
   const strategyEntries = (data.strategySleeps ?? recentSleeps).map(toSleepEntry);
-  const ctx = buildContext(baby, recentEntries, now, strategyEntries);
+  // Trend window for napBudget — prefer the 30-day fetch when present, then
+  // fall back to whatever wider data we have. The helper itself gates on
+  // ≥7 days of complete data.
+  const trendEntries = (data.trendSleeps ?? data.strategySleeps ?? recentSleeps).map(toSleepEntry);
+  const ctx = buildContext(baby, recentEntries, now, strategyEntries, trendEntries);
 
   const todaySleepsWithPauses = todaySleeps.map((s) => ({
     ...toSleepEntry(s),
@@ -435,6 +444,7 @@ function assembleNewbornPrediction(
     calibration: null,
     rescueNap: null,
     continuationWindow: null,
+    napBudget: null,
     // Newborn fields
     sleepWindow: result.sleepWindow,
     sleepPressure: result.sleepPressure,
@@ -601,6 +611,25 @@ function assembleEmergingPrediction(
       )
     : null;
 
+  // napBudget — emerging-rhythm is shakier on day plans than the schedule
+  // strategy, but the underlying trend math is the same. Same gate: this
+  // active nap must be the last for the day.
+  const isActiveNapEmerging = activeSleep?.type === "nap" && !activeSleep.end_time;
+  const isLastNapOfDayEmerging =
+    isActiveNapEmerging && (!predictedNaps || predictedNaps.length === 0);
+  const napBudget = isActiveNapEmerging && isLastNapOfDayEmerging && bedtime
+    ? computeNapBudget({
+        activeNap: activeSleep,
+        todaySleeps: todaySleeps.map(toSleepEntry),
+        trendSleeps: ctx.trendSleeps ?? ctx.recentSleeps,
+        bedtime,
+        isLastNapOfDay: isLastNapOfDayEmerging,
+        optedIn: true,
+        now,
+        ctx,
+      })
+    : null;
+
   return {
     strategy: "emerging_rhythm",
     feasible: true,
@@ -618,6 +647,7 @@ function assembleEmergingPrediction(
     calibration: null,
     rescueNap,
     continuationWindow,
+    napBudget,
     sleepWindow: result.sleepWindow,
     sleepPressure: result.sleepPressure,
     totalSleep24h: result.rolling.totalSleep24h,
@@ -806,6 +836,25 @@ function assembleSchedulePrediction(
       )
     : null;
 
+  // napBudget — only when this active nap is the day's last nap (v1 scope).
+  // The schedule branch knows the day's plan: predictedNaps after the
+  // active one is null/empty → no more naps coming.
+  const isActiveNap = activeSleep?.type === "nap" && !activeSleep.end_time;
+  const isLastNapOfDay = isActiveNap && (!predictedNaps || predictedNaps.length === 0);
+  const napBudget = isActiveNap && isLastNapOfDay && bedtime
+    ? computeNapBudget({
+        activeNap: activeSleep,
+        todaySleeps: todaySleeps.map(toSleepEntry),
+        trendSleeps: ctx.trendSleeps ?? ctx.recentSleeps,
+        bedtime,
+        isLastNapOfDay,
+        // v1: opt-in defaults to true. The per-baby setting will plug in here.
+        optedIn: true,
+        now,
+        ctx,
+      })
+    : null;
+
   return {
     strategy,
     feasible: selected?.feasible ?? true,
@@ -823,6 +872,7 @@ function assembleSchedulePrediction(
     calibration,
     rescueNap,
     continuationWindow,
+    napBudget,
     // Newborn fields — null for schedule-based strategies
     sleepWindow: null,
     sleepPressure: null,

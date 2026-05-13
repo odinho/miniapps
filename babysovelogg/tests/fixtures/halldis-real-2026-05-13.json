@@ -1,0 +1,296 @@
+[
+  {
+    "start_time": "2026-05-12T16:08:43.810Z",
+    "end_time": "2026-05-13T04:35:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-05-11T16:02:30.679Z",
+    "end_time": "2026-05-12T04:25:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-05-11T07:23:33.120Z",
+    "end_time": "2026-05-11T09:10:00.000Z",
+    "type": "nap",
+    "woke_by": "woken"
+  },
+  {
+    "start_time": "2026-05-10T15:50:32.676Z",
+    "end_time": "2026-05-11T03:38:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-05-10T07:37:15.441Z",
+    "end_time": "2026-05-10T08:13:00.000Z",
+    "type": "nap",
+    "woke_by": "woken"
+  },
+  {
+    "start_time": "2026-05-09T15:40:54.064Z",
+    "end_time": "2026-05-10T03:45:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-05-09T08:00:37.064Z",
+    "end_time": "2026-05-09T10:20:00.000Z",
+    "type": "nap",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-05-08T15:45:45.038Z",
+    "end_time": "2026-05-09T04:15:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-05-08T07:20:40.261Z",
+    "end_time": "2026-05-08T08:07:00.000Z",
+    "type": "nap",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-05-07T16:10:40.241Z",
+    "end_time": "2026-05-08T03:45:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-05-07T10:05:05.760Z",
+    "end_time": "2026-05-07T10:44:00.000Z",
+    "type": "nap",
+    "woke_by": "woken"
+  },
+  {
+    "start_time": "2026-05-07T06:20:53.660Z",
+    "end_time": "2026-05-07T06:48:55.544Z",
+    "type": "nap",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-05-06T16:31:08.301Z",
+    "end_time": "2026-05-07T03:30:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-05-06T11:32:00.000Z",
+    "end_time": "2026-05-06T12:14:00.000Z",
+    "type": "nap",
+    "woke_by": "woken"
+  },
+  {
+    "start_time": "2026-05-06T07:13:56.805Z",
+    "end_time": "2026-05-06T07:55:00.000Z",
+    "type": "nap",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-05-05T16:22:28.846Z",
+    "end_time": "2026-05-06T03:20:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-05-05T07:27:00.000Z",
+    "end_time": "2026-05-05T09:30:00.000Z",
+    "type": "nap",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-05-04T15:30:22.679Z",
+    "end_time": "2026-05-05T03:40:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-05-04T07:24:41.925Z",
+    "end_time": "2026-05-04T10:02:52.180Z",
+    "type": "nap",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-05-03T15:12:15.375Z",
+    "end_time": "2026-05-04T03:40:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-05-03T07:32:00.000Z",
+    "end_time": "2026-05-03T08:10:00.000Z",
+    "type": "nap",
+    "woke_by": null
+  },
+  {
+    "start_time": "2026-05-02T15:34:00.000Z",
+    "end_time": "2026-05-03T04:05:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-05-02T07:31:20.729Z",
+    "end_time": "2026-05-02T09:46:13.312Z",
+    "type": "nap",
+    "woke_by": "woken"
+  },
+  {
+    "start_time": "2026-05-01T16:30:00.000Z",
+    "end_time": "2026-05-02T03:17:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-05-01T07:39:00.000Z",
+    "end_time": "2026-05-01T09:25:00.000Z",
+    "type": "nap",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-04-30T15:40:35.424Z",
+    "end_time": "2026-05-01T03:30:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-04-30T08:03:54.124Z",
+    "end_time": "2026-04-30T09:23:00.000Z",
+    "type": "nap",
+    "woke_by": "woken"
+  },
+  {
+    "start_time": "2026-04-29T16:16:54.383Z",
+    "end_time": "2026-04-30T04:15:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-04-29T07:32:05.294Z",
+    "end_time": "2026-04-29T09:43:15.095Z",
+    "type": "nap",
+    "woke_by": "woken"
+  },
+  {
+    "start_time": "2026-04-28T16:26:33.671Z",
+    "end_time": "2026-04-29T03:40:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-04-28T07:23:45.684Z",
+    "end_time": "2026-04-28T09:08:00.000Z",
+    "type": "nap",
+    "woke_by": "woken"
+  },
+  {
+    "start_time": "2026-04-27T16:42:09.842Z",
+    "end_time": "2026-04-28T04:11:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-04-27T07:28:52.573Z",
+    "end_time": "2026-04-27T09:08:00.000Z",
+    "type": "nap",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-04-26T16:00:00.000Z",
+    "end_time": "2026-04-27T03:10:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-04-26T08:42:06.714Z",
+    "end_time": "2026-04-26T09:30:00.000Z",
+    "type": "nap",
+    "woke_by": "woken"
+  },
+  {
+    "start_time": "2026-04-25T16:15:00.000Z",
+    "end_time": "2026-04-26T04:00:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-04-25T08:00:04.799Z",
+    "end_time": "2026-04-25T10:00:00.000Z",
+    "type": "nap",
+    "woke_by": "woken"
+  },
+  {
+    "start_time": "2026-04-24T16:50:15.756Z",
+    "end_time": "2026-04-25T03:50:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-04-24T08:27:58.559Z",
+    "end_time": "2026-04-24T09:09:00.000Z",
+    "type": "nap",
+    "woke_by": "woken"
+  },
+  {
+    "start_time": "2026-04-23T16:10:00.000Z",
+    "end_time": "2026-04-24T04:15:00.000Z",
+    "type": "night",
+    "woke_by": null
+  },
+  {
+    "start_time": "2026-04-23T07:25:02.802Z",
+    "end_time": "2026-04-23T09:30:00.000Z",
+    "type": "nap",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-04-22T16:50:04.186Z",
+    "end_time": "2026-04-23T04:30:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-04-22T07:25:00.000Z",
+    "end_time": "2026-04-22T08:50:00.000Z",
+    "type": "nap",
+    "woke_by": null
+  },
+  {
+    "start_time": "2026-04-21T16:26:50.315Z",
+    "end_time": "2026-04-22T03:45:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-04-21T08:00:27.446Z",
+    "end_time": "2026-04-21T09:15:00.000Z",
+    "type": "nap",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-04-20T16:38:00.000Z",
+    "end_time": "2026-04-21T03:40:00.000Z",
+    "type": "night",
+    "woke_by": null
+  },
+  {
+    "start_time": "2026-04-20T08:30:03.907Z",
+    "end_time": "2026-04-20T10:13:08.749Z",
+    "type": "nap",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-04-19T16:34:34.574Z",
+    "end_time": "2026-04-20T03:40:00.000Z",
+    "type": "night",
+    "woke_by": "self"
+  },
+  {
+    "start_time": "2026-04-19T09:52:07.925Z",
+    "end_time": "2026-04-19T11:38:00.000Z",
+    "type": "nap",
+    "woke_by": "woken"
+  }
+]

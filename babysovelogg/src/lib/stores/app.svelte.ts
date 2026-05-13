@@ -79,6 +79,68 @@ export interface Prediction {
 		/** ISO — if she falls asleep, wake by this so the day's plan stays workable. */
 		capLatestEnd: string;
 	} | null;
+	/**
+	 * Trend-anchored wake-by recommendation for the *active* nap, when today's
+	 * accumulated sleep is on track to exceed the parent's blended 7d/30d trend.
+	 * Goal: stop the long-nap → next-day-skip pingpong by recommending a
+	 * gentle cap. Emitted only when:
+	 *   - There is an active nap (not a night sleep)
+	 *   - It's the day's last expected nap (1-nap babies always; multi-nap
+	 *     babies only on their final nap)
+	 *   - The active nap has been running ≥20 min (don't propose for a
+	 *     just-fell-asleep nap)
+	 *   - Trend data is stable enough (≥7 days complete data; stdev/mean OK)
+	 *   - Projected total exceeds trend by more than the tolerance
+	 *   - The baby has opt-in (`nap_cap_advice` setting, default on)
+	 *
+	 * Evidence base: Nakagawa 2016, Akacem 2015 (long nap → night-sleep loss);
+	 * Lassonde 2016 (missed nap SWA recouped at night); Brooks & Lack 2006
+	 * + Mednick 2003 (N2 alone restores; 20-30 min nap is biologically real).
+	 * See docs/sleep-science-research.md §12.
+	 */
+	napBudget: NapBudget | null;
+}
+
+export interface NapBudget {
+	/** Recommended wake time for the active nap (ISO). The cap. */
+	wakeBy: string;
+	/** Duration in minutes from nap start to wakeBy. */
+	recommendedDurationMin: number;
+	/** Why the cap fires. v1 only emits over_trend. */
+	reason: "over_trend";
+	/**
+	 * "first-contact" = full cycle cap, gentle introduction (default).
+	 * "established"   = sub-cycle cap with lead-time buffer; fires once the
+	 *                   7d trend has dropped meaningfully below the 30d trend,
+	 *                   indicating the parent has been actively capping naps
+	 *                   for ~a week. The cap math is more precise here,
+	 *                   may land mid-cycle (parent has practice waking).
+	 */
+	mode: "first-contact" | "established";
+	/**
+	 * Urgency. `advisory` = in-app only; `firm` = also schedules a push
+	 * notification 5 min before wakeBy. Promotion to `firm` happens when
+	 * projected overshoot exceeds `context.toleranceMin`.
+	 */
+	urgency: "advisory" | "firm";
+	/** Context for the UI explainer popover. */
+	context: {
+		/** The blended 7d/30d daily-total target in minutes, clamped to age-norm. */
+		blendedTrendMin: number;
+		/** Sleep already banked today (night + completed naps), in minutes. */
+		bankedMin: number;
+		/** ±tolerance before advisory becomes firm (v1 = 20). */
+		toleranceMin: number;
+		/** Short label describing the target source ('7d/30d blend', 'age norm', …). */
+		sourceLabel: string;
+	};
+	/**
+	 * If the cap was nudged to a cycle boundary for a softer wake, capture
+	 * that. Null when the raw budget cap was used unchanged. The nudge never
+	 * extends past the cap — see sleep-science-research.md §12 for why
+	 * "wake at cycle boundary" is a soft preference, not a hard rule.
+	 */
+	cycleNudge: { boundaryAtMin: number; nudgedFromMin: number } | null;
 }
 
 export type PostSkipPlan =
