@@ -485,7 +485,7 @@ function defaultWakeFor(arch: Archetype): string {
 
 function renderInputs(scn: BuiltScenario): string {
   const parts: string[] = [];
-  const wake = scn.data.todayWakeUp ? osloHHMM(scn.data.todayWakeUp.wake_time) : "none";
+  const wake = scn.data.todayWakeUp?.wake_time ? osloHHMM(scn.data.todayWakeUp.wake_time) : "none";
   parts.push(`wake=${wake}`);
   const completed = scn.data.todaySleeps.filter((s) => s.end_time);
   if (completed.length) {

@@ -115,6 +115,15 @@ export function computeNapBudget(input: ComputeNapBudgetInput): NapBudget | null
   // ── Gate 1: per-baby opt-out and v1 scope (last nap only). ──────────
   if (!optedIn || !isLastNapOfDay) return null;
 
+  // ── Gate 1b: today is flagged off (sick / travel / spurt / DST). The
+  //    off-day toggle exists so a parent's bad week doesn't pull the
+  //    *trend* sideways, AND so the engine backs off recommendations for
+  //    that day. Only filtering history would leave the parent staring at
+  //    a cap banner on the very day they told the app to leave them alone.
+  if (ctx.offDays && ctx.offDays.has(isoToDateInTz(new Date(now).toISOString(), ctx.tz))) {
+    return null;
+  }
+
   // ── Gate 2: nap just started — don't propose for a baby that just
   //    fell asleep. Risk of misfire is high in the first ~20 min.
   const napStartMs = new Date(activeNap.start_time).getTime();
@@ -264,7 +273,19 @@ function computeBlendedTrend(
   offDays?: Set<string>,
 ): { blendedTrendMin: number; sourceLabel: string; mean7: number; mean30: number } | null {
   const todayKey = isoToDateInTz(new Date(now).toISOString(), tz);
-  const skip = offDays ?? new Set<string>();
+  // Expand the off-day set to include the *previous* local date for each
+  // flagged day. getWeekStats anchors a night by its start_time, so the
+  // overnight that ended on Wed morning (started Tue 19:00 → ended Wed
+  // 06:00) lives in Tue's bucket. If the parent marks Wed off (sick
+  // morning), Tuesday's bucket is the one carrying the bad night data —
+  // skipping only Wed would still leak it into the trend. Skipping prev
+  // also drops Tue's daytime naps, which is a deliberate over-exclusion:
+  // a child sick enough that Wed is flagged was almost certainly already
+  // off-trend on Tue afternoon.
+  const skip = new Set<string>(offDays ?? []);
+  for (const k of offDays ?? []) {
+    skip.add(prevDateKey(k));
+  }
 
   // Slice by start_time within the 30d window. getWeekStats groups by
   // start-anchored local date — same convention as the stats page.
@@ -361,11 +382,11 @@ function computeBankedToday(
     if (wakeAnchorMs === null || endMs > wakeAnchorMs) wakeAnchorMs = endMs;
   }
   if (wakeAnchorMs === null) {
-    // No prior night logged — fall back to local midnight. Rare path (first
-    // day after install). The naive parse is fine because we just need a
-    // boundary, not a precise instant.
-    const todayKey = isoToDateInTz(new Date(now).toISOString(), tz);
-    wakeAnchorMs = new Date(`${todayKey}T00:00:00Z`).getTime();
+    // No prior night logged — fall back to local midnight in the baby's
+    // timezone. Rare path (first day after install). UTC midnight here
+    // would land 1-12h before local midnight for positive offsets and
+    // misattribute late-evening naps to "today".
+    wakeAnchorMs = localMidnightMs(now, tz);
   }
 
   // Limit night-fragment aggregation to a 12h window ending at the anchor —
@@ -435,6 +456,31 @@ function estimateRemainingNapMin(
     ? learnedNapDurationMin
     : ctx.ageMonths < 14 ? 90 : 75;
   return Math.max(0, typicalFullNapMin - elapsedMin);
+}
+
+/**
+ * Calendar-previous YYYY-MM-DD given a YYYY-MM-DD key. Used to expand the
+ * off-day set so the previous overnight (whose start_time bucket sits on
+ * the day before the off-day morning) is also dropped from trend math.
+ * UTC math is safe here — we're shifting a date *key*, not an instant.
+ */
+function prevDateKey(key: string): string {
+  const ms = new Date(`${key}T00:00:00Z`).getTime() - 86400_000;
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+/**
+ * Local midnight (start of day) in the given IANA tz, as epoch ms. Used by
+ * the sleep-day anchor fallback. Mirrors `todayInTz()` from src/lib/tz.ts
+ * but takes an explicit `now` so it's deterministic in tests.
+ */
+function localMidnightMs(now: number, tz: string): number {
+  const dateStr = isoToDateInTz(new Date(now).toISOString(), tz);
+  const asUtc = new Date(`${dateStr}T00:00:00Z`);
+  const utcRef = asUtc.toLocaleString("en-US", { timeZone: "UTC" });
+  const localRef = asUtc.toLocaleString("en-US", { timeZone: tz });
+  const offsetMs = new Date(localRef).getTime() - new Date(utcRef).getTime();
+  return asUtc.getTime() - offsetMs;
 }
 
 function mean(xs: number[]): number {

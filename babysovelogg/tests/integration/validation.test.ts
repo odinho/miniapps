@@ -226,6 +226,43 @@ test("POST batch of 3 valid events returns all 3", async () => {
   expect(body.state.diaperCount).toBe(3);
 });
 
+test("day.marked_off rejects non-YYYY-MM-DD date strings", async () => {
+  const babyId = createBaby();
+  const res = await post("/api/events", {
+    events: [
+      {
+        type: "day.marked_off",
+        payload: { babyId, date: "wat", reason: null },
+        clientId: "c",
+        clientEventId: generateId(),
+      },
+    ],
+  });
+  expect(res.status).toBe(400);
+  const body = await res.json();
+  expect(body.errors.some((e: string) => /Invalid local date/.test(e))).toBe(true);
+});
+
+test("day.marked_off accepts well-formed local date and projects off_day=1", async () => {
+  const babyId = createBaby();
+  const res = await post("/api/events", {
+    events: [
+      {
+        type: "day.marked_off",
+        payload: { babyId, date: "2026-05-13", reason: "sick" },
+        clientId: "c",
+        clientEventId: generateId(),
+      },
+    ],
+  });
+  expect(res.status).toBe(200);
+  const row = db
+    .prepare("SELECT off_day, off_day_reason FROM day_start WHERE baby_id = ? AND date = ?")
+    .get(babyId, "2026-05-13") as { off_day: number; off_day_reason: string | null };
+  expect(row.off_day).toBe(1);
+  expect(row.off_day_reason).toBe("sick");
+});
+
 test("Error response includes indexed messages", async () => {
   const res = await post("/api/events", {
     events: [

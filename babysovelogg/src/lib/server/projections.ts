@@ -322,12 +322,22 @@ export function applyEvent(event: AppEvent): void {
     }
 
     case "day.started": {
-      // Used during onboarding / cold start when no night sleep exists yet
+      // Used during onboarding / cold start when no night sleep exists yet.
+      // ON CONFLICT DO UPDATE (not INSERT OR REPLACE) so an existing row's
+      // off_day / off_day_reason survives. INSERT OR REPLACE deletes the
+      // conflicting row and reinserts with defaults, silently wiping the
+      // off-day marker if a parent marked the day off before opening the
+      // morning prompt — or during event replay where ordering is
+      // arbitrary.
       const baby = db.prepare("SELECT timezone FROM baby ORDER BY id DESC LIMIT 1").get() as { timezone: string | null } | undefined;
       const tz = baby?.timezone || "UTC";
       const dateStr = isoToDateInTz(payload.wakeTime as string, tz);
       db.prepare(
-        "INSERT OR REPLACE INTO day_start (baby_id, date, wake_time, created_by_event_id) VALUES (?, ?, ?, ?)",
+        `INSERT INTO day_start (baby_id, date, wake_time, created_by_event_id)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(baby_id, date) DO UPDATE SET
+           wake_time = excluded.wake_time,
+           created_by_event_id = excluded.created_by_event_id`,
       ).run(payload.babyId, dateStr, payload.wakeTime, eventId);
       break;
     }
@@ -348,18 +358,29 @@ export function applyEvent(event: AppEvent): void {
       const babyId = payload.babyId as number;
       const date = payload.date as string;
       const reason = (payload.reason as string | null | undefined) ?? null;
+      // ON CONFLICT preserves the existing created_by_event_id — that field
+      // records the row's *origin* event (typically day.started); a later
+      // mark-off shouldn't rewrite history.
       db.prepare(
         `INSERT INTO day_start (baby_id, date, wake_time, off_day, off_day_reason, created_by_event_id)
          VALUES (?, ?, ?, 1, ?, ?)
          ON CONFLICT(baby_id, date) DO UPDATE SET
            off_day = 1,
-           off_day_reason = excluded.off_day_reason,
-           created_by_event_id = excluded.created_by_event_id`,
+           off_day_reason = excluded.off_day_reason`,
       ).run(babyId, date, `${date}T00:00:00.000Z`, reason, eventId);
       break;
     }
 
     case "day.unmarked_off": {
+      // If the row was created *only* by day.marked_off (no real day.started
+      // happened), wake_time is the midnight placeholder we inserted at
+      // line 358 and downstream wake-derivation should not see it. Delete
+      // the row outright in that case; otherwise just clear the flag.
+      const placeholder = `${payload.date as string}T00:00:00.000Z`;
+      db.prepare(
+        `DELETE FROM day_start
+         WHERE baby_id = ? AND date = ? AND wake_time = ?`,
+      ).run(payload.babyId, payload.date, placeholder);
       db.prepare(
         `UPDATE day_start SET off_day = 0, off_day_reason = NULL
          WHERE baby_id = ? AND date = ?`,
@@ -416,6 +437,12 @@ export function rebuildAll(): RebuildReport {
     db.prepare("DELETE FROM sleep_pauses").run();
     db.prepare("DELETE FROM diaper_log").run();
     db.prepare("DELETE FROM sleep_log").run();
+    // Per-day projection rows + nap-budget state reference baby(id); clear
+    // before the baby delete or PRAGMA foreign_keys=ON aborts the rebuild.
+    // day.marked_off can produce day_start rows even before day.started, so
+    // any prod DB that has used off-days will hit this on rebuild.
+    db.prepare("DELETE FROM day_start").run();
+    db.prepare("DELETE FROM nap_budget_state").run();
     // Notification tables reference baby(id) — clear before deleting baby rows.
     // Subscriptions will need to be re-added after rebuild.
     db.prepare("DELETE FROM notification_schedule").run();

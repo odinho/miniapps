@@ -970,9 +970,80 @@ describe("computeNapBudget — Codex review regressions", () => {
       isLastNapOfDay: true,
       optedIn: true,
     });
-    if (out) {
-      const wakeByMs = new Date(out.wakeBy).getTime();
-      expect(wakeByMs).toBeGreaterThan(lateNow);
+    expect(out).not.toBeNull();
+    const wakeByMs = new Date(out!.wakeBy).getTime();
+    expect(wakeByMs).toBeGreaterThan(lateNow);
+  });
+
+  it("today flagged off → engine suppresses napBudget for today's last nap", () => {
+    // Off-day filter previously only excluded HISTORICAL days from trend
+    // computation; today's banner still rendered. After fix: today's
+    // local-date in ctx.offDays short-circuits computeNapBudget at gate 1b.
+    const s = halldisScenario();
+    const todayKey = "2026-05-13"; // halldisScenario fixes this date
+    const offDays = new Set<string>([todayKey]);
+    const baseOut = computeNapBudget({
+      ...s,
+      isLastNapOfDay: true,
+      optedIn: true,
+    });
+    // Sanity: without the flag the engine emits (otherwise the suppression
+    // test gives no signal).
+    expect(baseOut).not.toBeNull();
+    const out = computeNapBudget({
+      ...s,
+      isLastNapOfDay: true,
+      optedIn: true,
+      ctx: { ...s.ctx, offDays },
+    });
+    expect(out).toBeNull();
+  });
+
+  it("off-day filter also drops the previous date's overnight bucket", () => {
+    // getWeekStats anchors nights by their start_time local date. A baby
+    // sick on Wed had a bad overnight Tue→Wed which lives in Tuesday's
+    // bucket. Marking Wed off should also drop Tue from trend, otherwise
+    // the bad night still pulls the mean down.
+    const todayDateStr = "2026-05-13";
+    const yesterdayNightStart = new Date(`${todayDateStr}T00:00:00Z`).getTime() - 5 * 3600_000;
+    // 23 normal days, then one anomalously-short overnight (8h) for the
+    // night anchored to 2026-05-11 (= sick night going into 2026-05-12).
+    const normal = synthDays("2026-04-19", 24, 13 * 60);
+    // Replace the 2026-05-11 night with a much shorter one.
+    const shortNightStart = new Date("2026-05-11T19:00:00Z");
+    const shortNightEnd = new Date(shortNightStart.getTime() + 8 * 3600_000);
+    const fixed = normal.map((s) =>
+      s.start_time === shortNightStart.toISOString() && s.type === "night"
+        ? { ...s, end_time: shortNightEnd.toISOString() }
+        : s,
+    );
+    const yesterdayNight: SleepEntry = {
+      start_time: new Date(yesterdayNightStart).toISOString(),
+      end_time: new Date(yesterdayNightStart + 780 * 60_000).toISOString(),
+      type: "night",
+      woke_by: "self",
+    };
+    const trendSleeps = [...fixed, yesterdayNight];
+    const baseInput = {
+      activeNap: { start_time: `${todayDateStr}T08:30:00.000Z` },
+      todaySleeps: [] as SleepEntry[],
+      trendSleeps,
+      bedtime: `${todayDateStr}T17:00:00.000Z`,
+      isLastNapOfDay: true,
+      optedIn: true,
+      now: new Date(`${todayDateStr}T08:55:00.000Z`).getTime(),
+    };
+    // No off-day: the short Tue overnight is included → mean drops.
+    const withoutFilter = computeNapBudget({ ...baseInput, ctx: ctx({ trendSleeps }) });
+    // Off-day = 2026-05-12 (the sick day). The filter must expand back to
+    // 2026-05-11 (the overnight that ended that morning) so the bad night
+    // is also excluded → mean rises.
+    const offDays = new Set<string>(["2026-05-12"]);
+    const withFilter = computeNapBudget({ ...baseInput, ctx: ctx({ trendSleeps, offDays }) });
+    if (withoutFilter && withFilter) {
+      expect(withFilter.context.blendedTrendMin).toBeGreaterThan(
+        withoutFilter.context.blendedTrendMin,
+      );
     }
   });
 });

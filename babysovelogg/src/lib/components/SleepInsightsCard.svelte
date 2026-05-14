@@ -93,7 +93,7 @@
 	<div class="insights-collapsed-summary">
 		Lur {napDurLabel} · Natt {nightDurLabel} ·
 		{#if showTrendRow}
-			Trend {trendTotalLabel}
+			Totalt {totalSleepLabel} · Trend {trendTotalLabel}
 		{:else}
 			Totalt {totalSleepLabel}
 		{/if}

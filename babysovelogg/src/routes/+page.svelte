@@ -20,6 +20,7 @@
 	import ContextCard from '$lib/components/ContextCard.svelte';
 	import ManualSleepModal from '$lib/components/ManualSleepModal.svelte';
 	import SleepInsightsCard from '$lib/components/SleepInsightsCard.svelte';
+	import { isoToDateInTz } from '$lib/tz.js';
 
 	// --- modal state ---
 	let showTagSheet = $state(false);
@@ -343,13 +344,15 @@
 	}
 
 	// --- Morning prompt (onboarding / cold start) ---
-	// Shows when no todayWakeUp exists and no sleeps logged yet today
+	// Shows when no todayWakeUp exists and no sleeps logged yet today.
+	// Date keys are in the baby's timezone so dismissal and "today" stay
+	// consistent across UTC-midnight crossings.
 	const needsMorningPrompt = $derived.by(() => {
 		void now; // re-derive when clock ticks
 		if (!baby || todayWakeUp) return false;
 		if (activeSleep && !activeSleep.end_time) return false;
 		if (todaySleeps.length > 0) return false;
-		const todayStr = new Date().toISOString().slice(0, 10);
+		const todayStr = isoToDateInTz(new Date().toISOString(), baby.timezone || 'UTC');
 		if (morningDismissedDate === todayStr) return false;
 		const h = new Date().getHours();
 		return h >= 5 && h < 13;
@@ -364,16 +367,16 @@
 	let showNapBudgetExplain = $state(false);
 
 	$effect(() => {
-		if (needsMorningPrompt && !morningDate) {
-			const d = new Date();
-			morningDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+		if (needsMorningPrompt && !morningDate && baby) {
+			morningDate = isoToDateInTz(new Date().toISOString(), baby.timezone || 'UTC');
 		}
 	});
 
 	function openMorningDialog() {
-		const d = new Date();
-		morningDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-		if (todayWakeUp) {
+		if (baby) {
+			morningDate = isoToDateInTz(new Date().toISOString(), baby.timezone || 'UTC');
+		}
+		if (todayWakeUp?.wake_time) {
 			morningTime = formatTime(todayWakeUp.wake_time);
 		} else {
 			morningTime = '07:00';
@@ -397,7 +400,9 @@
 	}
 
 	function skipMorningWakeTime() {
-		morningDismissedDate = new Date().toISOString().slice(0, 10);
+		morningDismissedDate = baby
+			? isoToDateInTz(new Date().toISOString(), baby.timezone || 'UTC')
+			: new Date().toISOString().slice(0, 10);
 		showMorningDialog = false;
 	}
 
@@ -418,8 +423,10 @@
 		if (offDayBusy || !baby) return;
 		offDayBusy = true;
 		try {
+			// Local date in the baby's timezone — UTC slice would mark the wrong
+			// date around 22:00-24:00 local for positive offsets (Europe/Oslo).
 			const date = todayWakeUp?.date
-				?? new Date().toISOString().slice(0, 10);
+				?? isoToDateInTz(new Date().toISOString(), baby.timezone || 'UTC');
 			if (isOffDay) {
 				await sync.sendEvents([{
 					type: 'day.unmarked_off',
@@ -689,7 +696,7 @@
 				aria-pressed={isOffDay}
 			>
 				{#if isOffDay}
-					✅ Dagen er markert som av · trekk frå trenden
+					✅ Dagen er markert som av · halden utanfor trenden
 				{:else}
 					🤒 Marker som av (sjuk / reise)
 				{/if}

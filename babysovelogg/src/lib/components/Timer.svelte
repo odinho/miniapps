@@ -7,7 +7,7 @@
 	interface Props {
 		activeSleep: SleepLogRow | null;
 		prediction: Prediction | null;
-		todayWakeUp: { wake_time: string } | null;
+		todayWakeUp: { wake_time: string | null } | null;
 		todaySleeps: SleepLogRow[];
 		targetBedtime?: string | null;
 		/** Override internal clock (ms since epoch). Used by the dev playground. */

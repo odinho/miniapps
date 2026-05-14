@@ -45,6 +45,15 @@ export function getState(now?: number) {
   const dayStartRow = db
     .prepare("SELECT * FROM day_start WHERE baby_id = ? AND date = ?")
     .get(baby.id, todayDateStr) as DayStartRow | undefined;
+  // A day_start row created by day.marked_off (with no preceding
+  // day.started) carries a placeholder wake_time = `${date}T00:00:00.000Z`.
+  // Downstream wake-derivation must ignore that — using midnight as a real
+  // wake time would suppress the morning prompt and feed garbage into the
+  // schedule planner. Detect by exact placeholder match; an honest
+  // day.started wake at exact midnight is vanishingly rare and would
+  // re-anchor on the next reconcile from the night entry anyway.
+  const placeholderWake = `${todayDateStr}T00:00:00.000Z`;
+  const dayStartHasRealWake = !!dayStartRow && dayStartRow.wake_time !== placeholderWake;
   const overnightSleep = db
     .prepare(
       "SELECT end_time FROM sleep_log WHERE baby_id = ? AND type = 'night' AND start_time < ? AND end_time >= ? AND deleted = 0 ORDER BY end_time DESC LIMIT 1",
@@ -62,11 +71,26 @@ export function getState(now?: number) {
       off_day: dayStartRow?.off_day ?? 0,
       off_day_reason: dayStartRow?.off_day_reason ?? null,
     };
-  } else {
+  } else if (dayStartHasRealWake) {
     todayWakeUp = dayStartRow;
+  } else if (dayStartRow) {
+    // Marker-only row: keep the off-day flag visible to the UI but expose
+    // no wake_time so the morning prompt and engine fallbacks behave as if
+    // the day had not started yet.
+    todayWakeUp = {
+      ...dayStartRow,
+      wake_time: null,
+    };
+  } else {
+    todayWakeUp = undefined;
   }
 
-  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+  // Honour the explicit `now` so tests and backtests pin both the fetch
+  // window AND the engine clock to the same instant. Falling back to
+  // Date.now() lets the prediction time slip past the data window in a
+  // way that's hard to reason about.
+  const nowMs = now ?? Date.now();
+  const weekAgo = new Date(nowMs - 7 * 86400000).toISOString();
   const recentSleeps = db
     .prepare(
       "SELECT * FROM sleep_log WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time DESC",
@@ -76,7 +100,7 @@ export function getState(now?: number) {
   // 30-day lookback covers both the 21-day strategy hysteresis (which only
   // looks at the most recent 6-day replay window) and the napBudget trend
   // computation (which uses 7d/30d daily averages from getWeekStats).
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+  const thirtyDaysAgo = new Date(nowMs - 30 * 86400000).toISOString();
   const strategySleeps = db
     .prepare(
       "SELECT * FROM sleep_log WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time DESC",
@@ -151,7 +175,7 @@ export function getState(now?: number) {
   if (emittedMode && emittedMode !== priorNapBudgetState?.mode) {
     setNapBudgetState(baby.id, {
       mode: emittedMode,
-      enteredAt: new Date(now ?? Date.now()).toISOString(),
+      enteredAt: new Date(nowMs).toISOString(),
     });
   }
 

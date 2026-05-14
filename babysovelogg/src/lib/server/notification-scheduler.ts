@@ -136,13 +136,17 @@ export function reconcileNotifications(state: ReconcileInput): void {
   }
 
   // ── Nap ending soon ─────────────────────────────────────────────
-  // Skip when rescue wake is active — don't double-notify
+  // Skip when rescue wake or nap_budget cap is active — don't double-notify.
+  // Both rescue and napBudget already carry a wake-time recommendation;
+  // adding "ending soon" on top creates two pushes for the same active nap
+  // with potentially-conflicting times.
   if (
     prefs.nap_ending_soon &&
     isNappingActive &&
     active &&
     pred?.expectedNapEnd &&
-    !pred.rescueNap
+    !pred.rescueNap &&
+    !pred.napBudget
   ) {
     const dedupe = `nap_ending_soon:${active.domain_id}`;
     const fireAt = new Date(pred.expectedNapEnd).getTime() - PRE_NOTIFY_MIN * 60_000;

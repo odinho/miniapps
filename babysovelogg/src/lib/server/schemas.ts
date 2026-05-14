@@ -37,6 +37,14 @@ const domainId = v.pipe(
 const optStr = v.nullish(v.string());
 const optNum = v.nullish(v.number());
 
+// Calendar date in baby's local timezone (YYYY-MM-DD). Used by day-scope
+// events that key on a date string rather than an instant. Strict format
+// keeps stray values like "wat" from poisoning downstream projections.
+const localDate = v.pipe(
+  v.string(),
+  v.check((s) => /^\d{4}-\d{2}-\d{2}$/.test(s), "Invalid local date (expected YYYY-MM-DD)"),
+);
+
 const payloadSchemas: Record<string, v.BaseSchema<unknown, unknown, v.BaseIssue<unknown>>> = {
   "baby.created": v.object({
     name: v.string(),
@@ -132,16 +140,16 @@ const payloadSchemas: Record<string, v.BaseSchema<unknown, unknown, v.BaseIssue<
   }),
   "day.deleted": v.object({
     babyId: v.number(),
-    date: v.string(),
+    date: localDate,
   }),
   "day.marked_off": v.object({
     babyId: v.number(),
-    date: v.string(),
+    date: localDate,
     reason: optStr,
   }),
   "day.unmarked_off": v.object({
     babyId: v.number(),
-    date: v.string(),
+    date: localDate,
   }),
 };
 

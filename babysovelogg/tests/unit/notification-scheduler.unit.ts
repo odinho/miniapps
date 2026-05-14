@@ -606,4 +606,21 @@ describe("reconcileNotifications – nap_budget_cap", () => {
     expect(finalRows).toHaveLength(1);
     expect(finalRows[0].sent_at).not.toBeNull();
   });
+
+  it("napBudget suppresses nap_ending_soon (no double-push for same active nap)", () => {
+    // Both nap_budget_cap and nap_ending_soon would have fired for the
+    // same active nap with different wake times — the same coupling miss
+    // the rescue-vs-napBudget arbitration tried to fix. After: nap_budget_cap
+    // is the sole wake recommendation when present.
+    reconcileNotifications({
+      baby,
+      activeSleep: active,
+      prediction: makePrediction({
+        napBudget,
+        expectedNapEnd: "2026-05-13T11:30:00.000Z",
+      }),
+    });
+    expect(rowsOf("nap_budget_cap")).toHaveLength(1);
+    expect(rowsOf("nap_ending_soon")).toHaveLength(0);
+  });
 });

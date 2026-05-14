@@ -554,7 +554,9 @@ function assembleEmergingPrediction(
   const lastCutShort = mostRecentCutShort(completedNaps, shortThreshold);
 
   // ── Select best plan (natural vs target-guided, scored) ──
-  const selected = todayWakeUp
+  // Gate on a real wake_time — a marker-only day_start (off-day flagged
+  // before any real wake) carries no wake instant to plan against.
+  const selected = todayWakeUp?.wake_time
     ? selectBestPlan(todayWakeUp.wake_time, todaySleeps.map(toSleepEntry), activeSleep, ctx, now)
     : null;
 
@@ -766,7 +768,8 @@ function assembleSchedulePrediction(
   const lastCutShort = mostRecentCutShort(completedNaps, shortThreshold);
 
   // ── Select best plan (natural vs target-guided, scored) ──
-  const selected = todayWakeUp
+  // See emerging branch — `wake_time` may be null for marker-only off-day rows.
+  const selected = todayWakeUp?.wake_time
     ? selectBestPlan(todayWakeUp.wake_time, todaySleeps.map(toSleepEntry), activeSleep, ctx, now)
     : null;
   const allPredictedFromWakeUp = selected?.naps ?? [];

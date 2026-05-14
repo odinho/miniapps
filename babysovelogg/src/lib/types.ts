@@ -59,7 +59,13 @@ export interface DayStartRow {
   id: number;
   baby_id: number;
   date: string;
-  wake_time: string;
+  /**
+   * Wake time as ISO. `null` when the row exists only because of a
+   * `day.marked_off` event with no preceding `day.started` — the placeholder
+   * midnight isn't a real wake and downstream code must not anchor on it.
+   * Server normalises the placeholder away in getState before returning.
+   */
+  wake_time: string | null;
   created_at: string;
   created_by_event_id: number | null;
   /**

@@ -158,3 +158,63 @@ test("After rebuild, GET /api/state returns correct current state", async () => 
   expect(state.baby).toBeDefined();
   expect(state.diaperCount).toBeGreaterThanOrEqual(1);
 });
+
+test("Rebuild succeeds when day_start has rows (FK ordering)", async () => {
+  // Regression: rebuildAll didn't DELETE FROM day_start before
+  // DELETE FROM baby. With PRAGMA foreign_keys=ON the baby delete
+  // failed and rebuild aborted. After fix: rebuild succeeds.
+  const babyId = createBaby("Testa");
+  await postEvents([
+    makeEvent("day.started", { babyId, wakeTime: "2026-03-26T06:30:00Z" }),
+    makeEvent("day.marked_off", { babyId, date: "2026-03-26", reason: null }),
+  ]);
+  const res = await post("/api/admin/rebuild", {});
+  const report = await res.json();
+  expect(report.success).toBe(true);
+  // The off-day flag survived the rebuild (day.marked_off replayed
+  // after day.started; ON CONFLICT preserves wake_time, off_day=1).
+  const row = db
+    .prepare("SELECT off_day, wake_time FROM day_start WHERE baby_id = ? AND date = ?")
+    .get(babyId, "2026-03-26") as { off_day: number; wake_time: string };
+  expect(row.off_day).toBe(1);
+  expect(row.wake_time).toBe("2026-03-26T06:30:00Z");
+});
+
+test("day.started after day.marked_off preserves the off-day flag", async () => {
+  // The original INSERT OR REPLACE would have wiped off_day back to 0.
+  // After fix (ON CONFLICT DO UPDATE): off_day stays at 1.
+  const babyId = createBaby("Testa");
+  await postEvents([
+    makeEvent("day.marked_off", { babyId, date: "2026-03-26", reason: "sick" }),
+  ]);
+  // Parent still ends up logging the morning wake later. day.started
+  // must not silently un-flag the day.
+  await postEvents([
+    makeEvent("day.started", { babyId, wakeTime: "2026-03-26T07:00:00Z" }),
+  ]);
+  const row = db
+    .prepare("SELECT off_day, off_day_reason, wake_time FROM day_start WHERE baby_id = ? AND date = ?")
+    .get(babyId, "2026-03-26") as { off_day: number; off_day_reason: string | null; wake_time: string };
+  expect(row.off_day).toBe(1);
+  expect(row.off_day_reason).toBe("sick");
+  expect(row.wake_time).toBe("2026-03-26T07:00:00Z");
+});
+
+test("day.unmarked_off without prior day.started cleans up the placeholder row", async () => {
+  // mark off → unmark → row should be gone (no fake wake_time lingering).
+  const babyId = createBaby("Testa");
+  await postEvents([
+    makeEvent("day.marked_off", { babyId, date: "2026-03-26", reason: null }),
+  ]);
+  let row: { wake_time: string } | undefined | null = db
+    .prepare("SELECT wake_time FROM day_start WHERE baby_id = ? AND date = ?")
+    .get(babyId, "2026-03-26") as { wake_time: string } | undefined | null;
+  expect(row?.wake_time).toBe("2026-03-26T00:00:00.000Z"); // placeholder
+  await postEvents([
+    makeEvent("day.unmarked_off", { babyId, date: "2026-03-26" }),
+  ]);
+  row = db
+    .prepare("SELECT wake_time FROM day_start WHERE baby_id = ? AND date = ?")
+    .get(babyId, "2026-03-26") as { wake_time: string } | undefined | null;
+  expect(row ?? null).toBeNull();
+});

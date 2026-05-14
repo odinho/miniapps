@@ -46,7 +46,7 @@ export type TimerMode =
 export interface TimerInput {
 	activeSleep: SleepLogRow | null;
 	prediction: Prediction | null;
-	todayWakeUp: { wake_time: string } | null;
+	todayWakeUp: { wake_time: string | null } | null;
 	todaySleeps: SleepLogRow[];
 	now: number;
 }
