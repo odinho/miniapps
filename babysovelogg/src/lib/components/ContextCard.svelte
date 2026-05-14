@@ -11,7 +11,10 @@
 	}
 
 	let { prediction, ageMonths, birthdate }: Props = $props();
-	let collapsed = $state(false);
+	// Collapsed by default — the parent already sees the active timer + arc
+	// above; the rolling-24h breakdown is a secondary glance, not the
+	// primary surface. Tapping the header expands.
+	let collapsed = $state(true);
 
 	const totalSleepHours = $derived(
 		prediction.totalSleep24h != null ? (prediction.totalSleep24h / 60).toFixed(1) : null,
@@ -92,7 +95,7 @@
 
 		{#if longestStretchFormatted}
 			<div class="context-row">
-				<span class="context-label">Lengste strekkje</span>
+				<span class="context-label">Lengste strekk</span>
 				<span class="context-value">
 					{longestStretchFormatted}
 					<span class="context-trend">{trendIcon}</span>
@@ -103,13 +106,6 @@
 					{trendDetail}
 				</div>
 			{/if}
-		{/if}
-
-		{#if prediction.rolling && prediction.rolling.episodeCount > 0}
-			<div class="context-row">
-				<span class="context-label">Søvnepisodar</span>
-				<span class="context-value">{prediction.rolling.episodeCount} siste 24t</span>
-			</div>
 		{/if}
 
 		{#if meanEpisodeDuration}
@@ -126,9 +122,13 @@
 		</div>
 	{/if}
 
+	<!-- Single short status line. The earlier two-line guidance
+	     (phaseDescription + lookFor) said roughly the same thing twice
+	     and made the card look heavier than its content. phaseDescription
+	     was rewritten to stand alone; lookFor stays in the engine for
+	     callers that want supplementary copy. -->
 	<div class="guidance" data-testid="guidance-text">
 		<p class="guidance-phase">{guidance.phaseDescription}</p>
-		<p class="guidance-look">{guidance.lookFor}</p>
 	</div>
 	{/if}
 </div>
@@ -213,7 +213,7 @@
 	}
 
 	.guidance p {
-		margin: 0 0 4px 0;
+		margin: 0;
 		font-size: 0.8rem;
 		color: var(--text-light);
 		line-height: 1.4;
@@ -221,9 +221,5 @@
 
 	.guidance-phase {
 		font-style: italic;
-	}
-
-	.guidance-look {
-		margin-bottom: 0 !important;
 	}
 </style>

@@ -755,7 +755,20 @@ function assembleEmergingPrediction(
     },
     ageNorms: result.ageNorms,
     rolling: result.rolling,
-    learnedSchedule: null,
+    // Expose learned schedule values even in emerging — the stats page's
+    // norm-vs-baby table reads from this and was showing "—" everywhere
+    // for emerging babies (and the parent had no way to see the numbers
+    // the engine had learned). The same helpers the schedule path uses
+    // are pure functions over ctx; they don't require the strategy to
+    // be `routine_schedule`.
+    learnedSchedule: {
+      napDurationMin: getLearnedNapDuration(ctx),
+      nightDurationMin: getLearnedNightDuration(ctx),
+      wakeWindowMin: getWakeWindow(ctx),
+      bedtimeWakeWindowMin: getLearnedBedtimeWakeWindow(ctx),
+      expectedNapCount,
+      sleepCycleMin: estimateSleepCycleFromData(ctx),
+    },
   };
 }
 

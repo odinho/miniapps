@@ -261,9 +261,13 @@ export function computeRollingSleepStats(
   let totalDuration = 0;
 
   for (const s of sleeps) {
-    if (!s.end_time) continue;
     const startMs = new Date(s.start_time).getTime();
-    const endMs = new Date(s.end_time).getTime();
+    // An active sleep (no end_time yet) counts toward 24h with effective
+    // end = now. Skipping active sleeps made "Søvn siste 24t" look
+    // wildly under-reported for parents staring at a running timer —
+    // e.g. an 11mo mid-nap saw 8.6 h while she'd actually slept ~16 h
+    // including the active nap.
+    const endMs = s.end_time ? new Date(s.end_time).getTime() : refMs;
     // Include episodes that overlap with the 24h window
     if (endMs < cutoff) continue;
     if (startMs > refMs) continue;

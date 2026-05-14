@@ -776,7 +776,9 @@ function assertInvariants({ archetype, scenario, prediction }: InvariantContext)
       expect(p.sleepWindow, `${where}: routine sleepWindow null`).toBeNull();
       expect(p.confidence, `${where}: routine confidence set`).not.toBeNull();
     } else if (p.strategy === "emerging_rhythm") {
-      expect(p.learnedSchedule, `${where}: emerging learnedSchedule null`).toBeNull();
+      // emerging populates learnedSchedule too — the stats page's norm-
+      // vs-baby table needs it, and the helpers are pure over ctx.
+      expect(p.learnedSchedule, `${where}: emerging learnedSchedule set`).not.toBeNull();
       expect(p.confidence, `${where}: emerging confidence null`).toBeNull();
       expect(p.sleepWindow, `${where}: emerging sleepWindow set`).not.toBeNull();
       if (p.sleepWindow) {
@@ -1930,6 +1932,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=48m night=630m ww=125.2m bedww=95m
         sleepWindow: 07:15–08:35
         sleepPressure: low
 
@@ -1946,6 +1949,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=48m night=630m ww=125.2m bedww=95m
         sleepWindow: 08:15–09:35
         sleepPressure: high
 
@@ -1962,6 +1966,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=48m night=630m ww=125.2m bedww=95m
         sleepWindow: 10:05–11:25
         sleepPressure: low
 
@@ -1978,6 +1983,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=48m night=630m ww=125.2m bedww=95m
         sleepWindow: 13:05–14:25
         sleepPressure: low
 
@@ -1994,6 +2000,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=48m night=630m ww=125.2m bedww=95m
         sleepWindow: 14:15–15:35
         sleepPressure: high
 
@@ -2010,6 +2017,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=48m night=630m ww=125.2m bedww=95m
         sleepWindow: 19:00–20:20
         sleepPressure: low
 
@@ -2026,6 +2034,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=48m night=630m ww=125.2m bedww=95m
         sleepWindow: 19:30–20:50
         sleepPressure: rising
 
@@ -2042,6 +2051,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=48m night=630m ww=125.2m bedww=95m
         sleepWindow: 12:45–14:05
         sleepPressure: low
 
@@ -2058,6 +2068,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=48m night=630m ww=125.2m bedww=95m
         sleepWindow: 09:45–11:05
         sleepPressure: high"
     `);
@@ -2270,6 +2281,7 @@ describe("Iben Sparse (emerging_rhythm via demotion)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=64m night=712m ww=210m bedww=241.5m
         sleepWindow: 06:15–07:30
         sleepPressure: high
 
@@ -2286,6 +2298,7 @@ describe("Iben Sparse (emerging_rhythm via demotion)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=64m night=712m ww=210m bedww=241.5m
         sleepWindow: 10:15–11:30
         sleepPressure: high
 
@@ -2302,6 +2315,7 @@ describe("Iben Sparse (emerging_rhythm via demotion)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=64m night=712m ww=210m bedww=241.5m
         sleepWindow: 12:15–13:30
         sleepPressure: low
 
@@ -2318,6 +2332,7 @@ describe("Iben Sparse (emerging_rhythm via demotion)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=64m night=712m ww=210m bedww=241.5m
         sleepWindow: 16:30–17:45
         sleepPressure: low
 
@@ -2334,6 +2349,7 @@ describe("Iben Sparse (emerging_rhythm via demotion)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=64m night=712m ww=210m bedww=241.5m
         sleepWindow: 19:45–21:00
         sleepPressure: high
 
@@ -2350,6 +2366,7 @@ describe("Iben Sparse (emerging_rhythm via demotion)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=64m night=712m ww=210m bedww=241.5m
         sleepWindow: 10:45–12:00
         sleepPressure: high
 
@@ -2366,6 +2383,7 @@ describe("Iben Sparse (emerging_rhythm via demotion)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=64m night=712m ww=210m bedww=241.5m
         sleepWindow: 07:45–09:00
         sleepPressure: high"
     `);
@@ -3219,6 +3237,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=48m night=630m ww=125.2m bedww=95m
         sleepWindow: 09:45–11:05
         sleepPressure: high
 
@@ -3235,6 +3254,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=48m night=630m ww=125.2m bedww=95m
         sleepWindow: 22:15–23:35
         sleepPressure: high
 
@@ -3251,6 +3271,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=48m night=630m ww=125.2m bedww=95m
         sleepWindow: 12:45–14:05
         sleepPressure: high
 
@@ -3388,6 +3409,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=64m night=712m ww=210m bedww=241.5m
         sleepWindow: 09:45–11:00
         sleepPressure: high
 
@@ -3404,6 +3426,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=64m night=712m ww=210m bedww=241.5m
         sleepWindow: 22:15–23:30
         sleepPressure: high
 
@@ -3420,6 +3443,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
+        learned: nap=64m night=712m ww=210m bedww=241.5m
         sleepWindow: 12:45–14:00
         sleepPressure: high"
     `);

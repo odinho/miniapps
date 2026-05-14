@@ -12,37 +12,42 @@ export interface GuidanceText {
   lookFor: string;
 }
 
-/** Get age-appropriate guidance text. */
+/**
+ * Get age-appropriate guidance text. `phaseDescription` is shown as a
+ * short status line; `lookFor` is supplementary context (only surfaced
+ * when the consumer renders the secondary copy explicitly). Earlier
+ * versions also rendered `lookFor` next to `phaseDescription`, which
+ * felt redundant (two lines saying roughly the same thing). Keep both
+ * fields so callers can opt in, but make `phaseDescription` complete
+ * on its own.
+ */
 export function getGuidanceText(ageWeeks: number): GuidanceText {
   if (ageWeeks < 6) {
     return {
-      phaseDescription: "I denne fasen er søvnen ofte ujamn gjennom døgnet. Det er heilt normalt.",
+      phaseDescription: "Ujamn søvn er normalt i nyfødtfasen — det lengste strekket veks gradvis.",
       normalText: "Nyfødte søv 14–18 timar i døgnet, fordelt på mange korte økter. " +
         "Vakevinduet er kort — ofte berre 30–60 minutt.",
-      lookFor: "Det lengste søvnstrekkjet veks gradvis. " +
-        "Det er det fyrste teiknet på at døgnrytmen utviklar seg.",
+      lookFor: "Det lengste søvnstrekket er det fyrste teiknet på at døgnrytmen utviklar seg.",
     };
   }
   if (ageWeeks < 12) {
     return {
-      phaseDescription: "Døgnrytmen byrjar å ta form. Nattesøvnen vert gradvis lengre.",
+      phaseDescription: "Døgnrytmen tek form og nattesøvnen vert lengre.",
       normalText: "Babyen søv gjerne 14–17 timar i døgnet. " +
-        "Det lengste strekkjet er vanlegvis om natta og veks mot 5–6 timar.",
-      lookFor: "Ei meir tydeleg kveldssøvn og eit lengre nattstrekkje. " +
-        "Fyrste lur på dagtid vert ofte den mest faste.",
+        "Det lengste strekket er vanlegvis om natta og veks mot 5–6 timar.",
+      lookFor: "Ei meir tydeleg kveldssøvn og eit lengre nattstrekk. Fyrste lur vert ofte den mest faste.",
     };
   }
   if (ageWeeks < 20) {
     return {
-      phaseDescription: "Døgnrytmen er etablert. Søvnmønsteret vert meir føreseieleg.",
+      phaseDescription: "Etablert døgnrytme — søvnmønsteret er meir føreseieleg.",
       normalText: "Babyen søv gjerne 13–16 timar i døgnet med 3–4 lurar. " +
         "Nattesøvnen er vanlegvis 6+ timar samanhengande.",
-      lookFor: "Meir faste lurtider, særleg om morgonen. " +
-        "Lurane vert kortare og færre framover.",
+      lookFor: "Meir faste lurtider, særleg om morgonen. Lurane vert kortare og færre framover.",
     };
   }
   return {
-    phaseDescription: "Babyen har ein etablert døgnrytme med faste lurar og leggetid.",
+    phaseDescription: "Etablert døgnrytme — stabile lurtider gjev gode prediksjonar.",
     normalText: "Babyen søv gjerne 12–15 timar i døgnet med 2–3 lurar.",
     lookFor: "Stabile lurtider og leggetid gjev gode prediksjonar.",
   };
