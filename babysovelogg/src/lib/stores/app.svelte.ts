@@ -199,6 +199,12 @@ export interface AppState {
 	diaperCount: number;
 	lastDiaperTime: string | null;
 	todayWakeUp: DayStartRow | null;
+	/**
+	 * Local-date keys (YYYY-MM-DD in baby tz) currently flagged as
+	 * off-days. Consumed by WakeUpSheet / TagSheet / history to show
+	 * current state next to their per-date toggle.
+	 */
+	offDays: string[];
 }
 
 const emptyState: AppState = {
@@ -211,6 +217,7 @@ const emptyState: AppState = {
 	diaperCount: 0,
 	lastDiaperTime: null,
 	todayWakeUp: null,
+	offDays: [],
 };
 
 /** Reactive app state — the single source of truth for the UI. */

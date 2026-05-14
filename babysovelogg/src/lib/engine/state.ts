@@ -413,6 +413,10 @@ export function assembleState(data: DayData) {
     diaperCount: data.diaperCount,
     lastDiaperTime: data.lastDiaperTime,
     todayWakeUp,
+    // Off-day local-date keys so the wakeup / sleep-start / log surfaces
+    // can display + toggle the flag for any date they're operating on,
+    // not just today. Array (not Set) for JSON serializability.
+    offDays: data.offDays ? [...data.offDays] : [],
   };
 }
 

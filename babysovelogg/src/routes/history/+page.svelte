@@ -6,6 +6,7 @@
 	import ManualSleepModal from '$lib/components/ManualSleepModal.svelte';
 	import { appState } from '$lib/stores/app.svelte.js';
 	import { sync } from '$lib/stores/sync.svelte.js';
+	import { toggleOffDay } from '$lib/off-day-actions.js';
 	import {
 		type HistoryEntry,
 		fetchHistory,
@@ -35,8 +36,20 @@
 	let showManualSleep = $state(false);
 
 	const baby = $derived(appState.state.baby);
+	const offDays = $derived(appState.state.offDays);
 
 	const grouped = $derived(groupByDate(entries));
+
+	let offDayBusyFor = $state<string | null>(null);
+	async function handleToggleOffDay(date: string) {
+		if (!baby || offDayBusyFor === date) return;
+		offDayBusyFor = date;
+		try {
+			await toggleOffDay(baby.id, date, offDays.includes(date));
+		} finally {
+			offDayBusyFor = null;
+		}
+	}
 
 	async function load() {
 		loading = true;
@@ -106,9 +119,23 @@
 	{:else}
 		<div class="sleep-log">
 			{#each [...grouped] as [date, dayEntries]}
-				<div style="font-size: 0.8rem; color: var(--text-light); padding: 8px 4px 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;">
-					{getDateLabel(date)}
-				</div>
+				{@const dayIsOff = offDays.includes(date)}
+				<button
+					class="history-day-header"
+					class:off={dayIsOff}
+					onclick={() => handleToggleOffDay(date)}
+					disabled={offDayBusyFor === date || !baby}
+					data-testid="history-day-header"
+					aria-pressed={dayIsOff}
+					type="button"
+				>
+					<span>{getDateLabel(date)}</span>
+					{#if dayIsOff}
+						<span class="history-day-flag">🤒 Utypisk dag</span>
+					{:else}
+						<span class="history-day-flag-hint">Marker som utypisk</span>
+					{/if}
+				</button>
 
 				{#each dayEntries as entry}
 					{#if entry._kind === 'sleep'}
@@ -201,3 +228,60 @@
 		onClose={closeManualSleep}
 	/>
 {/if}
+
+<style>
+	.history-day-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		width: 100%;
+		font-size: 0.8rem;
+		color: var(--text-light);
+		padding: 12px 8px 6px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+		background: none;
+		border: none;
+		border-radius: 6px;
+		cursor: pointer;
+		font-family: inherit;
+		text-align: left;
+	}
+
+	.history-day-header:hover:not(:disabled) {
+		background: rgba(255, 255, 255, 0.03);
+	}
+
+	.history-day-header:disabled {
+		cursor: default;
+		opacity: 0.6;
+	}
+
+	.history-day-header.off {
+		color: var(--peach-dark, #d97757);
+	}
+
+	.history-day-flag {
+		font-size: 0.7rem;
+		text-transform: none;
+		letter-spacing: 0;
+		font-weight: 500;
+	}
+
+	/* Hint only visible on hover/focus — keeps the list visually quiet
+	   when nothing is flagged, but discoverable when the parent looks. */
+	.history-day-flag-hint {
+		font-size: 0.7rem;
+		text-transform: none;
+		letter-spacing: 0;
+		font-weight: 400;
+		opacity: 0;
+		transition: opacity 120ms ease;
+	}
+
+	.history-day-header:hover .history-day-flag-hint,
+	.history-day-header:focus-visible .history-day-flag-hint {
+		opacity: 0.6;
+	}
+</style>

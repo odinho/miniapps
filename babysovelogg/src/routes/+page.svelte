@@ -21,6 +21,7 @@
 	import ManualSleepModal from '$lib/components/ManualSleepModal.svelte';
 	import SleepInsightsCard from '$lib/components/SleepInsightsCard.svelte';
 	import { isoToDateInTz } from '$lib/tz.js';
+	import { toggleOffDay } from '$lib/off-day-actions.js';
 
 	// --- modal state ---
 	let showTagSheet = $state(false);
@@ -419,25 +420,13 @@
 	// recommendations sideways. Reason is free-text for now (v1).
 	const isOffDay = $derived((todayWakeUp?.off_day ?? 0) === 1);
 	let offDayBusy = $state(false);
-	async function toggleOffDay() {
+	async function toggleOffDayToday() {
 		if (offDayBusy || !baby) return;
 		offDayBusy = true;
 		try {
-			// Local date in the baby's timezone — UTC slice would mark the wrong
-			// date around 22:00-24:00 local for positive offsets (Europe/Oslo).
 			const date = todayWakeUp?.date
 				?? isoToDateInTz(new Date().toISOString(), baby.timezone || 'UTC');
-			if (isOffDay) {
-				await sync.sendEvents([{
-					type: 'day.unmarked_off',
-					payload: { babyId: baby.id, date },
-				}]);
-			} else {
-				await sync.sendEvents([{
-					type: 'day.marked_off',
-					payload: { babyId: baby.id, date, reason: null },
-				}]);
-			}
+			await toggleOffDay(baby.id, date, isOffDay);
 		} finally {
 			offDayBusy = false;
 		}
@@ -690,15 +679,15 @@
 			<button
 				class="off-day-btn"
 				class:active={isOffDay}
-				onclick={toggleOffDay}
+				onclick={toggleOffDayToday}
 				disabled={offDayBusy}
 				data-testid="off-day-toggle"
 				aria-pressed={isOffDay}
 			>
 				{#if isOffDay}
-					✅ Dagen er markert som av · halden utanfor trenden
+					✅ Utypisk dag · halden utanfor trenden
 				{:else}
-					🤒 Marker som av (sjuk / reise)
+					🤒 Utypisk dag (sjuk / reise / o.l.)
 				{/if}
 			</button>
 		</div>

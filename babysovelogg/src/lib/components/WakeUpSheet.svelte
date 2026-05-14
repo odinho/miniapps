@@ -1,9 +1,11 @@
 <script lang="ts">
 	import type { SleepLogRow } from '$lib/types.js';
 	import { sync } from '$lib/stores/sync.svelte.js';
+	import { appState } from '$lib/stores/app.svelte.js';
 	import { WOKE_OPTIONS, buildWakeUpEvent, getBedtimeSummary } from '$lib/wake-sheet-actions.js';
 	import { WAKE_MOODS } from '$lib/constants.js';
 	import { formatDuration, formatTime } from '$lib/utils.js';
+	import { toggleOffDay, localDateForOffDay } from '$lib/off-day-actions.js';
 	import TimeInput from './TimeInput.svelte';
 
 	interface Props {
@@ -112,6 +114,32 @@
 
 	function handleOverlayClick(e: MouseEvent) {
 		if (e.target === e.currentTarget) onClose?.();
+	}
+
+	// Off-day toggle for the day this wake belongs to. For a *night* sleep
+	// the wake instant is the morning the parent is now reviewing — that's
+	// the right date to flag (sick night → sick morning). For naps we still
+	// key on the wake's local-date, which is the same day the nap belongs
+	// to in the common case.
+	const baby = $derived(appState.state.baby);
+	const offDays = $derived(appState.state.offDays);
+	const wakeDateForOffDay = $derived.by(() => {
+		if (!baby) return null;
+		const wakeIso = new Date(`${wakeDate}T${wakeTime}:00`).toISOString();
+		return localDateForOffDay(wakeIso, baby.timezone || 'UTC');
+	});
+	const isOffDay = $derived(
+		wakeDateForOffDay != null && offDays.includes(wakeDateForOffDay),
+	);
+	let offDayBusy = $state(false);
+	async function toggleOffDayForWake() {
+		if (offDayBusy || !baby || !wakeDateForOffDay) return;
+		offDayBusy = true;
+		try {
+			await toggleOffDay(baby.id, wakeDateForOffDay, isOffDay);
+		} finally {
+			offDayBusy = false;
+		}
 	}
 </script>
 
@@ -233,6 +261,25 @@
 				bind:value={notes}
 				data-testid="wake-notes"
 			/>
+		</div>
+
+		<!-- Off-day toggle for this wake's date -->
+		<div class="form-group">
+			<button
+				class="off-day-btn"
+				class:active={isOffDay}
+				onclick={toggleOffDayForWake}
+				disabled={offDayBusy}
+				data-testid="off-day-toggle-wake"
+				aria-pressed={isOffDay}
+				type="button"
+			>
+				{#if isOffDay}
+					✅ Utypisk dag · halden utanfor trenden
+				{:else}
+					🤒 Utypisk dag (sjuk / reise / o.l.)
+				{/if}
+			</button>
 		</div>
 
 		<!-- Done button -->

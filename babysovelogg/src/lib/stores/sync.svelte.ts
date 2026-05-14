@@ -131,6 +131,7 @@ function createSync() {
 			diaperCount: (raw.diaperCount as number) ?? 0,
 			lastDiaperTime: (raw.lastDiaperTime as string | null) ?? null,
 			todayWakeUp: (raw.todayWakeUp as AppState["todayWakeUp"]) ?? null,
+			offDays: (raw.offDays as string[]) ?? [],
 		};
 	}
 

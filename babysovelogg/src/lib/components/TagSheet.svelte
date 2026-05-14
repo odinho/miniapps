@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { DiaperLogRow } from '$lib/types.js';
 	import { sync } from '$lib/stores/sync.svelte.js';
+	import { appState } from '$lib/stores/app.svelte.js';
 	import { MOODS, METHODS, FALL_ASLEEP_BUCKETS } from '$lib/constants.js';
 	import { formatTime } from '$lib/utils.js';
 	import {
@@ -8,6 +9,7 @@
 		shouldShowDiaperNudge,
 		collectTagSheetEvents,
 	} from '$lib/tag-sheet-actions.js';
+	import { toggleOffDay, localDateForOffDay } from '$lib/off-day-actions.js';
 
 	interface Props {
 		sleepDomainId: string;
@@ -116,6 +118,30 @@
 	function toDatetimeLocal(iso: string): string {
 		const d = new Date(iso);
 		return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+	}
+
+	// Off-day toggle for the day this sleep starts on. The parent landing
+	// in this sheet just put the baby down — natural moment to flag a
+	// known-atypical day. Re-derives if the start time gets nudged across
+	// midnight (rare; defensive).
+	const baby = $derived(appState.state.baby);
+	const offDays = $derived(appState.state.offDays);
+	const sleepDateForOffDay = $derived.by(() => {
+		if (!baby) return null;
+		return localDateForOffDay(adjustedStartTime, baby.timezone || 'UTC');
+	});
+	const isOffDay = $derived(
+		sleepDateForOffDay != null && offDays.includes(sleepDateForOffDay),
+	);
+	let offDayBusy = $state(false);
+	async function toggleOffDayForSleep() {
+		if (offDayBusy || !baby || !sleepDateForOffDay) return;
+		offDayBusy = true;
+		try {
+			await toggleOffDay(baby.id, sleepDateForOffDay, isOffDay);
+		} finally {
+			offDayBusy = false;
+		}
 	}
 </script>
 
@@ -229,6 +255,25 @@
 				bind:value={notes}
 				data-testid="tag-notes"
 			/>
+		</div>
+
+		<!-- Off-day toggle for the day this sleep starts on -->
+		<div class="form-group">
+			<button
+				class="off-day-btn"
+				class:active={isOffDay}
+				onclick={toggleOffDayForSleep}
+				disabled={offDayBusy}
+				data-testid="off-day-toggle-tag"
+				aria-pressed={isOffDay}
+				type="button"
+			>
+				{#if isOffDay}
+					✅ Utypisk dag · halden utanfor trenden
+				{:else}
+					🤒 Utypisk dag (sjuk / reise / o.l.)
+				{/if}
+			</button>
 		</div>
 
 		<!-- Diaper nudge -->

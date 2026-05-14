@@ -26,6 +26,7 @@ function makeState(overrides: Partial<AppState> = {}): AppState {
 		diaperCount: 3,
 		lastDiaperTime: '2026-03-27T08:00:00.000Z',
 		todayWakeUp: null,
+		offDays: [],
 		...overrides,
 	};
 }
