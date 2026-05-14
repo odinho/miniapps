@@ -148,6 +148,15 @@ export interface BabyContext {
    * so a bad week doesn't pull the engine's recommendations sideways.
    */
   offDays?: Set<string>;
+  /**
+   * Pre-computed blended 7d/30d daily-total trend (minutes), or null when
+   * the data is too sparse / noisy to trust. Computed once in
+   * `assembleState` and threaded through so the cut-short censor's
+   * cap-respect carve-out can compare day totals against the *actual*
+   * daily target instead of the conservative age-band floor — keeping
+   * the censor and napBudget aligned on one "near trend" definition.
+   */
+  trendTotalMin?: number | null;
   /** User-set preferred bedtime ("HH:MM"), or null for follow-the-baby mode. */
   targetBedtime?: string | null;
   features?: Partial<PredictionFeatures>;

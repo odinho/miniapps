@@ -17,7 +17,8 @@ import {
 import { RESCUE_NAP, NAP_FLOOR_BY_AGE, findByAge } from "./constants.js";
 import { getTodayStats } from "./stats.js";
 import { computeConfidence, computeWakeRange } from "./confidence.js";
-import { computeNapBudget, isDayOnTrend, computeTrendTotalMin } from "./nap-budget.js";
+import { computeNapBudget, isDayOnTrend } from "./nap-budget.js";
+import { computeTrendTotalMin } from "./trend.js";
 import { calibrate } from "./calibration.js";
 import { computeStrategySignals } from "./features.js";
 import { selectStrategy } from "./strategy.js";
@@ -318,16 +319,33 @@ function buildContext(
   trendSleeps?: SleepEntry[],
   offDays?: Set<string>,
 ): BabyContext {
+  const tz = baby.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Compute the blended trend once and thread it through ctx — the censor
+  // (cap-respect carve-out) and the napBudget engine both consume the
+  // same number, so they can't disagree on what "near trend" means.
+  const trendTotalMin = computeTrendTotalMin(
+    trendSleeps ?? extendedSleeps ?? recentSleeps,
+    {
+      birthdate: baby.birthdate,
+      ageMonths: calculateAgeMonths(baby.birthdate, new Date(now)),
+      tz,
+      customNapCount: baby.custom_nap_count ?? null,
+      recentSleeps,
+      offDays,
+    },
+    now,
+  );
   return {
     birthdate: baby.birthdate,
     ageMonths: calculateAgeMonths(baby.birthdate, new Date(now)),
-    tz: baby.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+    tz,
     customNapCount: baby.custom_nap_count ?? null,
     targetBedtime: baby.target_bedtime ?? null,
     recentSleeps,
     extendedSleeps,
     trendSleeps,
     offDays,
+    trendTotalMin,
   };
 }
 

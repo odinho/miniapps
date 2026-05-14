@@ -22,12 +22,13 @@ import {
   NAP_BUDGET,
   NAP_FLOOR_BY_AGE,
   RESCUE_NAP,
-  SLEEP_NEEDS,
   findByAge,
 } from "./constants.js";
 import { isoToDateInTz } from "$lib/tz.js";
 import { estimateSleepCycleFromData } from "./schedule.js";
-import { getWeekStats } from "./stats.js";
+import { computeBlendedTrend, computeTrendTotalMin } from "./trend.js";
+
+export { computeTrendTotalMin };
 
 interface ComputeNapBudgetInput {
   /** Active nap. Must be type === 'nap'. */
@@ -80,23 +81,6 @@ interface ComputeNapBudgetInput {
  * Returns false (no suppression) when trend data is too sparse or noisy
  * to trust — the existing rescue behaviour stays in place by default.
  */
-/**
- * The blended 7d/30d daily-total trend in minutes, age-norm clamped. Same
- * value napBudget uses internally; exposed here so UI surfaces (the static
- * SleepInsightsCard) can show parents the trend goal instead of the
- * potentially-stale learnedSchedule total.
- *
- * Returns null when the data is too sparse or noisy to trust.
- */
-export function computeTrendTotalMin(
-  trendSleeps: SleepEntry[],
-  ctx: BabyContext,
-  now: number,
-): number | null {
-  const trend = computeBlendedTrend(trendSleeps, ctx.tz, now, ctx.ageMonths, ctx.offDays);
-  return trend ? Math.round(trend.blendedTrendMin) : null;
-}
-
 export function isDayOnTrend(
   trendSleeps: SleepEntry[],
   todaySleeps: SleepEntry[],
@@ -260,87 +244,6 @@ export function computeNapBudget(input: ComputeNapBudgetInput): NapBudget | null
 // ── Internal helpers ────────────────────────────────────────────────
 
 /**
- * Compute the blended trend target (7d / 30d) for daily total sleep.
- * Reuses `getWeekStats` so the numbers match what the parent reads on
- * the stats page exactly (start-anchored per-day totals). Returns null
- * when data is too sparse or too noisy to trust.
- */
-function computeBlendedTrend(
-  trendSleeps: SleepEntry[],
-  tz: string,
-  now: number,
-  ageMonths: number,
-  offDays?: Set<string>,
-): { blendedTrendMin: number; sourceLabel: string; mean7: number; mean30: number } | null {
-  const todayKey = isoToDateInTz(new Date(now).toISOString(), tz);
-  // Expand the off-day set to include the *previous* local date for each
-  // flagged day. getWeekStats anchors a night by its start_time, so the
-  // overnight that ended on Wed morning (started Tue 19:00 → ended Wed
-  // 06:00) lives in Tue's bucket. If the parent marks Wed off (sick
-  // morning), Tuesday's bucket is the one carrying the bad night data —
-  // skipping only Wed would still leak it into the trend. Skipping prev
-  // also drops Tue's daytime naps, which is a deliberate over-exclusion:
-  // a child sick enough that Wed is flagged was almost certainly already
-  // off-trend on Tue afternoon.
-  const skip = new Set<string>(offDays ?? []);
-  for (const k of offDays ?? []) {
-    skip.add(prevDateKey(k));
-  }
-
-  // Slice by start_time within the 30d window. getWeekStats groups by
-  // start-anchored local date — same convention as the stats page.
-  const cutoff30dMs = now - 30 * 86400_000;
-  const cutoff7dMs = now - 7 * 86400_000;
-  const within30 = trendSleeps.filter((s) => new Date(s.start_time).getTime() >= cutoff30dMs);
-  const within7 = trendSleeps.filter((s) => new Date(s.start_time).getTime() >= cutoff7dMs);
-
-  const stats30 = getWeekStats(within30, tz);
-  const stats7 = getWeekStats(within7, tz);
-
-  // Drop today (incomplete) and gather per-day totals (nap + night). A day
-  // counts as "complete" only when it carried a night entry — nap-only or
-  // night-fragment-only days would feed biased totals into the trend.
-  // (Naps without a same-day-anchored night are common when a parent
-  // forgot to log bedtime, or a fixture only has half a day.)
-  // Off-days (sick/travel/spurt/DST) are skipped — Codex 2026-05-13 review
-  // promoted this from v2 to v1 because variance gate fires AFTER noisy
-  // data accumulates, not on the first sick day.
-  const completedDays30 = stats30.days.filter(
-    (d) => d.date !== todayKey && d.stats.totalNightMinutes > 0 && !skip.has(d.date),
-  );
-  if (completedDays30.length < NAP_BUDGET.MIN_TREND_DAYS) return null;
-  const completedDays7 = stats7.days.filter(
-    (d) => d.date !== todayKey && d.stats.totalNightMinutes > 0 && !skip.has(d.date),
-  );
-
-  const totals30 = completedDays30.map((d) => d.stats.totalNapMinutes + d.stats.totalNightMinutes);
-  const totals7 = completedDays7.map((d) => d.stats.totalNapMinutes + d.stats.totalNightMinutes);
-
-  const mean30 = mean(totals30);
-  const mean7 = totals7.length > 0 ? mean(totals7) : mean30;
-
-  // Stability gate — recent stdev/mean too high means a bad week, sick
-  // day, or growth spurt is poisoning the target. Defer to "no advice"
-  // rather than push a confident-but-wrong cap.
-  const sd7 = stdev(totals7.length >= 3 ? totals7 : totals30, mean7);
-  if (sd7 / mean7 > NAP_BUDGET.MAX_STDEV_FRACTION) return null;
-
-  // Age-norm clamp. Never trim below or push above the published age
-  // range from SLEEP_NEEDS, so noisy data can't drag the target outside
-  // what's healthy on principle.
-  const ageBand = findByAge(SLEEP_NEEDS, ageMonths);
-  const minNormMin = ageBand.range[0] * 60;
-  const maxNormMin = ageBand.range[1] * 60;
-
-  const rawBlend = NAP_BUDGET.BLEND_WEIGHT_7D * mean7 + NAP_BUDGET.BLEND_WEIGHT_30D * mean30;
-  const blendedTrendMin = Math.max(minNormMin, Math.min(maxNormMin, rawBlend));
-
-  const sourceLabel =
-    totals30.length >= 14 ? "7d/30d-blanding" : "7d-snitt (lite data)";
-  return { blendedTrendMin, sourceLabel, mean7, mean30 };
-}
-
-/**
  * "Today's frame" sleep total, sleep-day-anchored.
  *
  * Sleep-day anchor = the morning wake (= end_time of the most recent
@@ -459,17 +362,6 @@ function estimateRemainingNapMin(
 }
 
 /**
- * Calendar-previous YYYY-MM-DD given a YYYY-MM-DD key. Used to expand the
- * off-day set so the previous overnight (whose start_time bucket sits on
- * the day before the off-day morning) is also dropped from trend math.
- * UTC math is safe here — we're shifting a date *key*, not an instant.
- */
-function prevDateKey(key: string): string {
-  const ms = new Date(`${key}T00:00:00Z`).getTime() - 86400_000;
-  return new Date(ms).toISOString().slice(0, 10);
-}
-
-/**
  * Local midnight (start of day) in the given IANA tz, as epoch ms. Used by
  * the sleep-day anchor fallback. Mirrors `todayInTz()` from src/lib/tz.ts
  * but takes an explicit `now` so it's deterministic in tests.
@@ -481,14 +373,4 @@ function localMidnightMs(now: number, tz: string): number {
   const localRef = asUtc.toLocaleString("en-US", { timeZone: tz });
   const offsetMs = new Date(localRef).getTime() - new Date(utcRef).getTime();
   return asUtc.getTime() - offsetMs;
-}
-
-function mean(xs: number[]): number {
-  return xs.reduce((a, b) => a + b, 0) / xs.length;
-}
-
-function stdev(xs: number[], mu?: number): number {
-  if (xs.length < 2) return 0;
-  const m = mu ?? mean(xs);
-  return Math.sqrt(xs.reduce((s, x) => s + (x - m) ** 2, 0) / (xs.length - 1));
 }

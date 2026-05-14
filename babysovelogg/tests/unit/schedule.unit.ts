@@ -507,6 +507,35 @@ describe("getLearnedNapDuration: right-censors cut-short parent-ended naps", () 
     );
   });
 
+  it("cap-respect carve-out: tightens with trend total (12h-day-but-13h-trend example)", () => {
+    // 4 cap-respect days with 60 min naps + 11h nights = 720 min/day.
+    // Age-band-min for 10mo (≈660 min) is the *floor*. The actual trend
+    // baseline for a Halldis-like baby is ~830 min (13.8h). With trend
+    // visible, dayTotal=720 falls below dayTarget=trend-30=800, so the
+    // carve-out should NOT fire and the woken naps should be censored —
+    // tightening the proxy from "day cleared age-band floor" to "day
+    // landed near trend".
+    const baseRows = [
+      { dur: 125, wokeBy: "self" as const },
+      { dur: 120, wokeBy: "self" as const },
+      { dur: 110, wokeBy: "self" as const },
+      { dur: 100, wokeBy: "self" as const },
+      { dur:  60, wokeBy: "woken" as const },
+      { dur:  60, wokeBy: "woken" as const },
+      { dur:  60, wokeBy: "woken" as const },
+      { dur:  60, wokeBy: "woken" as const },
+    ];
+    const withoutTrend = napCtx(baseRows); // ctx.trendTotalMin = undefined
+    const withTightTrend = napCtx(baseRows);
+    withTightTrend.trendTotalMin = 830;
+    // Sanity: without the trend, day total 720 clears age-band-min so
+    // the carve-out fires → learned drops below the self-only mean.
+    // With the tight trend, the same 720 falls below 830-30=800, the
+    // carve-out doesn't fire → woken naps censored → learned rises back.
+    expect(getLearnedNapDuration(withTightTrend))
+      .toBeGreaterThan(getLearnedNapDuration(withoutTrend));
+  });
+
   it("cap-respect carve-out: drops short woken naps on sleep-deficit days", () => {
     // Same shape as napCtx (one nap + ~13h night), but the 41-min nap
     // means total day sleep ≈ 11h41m which is BELOW the 9-12mo age-band

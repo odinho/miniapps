@@ -8,6 +8,7 @@ import {
 } from "./schedule.js";
 import { computeStrategySignals, computeSleepWindow, extractWakeWindows } from "./features.js";
 import { selectStrategy, type Strategy } from "./strategy.js";
+import { computeTrendTotalMin } from "./trend.js";
 
 /** A single day's recorded sleep data. */
 export interface DayRecord {
@@ -124,15 +125,28 @@ export function backtest(
     // Need at least 1 prior day to have any learning signal
     if (i < 1) continue;
 
-    // Build context for this day
+    // Build context for this day. Compute the same blended trend prod
+    // sets in `buildContext` so the cut-short censor's cap-respect
+    // carve-out evaluates here the same way it will in production —
+    // otherwise backtest MAE numbers would silently diverge from real
+    // behavior. Backtest uses the 21d extendedSleeps window in lieu of
+    // prod's 30d trend window; the trend gate (MIN_TREND_DAYS) still
+    // applies and the source label is "lite data" but the math is the same.
+    const ctxAgeMonths = calculateAgeMonths(birthdate, new Date(day.date + "T12:00:00Z"));
+    const trendTotalMin = computeTrendTotalMin(
+      extendedSleeps,
+      { birthdate, ageMonths: ctxAgeMonths, tz, customNapCount, recentSleeps },
+      dayMs,
+    );
     const ctx: BabyContext = {
       birthdate,
-      ageMonths: calculateAgeMonths(birthdate, new Date(day.date + "T12:00:00Z")),
+      ageMonths: ctxAgeMonths,
       tz,
       customNapCount,
       targetBedtime: day.target_bedtime ?? null,
       recentSleeps,
       extendedSleeps,
+      trendTotalMin,
       features,
     };
 

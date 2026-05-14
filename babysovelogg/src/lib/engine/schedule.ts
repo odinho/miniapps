@@ -1,4 +1,4 @@
-import { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, RESCUE_NAP, findByAge } from "./constants.js";
+import { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, RESCUE_NAP, NAP_BUDGET, findByAge } from "./constants.js";
 export { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, RESCUE_NAP, findByAge } from "./constants.js";
 export type { SleepEntry } from "$lib/types.js";
 import type { SleepEntry, BabyContext, PredictionFeatures } from "$lib/types.js";
@@ -854,7 +854,21 @@ function censorCutShortNaps(
     const dayKey = localDate(s.start_time, ctx.tz);
     totalMinByDay.set(dayKey, (totalMinByDay.get(dayKey) ?? 0) + dur);
   }
+  // Cap-respect carve-out target. The carve-out is meant to capture "the
+  // day landed near trend, so the parent ending the nap was a deliberate
+  // cap, not a deficit". Compare against the blended 7d/30d trend (set
+  // once in assembleState's buildContext so the censor and the napBudget
+  // engine see the same number) — that's the *actual* daily target the
+  // napBudget engine recommends to. Fall back to the conservative age-
+  // band floor when trend math returned null (sparse data, noisy week,
+  // sick spurt) or the caller didn't compute one. Without this, a day at
+  // 12 h (age-band-min for 9-12mo) but 1 h below a 13 h trend would
+  // still qualify, slightly under-stating learnedNapDuration on real
+  // cap-respect days.
   const ageBandMinTotalMin = findByAge(SLEEP_NEEDS, ctx.ageMonths).range[0] * 60;
+  const dayTargetMin = ctx.trendTotalMin != null
+    ? ctx.trendTotalMin - NAP_BUDGET.TOLERANCE_MIN
+    : ageBandMinTotalMin;
   // Anything below 30 min is a micro-nap regardless of position — never
   // qualifies for the cap-respect carve-out.
   const CAP_RESPECT_FLOOR_MIN = 30;
@@ -866,7 +880,7 @@ function censorCutShortNaps(
     if (
       lastNapByDay.get(s.localDate) === s
       && dur >= CAP_RESPECT_FLOOR_MIN
-      && (totalMinByDay.get(s.localDate) ?? 0) >= ageBandMinTotalMin
+      && (totalMinByDay.get(s.localDate) ?? 0) >= dayTargetMin
     ) {
       return true;
     }

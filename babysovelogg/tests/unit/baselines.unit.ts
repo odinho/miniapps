@@ -76,8 +76,8 @@ describe("baseline comparison", () => {
       "engine 6mo: 5 days, count 60% (3/5), nap MAE 56.5, dur MAE 27.7, bed MAE 28.7, wake MAE 19.9, nap bias +11, count bias -0.4
       engine 7mo: 31 days, count 77% (24/31), nap MAE 48.9, dur MAE 26.8, bed MAE 22.3, wake MAE 29.1, nap bias -8.8, count bias +0.16
       engine 8mo: 28 days, count 89% (25/28), nap MAE 26.9, dur MAE 18.9, bed MAE 15.8, wake MAE 21.8, nap bias +4.1, count bias +0.11
-      engine 9mo: 31 days, count 87% (27/31), nap MAE 50.5, dur MAE 26.1, bed MAE 25.2, wake MAE 26.3, nap bias -6.2, count bias 0
-      engine 10mo: 17 days, count 94% (16/17), nap MAE 29.4, dur MAE 26.5, bed MAE 19.4, wake MAE 22.9, nap bias +3.7, count bias -0.06
+      engine 9mo: 31 days, count 87% (27/31), nap MAE 50.5, dur MAE 26.2, bed MAE 25.2, wake MAE 26.3, nap bias -6.2, count bias 0
+      engine 10mo: 17 days, count 94% (16/17), nap MAE 29.4, dur MAE 26.8, bed MAE 19.4, wake MAE 23, nap bias +3.7, count bias -0.06
 
       age-default 6mo: 5 days, count 20% (1/5), nap MAE 40, dur MAE 20.8, bed MAE 44.9, wake MAE 28, nap bias +25.6, count bias -0.8
       age-default 7mo: 31 days, count 84% (26/31), nap MAE 68.6, dur MAE 30.6, bed MAE 64.9, wake MAE 46.2, nap bias -50.7, count bias +0.1
@@ -101,7 +101,7 @@ describe("baseline comparison", () => {
       weighted 7mo: 31 days, count 74% (23/31), nap MAE 51.1, dur MAE 27.6, bed MAE 45.9, wake MAE 29.1, nap bias -6.1, count bias +0.13
       weighted 8mo: 28 days, count 89% (25/28), nap MAE 33.4, dur MAE 17.7, bed MAE 31.2, wake MAE 21.8, nap bias +10.6, count bias +0.11
       weighted 9mo: 31 days, count 87% (27/31), nap MAE 85.5, dur MAE 29.3, bed MAE 61.8, wake MAE 26.3, nap bias -71.7, count bias 0
-      weighted 10mo: 17 days, count 94% (16/17), nap MAE 32.6, dur MAE 30, bed MAE 87.9, wake MAE 22.9, nap bias -11.2, count bias -0.06"
+      weighted 10mo: 17 days, count 94% (16/17), nap MAE 32.6, dur MAE 30, bed MAE 87.9, wake MAE 23, nap bias -11.2, count bias -0.06"
     `);
   });
 });

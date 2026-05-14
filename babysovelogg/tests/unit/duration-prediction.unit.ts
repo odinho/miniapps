@@ -149,8 +149,8 @@ describe("duration and wake-time prediction", () => {
   it("overall metrics", () => {
     expect(renderDurationMetrics(result)).toMatchInlineSnapshot(`
       "112 days
-      nap dur MAE: 24.3 min (bias +0.6)
-      nap end MAE: 50.9 min
+      nap dur MAE: 24.3 min (bias +0.8)
+      nap end MAE: 50.8 min
       wake time MAE: 25.2 min (bias -1.6)"
     `);
 
@@ -169,8 +169,8 @@ describe("duration and wake-time prediction", () => {
       "6mo: dur MAE 27.7, wake MAE 19.9
       7mo: dur MAE 26.8, wake MAE 29.1
       8mo: dur MAE 18.9, wake MAE 21.8
-      9mo: dur MAE 26.1, wake MAE 26.3
-      10mo: dur MAE 26.5, wake MAE 22.9"
+      9mo: dur MAE 26.2, wake MAE 26.3
+      10mo: dur MAE 26.8, wake MAE 23"
     `);
   });
 
@@ -194,7 +194,7 @@ describe("duration and wake-time prediction", () => {
 
   it("per-position duration (1st nap ≠ 2nd nap)", () => {
     expect(renderPositionalDurations()).toMatchInlineSnapshot(`
-      "nap 1: avg 77 min actual, MAE 24.7, bias -0.2 (n=112)
+      "nap 1: avg 77 min actual, MAE 24.8, bias +0.1 (n=112)
       nap 2: avg 61 min actual, MAE 23.3, bias +2.1 (n=58)
       nap 3: avg 60 min actual, MAE 26.4, bias -2.9 (n=2)"
     `);
