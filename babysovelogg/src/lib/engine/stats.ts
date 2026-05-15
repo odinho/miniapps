@@ -217,6 +217,14 @@ export interface HeatmapRow {
 /** Build a sleep heatmap: minutes of sleep per hour-of-day, grouped by date. */
 export function buildSleepHeatmap(sleeps: SleepEntry[], tz?: string): HeatmapRow[] {
   const rows = new Map<string, number[]>();
+  const getOrInit = (date: string): number[] => {
+    let r = rows.get(date);
+    if (!r) {
+      r = Array.from({ length: 24 }, () => 0);
+      rows.set(date, r);
+    }
+    return r;
+  };
 
   for (const s of sleeps) {
     if (!s.end_time) continue;
@@ -224,20 +232,21 @@ export function buildSleepHeatmap(sleeps: SleepEntry[], tz?: string): HeatmapRow
     const endMs = new Date(s.end_time).getTime();
     if (endMs <= startMs) continue;
 
-    // Walk through each hour slot the sleep overlaps
-    // Anchor to the start date; a sleep crossing midnight contributes to the start date's row
-    const date = tz ? isoToDateInTz(s.start_time, tz) : s.start_time.slice(0, 10);
-    if (!rows.has(date)) rows.set(date, Array.from({ length: 24 }, () => 0));
-    const row = rows.get(date)!;
-
-    // Get start hour in local time
+    // Distribute the sleep's minutes per (date, hour) slot. A sleep that
+    // crosses midnight contributes its pre-midnight minutes to the start
+    // date's row and its post-midnight minutes to the *next* date's row —
+    // the previous implementation lumped everything on the start date,
+    // which left every morning's overnight portion missing from the day
+    // a parent would naturally look at it under (e.g. last night's 00-06
+    // showing on Thursday's row instead of Friday's).
     const startDate = new Date(startMs);
     const startHourFrac = tz ? getHourInTz(startDate, tz) : startDate.getHours() + startDate.getMinutes() / 60;
     const totalMinutes = (endMs - startMs) / 60000;
 
-    // Distribute minutes across hour slots
     let remaining = totalMinutes;
     let currentHourFrac = startHourFrac;
+    let currentDate = tz ? isoToDateInTz(s.start_time, tz) : s.start_time.slice(0, 10);
+    let row = getOrInit(currentDate);
 
     while (remaining > 0) {
       const hourIdx = Math.floor(currentHourFrac) % 24;
@@ -246,10 +255,20 @@ export function buildSleepHeatmap(sleeps: SleepEntry[], tz?: string): HeatmapRow
       const chunk = Math.min(remaining, minutesLeftInSlot);
       row[hourIdx] += chunk;
       remaining -= chunk;
-      currentHourFrac = (hourIdx + 1) % 24;
+      const nextHour = hourIdx + 1;
+      if (nextHour >= 24) {
+        // Wrapped past midnight — advance to the next calendar date so
+        // post-midnight minutes land on the morning the parent slept into.
+        currentDate = nextLocalDate(currentDate);
+        row = getOrInit(currentDate);
+      }
+      currentHourFrac = nextHour % 24;
     }
+  }
 
-    // Cap each slot at 60 min
+  // Cap each slot at 60 min after aggregation (multiple sleeps could
+  // overlap an hour due to logging quirks or data import).
+  for (const row of rows.values()) {
     for (let i = 0; i < 24; i++) {
       if (row[i] > 60) row[i] = 60;
     }
@@ -258,4 +277,11 @@ export function buildSleepHeatmap(sleeps: SleepEntry[], tz?: string): HeatmapRow
   return [...rows.entries()]
     .toSorted(([a], [b]) => a.localeCompare(b))
     .map(([date, hours]) => ({ date, hours: hours.map((m) => Math.round(m)) }));
+}
+
+/** Calendar next YYYY-MM-DD for a YYYY-MM-DD key. UTC math is safe — we're
+ * shifting a date *key*, not an instant, so DST doesn't bite. */
+function nextLocalDate(key: string): string {
+  const ms = new Date(`${key}T00:00:00Z`).getTime() + 86400_000;
+  return new Date(ms).toISOString().slice(0, 10);
 }

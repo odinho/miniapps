@@ -293,17 +293,24 @@ describe("buildSleepHeatmap", () => {
     expect(rows[0].hours[9]).toBe(60); // capped
   });
 
-  it("distributes cross-midnight sleep across correct hour slots", () => {
+  it("splits cross-midnight sleep into the start AND end date rows", () => {
+    // The morning portion of an overnight belongs to the day the parent
+    // slept *into* — otherwise the Søvnkart row for "today" reads empty
+    // for 00-06 even though the baby was clearly sleeping then.
     const sleeps: SleepEntry[] = [
       sleep("2026-03-25T22:30:00.000Z", "2026-03-26T02:15:00.000Z", "night"),
     ];
     const rows = buildSleepHeatmap(sleeps);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].hours[22]).toBe(30);   // 22:30–23:00
-    expect(rows[0].hours[23]).toBe(60);   // 23:00–00:00
-    expect(rows[0].hours[0]).toBe(60);    // 00:00–01:00
-    expect(rows[0].hours[1]).toBe(60);    // 01:00–02:00
-    expect(rows[0].hours[2]).toBe(15);    // 02:00–02:15
+    expect(rows).toHaveLength(2);
+    const [mar25, mar26] = rows;
+    expect(mar25.date).toBe("2026-03-25");
+    expect(mar25.hours[22]).toBe(30); // 22:30–23:00
+    expect(mar25.hours[23]).toBe(60); // 23:00–00:00
+    expect(mar25.hours[0]).toBe(0);   // morning portion is on mar26 now
+    expect(mar26.date).toBe("2026-03-26");
+    expect(mar26.hours[0]).toBe(60);  // 00:00–01:00
+    expect(mar26.hours[1]).toBe(60);  // 01:00–02:00
+    expect(mar26.hours[2]).toBe(15);  // 02:00–02:15
   });
 
   it("groups multiple days", () => {

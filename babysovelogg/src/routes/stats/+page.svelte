@@ -17,6 +17,7 @@
 		getNextSleepMilestone,
 		formatAge,
 	} from '$lib/settings-utils.js';
+	import SleepInsightsCard from '$lib/components/SleepInsightsCard.svelte';
 
 	const s = $derived(appState.state);
 	const baby = $derived(s.baby);
@@ -124,33 +125,45 @@
 	<!-- Unified comparison: Norm vs Baby -->
 	{#if baby}
 		<div class="stats-section">
-			<h3 class="stats-section-title">{baby.name} vs. norm ({formatAge(baby.birthdate)})</h3>
-			<div class="sleep-info-panel" style="overflow: hidden;">
-				<table class="comparison-table">
-					<thead>
-						<tr>
-							<th></th>
-							<th>{hasAltNorm ? `${comparisonRows.find(r => r.label === 'Lurar')?.norm ?? ''}‑lur` : 'Norm'}</th>
-							{#if hasAltNorm}
-								<th>{comparisonRows.find(r => r.label === 'Lurar')?.altNorm ?? ''}‑lur</th>
+			<div class="stats-section-head">
+				<h3 class="stats-section-title">{baby.name} vs. norm ({formatAge(baby.birthdate)})</h3>
+				<details class="help-disclosure">
+					<summary aria-label="Forklaring">?</summary>
+					<p>
+						Norm-tala er typiske verdiar for alderen — frå publisert forsking
+						(Galland 2012, AAP). {baby.name}-tala er det appen har lært frå dei
+						siste 7 dagane. Når barnet har eit anna lurmønster enn alderssnittet
+						(t.d. 1 lur i staden for 2), viser me begge normsetta inline.
+					</p>
+				</details>
+			</div>
+			<!--
+				Card-list layout: one row per metric, the baby's value on the
+				right (the punchline), the norm range as sub-text below. The
+				earlier 3- or 4-column table overflowed on mobile and clipped
+				the baby column — exactly the column the parent came to read.
+				When the baby's nap count differs from age norm we show both
+				norms inline ("2-lur 1t04 · 1-lur 2t08") so the comparison
+				still works without a second column.
+			-->
+			<div class="comparison-panel sleep-info-panel">
+				{#each comparisonRows as row}
+					{@const napHead = comparisonRows.find(r => r.label === 'Lurar')}
+					<div class="comparison-row">
+						<div class="comparison-row-head">
+							<span class="comparison-row-label">{row.label}</span>
+							<span class="comparison-row-actual">{row.actual}</span>
+						</div>
+						<div class="comparison-row-norm">
+							{#if hasAltNorm && row.altNorm && row.norm !== row.altNorm}
+								{napHead?.norm ?? ''}-lur: {row.norm} · {napHead?.altNorm ?? ''}-lur: {row.altNorm}
+							{:else}
+								Norm {row.norm}
 							{/if}
-							<th>{baby.name}</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each comparisonRows as row}
-							<tr>
-								<td class="comparison-label">{row.label}</td>
-								<td class="comparison-val">{row.norm}</td>
-								{#if hasAltNorm}
-									<td class="comparison-val comparison-alt">{row.altNorm ?? ''}</td>
-								{/if}
-								<td class="comparison-val comparison-actual">{row.actual}</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-				<p style="font-size: 0.7rem; color: var(--text-light); margin: 6px 12px 0; line-height: 1.3;">
+						</div>
+					</div>
+				{/each}
+				<p class="comparison-footnote">
 					Normverdiar er omtrentlege og varierer mellom barn. {baby.name}-verdiane er baserte på dei siste 7 dagane.
 				</p>
 			</div>
@@ -160,8 +173,20 @@
 					data-testid="pred-panel"
 					style="margin-top: 12px; padding: 12px; background: var(--lavender); border-radius: var(--radius-sm);"
 				>
-					<div style="font-weight: 600; margin-bottom: 8px; font-size: 0.9rem;">
-						Appen reknar med
+					<div class="pred-panel-head">
+						<span style="font-weight: 600; font-size: 0.9rem;">Appen reknar med</span>
+						<!-- Inline help: small (?) toggle reveals a one-paragraph
+						     explanation. Defaults closed so the section stays
+						     compact for parents who already understand it. -->
+						<details class="help-disclosure">
+							<summary aria-label="Forklaring">?</summary>
+							<p>
+								Dagens spesifikke prediksjonar — kva tid neste lur og leggetid kjem,
+								og kor mykje søvn som er logga så langt i dag. Tider med tilde (~)
+								er estimat basert på dei siste dagane og kan flytta seg etter kvart
+								som dagen utviklar seg.
+							</p>
+						</details>
 					</div>
 					{#each predictionRows as row}
 						<div class="stats-trend-row">
@@ -169,6 +194,23 @@
 							<div class="stats-trend-val">{row.value}</div>
 						</div>
 					{/each}
+				</div>
+			{/if}
+
+			<!--
+				Pull in the home-page SleepInsightsCard so the stats page carries
+				the same learned-schedule overview the parent sees on the home
+				screen — feedback was that "Appen reknar med" felt sparse compared
+				to the front. Card collapses by default; same trust badge + trend
+				comparison logic.
+			-->
+			{#if s.prediction?.learnedSchedule}
+				<div style="margin-top: 12px;">
+					<SleepInsightsCard
+						schedule={s.prediction.learnedSchedule}
+						calibration={s.prediction.calibration}
+						dailyTrendTotalMin={s.prediction.dailyTrendTotalMin}
+					/>
 				</div>
 			{/if}
 
@@ -647,54 +689,103 @@
 		cursor: pointer;
 	}
 
-	.comparison-table {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 0.85rem;
+	/* --- comparison: norm vs baby, card-list (mobile-first, no overflow) --- */
+	.comparison-panel {
+		padding: 4px 4px 0;
 	}
 
-	.comparison-table th {
-		padding: 8px 10px;
-		text-align: right;
-		font-size: 0.7rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.02em;
-		color: var(--text-light);
-		border-bottom: 1px solid var(--cream-dark);
-		white-space: nowrap;
-	}
-
-	.comparison-table th:first-child {
-		text-align: left;
-	}
-
-	.comparison-table td {
-		padding: 7px 10px;
+	.comparison-row {
+		padding: 8px 12px;
 		border-bottom: 1px solid var(--cream-dark);
 	}
 
-	.comparison-table tbody tr:last-child td {
+	.comparison-row:last-of-type {
 		border-bottom: none;
 	}
 
-	.comparison-label {
-		color: var(--text-light);
-		font-size: 0.8rem;
+	.comparison-row-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		gap: 12px;
 	}
 
-	.comparison-val {
-		text-align: right;
-		font-weight: 500;
-		font-variant-numeric: tabular-nums;
-		white-space: nowrap;
+	.comparison-row-label {
+		font-size: 0.85rem;
+		color: var(--text);
 	}
 
-	.comparison-alt {
-		opacity: 0.6;
-	}
-
-	.comparison-actual {
+	.comparison-row-actual {
+		font-size: 1.05rem;
 		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+		/* Allow the value to shrink-wrap; never let it get clipped. */
+		flex-shrink: 0;
+	}
+
+	.comparison-row-norm {
+		font-size: 0.72rem;
+		color: var(--text-light);
+		margin-top: 2px;
+		line-height: 1.3;
+	}
+
+	.comparison-footnote {
+		font-size: 0.7rem;
+		color: var(--text-light);
+		margin: 8px 12px 6px;
+		line-height: 1.3;
+	}
+
+	/* --- inline (?) help disclosures --- */
+	.stats-section-head,
+	.pred-panel-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 8px;
+		margin-bottom: 8px;
+	}
+
+	.help-disclosure {
+		font-size: 0.85rem;
+	}
+
+	.help-disclosure summary {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 22px;
+		height: 22px;
+		border-radius: 50%;
+		background: var(--cream-dark, rgba(255, 255, 255, 0.06));
+		color: var(--text-light);
+		cursor: pointer;
+		font-weight: 600;
+		font-size: 0.78rem;
+		list-style: none;
+		user-select: none;
+		transition: background 0.15s, color 0.15s;
+	}
+
+	.help-disclosure summary::-webkit-details-marker {
+		display: none;
+	}
+
+	.help-disclosure summary:hover,
+	.help-disclosure[open] summary {
+		background: var(--lavender);
+		color: var(--text);
+	}
+
+	.help-disclosure p {
+		margin: 8px 0 0;
+		font-size: 0.78rem;
+		line-height: 1.4;
+		color: var(--text-light);
+		background: var(--lavender);
+		padding: 10px 12px;
+		border-radius: var(--radius-sm);
 	}
 </style>
