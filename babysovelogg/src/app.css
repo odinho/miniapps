@@ -1065,10 +1065,6 @@ html, body {
 }
 
 /* --- Off-day toggle (sick/travel/spurt/DST — skipped from trend) --- */
-.off-day-row {
-  margin: 8px 16px 0;
-}
-
 .off-day-btn {
   width: 100%;
   padding: 8px 12px;

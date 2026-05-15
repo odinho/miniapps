@@ -21,7 +21,6 @@
 	import ManualSleepModal from '$lib/components/ManualSleepModal.svelte';
 	import SleepInsightsCard from '$lib/components/SleepInsightsCard.svelte';
 	import { isoToDateInTz } from '$lib/tz.js';
-	import { toggleOffDay } from '$lib/off-day-actions.js';
 
 	// --- modal state ---
 	let showTagSheet = $state(false);
@@ -415,22 +414,6 @@
 		showMorningManualSleep = false;
 	}
 
-	// Off-day toggle. Sick/travel/spurt/DST days that should be excluded
-	// from the napBudget trend so a bad week doesn't pull the engine's
-	// recommendations sideways. Reason is free-text for now (v1).
-	const isOffDay = $derived((todayWakeUp?.off_day ?? 0) === 1);
-	let offDayBusy = $state(false);
-	async function toggleOffDayToday() {
-		if (offDayBusy || !baby) return;
-		offDayBusy = true;
-		try {
-			const date = todayWakeUp?.date
-				?? isoToDateInTz(new Date().toISOString(), baby.timezone || 'UTC');
-			await toggleOffDay(baby.id, date, isOffDay);
-		} finally {
-			offDayBusy = false;
-		}
-	}
 </script>
 
 {#if !loaded}
@@ -674,23 +657,6 @@
 				dailyTrendTotalMin={prediction.dailyTrendTotalMin}
 			/>
 		{/if}
-
-		<div class="off-day-row">
-			<button
-				class="off-day-btn"
-				class:active={isOffDay}
-				onclick={toggleOffDayToday}
-				disabled={offDayBusy}
-				data-testid="off-day-toggle"
-				aria-pressed={isOffDay}
-			>
-				{#if isOffDay}
-					✅ Utypisk dag · halden utanfor trenden
-				{:else}
-					🤒 Utypisk dag (sjuk / reise / o.l.)
-				{/if}
-			</button>
-		</div>
 
 		<!-- Spacer to push stats down -->
 		<div style="flex: 1;"></div>
