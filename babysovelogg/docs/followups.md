@@ -232,3 +232,69 @@ These are non-bug improvements both reviewers want:
 - Strategy override (`StrategyOverride`) through `assembleState`.
 - `nextNap` consistency across shuffled `todaySleeps` order (currently
   every test assumes prod's DESC ordering).
+
+## Arc test coverage — keep visual-rendering regressions from slipping
+
+The Arc has now regressed three times on rendering bugs the unit
+tests couldn't catch (1: night-mode duplicate "06:00 / 06:03" wake
+labels; 2: post-bedtime overrun visualisation; 3: 2026-05-17 — peach
+wake-band in night mode cued as "elapsed paint", invisible 13-min
+active bubble, marker/endpoint label duplicate when wakeFrac fell
+inside `1 - ARC_ENDPOINT_PROXIMITY`). Each time we landed a fix and
+each time the unit tests passed before *and* after — because the
+tests cover `arc-utils.ts` math (`timeToArcFraction`,
+`isAtArcEndpoint`, `fracToPoint`) but not what the SVG component
+actually composes from those primitives.
+
+Three levels of coverage to consider, picking the lightest first:
+
+1. **Snapshot the rendered-element bundle, not the SVG string.**
+   `Arc.svelte` already derives a structured `renderedBubbles[]`,
+   `plannedTrack`, `activeWakeBandPath`, plus geometry for the now-
+   marker, skipped blob, and rescue blob. Extract those derivations
+   into a pure `composeArc({sleeps, activeSleep, prediction, now,
+   config})` returning a plain `ArcScene` object — bubbles with their
+   labels, paths, colours, dot/path discriminator, marker visibility,
+   wake-band fraction range. Then assert *that object* in unit tests
+   for the scenarios that have bitten us:
+   - Active night sleep at +13 min: bubble dot rendered, wake-band
+     coloured `var(--moon)`, marker suppressed because its label
+     equals the right-endpoint label.
+   - Active nap mid-cycle: bubble path present, wake-band peach,
+     marker only when its label differs from the endpoint.
+   - Cut-short → continuation: rescue blob present, skipped blob
+     absent.
+   - Post-bedtime overrun: now-marker still visible, planned-track
+     tick still visible past the bubble end.
+   This catches the dedup/color/visibility class of bug without a
+   browser. The composition function would be the single home for
+   the rules currently scattered across the Svelte component.
+
+2. **Playwright visual snapshots for a handful of canonical scenes.**
+   `arc.e2e.ts` already exists; today it asserts "arc visible" but
+   not what's *in* it. Pin 6-8 canonical scenes (active nap mid-
+   cycle, active night just-started, after-bedtime with cycle hint,
+   skipped + rescue blob, etc.) with `expect(arc).toHaveScreenshot()`
+   on a deterministic clock. Costs a screenshot diff CI step; in
+   return, the kind of bug a screenshot would show but
+   `composeArc({})` might not (e.g. SVG stacking order, opacity
+   compositing, `<text>` baseline alignment with non-Latin chars).
+
+3. **A small CLI dev surface that prints `ArcScene` as ASCII.** Like
+   the `renderTimeline` follow-up above but for the arc — top of the
+   clock, two endpoints, "now" tick, bubbles between, marker labels.
+   Cheap, debuggable in a terminal, useful in commit messages.
+
+Recommendation: start with #1. The 2026-05-17 bugs were all
+expressible as object-level assertions (`expect(scene.wakeBand.color
+).toBe('moon')`, `expect(scene.markers.find(m => m.label === '05:49').
+length).toBe(1)`). The composition extraction is also useful on its
+own — `Arc.svelte`'s logic gets pure, the Svelte file shrinks to
+mostly markup.
+
+Concrete first targets if/when this gets picked up:
+- `src/lib/arc-scene.ts` exporting `composeArc({sleeps, activeSleep,
+  prediction, now, config}): ArcScene`.
+- `tests/unit/arc-scene.unit.ts` with the four scenarios above.
+- Migrate `Arc.svelte` to consume the helper instead of computing
+  inline (no behaviour change, mostly a move).
