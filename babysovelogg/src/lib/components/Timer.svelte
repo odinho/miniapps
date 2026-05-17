@@ -120,6 +120,15 @@
 	{:else if mode.kind === 'after-bedtime'}
 		<div class="arc-center-label">Etter leggetid</div>
 		<span class="countdown-value">{formatTime(mode.bedtime)}</span>
+		{#if mode.nextCycleTarget}
+			<!-- Cycle-aligned next target. Helps the parent decide whether
+			     to put baby down now or wait the few minutes until the next
+			     light-phase boundary. -->
+			<div class="arc-sub-label" style="opacity: 0.8;">
+				💡 Neste søvnsyklus kl. {formatTime(mode.nextCycleTarget)}
+				<span style="opacity: 0.7;">({formatDuration(new Date(mode.nextCycleTarget).getTime() - (nowMs ?? Date.now()))} att, ~{mode.cycleMin}m-syklus)</span>
+			</div>
+		{/if}
 	{:else if mode.kind === 'skipped-nap'}
 		<div class="arc-center-label">Hoppa over lur</div>
 		<span class="countdown-value" style="font-size: 2.2rem;">{formatTime(mode.plannedAt)}</span>

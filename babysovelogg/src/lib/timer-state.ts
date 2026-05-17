@@ -30,7 +30,20 @@ export type TimerMode =
 	| { kind: 'next-nap'; countdown: number }
 	| { kind: 'overtime'; overtime: number }
 	| { kind: 'bedtime'; countdown: number; bedtime: string }
-	| { kind: 'after-bedtime'; bedtime: string }
+	| {
+			kind: 'after-bedtime';
+			bedtime: string;
+			/**
+			 * Next ~50min sleep-cycle-aligned target after the planned bedtime.
+			 * Parents who miss the original window often want to wait briefly
+			 * and put the baby down at a cycle boundary instead of stewing on
+			 * "bedtime was 18:00" — same N1→N2→cycle-boundary easy-onset
+			 * mechanic the wake-recommendation logic leans on.
+			 */
+			nextCycleTarget: string | null;
+			/** Cycle length (minutes) used to compute the target. */
+			cycleMin: number;
+	  }
 	| { kind: 'sleep-window'; windowStart: number; windowEnd: number; pressure: 'low' | 'rising' | 'high' }
 	| {
 			kind: 'skipped-nap';
@@ -96,11 +109,23 @@ export function getTimerMode(input: TimerInput): TimerMode {
 		};
 	}
 
-	// Newborn: always use sleep window mode
-	// Emerging: use sleep window when schedule has no nextNap (low confidence)
+	const bedtimeMs = prediction?.bedtime ? new Date(prediction.bedtime).getTime() : null;
+	// "Close to bedtime" — within 90 min. Once this fires the parent's
+	// focus is bedtime, not a wake-window. 90 min is a conservative
+	// floor: the typical 11mo wake-window before bed is 3-5 h, but a
+	// nap that would START 90 min before bedtime would also END too
+	// close, so we treat that whole window as bedtime territory.
+	const closeToBedtime = bedtimeMs != null && bedtimeMs - now < 90 * 60_000;
+	const cycleMin = prediction?.learnedSchedule?.sleepCycleMin ?? 45;
+
+	// Newborn: always use sleep window mode.
+	// Emerging: use sleep window when schedule has no nextNap AND bedtime
+	// isn't close — once bedtime is near, the parent's mental model is
+	// "wait for bedtime", and showing 'Søvnvindauge no 💤' at 17:44 with
+	// bedtime at 18:17 lands somewhere between unhelpful and incorrect.
 	const usesSleepWindow = prediction?.sleepWindow && prediction.sleepPressure && (
 		prediction.strategy === 'newborn_guidance'
-		|| (prediction.strategy === 'emerging_rhythm' && !prediction.nextNap)
+		|| (prediction.strategy === 'emerging_rhythm' && !prediction.nextNap && !closeToBedtime)
 	);
 	if (usesSleepWindow) {
 		const windowStart = new Date(prediction!.sleepWindow!.earliest).getTime() - now;
@@ -114,7 +139,6 @@ export function getTimerMode(input: TimerInput): TimerMode {
 	// the misleading "Leggetid om 8t" the regular bedtime branch would show.
 	if (prediction?.skippedNap) {
 		const plannedMs = new Date(prediction.skippedNap.plannedAt).getTime();
-		const bedtimeMs = prediction.bedtime ? new Date(prediction.bedtime).getTime() : null;
 		return {
 			kind: 'skipped-nap',
 			plannedAt: prediction.skippedNap.plannedAt,
@@ -131,10 +155,9 @@ export function getTimerMode(input: TimerInput): TimerMode {
 		const isEvening = currentHour >= 20;
 		const showBedtime = prediction.napsAllDone || isEvening;
 
-		if (showBedtime && prediction.bedtime) {
-			const bedtimeMs = new Date(prediction.bedtime).getTime();
+		if (showBedtime && prediction.bedtime && bedtimeMs != null) {
 			if (bedtimeMs < now) {
-				return { kind: 'after-bedtime', bedtime: prediction.bedtime };
+				return makeAfterBedtime(prediction.bedtime, bedtimeMs, now, cycleMin);
 			}
 			return { kind: 'bedtime', countdown: bedtimeMs - now, bedtime: prediction.bedtime };
 		}
@@ -146,7 +169,44 @@ export function getTimerMode(input: TimerInput): TimerMode {
 		return { kind: 'overtime', overtime: now - nextNapMs };
 	}
 
+	// Bedtime fallback. The engine left us without a concrete nextNap
+	// (emerging-rhythm often hits this when the predicted next nap is
+	// inside the bedtime buffer and gets filtered out). If bedtime itself
+	// is on the table, surface that — beats falling through to 'idle' and
+	// telling the parent nothing.
+	if (prediction?.bedtime && bedtimeMs != null) {
+		if (bedtimeMs < now) {
+			return makeAfterBedtime(prediction.bedtime, bedtimeMs, now, cycleMin);
+		}
+		return { kind: 'bedtime', countdown: bedtimeMs - now, bedtime: prediction.bedtime };
+	}
+
 	return { kind: 'idle' };
+}
+
+/**
+ * Build the `after-bedtime` mode, including the next cycle-aligned target.
+ * A parent who missed the planned bedtime by ~25 min often does better
+ * waiting until the next ~50-min cycle boundary than putting the baby
+ * down at a random "in-between" point — the boundaries line up with the
+ * baby's natural light/easy-onset windows. The target is `bedtime + N *
+ * cycleMin` where N is the smallest integer that pushes it past `now`.
+ */
+function makeAfterBedtime(
+	bedtime: string,
+	bedtimeMs: number,
+	now: number,
+	cycleMin: number,
+): TimerMode {
+	const minutesPastBedtime = (now - bedtimeMs) / 60_000;
+	const cyclesPast = Math.max(1, Math.ceil(minutesPastBedtime / cycleMin));
+	const nextCycleMs = bedtimeMs + cyclesPast * cycleMin * 60_000;
+	return {
+		kind: 'after-bedtime',
+		bedtime,
+		nextCycleTarget: new Date(nextCycleMs).toISOString(),
+		cycleMin,
+	};
 }
 
 /** Awake-since duration in ms, or null if unknown. */

@@ -453,3 +453,174 @@ describe("getTimerMode — skipped-nap state", () => {
     }
   });
 });
+
+// ── Timeline regression suite ─────────────────────────────────────────
+//
+// The shape every other test in this file leans on is "single point in
+// time, single prediction". That left a class of bugs (transitions
+// between modes across a day) silently uncovered — the 2026-05-17
+// screenshot was exactly that: at 17:44 with bedtime at 18:17, an
+// emerging-rhythm prediction whose next-nap got filtered out flipped
+// the Timer into 'sleep-window' instead of the bedtime countdown a
+// parent would expect.
+//
+// What this suite does: pin the timer mode at many timestamps across
+// the day for several baby archetypes. Adding a regression here is
+// cheap and the failure messages name the exact transition that
+// broke.
+describe("timer-mode timeline", () => {
+  type TimerMode = ReturnType<typeof getTimerMode>;
+  interface TimelinePoint {
+    /** Local time-of-day for the assertion, "HH:MM". */
+    at: string;
+    expectedKind: TimerMode["kind"];
+    /** Optional per-moment overrides on the base input. Real days have
+     *  predictions that mutate as events fire — this lets a single
+     *  timeline describe that progression. */
+    inputOverrides?: (base: TimerInput) => TimerInput;
+    /** Optional extra assertion against the resolved mode. */
+    check?: (mode: TimerMode) => void;
+  }
+
+  function runTimeline(
+    label: string,
+    date: string,
+    baseInput: () => TimerInput,
+    points: TimelinePoint[],
+  ): void {
+    it(label, () => {
+      for (const p of points) {
+        const at = new Date(`${date}T${p.at}:00.000Z`).getTime();
+        const base: TimerInput = { ...baseInput(), now: at };
+        const input = p.inputOverrides ? p.inputOverrides(base) : base;
+        const mode = getTimerMode({ ...input, now: at });
+        expect(mode.kind, `${label} @ ${p.at}: expected ${p.expectedKind}, got ${mode.kind}`)
+          .toBe(p.expectedKind);
+        if (p.check) p.check(mode);
+      }
+    });
+  }
+
+  // Archetype 1 — Halldis-shaped 11mo on emerging_rhythm whose 2nd nap
+  // is the one that gets filtered out near bedtime. Reproduces the
+  // 2026-05-17 screenshot.
+  runTimeline(
+    "emerging 11mo + no 2nd-nap prediction + bedtime ~18:17: never falls into sleep-window in the final ~90 min",
+    "2026-05-17",
+    () => {
+      const pred = makePrediction({
+        strategy: "emerging_rhythm",
+        // Emerging emits a sleep window even when nextNap is also set;
+        // the original bug was sleep-window winning over bedtime here.
+        sleepWindow: { earliest: "2026-05-17T17:30:00.000Z", latest: "2026-05-17T18:30:00.000Z" },
+        sleepPressure: "high",
+        nextNap: null,             // 2nd nap filtered out
+        napsAllDone: false,
+        bedtime: "2026-05-17T18:17:00.000Z",
+        expectedNapCount: 2,
+        learnedSchedule: {
+          napDurationMin: 90, nightDurationMin: 720, wakeWindowMin: 240,
+          bedtimeWakeWindowMin: 240, expectedNapCount: 2, sleepCycleMin: 50,
+        },
+      });
+      return makeInput({ prediction: pred });
+    },
+    [
+      // Well before bedtime → sleep-window allowed (no other countdown to anchor on).
+      { at: "14:00", expectedKind: "sleep-window" },
+      // 90+ min before bedtime → still sleep-window territory.
+      { at: "16:30", expectedKind: "sleep-window" },
+      // 33 min before bedtime — the screenshot moment. Must NOT be
+      // sleep-window; the parent's mental model is bedtime now.
+      { at: "17:44", expectedKind: "bedtime", check: (m) => {
+        if (m.kind === "bedtime") expect(m.bedtime).toBe("2026-05-17T18:17:00.000Z");
+      } },
+      // Past bedtime — second screenshot moment. Show after-bedtime
+      // with a cycle target so the parent knows when to try again.
+      { at: "18:39", expectedKind: "after-bedtime", check: (m) => {
+        if (m.kind === "after-bedtime") {
+          expect(m.nextCycleTarget).not.toBeNull();
+          expect(m.cycleMin).toBe(50);
+          // First cycle target past 18:39 is 18:17 + 50min = 19:07.
+          expect(m.nextCycleTarget).toBe("2026-05-17T19:07:00.000Z");
+        }
+      } },
+    ],
+  );
+
+  // Archetype 2 — routine_schedule, normal day with prediction
+  // overrides for the evening (after the nap is logged).
+  runTimeline(
+    "routine 11mo: deep-night → next-nap → overtime → bedtime → after-bedtime",
+    "2026-05-17",
+    () => {
+      const pred = makePrediction({
+        strategy: "routine_schedule",
+        nextNap: "2026-05-17T10:30:00.000Z",
+        bedtime: "2026-05-17T18:30:00.000Z",
+        napsAllDone: false,
+        expectedNapCount: 1,
+        learnedSchedule: {
+          napDurationMin: 90, nightDurationMin: 720, wakeWindowMin: 240,
+          bedtimeWakeWindowMin: 240, expectedNapCount: 1, sleepCycleMin: 45,
+        },
+      });
+      return makeInput({
+        prediction: pred,
+        todayWakeUp: { wake_time: "2026-05-17T05:30:00.000Z" },
+      });
+    },
+    [
+      { at: "02:30", expectedKind: "deep-night" },
+      { at: "07:00", expectedKind: "next-nap" },
+      { at: "11:00", expectedKind: "overtime" }, // 30 min past predicted nap, not yet skipped
+      // After nap completed, prediction collapses napsAllDone → bedtime.
+      { at: "17:00", expectedKind: "bedtime", inputOverrides: (base) => ({
+        ...base,
+        prediction: makePrediction({
+          ...base.prediction!,
+          nextNap: "2026-05-17T18:30:00.000Z",
+          napsAllDone: true,
+        }),
+      }) },
+      { at: "18:35", expectedKind: "after-bedtime", inputOverrides: (base) => ({
+        ...base,
+        prediction: makePrediction({
+          ...base.prediction!,
+          nextNap: "2026-05-17T18:30:00.000Z",
+          napsAllDone: true,
+        }),
+      }) },
+    ],
+  );
+
+  // Archetype 3 — the user's "post-bedtime" UX request. Past bedtime,
+  // cycle target should be the *next* boundary, not a stale one.
+  runTimeline(
+    "after-bedtime cycle target advances as cycles pass",
+    "2026-05-17",
+    () => {
+      const pred = makePrediction({
+        strategy: "routine_schedule",
+        nextNap: "2026-05-17T18:00:00.000Z", // collapsed
+        napsAllDone: true,
+        bedtime: "2026-05-17T18:00:00.000Z",
+        learnedSchedule: {
+          napDurationMin: 90, nightDurationMin: 720, wakeWindowMin: 240,
+          bedtimeWakeWindowMin: 240, expectedNapCount: 1, sleepCycleMin: 50,
+        },
+      });
+      return makeInput({ prediction: pred });
+    },
+    [
+      // 10 min after bedtime → next cycle target = 18:50.
+      { at: "18:10", expectedKind: "after-bedtime", check: (m) => {
+        if (m.kind === "after-bedtime") expect(m.nextCycleTarget).toBe("2026-05-17T18:50:00.000Z");
+      } },
+      // 55 min after bedtime → first cycle already past → next = 19:40.
+      { at: "18:55", expectedKind: "after-bedtime", check: (m) => {
+        if (m.kind === "after-bedtime") expect(m.nextCycleTarget).toBe("2026-05-17T19:40:00.000Z");
+      } },
+    ],
+  );
+});

@@ -382,6 +382,203 @@ export function arbitrateRescueAgainstNapBudget(
   return rescueNap;
 }
 
+interface PostPlanInput {
+  ctx: BabyContext;
+  todaySleeps: SleepLogRow[];
+  todaySleepEntries: SleepEntry[];
+  completedNaps: SleepLogRow[];
+  activeSleep: SleepLogRow | undefined;
+  cycleMin: number;
+  shortThreshold: number;
+  consumedNaps: number;
+  expectedNapCount: number;
+  lastCutShort: CutShortInfo | null;
+  remaining: PredictedNap[];
+  bedtime: string;
+  /**
+   * Fallback `nextNap` when the filtered predictedNaps is empty.
+   *
+   * Schedule path: `predictNextNap(wakeTime, ctx)` — always a string,
+   * computed from wakeTime + WW.
+   *
+   * Emerging path: `predictEmerging(...).nextNap` — may be null when the
+   * engine doesn't have enough signal to surface one.
+   */
+  fallbackNextNap: string | null;
+  now: number;
+  napBudgetOptedIn: boolean;
+  priorNapBudgetState: { mode: "first-contact" | "established"; enteredAt: string } | null;
+}
+
+interface PostPlanOutput {
+  predictedNaps: PredictedNap[] | null;
+  nextNap: string | null;
+  napSkipped: boolean;
+  napsAllDone: boolean;
+  skippedNap: { plannedAt: string } | null;
+  postSkipPlan: PostSkipPlan | null;
+  expectedNapEnd: string | null;
+  expectedNightEnd: string | null;
+  rescueNap: Prediction["rescueNap"];
+  napBudget: Prediction["napBudget"];
+  continuationWindow: Prediction["continuationWindow"];
+  expectedWakeRange: Prediction["expectedWakeRange"];
+}
+
+/**
+ * The shared post-plan derivation chain used by both
+ * `assembleEmergingPrediction` and `assembleSchedulePrediction`. Both
+ * branches build a "remaining nap" list (from `selectBestPlan` + Borbély
+ * compression) and then need to run the same sequence of derivations on
+ * top of it: B8 + stale filter, nextNap derivation, skip detection,
+ * napsAllDone, expected nap/night end, rescueNap, napBudget,
+ * continuationWindow, expectedWakeRange.
+ *
+ * Splitting this out is the consolidation pass the bug history kept
+ * begging for — these two branches have silently drifted apart at least
+ * three times (napBudget gate, continuation rule, napsAllDone). With one
+ * implementation, a fix in any of those layers lands in both strategies
+ * for free.
+ */
+function derivePostPlanFields(input: PostPlanInput): PostPlanOutput {
+  const {
+    ctx, todaySleeps, todaySleepEntries, completedNaps, activeSleep,
+    cycleMin, shortThreshold, consumedNaps, expectedNapCount, lastCutShort,
+    remaining, bedtime, fallbackNextNap, now, napBudgetOptedIn, priorNapBudgetState,
+  } = input;
+
+  const bedtimeMs = new Date(bedtime).getTime();
+
+  // ── B8 + stale filter ──
+  // Drop naps that would land within 60 min of bedtime (B8) AND drop
+  // naps whose start time is already >60 min in the past (stale —
+  // parent didn't act on them, no point rendering them as "next" any
+  // longer). Surfaced by the May-2026 review where Oskar's planned
+  // comeback at 14:13 was still rendered as nextNap at now=15:43.
+  let predictedNaps: PredictedNap[] | null = remaining.filter((n) => {
+    const startMs = new Date(n.startTime).getTime();
+    const endMs = new Date(n.endTime).getTime();
+    return startMs < bedtimeMs - 60 * 60_000
+      && endMs < bedtimeMs - 60 * 60_000
+      && startMs > now - 60 * 60_000;
+  });
+  if (predictedNaps.length === 0) predictedNaps = null;
+
+  // ── Derive nextNap ──
+  let nextNap: string | null = predictedNaps && predictedNaps.length > 0
+    ? predictedNaps[0].startTime
+    : fallbackNextNap;
+
+  // ── Skip detection + napsAllDone ──
+  // 60-min threshold (was 90) — the laxer setting let predictNextNap
+  // produce stale past-time naps that lived past the visibility filter.
+  const nextNapMs = nextNap ? new Date(nextNap).getTime() : 0;
+  const overdueMs = nextNapMs ? now - nextNapMs : 0;
+  const napSkipped = !activeSleep && overdueMs > 60 * 60_000 && overdueMs < 18 * 60 * 60_000;
+  // When the next predicted nap lands within 60 min of bedtime, treat
+  // the day's naps as effectively done — otherwise the Timer would show
+  // "next nap" with bedtime as the target time.
+  const collapsedToBedtime = nextNapMs >= bedtimeMs - 60 * 60_000;
+  // An active night ends the day's nap budget regardless of count.
+  const napsAllDone = consumedNaps >= expectedNapCount
+    || napSkipped
+    || collapsedToBedtime
+    || activeSleep?.type === "night";
+
+  // Capture the missed slot *before* napsAllDone clears nextNap.
+  const { skippedNap, postSkipPlan } = buildSkippedNapFields(
+    napSkipped, nextNap, bedtime, now, ctx.ageMonths,
+  );
+
+  if (napsAllDone) {
+    nextNap = bedtime;
+    predictedNaps = null;
+  }
+
+  // ── Active-sleep derived fields ──
+  let expectedNapEnd: string | null = null;
+  let rescueNap: Prediction["rescueNap"] = null;
+  if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
+    expectedNapEnd = predictNapEndTime(activeSleep.start_time, ctx);
+    const rescueCap = computeRescueNapCap(cycleMin);
+    // Pass only sufficient-length prior naps to the rescue detector.
+    // A comeback nap after a 28-min cut-short shouldn't be treated as
+    // an "extra" nap and capped at ~50 min — it's making up for the
+    // missed real nap and should run full length.
+    const priorSufficient = completedNaps.filter((s) => {
+      if (!s.end_time) return false;
+      const dur = (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60_000;
+      return dur >= shortThreshold;
+    });
+    rescueNap = detectRescueNap(
+      activeSleep.start_time,
+      priorSufficient.map((s) => ({ start_time: s.start_time, end_time: s.end_time! })),
+      expectedNapCount,
+      bedtime,
+      shortThreshold,
+      rescueCap,
+    );
+  }
+
+  let expectedNightEnd: string | null = null;
+  if (activeSleep && activeSleep.type === "night" && !activeSleep.end_time) {
+    const todayNapMin = todaySleeps
+      .filter((s) => s.type === "nap" && s.end_time)
+      .reduce((sum, s) => sum + (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60_000, 0);
+    expectedNightEnd = predictNightEndTime(activeSleep.start_time, ctx, todayNapMin);
+  }
+
+  // ── continuationWindow gate (shared logic in shouldSuppressContinuation) ──
+  const learnedNapDurMin = getLearnedNapDuration(ctx);
+  const suppressContinuation = lastCutShort
+    ? shouldSuppressContinuation(
+        lastCutShort, ctx, todaySleepEntries,
+        ctx.trendSleeps ?? ctx.recentSleeps, now,
+        findByAge(NAP_FLOOR_BY_AGE, ctx.ageMonths).floorMin,
+        learnedNapDurMin,
+      )
+    : false;
+  const continuationWindow = !activeSleep && lastCutShort && !suppressContinuation
+    ? computeContinuationWindow(lastCutShort, lastCutShort.startMs, learnedNapDurMin, now)
+    : null;
+
+  // ── napBudget + arbitration ──
+  const isActiveNap = activeSleep?.type === "nap" && !activeSleep.end_time;
+  const isLastNapOfDay = isActiveNap && (!predictedNaps || predictedNaps.length === 0);
+  const napBudget = isActiveNap && isLastNapOfDay && bedtime
+    ? computeNapBudget({
+        activeNap: activeSleep,
+        todaySleeps: todaySleepEntries,
+        trendSleeps: ctx.trendSleeps ?? ctx.recentSleeps,
+        bedtime,
+        isLastNapOfDay,
+        optedIn: napBudgetOptedIn,
+        learnedNapDurationMin: learnedNapDurMin,
+        priorState: priorNapBudgetState,
+        now,
+        ctx,
+      })
+    : null;
+  rescueNap = arbitrateRescueAgainstNapBudget(rescueNap, napBudget);
+
+  // ── expectedWakeRange — uncertainty around the prediction, orthogonal
+  //    to napBudget/rescue arbitration (per Codex review §"expectedWakeRange").
+  const expectedWakeRange = activeSleep
+    ? computeWakeRange(
+        activeSleep.type === "night" ? expectedNightEnd : expectedNapEnd,
+        activeSleep.type === "night" ? "night" : "nap",
+        ctx.ageMonths,
+        ctx.recentSleeps,
+      )
+    : null;
+
+  return {
+    predictedNaps, nextNap, napSkipped, napsAllDone, skippedNap, postSkipPlan,
+    expectedNapEnd, expectedNightEnd, rescueNap, napBudget, continuationWindow,
+    expectedWakeRange,
+  };
+}
+
 function buildContext(
   baby: Baby,
   recentSleeps: SleepEntry[],
@@ -673,151 +870,50 @@ function assembleEmergingPrediction(
     remaining = [compressComebackNap(remaining[0], lastCutShort), ...remaining.slice(1)];
   }
 
-  let bedtimeMs = bedtime ? new Date(bedtime).getTime() : Infinity;
-
-  // Safety B8 + stale filter: see schedule branch for rationale.
-  let predictedNaps: PredictedNap[] | null = remaining.filter((n) => {
-    const startMs = new Date(n.startTime).getTime();
-    const endMs = new Date(n.endTime).getTime();
-    return startMs < bedtimeMs - 60 * 60_000  // B8: nap starts ≥60 before bedtime
-      && endMs < bedtimeMs - 60 * 60_000      // B8: nap ENDS ≥60 before bedtime
-      && startMs > now - 60 * 60_000;          // not stale
-  });
-  if (predictedNaps.length === 0) predictedNaps = null;
-
-  // Derive nextNap from remaining predictions
-  let nextNap = result.nextNap;
-  if (predictedNaps && predictedNaps.length > 0) {
-    nextNap = predictedNaps[0].startTime;
-  }
-
-  // Detect skipped naps and determine if all naps are done. An active night
-  // ends the day's nap budget regardless of count — see schedule branch for
-  // the detailed reasoning. Including this here keeps nextNap/predictedNaps
-  // consistent with the boolean.
-  const nextNapMs = nextNap ? new Date(nextNap).getTime() : 0;
-  const overdueMs = nextNapMs ? now - nextNapMs : 0;
-  // Tightened from 90 to 60 min in the May-2026 review: 90 min was just lax
-  // enough to let the predictNextNap fallback render a stale past-time nap
-  // (e.g. Oskar nextNap=15:06 at now=16:22, 76 min overdue but napSkipped
-  // didn't fire). Matches the 60-min past-nap visibility filter elsewhere.
-  const napSkipped = !activeSleep && overdueMs > 60 * 60000 && overdueMs < 18 * 60 * 60000;
-  // Mirror routine path: when the next predicted nap lands within 60 min of
-  // bedtime (≥ threshold), treat the day's naps as done. Without this, the
-  // Timer would show nextNap=bedtime but napsAllDone=false — an inconsistent
-  // state where the UI doesn't know whether to show a "nap" or "bedtime" mode.
-  const collapsedToBedtime = nextNapMs >= bedtimeMs - 60 * 60000;
-  const napsAllDone = consumedNaps >= expectedNapCount || napSkipped || collapsedToBedtime
-    || activeSleep?.type === "night";
-
-  const { skippedNap, postSkipPlan } = buildSkippedNapFields(
-    napSkipped,
-    nextNap,
-    bedtime,
+  // Emerging may have no bedtime when selectBestPlan didn't return one;
+  // derivePostPlanFields assumes a string. Fall back to `now` as a
+  // last-resort anchor — the predictedNaps filter will then drop all
+  // naps and napsAllDone will fire via collapsedToBedtime, which is the
+  // right behaviour when we have no plan to project against.
+  const bedtimeForDerivation: string = bedtime ?? new Date(now).toISOString();
+  const todaySleepEntries = todaySleeps.map(toSleepEntry);
+  const post = derivePostPlanFields({
+    ctx,
+    todaySleeps,
+    todaySleepEntries,
+    completedNaps,
+    activeSleep,
+    cycleMin,
+    shortThreshold,
+    consumedNaps,
+    expectedNapCount,
+    lastCutShort,
+    remaining,
+    bedtime: bedtimeForDerivation,
+    fallbackNextNap: result.nextNap,
     now,
-    ctx.ageMonths,
-  );
-
-  if (napsAllDone) {
-    nextNap = bedtime;
-    predictedNaps = null;
-  }
-
-  // Compute expected nap/night end for active sleep (reuse schedule functions)
-  let expectedNapEnd: string | null = null;
-  let rescueNap: Prediction["rescueNap"] = null;
-  if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
-    expectedNapEnd = predictNapEndTime(activeSleep.start_time, ctx);
-    const rescueCap = computeRescueNapCap(cycleMin);
-    const priorSufficient = completedNaps.filter((s) => {
-      if (!s.end_time) return false;
-      const dur = (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60_000;
-      return dur >= shortThreshold;
-    });
-    rescueNap = detectRescueNap(
-      activeSleep.start_time,
-      priorSufficient.map((s) => ({ start_time: s.start_time, end_time: s.end_time! })),
-      expectedNapCount,
-      bedtime,
-      shortThreshold,
-      rescueCap,
-    );
-  }
-  let expectedNightEnd: string | null = null;
-  if (activeSleep && activeSleep.type === "night" && !activeSleep.end_time) {
-    const todayNapMin = todaySleeps
-      .filter((s) => s.type === "nap" && s.end_time)
-      .reduce((sum, s) => sum + (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60000, 0);
-    expectedNightEnd = predictNightEndTime(activeSleep.start_time, ctx, todayNapMin);
-  }
-
-  // ── continuationWindow gate — see shouldSuppressContinuation's doc.
-  const learnedNapDurMin = getLearnedNapDuration(ctx);
-  const suppressContinuation = lastCutShort
-    ? shouldSuppressContinuation(
-        lastCutShort,
-        ctx,
-        todaySleeps.map(toSleepEntry),
-        ctx.trendSleeps ?? ctx.recentSleeps,
-        now,
-        findByAge(NAP_FLOOR_BY_AGE, ctx.ageMonths).floorMin,
-        learnedNapDurMin,
-      )
-    : false;
-  const continuationWindow = !activeSleep && lastCutShort && !suppressContinuation
-    ? computeContinuationWindow(lastCutShort, lastCutShort.startMs, learnedNapDurMin, now)
-    : null;
-
-  const expectedWakeRange = activeSleep
-    ? computeWakeRange(
-        activeSleep.type === "night" ? expectedNightEnd : expectedNapEnd,
-        activeSleep.type === "night" ? "night" : "nap",
-        ctx.ageMonths,
-        ctx.recentSleeps,
-      )
-    : null;
-
-  // napBudget — emerging-rhythm is shakier on day plans than the schedule
-  // strategy, but the underlying trend math is the same. Same gate: this
-  // active nap must be the last for the day.
-  const isActiveNapEmerging = activeSleep?.type === "nap" && !activeSleep.end_time;
-  const isLastNapOfDayEmerging =
-    isActiveNapEmerging && (!predictedNaps || predictedNaps.length === 0);
-  const napBudget = isActiveNapEmerging && isLastNapOfDayEmerging && bedtime
-    ? computeNapBudget({
-        activeNap: activeSleep,
-        todaySleeps: todaySleeps.map(toSleepEntry),
-        trendSleeps: ctx.trendSleeps ?? ctx.recentSleeps,
-        bedtime,
-        isLastNapOfDay: isLastNapOfDayEmerging,
-        optedIn: napBudgetOptedIn,
-        learnedNapDurationMin: getLearnedNapDuration(ctx),
-        priorState: priorNapBudgetState,
-        now,
-        ctx,
-      })
-    : null;
-
-  rescueNap = arbitrateRescueAgainstNapBudget(rescueNap, napBudget);
+    napBudgetOptedIn,
+    priorNapBudgetState,
+  });
 
   return {
     strategy: "emerging_rhythm",
     feasible: true,
-    nextNap,
+    nextNap: post.nextNap,
     bedtime,
-    predictedNaps,
+    predictedNaps: post.predictedNaps,
     expectedNapCount,
-    napsAllDone,
-    expectedNapEnd,
-    expectedNightEnd,
-    expectedWakeRange,
-    skippedNap,
-    postSkipPlan,
+    napsAllDone: post.napsAllDone,
+    expectedNapEnd: post.expectedNapEnd,
+    expectedNightEnd: post.expectedNightEnd,
+    expectedWakeRange: post.expectedWakeRange,
+    skippedNap: post.skippedNap,
+    postSkipPlan: post.postSkipPlan,
     confidence: null,
     calibration: null,
-    rescueNap,
-    continuationWindow,
-    napBudget,
+    rescueNap: post.rescueNap,
+    continuationWindow: post.continuationWindow,
+    napBudget: post.napBudget,
     dailyTrendTotalMin: computeTrendTotalMin(ctx.trendSleeps ?? ctx.recentSleeps, ctx, now),
     sleepWindow: result.sleepWindow,
     sleepPressure: result.sleepPressure,
@@ -907,175 +1003,51 @@ function assembleSchedulePrediction(
     remaining = [compressComebackNap(remaining[0], lastCutShort), ...remaining.slice(1)];
   }
 
-  let bedtimeMs = new Date(bedtime).getTime();
-
-  // Safety B8 + stale filter: drop naps that would land within 60 min of
-  // bedtime (B8) AND drop naps whose start time is already >60 min in the
-  // past (stale — parent didn't act on them, no point displaying them as
-  // "next" anymore). Surfaced by the May-2026 review where Oskar's planned
-  // comeback at 14:13 was still rendered as nextNap at now=15:43 (89 min
-  // overdue) because the napSkipped 90-min threshold was a hair too lax.
-  let predictedNaps: PredictedNap[] | null = remaining.filter((n) => {
-    const startMs = new Date(n.startTime).getTime();
-    const endMs = new Date(n.endTime).getTime();
-    return startMs < bedtimeMs - 60 * 60_000  // B8: nap starts ≥60 before bedtime
-      && endMs < bedtimeMs - 60 * 60_000      // B8: nap ENDS ≥60 before bedtime
-      && startMs > now - 60 * 60_000;          // not stale
-  });
-  if (predictedNaps.length === 0) predictedNaps = null;
-
-  // ── Step 4: Derive nextNap, napsAllDone, and final cleanup ──
-  let nextNap: string;
-  if (predictedNaps && predictedNaps.length > 0) {
-    nextNap = predictedNaps[0].startTime;
-  } else {
-    nextNap = predictNextNap(wakeTimeForPrediction, ctx);
-  }
-
-  const nextNapMs = new Date(nextNap).getTime();
-  const overdueMs = now - nextNapMs;
-  // Tightened from 90 to 60 min in the May-2026 review: 90 min was just lax
-  // enough to let the predictNextNap fallback render a stale past-time nap
-  // (e.g. Oskar nextNap=15:06 at now=16:22, 76 min overdue but napSkipped
-  // didn't fire). Matches the 60-min past-nap visibility filter elsewhere.
-  const napSkipped = !activeSleep && overdueMs > 60 * 60000 && overdueMs < 18 * 60 * 60000;
-  // If the next predicted nap would land within 1h of bedtime, treat the day's
-  // naps as effectively done — otherwise the Timer would show "next nap" with
-  // bedtime as the target time. The `>=` mirrors the B8 filter's strict `<`
-  // above: anything at or beyond bedtime-60m is collapsed.
-  const collapsedToBedtime = nextNapMs >= bedtimeMs - 60 * 60000;
-  // An active night ends the day's nap budget regardless of how many naps
-  // were completed: if the parent has the baby down for the night, no more
-  // naps are coming. Including this here (rather than OR'ing only into the
-  // returned napsAllDone) keeps `nextNap`/`predictedNaps` consistent with
-  // the boolean — otherwise `nextNap` points to a stale predicted-nap time
-  // while napsAllDone says "done".
-  const napsAllDone = consumedNaps >= expectedNapCount || napSkipped || collapsedToBedtime
-    || activeSleep?.type === "night";
-
-  // Capture the missed slot *before* napsAllDone clears nextNap / predictedNaps,
-  // so the UI can preserve the "this should have happened at HH:MM" narrative.
-  const { skippedNap, postSkipPlan } = buildSkippedNapFields(
-    napSkipped,
-    nextNap,
+  const todaySleepEntries = todaySleeps.map(toSleepEntry);
+  const post = derivePostPlanFields({
+    ctx,
+    todaySleeps,
+    todaySleepEntries,
+    completedNaps,
+    activeSleep,
+    cycleMin,
+    shortThreshold,
+    consumedNaps,
+    expectedNapCount,
+    lastCutShort,
+    remaining,
     bedtime,
+    fallbackNextNap: predictNextNap(wakeTimeForPrediction, ctx),
     now,
-    ctx.ageMonths,
-  );
+    napBudgetOptedIn,
+    priorNapBudgetState,
+  });
 
-  if (napsAllDone) {
-    nextNap = bedtime;
-    predictedNaps = null;
-  }
-
-  // Confidence aligns with the visible nap list — napRanges[i] corresponds to
-  // predictedNaps[i], so the Timer's `napRanges[0]` read is the *next* nap's
-  // SD even after some naps are done. Passing [] still returns a bedtime range,
-  // which Timer uses for bedtime / after-bedtime modes.
-  const confidenceNaps = predictedNaps ?? [];
-  const confidence = computeConfidence(confidenceNaps, bedtime, ctx.ageMonths, ctx.recentSleeps, ctx.tz);
+  // Confidence aligns with the visible nap list — napRanges[i] corresponds
+  // to predictedNaps[i], so the Timer's `napRanges[0]` read is the *next*
+  // nap's SD even after some naps are done. Passing [] still returns a
+  // bedtime range, which Timer uses for bedtime / after-bedtime modes.
+  const confidence = computeConfidence(post.predictedNaps ?? [], bedtime, ctx.ageMonths, ctx.recentSleeps, ctx.tz);
   const calibration = calibrate(ctx.ageMonths, ctx.recentSleeps, ctx.customNapCount, ctx.tz);
-
-  // Compute expected nap end for active naps
-  let expectedNapEnd: string | null = null;
-  let rescueNap: Prediction["rescueNap"] = null;
-  if (activeSleep && activeSleep.type === "nap" && !activeSleep.end_time) {
-    expectedNapEnd = predictNapEndTime(activeSleep.start_time, ctx);
-    const rescueCap = computeRescueNapCap(cycleMin);
-    // Pass only sufficient-length prior naps to the rescue detector. A
-    // comeback nap after a 28-min cut-short shouldn't be treated as an "extra"
-    // nap and capped at ~50 min — it's making up for the missed real nap and
-    // should run full length.
-    const priorSufficient = completedNaps.filter((s) => {
-      if (!s.end_time) return false;
-      const dur = (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60_000;
-      return dur >= shortThreshold;
-    });
-    rescueNap = detectRescueNap(
-      activeSleep.start_time,
-      priorSufficient.map((s) => ({ start_time: s.start_time, end_time: s.end_time! })),
-      expectedNapCount,
-      bedtime,
-      shortThreshold,
-      rescueCap,
-    );
-  }
-
-  // Compute expected night end for active night sleep
-  let expectedNightEnd: string | null = null;
-  if (activeSleep && activeSleep.type === "night" && !activeSleep.end_time) {
-    const todayNapMin = todaySleeps
-      .filter((s) => s.type === "nap" && s.end_time)
-      .reduce((sum, s) => sum + (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60000, 0);
-    expectedNightEnd = predictNightEndTime(activeSleep.start_time, ctx, todayNapMin);
-  }
-
-  // ── continuationWindow gate — see shouldSuppressContinuation's doc.
-  const learnedNapDurMin = getLearnedNapDuration(ctx);
-  const suppressContinuation = lastCutShort
-    ? shouldSuppressContinuation(
-        lastCutShort,
-        ctx,
-        todaySleeps.map(toSleepEntry),
-        ctx.trendSleeps ?? ctx.recentSleeps,
-        now,
-        findByAge(NAP_FLOOR_BY_AGE, ctx.ageMonths).floorMin,
-        learnedNapDurMin,
-      )
-    : false;
-  const continuationWindow = !activeSleep && lastCutShort && !suppressContinuation
-    ? computeContinuationWindow(lastCutShort, lastCutShort.startMs, learnedNapDurMin, now)
-    : null;
-
-  const expectedWakeRange = activeSleep
-    ? computeWakeRange(
-        activeSleep.type === "night" ? expectedNightEnd : expectedNapEnd,
-        activeSleep.type === "night" ? "night" : "nap",
-        ctx.ageMonths,
-        ctx.recentSleeps,
-      )
-    : null;
-
-  // napBudget — only when this active nap is the day's last nap (v1 scope).
-  // The schedule branch knows the day's plan: predictedNaps after the
-  // active one is null/empty → no more naps coming.
-  const isActiveNap = activeSleep?.type === "nap" && !activeSleep.end_time;
-  const isLastNapOfDay = isActiveNap && (!predictedNaps || predictedNaps.length === 0);
-  const napBudget = isActiveNap && isLastNapOfDay && bedtime
-    ? computeNapBudget({
-        activeNap: activeSleep,
-        todaySleeps: todaySleeps.map(toSleepEntry),
-        trendSleeps: ctx.trendSleeps ?? ctx.recentSleeps,
-        bedtime,
-        isLastNapOfDay,
-        optedIn: napBudgetOptedIn,
-        learnedNapDurationMin: getLearnedNapDuration(ctx),
-        priorState: priorNapBudgetState,
-        now,
-        ctx,
-      })
-    : null;
-
-  rescueNap = arbitrateRescueAgainstNapBudget(rescueNap, napBudget);
 
   return {
     strategy,
     feasible: selected?.feasible ?? true,
-    nextNap,
+    nextNap: post.nextNap,
     bedtime,
-    predictedNaps,
+    predictedNaps: post.predictedNaps,
     expectedNapCount,
-    napsAllDone,
-    expectedNapEnd,
-    expectedNightEnd,
-    expectedWakeRange,
-    skippedNap,
-    postSkipPlan,
+    napsAllDone: post.napsAllDone,
+    expectedNapEnd: post.expectedNapEnd,
+    expectedNightEnd: post.expectedNightEnd,
+    expectedWakeRange: post.expectedWakeRange,
+    skippedNap: post.skippedNap,
+    postSkipPlan: post.postSkipPlan,
     confidence,
     calibration,
-    rescueNap,
-    continuationWindow,
-    napBudget,
+    rescueNap: post.rescueNap,
+    continuationWindow: post.continuationWindow,
+    napBudget: post.napBudget,
     dailyTrendTotalMin: computeTrendTotalMin(ctx.trendSleeps ?? ctx.recentSleeps, ctx, now),
     // Newborn fields — null for schedule-based strategies
     sleepWindow: null,
