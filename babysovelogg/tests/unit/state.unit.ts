@@ -2,10 +2,11 @@ import { describe, expect, it } from "bun:test";
 import {
   assembleState,
   arbitrateRescueAgainstNapBudget,
+  shouldSuppressContinuation,
   type DayData,
 } from "$lib/engine/state.js";
 import { computeConfidence } from "$lib/engine/confidence.js";
-import type { Baby, SleepLogRow, DayStartRow, SleepEntry } from "$lib/types.js";
+import type { Baby, SleepLogRow, DayStartRow, SleepEntry, BabyContext } from "$lib/types.js";
 
 const baseBaby: Baby = {
   id: 1,
@@ -1247,6 +1248,165 @@ describe("assembleState", () => {
         reason: "short_prior_nap" as const,
       };
       expect(arbitrateRescueAgainstNapBudget(earlierRescue, fakeNapBudget)).toBeNull();
+    });
+  });
+
+  describe("shouldSuppressContinuation", () => {
+    // The screenshot bug: napBudget engine recommends an early wake, the
+    // parent obeys (woke_by = "woken"), the nap is short by definition
+    // (that's what the cap *did*), and continuationWindow then fires
+    // "Forleng luren" — directly contradicting the cap the parent acted
+    // on. Each test here pins one gate of the suppression so a future
+    // change can't silently regress one of them.
+
+    const napStart = new Date("2026-05-17T10:30:00.000Z").getTime();
+    const napEnd = napStart + 60 * 60_000;           // 60 min nap
+    const napEndShort = napStart + 28 * 60_000;      // 28 min transit-style cut-short
+    const napEndMicro = napStart + 12 * 60_000;      // 12 min micro-nap
+    const now = napEnd + 5 * 60_000;                  // 5 min after wake
+
+    const ctx: BabyContext = {
+      birthdate: "2025-06-12",
+      ageMonths: 11,
+      tz: "Europe/Oslo",
+      customNapCount: null,
+      recentSleeps: [],
+      extendedSleeps: [],
+      trendSleeps: [],
+    };
+
+    function todaySleeps(napDurMin: number, wokeBy: "self" | "woken"): SleepEntry[] {
+      return [
+        {
+          start_time: new Date(napStart - 5 * 3600_000).toISOString(),
+          end_time: new Date(napStart - 5 * 3600_000 + 720 * 60_000).toISOString(),
+          type: "night",
+          woke_by: "self",
+        },
+        {
+          start_time: new Date(napStart).toISOString(),
+          end_time: new Date(napStart + napDurMin * 60_000).toISOString(),
+          type: "nap",
+          woke_by: wokeBy,
+        },
+      ];
+    }
+
+    it("fires on a micro-nap regardless of woke_by (didn't discharge pressure)", () => {
+      const cutShort = { startMs: napStart, endMs: napEndMicro, durMin: 12, wokeBy: "woken" as const };
+      const out = shouldSuppressContinuation(
+        cutShort, ctx, todaySleeps(12, "woken"), [], now, 22, 110,
+      );
+      expect(out).toBe(false);
+    });
+
+    it("fires on a transit-style 28 min woken cut-short (substantial gate not met)", () => {
+      // 28 min < 110 * 0.5 → parent likely had to end early (car ride,
+      // appointment), not a deliberate cap. Continuation helps.
+      const cutShort = { startMs: napStart, endMs: napEndShort, durMin: 28, wokeBy: "woken" as const };
+      const out = shouldSuppressContinuation(
+        cutShort, ctx, todaySleeps(28, "woken"), [], now, 22, 110,
+      );
+      expect(out).toBe(false);
+    });
+
+    it("SUPPRESSES on a substantial woken nap below trend — the cap-respect bug", () => {
+      // The screenshot: 11mo, learned ~110 min nap, parent woke at 60 min
+      // because napBudget told them to. Day total still below trend
+      // (banked + (cut-off remaining) = trend — the engine's intended target).
+      // Without this gate, "Forleng luren" fires right on top of the
+      // wake the engine just asked for.
+      const cutShort = { startMs: napStart, endMs: napEnd, durMin: 60, wokeBy: "woken" as const };
+      const out = shouldSuppressContinuation(
+        cutShort, ctx, todaySleeps(60, "woken"), [], now, 22, 110,
+      );
+      expect(out).toBe(true);
+    });
+
+    it("fires when a self-woke baby cut a long nap short (real cut-short, regardless of duration)", () => {
+      // Same 60 min nap but with self-wake: the baby actually woke up.
+      // High residual pressure → continuation is the right call.
+      const cutShort = { startMs: napStart, endMs: napEnd, durMin: 60, wokeBy: "self" as const };
+      const out = shouldSuppressContinuation(
+        cutShort, ctx, todaySleeps(60, "self"), [], now, 22, 110,
+      );
+      expect(out).toBe(false);
+    });
+
+    it("falls back to old behavior when wokeBy is null/untagged (treat as self)", () => {
+      const cutShort = { startMs: napStart, endMs: napEnd, durMin: 60, wokeBy: null };
+      const out = shouldSuppressContinuation(
+        cutShort, ctx, todaySleeps(60, "self"), [], now, 22, 110,
+      );
+      // No isDayOnTrend signal (empty trend), no "woken" flag → fire.
+      expect(out).toBe(false);
+    });
+
+    it("end-to-end: assembleState does NOT emit continuationWindow on cap-respect", () => {
+      // The screenshot scenario, end-to-end through assembleState rather
+      // than the helper alone. 11mo, learned ~110 min nap (from 10 days
+      // of self-wake history), parent-woken at 60 min. Continuation
+      // window should be null even though the day is below trend —
+      // because the parent followed the engine's cap.
+      const baby11mo: Baby = { ...baseBaby, birthdate: "2025-06-12", custom_nap_count: 1 };
+      const wakeUp: DayStartRow = {
+        id: 1, baby_id: 1, date: "2026-04-29",
+        wake_time: "2026-04-29T05:30:00.000Z",
+        created_at: "2026-04-29T05:30:00.000Z",
+        created_by_event_id: null,
+      };
+      const capRespectNap = sleepRow({
+        id: 9100,
+        start_time: "2026-04-29T10:30:00.000Z",
+        end_time: "2026-04-29T11:30:00.000Z", // 60 min, parent woke (cap-respect)
+        type: "nap",
+        woke_by: "woken",
+        domain_id: "slp_cap_respect",
+      });
+      const result = assembleState(
+        dayData({
+          baby: baby11mo,
+          recentSleeps: rested1NapHistory(),
+          strategySleeps: rested1NapHistory(),
+          trendSleeps: rested1NapHistory(),
+          todaySleeps: [capRespectNap],
+          todayWakeUp: wakeUp,
+          now: new Date("2026-04-29T11:35:00.000Z").getTime(),
+        }),
+      );
+      expect(result.prediction?.continuationWindow).toBeNull();
+    });
+
+    it("end-to-end: self-woken cut-short still triggers continuation banner", () => {
+      // Same shape but woke_by = "self". The continuation help is
+      // appropriate here — the baby actually woke prematurely.
+      const baby11mo: Baby = { ...baseBaby, birthdate: "2025-06-12", custom_nap_count: 1 };
+      const wakeUp: DayStartRow = {
+        id: 1, baby_id: 1, date: "2026-04-29",
+        wake_time: "2026-04-29T05:30:00.000Z",
+        created_at: "2026-04-29T05:30:00.000Z",
+        created_by_event_id: null,
+      };
+      const selfCutShort = sleepRow({
+        id: 9101,
+        start_time: "2026-04-29T10:30:00.000Z",
+        end_time: "2026-04-29T11:30:00.000Z",
+        type: "nap",
+        woke_by: "self",
+        domain_id: "slp_self_short",
+      });
+      const result = assembleState(
+        dayData({
+          baby: baby11mo,
+          recentSleeps: rested1NapHistory(),
+          strategySleeps: rested1NapHistory(),
+          trendSleeps: rested1NapHistory(),
+          todaySleeps: [selfCutShort],
+          todayWakeUp: wakeUp,
+          now: new Date("2026-04-29T11:35:00.000Z").getTime(),
+        }),
+      );
+      expect(result.prediction?.continuationWindow).not.toBeNull();
     });
   });
 });

@@ -97,25 +97,96 @@ function countSufficientNaps(
   return sufficient.length + (hasActiveNap ? 1 : 0);
 }
 
+export interface CutShortInfo {
+  startMs: number;
+  endMs: number;
+  durMin: number;
+  /** Captured wake reason — 'woken' = parent ended it, 'self' = baby spontaneous, null = untagged. */
+  wokeBy: "self" | "woken" | null;
+}
+
 /**
  * Find the most recently-ended completed nap that fell short of the threshold.
- * Drives the comeback-nap re-anchor in assembleSchedulePrediction.
+ * Drives the comeback-nap re-anchor in assembleSchedulePrediction and the
+ * continuationWindow gating (which now reads `wokeBy` to respect deliberate
+ * parent wakes).
  */
 function mostRecentCutShort(
   completedNaps: SleepLogRow[],
   shortNapThresholdMin: number,
-): { startMs: number; endMs: number; durMin: number } | null {
-  let best: { startMs: number; endMs: number; durMin: number } | null = null;
+): CutShortInfo | null {
+  let best: CutShortInfo | null = null;
   for (const s of completedNaps) {
     if (!s.end_time) continue;
     const startMs = new Date(s.start_time).getTime();
     const endMs = new Date(s.end_time).getTime();
     const durMin = (endMs - startMs) / 60_000;
     if (durMin >= shortNapThresholdMin) continue;
-    if (!best || endMs > best.endMs) best = { startMs, endMs, durMin };
+    const wokeBy = s.woke_by === "self" || s.woke_by === "woken" ? s.woke_by : null;
+    if (!best || endMs > best.endMs) best = { startMs, endMs, durMin, wokeBy };
   }
   return best;
 }
+
+/**
+ * Decide whether to suppress the "Forleng luren" continuation banner for a
+ * cut-short nap.
+ *
+ * The continuation window is sleep-science-correct for one specific case:
+ * a baby self-woke too early from a meaningful nap, residual pressure is
+ * high, the parent has ~25 min to settle them back. It's actively wrong
+ * for the case we keep landing on:
+ *
+ *   1. napBudget recommends a cap (projected total > trend).
+ *   2. Parent obeys, wakes the baby (woke_by = "woken").
+ *   3. The just-ended nap is below `shortNapThreshold` by definition
+ *      (the parent cut it short *because the engine asked*).
+ *   4. Continuation fires "Forleng luren" — directly contradicting the
+ *      cap recommendation the parent just acted on.
+ *
+ * Gates, in order:
+ *
+ *   - Below age-band floor → fire (micro-nap, didn't discharge pressure;
+ *     parent intent is moot).
+ *   - Day already on trend → suppress (the existing 2026-05-13 fix).
+ *   - Substantial parent-woken nap (woke_by = "woken", dur ≥ half of
+ *     learned typical duration) → suppress. The duration gate keeps
+ *     transit-cut shorts (a 28 min car nap on a 100 min-typical baby)
+ *     firing continuation as before — those parents *do* want help
+ *     extending — while respecting the deliberate engine-cap-respect
+ *     wake that triggered this whole fix.
+ *   - Otherwise → fire.
+ *
+ * Exported so tests can pin each gate down independently — the previous
+ * version inlined the logic at both call sites and the parent-woken case
+ * was missing, which is the bug this commit closes.
+ */
+export function shouldSuppressContinuation(
+  cutShort: CutShortInfo,
+  ctx: BabyContext,
+  todaySleeps: SleepEntry[],
+  trendSleeps: SleepEntry[],
+  now: number,
+  ageBandFloorMin: number,
+  learnedNapDurationMin: number,
+): boolean {
+  if (cutShort.durMin < ageBandFloorMin) return false;
+  if (isDayOnTrend(trendSleeps, todaySleeps, ctx, now)) return true;
+  if (
+    cutShort.wokeBy === "woken"
+    && cutShort.durMin >= learnedNapDurationMin * SUBSTANTIAL_FRACTION
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** A parent-ended nap counts as a "substantial" wake (likely a deliberate
+ * cap-respect, not an interrupted-by-life cut-short) when it cleared this
+ * fraction of the baby's learned typical nap duration. Picked at 0.5 so a
+ * ~60 min wake on a ~110-120 min-typical baby reads as cap-respect, while
+ * a ~28 min transit cut-short still triggers continuation. */
+const SUBSTANTIAL_FRACTION = 0.5;
 
 /**
  * Minutes after a cut-short during which residual sleep pressure is still high
@@ -680,21 +751,21 @@ function assembleEmergingPrediction(
     expectedNightEnd = predictNightEndTime(activeSleep.start_time, ctx, todayNapMin);
   }
 
-  // Gate continuationWindow on (a) the just-ended nap was meaningful (≥
-  // the age-band floor — a 5-min micro-nap didn't discharge any pressure,
-  // so rescue should still fire regardless of trend) AND (b) the day is
-  // on trend already. Without this, the engine recommends a napBudget
-  // cap, the parent obliges (woke_by = woken), and the moment the nap
-  // ends `mostRecentCutShort` flags it as too short and continuationWindow
-  // fires "forleng luren". See docs/sleep-science §12 and the 2026-05-13
-  // Halldis screenshot where this fired at 67 min after a 12.4 h
-  // overnight (banked24h ≈ 13.5 h vs ~13 h trend).
-  const cutShortWasMeaningful =
-    lastCutShort && lastCutShort.durMin >= findByAge(NAP_FLOOR_BY_AGE, ctx.ageMonths).floorMin;
-  const suppressContinuationOnTrend = cutShortWasMeaningful
-    && isDayOnTrend(ctx.trendSleeps ?? ctx.recentSleeps, todaySleeps.map(toSleepEntry), ctx, now);
-  const continuationWindow = !activeSleep && lastCutShort && !suppressContinuationOnTrend
-    ? computeContinuationWindow(lastCutShort, lastCutShort.startMs, getLearnedNapDuration(ctx), now)
+  // ── continuationWindow gate — see shouldSuppressContinuation's doc.
+  const learnedNapDurMin = getLearnedNapDuration(ctx);
+  const suppressContinuation = lastCutShort
+    ? shouldSuppressContinuation(
+        lastCutShort,
+        ctx,
+        todaySleeps.map(toSleepEntry),
+        ctx.trendSleeps ?? ctx.recentSleeps,
+        now,
+        findByAge(NAP_FLOOR_BY_AGE, ctx.ageMonths).floorMin,
+        learnedNapDurMin,
+      )
+    : false;
+  const continuationWindow = !activeSleep && lastCutShort && !suppressContinuation
+    ? computeContinuationWindow(lastCutShort, lastCutShort.startMs, learnedNapDurMin, now)
     : null;
 
   const expectedWakeRange = activeSleep
@@ -939,21 +1010,21 @@ function assembleSchedulePrediction(
     expectedNightEnd = predictNightEndTime(activeSleep.start_time, ctx, todayNapMin);
   }
 
-  // Gate continuationWindow on (a) the just-ended nap was meaningful (≥
-  // the age-band floor — a 5-min micro-nap didn't discharge any pressure,
-  // so rescue should still fire regardless of trend) AND (b) the day is
-  // on trend already. Without this, the engine recommends a napBudget
-  // cap, the parent obliges (woke_by = woken), and the moment the nap
-  // ends `mostRecentCutShort` flags it as too short and continuationWindow
-  // fires "forleng luren". See docs/sleep-science §12 and the 2026-05-13
-  // Halldis screenshot where this fired at 67 min after a 12.4 h
-  // overnight (banked24h ≈ 13.5 h vs ~13 h trend).
-  const cutShortWasMeaningful =
-    lastCutShort && lastCutShort.durMin >= findByAge(NAP_FLOOR_BY_AGE, ctx.ageMonths).floorMin;
-  const suppressContinuationOnTrend = cutShortWasMeaningful
-    && isDayOnTrend(ctx.trendSleeps ?? ctx.recentSleeps, todaySleeps.map(toSleepEntry), ctx, now);
-  const continuationWindow = !activeSleep && lastCutShort && !suppressContinuationOnTrend
-    ? computeContinuationWindow(lastCutShort, lastCutShort.startMs, getLearnedNapDuration(ctx), now)
+  // ── continuationWindow gate — see shouldSuppressContinuation's doc.
+  const learnedNapDurMin = getLearnedNapDuration(ctx);
+  const suppressContinuation = lastCutShort
+    ? shouldSuppressContinuation(
+        lastCutShort,
+        ctx,
+        todaySleeps.map(toSleepEntry),
+        ctx.trendSleeps ?? ctx.recentSleeps,
+        now,
+        findByAge(NAP_FLOOR_BY_AGE, ctx.ageMonths).floorMin,
+        learnedNapDurMin,
+      )
+    : false;
+  const continuationWindow = !activeSleep && lastCutShort && !suppressContinuation
+    ? computeContinuationWindow(lastCutShort, lastCutShort.startMs, learnedNapDurMin, now)
     : null;
 
   const expectedWakeRange = activeSleep
