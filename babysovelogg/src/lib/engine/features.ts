@@ -166,16 +166,32 @@ export function computeStrategySignals(
   }
   const completeDays = completeDayKeys.length;
 
-  // Night-day ratio: fraction of total sleep duration in 18:00-08:00 window
+  // Night-day ratio: fraction of total sleep duration that's "night" sleep.
+  //
+  // The earlier heuristic used a hard-coded 18:00-08:00 start window to
+  // decide what counted as a night. That mis-classified anyone with an
+  // early bedtime — a Norwegian-style 17:30-18:00 baby (1-nap transition,
+  // big nap deficit forcing earlier bed) had real `type="night"` sleeps
+  // sitting just outside the window. The engine then computed a ratio
+  // below the 0.55 routine-schedule threshold and demoted them to
+  // emerging-rhythm despite being firmly on a stable 1-nap schedule.
+  //
+  // Trust the explicit `type` tag when present (it's been required on the
+  // sleep schema for ages). Fall back to the clock-time heuristic only for
+  // entries that lack a type — defensive against legacy/imported data, not
+  // something we'd hit on real prod records.
   let nightWindowMin = 0;
   let totalMin = 0;
   for (const s of parsed) {
     totalMin += s.durationMin;
-    const startHour = s.startMinuteOfDay / 60;
-    // Count as "night window" if starts between 18:00 and 08:00
-    if (startHour >= 18 || startHour < 8) {
+    if (s.type === "night") {
       nightWindowMin += s.durationMin;
+      continue;
     }
+    if (s.type === "nap") continue;
+    // Untyped: fall back to start-hour window.
+    const startHour = s.startMinuteOfDay / 60;
+    if (startHour >= 18 || startHour < 8) nightWindowMin += s.durationMin;
   }
   const nightDayRatio = totalMin > 0 ? nightWindowMin / totalMin : 0;
 

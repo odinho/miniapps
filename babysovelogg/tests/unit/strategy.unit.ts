@@ -127,6 +127,61 @@ describe("computeStrategySignals", () => {
     expect(result.nightDayRatio).toBeGreaterThan(0.5);
   });
 
+  it("nightDayRatio respects type tag for early bedtimes (Halldis regression)", () => {
+    // Halldis-shape: 1-nap 11mo with bedtimes ranging 17:30-18:55. The
+    // earlier 18:00 start-hour heuristic dropped ~30% of her nights from
+    // the night-window count, sinking nightDayRatio to 0.53 and demoting
+    // her to emerging_rhythm even though every sleep was correctly typed.
+    // With the type-tag fix, all `type=night` entries count regardless
+    // of clock time.
+    const sleeps: SleepEntry[] = [];
+    for (let d = 1; d <= 14; d++) {
+      const day = `2026-03-${String(d).padStart(2, "0")}`;
+      // Nap mid-morning
+      sleeps.push({
+        start_time: `${day}T08:30:00Z`,
+        end_time: `${day}T10:00:00Z`,
+        type: "nap",
+        woke_by: "woken",
+      });
+      // Night starting before 18:00 — would have failed the old gate.
+      sleeps.push({
+        start_time: `${day}T15:45:00Z`,
+        end_time: `2026-03-${String(d + 1).padStart(2, "0")}T03:00:00Z`,
+        type: "night",
+        woke_by: "self",
+      });
+    }
+    const result = computeStrategySignals(sleeps, "2025-06-01", "UTC",
+      new Date("2026-03-15T12:00:00Z").getTime());
+    expect(result.nightDayRatio).toBeGreaterThan(0.55);
+  });
+
+  it("nightDayRatio falls back to clock-hour heuristic when type is missing", () => {
+    // Defensive: a legacy/imported entry without a type field still gets
+    // bucketed by the 18:00-08:00 window. Constructed by casting around
+    // SleepEntry's required type — we're simulating data that survived
+    // through pre-type schema days.
+    const sleeps = [
+      {
+        start_time: "2026-03-25T19:00:00Z", // 19:00 = night window
+        end_time: "2026-03-26T06:00:00Z",
+        type: undefined as unknown as "night",
+        woke_by: "self" as const,
+      },
+      {
+        start_time: "2026-03-25T10:00:00Z", // 10:00 = day window
+        end_time: "2026-03-25T11:30:00Z",
+        type: undefined as unknown as "nap",
+        woke_by: "self" as const,
+      },
+    ];
+    const result = computeStrategySignals(sleeps, "2025-06-01", "UTC",
+      new Date("2026-03-26T12:00:00Z").getTime());
+    // Night entry counted via fallback heuristic.
+    expect(result.nightDayRatio).toBeGreaterThan(0.5);
+  });
+
   it("computes logging completeness", () => {
     // 3 days of data over 5 calendar days
     const sleeps = [

@@ -160,7 +160,14 @@
 			// Sleep is outside this arc's time window (clamping inverted start/end)
 			if (endFrac < startFrac) continue;
 
-			const isVeryShort = endFrac - startFrac < 0.015;
+			// A 13-min active night sleep on the 720-min night arc is 0.018 of
+			// the arc — visually a thin sliver that disappears next to the
+			// wake-band paint at the other end. Treat anything under 0.03
+			// (≈22 min on the 12-h arcs) as "very short" for active sleep so
+			// the dot anchor below renders and the parent can see where the
+			// active sleep actually started.
+			const veryShortThreshold = bubble.status === 'active' ? 0.03 : 0.015;
+			const isVeryShort = endFrac - startFrac < veryShortThreshold;
 
 			if (bubble.status === 'active' && isVeryShort) {
 				endFrac = Math.min(1, startFrac + 0.015);
@@ -304,13 +311,22 @@
 		const wakeFrac = Math.max(0, Math.min(1, wakeFracRaw));
 		if (wakeFrac - startFrac < 0.005) return empty;
 
-		// Suppress the standalone wake-marker + tick when the wake position
-		// coincides with an arc endpoint — the endpoint icon's own time label
-		// already shows that exact time. Without this guard, night-mode (where
-		// `endTimeLabel` and `activeWakeAt` both derive from expectedNightEnd)
-		// renders two overlapping "06:00 / 06:03"-style labels at the right
-		// endpoint, which has now regressed several times. See ARC_ENDPOINT_PROXIMITY.
-		const wakeAtEndpoint = isAtArcEndpoint(wakeFrac);
+		// Suppress the standalone wake-marker + tick when it would overlap or
+		// visually duplicate the arc's endpoint icon. Two gates:
+		//
+		//   1. Geometric: fraction is within ARC_ENDPOINT_PROXIMITY of either
+		//      endpoint. Catches the obvious "06:00 wake = arc end" case.
+		//   2. Semantic: the marker's formatted label matches the endpoint
+		//      label that's already on the same side. Catches the trickier
+		//      case where wake is at 05:49 with seconds (e.g. 05:48:42), the
+		//      fraction lands at 0.984 (just inside 1 - 0.015 = 0.985), but
+		//      both labels format to the same HH:MM string. Without the
+		//      semantic gate the parent saw two "05:49" labels stacked, which
+		//      is what the 2026-05-17 screenshot reported.
+		const wakeLabel = formatTime(new Date(activeWakeAt));
+		const wakeAtEndpoint = isAtArcEndpoint(wakeFrac)
+			|| (wakeFrac > 0.5 && endTimeLabel === wakeLabel)
+			|| (wakeFrac < 0.5 && startTimeLabel === wakeLabel);
 
 		const d = describeArc(cx, cy, r, startFrac, wakeFrac);
 		const markerPt = fracToPoint(wakeFrac, cx, cy, r + 24);
@@ -324,7 +340,7 @@
 			type: activeSleep.type,
 			wakeMarker: wakeAtEndpoint
 				? null
-				: { x: markerPt.x, y: markerPt.y, label: formatTime(new Date(activeWakeAt)) },
+				: { x: markerPt.x, y: markerPt.y, label: wakeLabel },
 			wakeTick: wakeAtEndpoint
 				? null
 				: { x1: tickOuter.x, y1: tickOuter.y, x2: tickInner.x, y2: tickInner.y },
@@ -499,12 +515,16 @@
 		/>
 	{/if}
 
-	<!-- Confidence band around the active sleep's predicted wake -->
+	<!-- Confidence band around the active sleep's predicted wake. Color
+		 follows the sleep type so a night-mode band reads as the *night*
+		 wake uncertainty (moon-coloured) instead of looking like a peach
+		 nap-elapsed paint at the wrong end of the arc — the 2026-05-17
+		 screenshot complaint. -->
 	{#if activeWakeBandPath.visible}
 		<path
 			d={activeWakeBandPath.d}
 			fill="none"
-			stroke="var(--peach-dark)"
+			stroke={activeSleep?.type === 'night' ? 'var(--moon)' : 'var(--peach-dark)'}
 			stroke-width={trackWidth * 2.4}
 			stroke-linecap="round"
 			opacity="0.3"
