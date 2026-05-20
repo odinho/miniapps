@@ -45,11 +45,18 @@ describe('buildBabyEvent', () => {
 		expect(ev.payload).toHaveProperty('timezone');
 		expect(ev.payload).not.toHaveProperty('customNapCount');
 		expect(ev.payload).not.toHaveProperty('pottyMode');
+		expect(ev.payload).not.toHaveProperty('trackDiaper');
 	});
 
 	it('builds baby.updated for existing baby with all fields', () => {
 		const ev = buildBabyEvent(
-			{ name: 'Halldis', birthdate: '2025-06-15', customNapCount: 2, pottyMode: true },
+			{
+				name: 'Halldis',
+				birthdate: '2025-06-15',
+				customNapCount: 2,
+				pottyMode: true,
+				trackDiaper: true,
+			},
 			false,
 		);
 		expect(ev.type).toBe('baby.updated');
@@ -58,6 +65,7 @@ describe('buildBabyEvent', () => {
 			birthdate: '2025-06-15',
 			customNapCount: 2,
 			pottyMode: true,
+			trackDiaper: true,
 			targetBedtime: null,
 		});
 	});
@@ -66,6 +74,7 @@ describe('buildBabyEvent', () => {
 		const ev = buildBabyEvent({ name: 'Test', birthdate: '2025-01-01' }, false);
 		expect(ev.payload.customNapCount).toBeNull();
 		expect(ev.payload.pottyMode).toBe(false);
+		expect(ev.payload.trackDiaper).toBe(false);
 	});
 });
 
