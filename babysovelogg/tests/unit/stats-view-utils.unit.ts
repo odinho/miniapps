@@ -2,17 +2,10 @@ import { describe, it, expect } from "bun:test";
 import {
 	dayLabel,
 	fmtDate,
-	buildBars,
-	getMaxMin,
-	buildYTicks,
-	buildGridLines,
-	buildBarGeometries,
 	computeDiaperStats,
 	buildTrendRows,
 	getBestWorst,
 	computeAllStats,
-	CHART,
-	type BarData,
 } from "$lib/stats-view-utils.js";
 import type { WeekStats } from "$lib/engine/stats.js";
 import type { DiaperLogRow, SleepEntry } from "$lib/types.js";
@@ -20,11 +13,13 @@ import type { DiaperLogRow, SleepEntry } from "$lib/types.js";
 // ── dayLabel ────────────────────────────────────────────────────
 
 describe("dayLabel", () => {
-	it("returns short Norwegian weekday", () => {
-		const result = dayLabel("2026-03-23"); // Monday
-		expect(result).toBeTruthy();
-		expect(typeof result).toBe("string");
-		expect(result.length).toBeLessThanOrEqual(4);
+	it("returns short Norwegian weekday for Monday", () => {
+		// 2026-03-23 is a Monday; nb-NO "short" is "man".
+		expect(dayLabel("2026-03-23")).toMatch(/^man/i);
+	});
+
+	it("returns short Norwegian weekday for Sunday", () => {
+		expect(dayLabel("2026-03-22")).toMatch(/^sø[n]?/i);
 	});
 });
 
@@ -35,114 +30,6 @@ describe("fmtDate", () => {
 		const result = fmtDate("2026-03-23");
 		expect(result).toBeTruthy();
 		expect(typeof result).toBe("string");
-	});
-});
-
-// ── buildBars ───────────────────────────────────────────────────
-
-describe("buildBars", () => {
-	it("extracts bar data from week stats", () => {
-		const ws: WeekStats = {
-			days: [
-				{ date: "2026-03-20", stats: { totalNapMinutes: 90, totalNightMinutes: 120, napCount: 2, sleeps: [] } },
-				{ date: "2026-03-21", stats: { totalNapMinutes: 60, totalNightMinutes: 0, napCount: 1, sleeps: [] } },
-			],
-			avgNapMinutesPerDay: 75,
-			avgNightMinutesPerDay: 60,
-			avgNapsPerDay: 1.5,
-		};
-		const bars = buildBars(ws);
-		expect(bars).toHaveLength(2);
-		expect(bars[0].napMin).toBe(90);
-		expect(bars[0].nightMin).toBe(120);
-		expect(bars[1].napMin).toBe(60);
-	});
-
-	it("limits to last 7 days", () => {
-		const days = Array.from({ length: 10 }, (_, i) => ({
-			date: `2026-03-${String(10 + i).padStart(2, "0")}`,
-			stats: { totalNapMinutes: i * 10, totalNightMinutes: 0, napCount: 1, sleeps: [] },
-		}));
-		const ws: WeekStats = { days, avgNapMinutesPerDay: 0, avgNightMinutesPerDay: 0, avgNapsPerDay: 0 };
-		expect(buildBars(ws)).toHaveLength(7);
-	});
-
-	it("returns empty for no days", () => {
-		const ws: WeekStats = { days: [], avgNapMinutesPerDay: 0, avgNightMinutesPerDay: 0, avgNapsPerDay: 0 };
-		expect(buildBars(ws)).toHaveLength(0);
-	});
-});
-
-// ── getMaxMin ───────────────────────────────────────────────────
-
-describe("getMaxMin", () => {
-	it("returns at least 60", () => {
-		expect(getMaxMin([])).toBe(60);
-		expect(getMaxMin([{ date: "d", dayLabel: "d", napMin: 10, nightMin: 10 }])).toBe(60);
-	});
-
-	it("returns max of nap + night", () => {
-		const bars: BarData[] = [
-			{ date: "d1", dayLabel: "d", napMin: 100, nightMin: 200 },
-			{ date: "d2", dayLabel: "d", napMin: 50, nightMin: 50 },
-		];
-		expect(getMaxMin(bars)).toBe(300);
-	});
-});
-
-// ── buildYTicks ─────────────────────────────────────────────────
-
-describe("buildYTicks", () => {
-	it("returns 4 ticks", () => {
-		const ticks = buildYTicks(240);
-		expect(ticks).toHaveLength(4);
-	});
-
-	it("tick labels are in hours", () => {
-		const ticks = buildYTicks(240);
-		expect(ticks[3].label).toBe("4h");
-	});
-
-	it("y decreases as value increases", () => {
-		const ticks = buildYTicks(240);
-		expect(ticks[0].y).toBeGreaterThan(ticks[3].y);
-	});
-});
-
-// ── buildGridLines ──────────────────────────────────────────────
-
-describe("buildGridLines", () => {
-	it("returns 5 lines (0 to 4)", () => {
-		expect(buildGridLines(240)).toHaveLength(5);
-	});
-});
-
-// ── buildBarGeometries ──────────────────────────────────────────
-
-describe("buildBarGeometries", () => {
-	it("computes geometry for each bar", () => {
-		const bars: BarData[] = [
-			{ date: "d1", dayLabel: "d", napMin: 60, nightMin: 120 },
-			{ date: "d2", dayLabel: "d", napMin: 30, nightMin: 0 },
-		];
-		const geom = buildBarGeometries(bars, 180);
-		expect(geom).toHaveLength(2);
-		expect(geom[0].x).toBeLessThan(geom[1].x);
-		expect(geom[0].napH).toBeGreaterThan(0);
-		expect(geom[0].nightH).toBeGreaterThan(0);
-		expect(geom[1].nightH).toBe(0);
-	});
-
-	it("bar width capped at 36", () => {
-		const bars: BarData[] = [{ date: "d1", dayLabel: "d", napMin: 60, nightMin: 0 }];
-		const geom = buildBarGeometries(bars, 60);
-		expect(geom[0].barW).toBeLessThanOrEqual(36);
-	});
-
-	it("baseY equals PAD_T + chartH", () => {
-		const bars: BarData[] = [{ date: "d1", dayLabel: "d", napMin: 60, nightMin: 0 }];
-		const geom = buildBarGeometries(bars, 60);
-		expect(geom[0].baseY).toBe(CHART.PAD_T + CHART.H - CHART.PAD_T - CHART.PAD_B);
 	});
 });
 
@@ -319,10 +206,6 @@ describe("computeAllStats", () => {
 		const result = computeAllStats(sleeps, []);
 		expect(result.weekStats).toBeDefined();
 		expect(result.allStats).toBeDefined();
-		expect(result.bars.length).toBeGreaterThan(0);
-		expect(result.barGeometries.length).toBeGreaterThan(0);
-		expect(result.yTicks).toHaveLength(4);
-		expect(result.gridLines).toHaveLength(5);
 		expect(result.trendRows).toHaveLength(5);
 		expect(result.diaperStats7).toBeNull();
 		expect(result.diaperStats30).toBeNull();

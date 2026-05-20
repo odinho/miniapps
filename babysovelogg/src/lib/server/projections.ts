@@ -1,5 +1,6 @@
 import { db } from "./db.js";
 import type { AppEvent } from "./events.js";
+import { rowToAppEvent } from "./events.js";
 import type { EventRow } from "$lib/types.js";
 import { validateEventPayload } from "./schemas.js";
 import { isoToDateInTz } from "$lib/tz.js";
@@ -262,9 +263,12 @@ export function applyEvent(event: AppEvent): void {
         .prepare("SELECT id FROM sleep_pauses WHERE sleep_id = ? ORDER BY pause_time ASC")
         .all(sleep.id) as { id: number }[];
       const idx = payload.pauseIndex as number;
-      if (idx >= 0 && idx < pauses.length) {
-        db.prepare("DELETE FROM sleep_pauses WHERE id = ?").run(pauses[idx].id);
+      if (idx < 0 || idx >= pauses.length) {
+        throw new Error(
+          `sleep.pause_deleted: pauseIndex ${idx} out of range (sleep has ${pauses.length} pauses)`,
+        );
       }
+      db.prepare("DELETE FROM sleep_pauses WHERE id = ?").run(pauses[idx].id);
       break;
     }
 
@@ -454,7 +458,7 @@ export function rebuildAll(): RebuildReport {
       "DELETE FROM sqlite_sequence WHERE name IN ('baby', 'sleep_log', 'diaper_log', 'sleep_pauses')",
     ).run();
     for (const row of events) {
-      applyEvent({ ...row, payload: JSON.parse(row.payload) } as unknown as AppEvent);
+      applyEvent(rowToAppEvent(row));
     }
   });
   doRebuild();

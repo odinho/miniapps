@@ -20,11 +20,30 @@ export interface ProcessedEvent {
   duplicate: boolean;
 }
 
-function rowToAppEvent(row: EventRow): AppEvent {
+/** Parse a stored `events` row into a typed AppEvent. Validates that the
+ *  serialized payload is a JSON object (not an array, scalar, or null) so
+ *  the rest of the pipeline can safely treat `payload` as a record. */
+export function rowToAppEvent(row: EventRow): AppEvent {
+  const parsed: unknown = JSON.parse(row.payload);
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(
+      `events row ${row.id} (${row.type}): payload is not a JSON object (got ${
+        Array.isArray(parsed) ? "array" : typeof parsed
+      })`,
+    );
+  }
   return {
-    ...row,
-    payload: JSON.parse(row.payload),
-  } as unknown as AppEvent;
+    id: row.id,
+    type: row.type,
+    payload: parsed as Record<string, unknown>,
+    client_id: row.client_id,
+    client_event_id: row.client_event_id,
+    timestamp: row.timestamp,
+    schema_version: row.schema_version,
+    correlation_id: row.correlation_id,
+    caused_by_event_id: row.caused_by_event_id,
+    domain_id: row.domain_id,
+  };
 }
 
 /**

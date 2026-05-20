@@ -43,6 +43,7 @@
 	);
 	const hasAltNorm = $derived(comparisonRows.some(r => r.altNorm !== undefined));
 	const hasTodayColumn = $derived(comparisonRows.some(r => r.today !== undefined));
+	const napComparison = $derived(comparisonRows.find(r => r.label === 'Lurar'));
 
 	const predictionRows = $derived(
 		baby
@@ -164,10 +165,9 @@
 			-->
 			<div class="comparison-panel sleep-info-panel">
 				{#each comparisonRows as row}
-					{@const napHead = comparisonRows.find(r => r.label === 'Lurar')}
 					{@const punchline = row.today ?? row.learned}
 					{@const normLine = hasAltNorm && row.altNorm && row.norm !== row.altNorm
-						? `${napHead?.norm ?? ''}-lur: ${row.norm} · ${napHead?.altNorm ?? ''}-lur: ${row.altNorm}`
+						? `${napComparison?.norm ?? ''}-lur: ${row.norm} · ${napComparison?.altNorm ?? ''}-lur: ${row.altNorm}`
 						: row.norm === '—' ? null : `Norm ${row.norm}`}
 					<div class="comparison-row">
 						<div class="comparison-row-head">

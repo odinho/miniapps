@@ -13,40 +13,8 @@ import {
 	type BedtimePoint,
 } from "$lib/engine/stats.js";
 import { formatDuration } from "$lib/utils.js";
-import { isoToDateInTz, setHourInTz } from "$lib/tz.js";
+import { isoToDateInTz } from "$lib/tz.js";
 import { regressionEquations, sleepDuration } from "$lib/data/galland2012.js";
-
-// ── SVG bar chart helpers ──────────────────────────────────────
-
-export const CHART = {
-	W: 320,
-	H: 180,
-	PAD_L: 36,
-	PAD_B: 28,
-	PAD_T: 12,
-	PAD_R: 8,
-} as const;
-
-export interface BarData {
-	date: string;
-	dayLabel: string;
-	napMin: number;
-	nightMin: number;
-}
-
-export interface BarGeometry {
-	bar: BarData;
-	x: number;
-	barW: number;
-	baseY: number;
-	napH: number;
-	nightH: number;
-}
-
-export interface YTick {
-	y: number;
-	label: string;
-}
 
 export function dayLabel(dateStr: string): string {
 	const d = new Date(dateStr + "T12:00:00");
@@ -58,55 +26,6 @@ export function fmtDate(d: string): string {
 		weekday: "short",
 		month: "short",
 		day: "numeric",
-	});
-}
-
-export function buildBars(weekStats: WeekStats): BarData[] {
-	return weekStats.days.slice(-7).map((d) => ({
-		date: d.date,
-		dayLabel: dayLabel(d.date),
-		napMin: d.stats.totalNapMinutes,
-		nightMin: d.stats.totalNightMinutes,
-	}));
-}
-
-export function getMaxMin(bars: BarData[]): number {
-	return Math.max(60, ...bars.map((b) => b.napMin + b.nightMin));
-}
-
-export function buildYTicks(maxMin: number): YTick[] {
-	const chartH = CHART.H - CHART.PAD_T - CHART.PAD_B;
-	const ticks: YTick[] = [];
-	for (let i = 1; i <= 4; i++) {
-		const mins = Math.round((maxMin / 4) * i);
-		const y = CHART.PAD_T + chartH - (chartH * mins) / maxMin;
-		ticks.push({ y, label: `${Math.round(mins / 60)}h` });
-	}
-	return ticks;
-}
-
-export function buildGridLines(maxMin: number): number[] {
-	const chartH = CHART.H - CHART.PAD_T - CHART.PAD_B;
-	const lines: number[] = [];
-	for (let i = 0; i <= 4; i++) {
-		const mins = Math.round((maxMin / 4) * i);
-		lines.push(CHART.PAD_T + chartH - (chartH * mins) / maxMin);
-	}
-	return lines;
-}
-
-export function buildBarGeometries(bars: BarData[], maxMin: number): BarGeometry[] {
-	const chartW = CHART.W - CHART.PAD_L - CHART.PAD_R;
-	const chartH = CHART.H - CHART.PAD_T - CHART.PAD_B;
-	const gap = chartW / bars.length;
-	const barW = Math.min(36, gap * 0.7);
-	const baseY = CHART.PAD_T + chartH;
-
-	return bars.map((bar, i) => {
-		const x = CHART.PAD_L + gap * i + (gap - barW) / 2;
-		const napH = (bar.napMin / maxMin) * chartH;
-		const nightH = (bar.nightMin / maxMin) * chartH;
-		return { bar, x, barW, baseY, napH, nightH };
 	});
 }
 
@@ -849,177 +768,17 @@ function buildWakeScatter(
 	return { dots, bandY, yTicks, gridLines, maxMin };
 }
 
-// ── Sleep Pressure Chart ──────────────────────────────────────
-
-export interface PressurePoint {
-	x: number;
-	y: number;
-	hour: number;
-	pressureMin: number;
-}
-
-export interface SleepPressureChartData {
-	/** One curve per recent day */
-	curves: Array<{
-		date: string;
-		linePath: string;
-		areaPath: string;
-		sleepBands: Array<{ x1: number; x2: number; type: 'nap' | 'night' }>;
-	}>;
-	/** Average curve (bold) */
-	avgLinePath: string | null;
-	xLabels: Array<{ x: number; label: string }>;
-	yTicks: Array<{ y: number; label: string }>;
-	gridLines: number[];
-}
-
-/**
- * Build a sleep pressure chart from recent sleep data.
- * Shows how awake-time accumulates (pressure rises) and resets during sleep.
- * X-axis = time of day (05:00–22:00), Y-axis = minutes awake since last sleep.
- */
-function buildSleepPressureChart(
-	sleeps: SleepEntry[],
-	tz?: string,
-): SleepPressureChartData {
-	const empty: SleepPressureChartData = { curves: [], avgLinePath: null, xLabels: [], yTicks: [], gridLines: [] };
-
-	// Group sleeps by local date
-	const timezone = tz ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
-	const dayMap = new Map<string, SleepEntry[]>();
-	for (const s of sleeps) {
-		if (!s.end_time) continue;
-		const d = isoToDateInTz(s.start_time, timezone);
-		if (!dayMap.has(d)) dayMap.set(d, []);
-		dayMap.get(d)!.push(s);
-	}
-
-	// Get last 7 complete days (not today)
-	const today = new Date().toLocaleDateString("en-CA", { timeZone: timezone });
-	const sortedDays = [...dayMap.keys()].filter(d => d !== today).toSorted().slice(-7);
-	if (sortedDays.length === 0) return empty;
-
-	// Chart config: 05:00–22:00 (17 hours)
-	const startHour = 5;
-	const endHour = 22;
-	const totalHours = endHour - startHour;
-	const plotW = tsPlotW();
-	const plotH = tsPlotH();
-	const maxPressure = 300; // 5 hours max on Y axis
-	const baseY = TS_CHART.PAD_T + plotH;
-
-	const xMap = (h: number) => TS_CHART.PAD_L + ((h - startHour) / totalHours) * plotW;
-	const yMap = (min: number) => baseY - (Math.min(min, maxPressure) / maxPressure) * plotH;
-
-	// For each day, compute the pressure curve at 5-min intervals
-	const resolution = 5; // minutes
-	const steps = totalHours * 60 / resolution;
-	const allCurves: number[][] = [];
-
-	const curves = sortedDays.map(dayStr => {
-		const daySleeps = dayMap.get(dayStr)!
-			.filter(s => s.end_time)
-			.toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-
-		// Find the earliest wake time (end of first night or start of day)
-		const firstNight = daySleeps.find(s => s.type === 'night');
-		const refDate = new Date(`${dayStr}T12:00:00Z`); // noon UTC as reference for setHourInTz
-		const wakeMs = firstNight?.end_time
-			? new Date(firstNight.end_time).getTime()
-			: setHourInTz(refDate, 6, 0, timezone).getTime();
-
-		// Build minute-by-minute sleep state
-		const dayStartMs = setHourInTz(refDate, startHour, 0, timezone).getTime();
-
-		const pressureValues: number[] = [];
-		let pressure = 0;
-		const points: string[] = [];
-
-		for (let i = 0; i <= steps; i++) {
-			const timeMs = dayStartMs + i * resolution * 60_000;
-			const hour = startHour + (i * resolution) / 60;
-
-			// Before wake: pressure is 0
-			if (timeMs < wakeMs) {
-				pressure = 0;
-			} else {
-				// Check if sleeping at this moment
-				const sleeping = daySleeps.some(s => {
-					const sStart = new Date(s.start_time).getTime();
-					const sEnd = new Date(s.end_time!).getTime();
-					return timeMs >= sStart && timeMs < sEnd && s.type === 'nap';
-				});
-
-				if (sleeping) {
-					// During nap: pressure decreases rapidly
-					pressure = Math.max(0, pressure - resolution * 0.8);
-				} else {
-					// Awake: pressure builds
-					pressure += resolution;
-				}
-			}
-
-			pressureValues.push(pressure);
-			points.push(`${xMap(hour)},${yMap(pressure)}`);
-		}
-
-		allCurves.push(pressureValues);
-
-		const linePath = `M${points.join(" L")}`;
-		const areaPath = `${linePath} L${xMap(endHour)},${baseY} L${xMap(startHour)},${baseY} Z`;
-
-		// Sleep bands (nap shaded regions)
-		const sleepBands = daySleeps
-			.filter(s => s.type === 'nap' && s.end_time)
-			.map(s => {
-				const sH = (new Date(s.start_time).getTime() - dayStartMs) / 3_600_000 + startHour;
-				const eH = (new Date(s.end_time!).getTime() - dayStartMs) / 3_600_000 + startHour;
-				return {
-					x1: xMap(Math.max(startHour, sH)),
-					x2: xMap(Math.min(endHour, eH)),
-					type: 'nap' as const,
-				};
-			})
-			.filter(b => b.x2 > b.x1);
-
-		return { date: dayStr, linePath, areaPath, sleepBands };
-	});
-
-	// Average curve
-	let avgLinePath: string | null = null;
-	if (allCurves.length >= 2) {
-		const avgPoints: string[] = [];
-		for (let i = 0; i <= steps; i++) {
-			const avg = allCurves.reduce((sum, c) => sum + c[i], 0) / allCurves.length;
-			const hour = startHour + (i * resolution) / 60;
-			avgPoints.push(`${xMap(hour)},${yMap(avg)}`);
-		}
-		avgLinePath = `M${avgPoints.join(" L")}`;
-	}
-
-	// X labels: every 2 hours
-	const xLabels: Array<{ x: number; label: string }> = [];
-	for (let h = 6; h <= 22; h += 2) {
-		xLabels.push({ x: xMap(h), label: `${String(h).padStart(2, '0')}` });
-	}
-
-	// Y ticks: every 60 minutes
-	const yTicks: Array<{ y: number; label: string }> = [];
-	const gridLines: number[] = [];
-	for (let m = 60; m <= maxPressure; m += 60) {
-		const y = yMap(m);
-		yTicks.push({ y, label: `${m / 60}t` });
-		gridLines.push(y);
-	}
-
-	return { curves, avgLinePath, xLabels, yTicks, gridLines };
-}
 
 // ── Data fetching ──────────────────────────────────────────────
 
 export interface StatsData {
 	sleeps: SleepEntry[];
 	diapers: DiaperLogRow[];
+}
+
+async function fetchOrThrow(resp: Response, label: string): Promise<unknown> {
+	if (!resp.ok) throw new Error(`${label} failed: ${resp.status}`);
+	return resp.json();
 }
 
 export async function fetchStatsData(): Promise<StatsData> {
@@ -1029,8 +788,10 @@ export async function fetchStatsData(): Promise<StatsData> {
 		fetch(`/api/sleeps?from=${thirtyDaysAgo}&limit=500`),
 		fetch(`/api/diapers?from=${thirtyDaysAgo}&limit=500`),
 	]);
-	const sleeps = await sleepRes.json();
-	const diapers = await diaperRes.json();
+	const [sleeps, diapers] = await Promise.all([
+		fetchOrThrow(sleepRes, "/api/sleeps") as Promise<SleepEntry[]>,
+		fetchOrThrow(diaperRes, "/api/diapers") as Promise<DiaperLogRow[]>,
+	]);
 	return { sleeps, diapers };
 }
 
@@ -1040,8 +801,10 @@ export async function fetchFullHistory(): Promise<StatsData> {
 		fetch("/api/sleeps?limit=10000"),
 		fetch("/api/diapers?limit=10000"),
 	]);
-	const sleeps = await sleepRes.json();
-	const diapers = await diaperRes.json();
+	const [sleeps, diapers] = await Promise.all([
+		fetchOrThrow(sleepRes, "/api/sleeps") as Promise<SleepEntry[]>,
+		fetchOrThrow(diaperRes, "/api/diapers") as Promise<DiaperLogRow[]>,
+	]);
 	return { sleeps, diapers };
 }
 
@@ -1185,11 +948,6 @@ export function getBestWorst(weekStats: WeekStats, tz?: string): BestWorst | nul
 export interface ComputedStats {
 	weekStats: WeekStats;
 	allStats: WeekStats;
-	bars: BarData[];
-	maxMin: number;
-	barGeometries: BarGeometry[];
-	yTicks: YTick[];
-	gridLines: number[];
 	wakeAvg: number | null;
 	trendRows: TrendRow[];
 	bestWorst: BestWorst | null;
@@ -1201,7 +959,6 @@ export interface ComputedStats {
 	nightStretchChart: NightStretchChartData;
 	bedtimeChart: BedtimeChartData;
 	napCountChart: NapCountChartData;
-	pressureChart: SleepPressureChartData;
 	// Tier 2 charts
 	gantt: GanttChartData;
 	heatmapChart: HeatmapChartData;
@@ -1232,12 +989,6 @@ export function computeAllStats(
 	);
 	const weekStats = getWeekStats(week7, tz);
 	const allStats = getWeekStats(mapped, tz);
-
-	const bars = buildBars(weekStats);
-	const maxMin = getMaxMin(bars);
-	const barGeometries = bars.length > 0 ? buildBarGeometries(bars, maxMin) : [];
-	const yTicks = buildYTicks(maxMin);
-	const gridLines = buildGridLines(maxMin);
 
 	const wakeAvg = getAverageWakeWindow(week7);
 	const trendRows = buildTrendRows(weekStats, allStats);
@@ -1285,9 +1036,6 @@ export function computeAllStats(
 	const napCountDays = completeDays.map((d) => ({ date: d.date, napCount: d.stats.napCount }));
 	const napCountChart = buildNapCountChart(napCountDays);
 
-	// Sleep pressure chart
-	const pressureChart = buildSleepPressureChart(mapped, tz);
-
 	// Tier 2: advanced charts
 	const wakeGaps = getWakeWindowGaps(week7);
 	const heatmap = buildSleepHeatmap(mapped, tz);
@@ -1298,11 +1046,6 @@ export function computeAllStats(
 	return {
 		weekStats,
 		allStats,
-		bars,
-		maxMin,
-		barGeometries,
-		yTicks,
-		gridLines,
 		wakeAvg,
 		trendRows,
 		bestWorst,
@@ -1313,7 +1056,6 @@ export function computeAllStats(
 		nightStretchChart,
 		bedtimeChart,
 		napCountChart,
-		pressureChart,
 		gantt,
 		heatmapChart,
 		wakeScatter,

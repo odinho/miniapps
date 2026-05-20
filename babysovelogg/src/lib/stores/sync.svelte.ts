@@ -19,6 +19,28 @@ interface DomainEvent {
 	payload: Record<string, unknown>;
 }
 
+/** Server `/api/state` shape. Every field is optional because the client may
+ *  run against an older server that doesn't emit some newer field — and
+ *  undefined → null/[] is exactly what normalizeState exists to do. */
+type AppStateResponse = Partial<AppState>;
+
+function normalizeState(raw: AppStateResponse): AppState {
+	return {
+		baby: raw.baby ?? null,
+		activeSleep: raw.activeSleep ?? null,
+		todaySleeps: raw.todaySleeps ?? [],
+		stats: raw.stats ?? null,
+		dayTotals: raw.dayTotals ?? null,
+		priorOvernightSleep: raw.priorOvernightSleep ?? null,
+		prediction: raw.prediction ?? null,
+		ageMonths: raw.ageMonths ?? 0,
+		diaperCount: raw.diaperCount ?? 0,
+		lastDiaperTime: raw.lastDiaperTime ?? null,
+		todayWakeUp: raw.todayWakeUp ?? null,
+		offDays: raw.offDays ?? [],
+	};
+}
+
 function createSync() {
 	let status = $state<ConnectionStatus>("disconnected");
 	let pendingCount = $state(0);
@@ -118,23 +140,6 @@ function createSync() {
 		}
 	}
 
-	/** Normalize server state to ensure null instead of undefined for optional fields. */
-	function normalizeState(raw: Record<string, unknown>): AppState {
-		return {
-			baby: (raw.baby as AppState["baby"]) ?? null,
-			activeSleep: (raw.activeSleep as AppState["activeSleep"]) ?? null,
-			todaySleeps: (raw.todaySleeps as AppState["todaySleeps"]) ?? [],
-			stats: (raw.stats as AppState["stats"]) ?? null,
-			dayTotals: (raw.dayTotals as AppState["dayTotals"]) ?? null,
-			priorOvernightSleep: (raw.priorOvernightSleep as AppState["priorOvernightSleep"]) ?? null,
-			prediction: (raw.prediction as AppState["prediction"]) ?? null,
-			ageMonths: (raw.ageMonths as number) ?? 0,
-			diaperCount: (raw.diaperCount as number) ?? 0,
-			lastDiaperTime: (raw.lastDiaperTime as string | null) ?? null,
-			todayWakeUp: (raw.todayWakeUp as AppState["todayWakeUp"]) ?? null,
-			offDays: (raw.offDays as string[]) ?? [],
-		};
-	}
 
 	return {
 		/** SSE connection status. Reactive. */
