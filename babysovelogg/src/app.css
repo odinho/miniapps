@@ -1320,7 +1320,12 @@ html, body {
   min-width: 5.5em;
 }
 
-/* --- Compact summary row --- */
+/* --- Compact summary row ---
+   Tap target for the "I dag" details panel — looks like the original
+   read-only row but is actually a button. No focus ring or hover chrome
+   (it sits below the arc and would otherwise read as a UI element
+   demanding attention); the only visible affordance for the
+   tap-to-expand is the subtle aria-expanded state. */
 .summary-row {
   display: flex;
   align-items: center;
@@ -1329,6 +1334,17 @@ html, body {
   font-size: 0.85rem;
   color: var(--text-light);
   padding: 8px 0;
+  background: none;
+  border: none;
+  width: 100%;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.summary-row:focus-visible {
+  outline: 2px solid var(--moon, currentColor);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .summary-row .stat-value {

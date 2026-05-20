@@ -87,6 +87,10 @@
 	const showPopulationNorms = $derived(!showContextCard && !showTodayCard && prediction?.calibration?.trust === 'age-default');
 	const populationNormsRows = $derived(showPopulationNorms ? buildSleepInfoRows(ageMonths) : []);
 	let pauseBusy = $state(false);
+	// The bottom summary row is the default surface; tap it to reveal the
+	// detailed "I dag" rows (per-sleep windows + Leggetid hint). Per-mount
+	// state so a refresh resets to the clean default.
+	let summaryExpanded = $state(false);
 
 	async function handlePauseToggle() {
 		if (pauseBusy || !activeSleep) return;
@@ -686,7 +690,13 @@
 			</div>
 		{/if}
 
-		{#if showTodayCard}
+		<!-- Spacer to push stats down -->
+		<div style="flex: 1;"></div>
+
+		<!-- Expanded details for "I dag" — only renders when the summary row
+			 below is tapped. The card itself just paints its rows; visibility
+			 is the parent's responsibility. -->
+		{#if showTodayCard && summaryExpanded}
 			<TodayCard
 				priorOvernightSleep={s.priorOvernightSleep}
 				dayTotals={s.dayTotals}
@@ -696,11 +706,15 @@
 			/>
 		{/if}
 
-		<!-- Spacer to push stats down -->
-		<div style="flex: 1;"></div>
-
-		<!-- Summary stats -->
-		<div class="summary-row">
+		<!-- Summary stats — tap to toggle the detailed I dag panel above. -->
+		<button
+			type="button"
+			class="summary-row"
+			class:summary-row-expanded={summaryExpanded}
+			aria-expanded={summaryExpanded}
+			data-testid="summary-row"
+			onclick={() => (summaryExpanded = !summaryExpanded)}
+		>
 			<span>
 				<span class="stat-value">{liveNapCount}</span>
 				<span class="summary-label">{liveNapCount === 1 ? 'lur' : 'lurar'}</span>
@@ -722,7 +736,7 @@
 				<span class="stat-value">{s.diaperCount}</span>
 				<span class="summary-label">{pottyMode ? 'dobesøk' : (s.diaperCount === 1 ? 'bleie' : 'bleier')}</span>
 			</span>
-		</div>
+		</button>
 	</div>
 
 	<!-- Modals -->
