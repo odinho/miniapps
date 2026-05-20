@@ -556,7 +556,7 @@
 			{
 				// Halldis-scenario: woke 06:25, predicted nap 09:53, now 10:59.
 				// Plenty of room before 19:00 bedtime → rescue suggestion.
-				label: 'Hoppa over lur – reddingslur mogeleg',
+				label: 'Hoppa over lur – kort ekstralur mogeleg',
 				group: 'Hoppa over',
 				modeKind: 'skipped-nap',
 				nowMs: n,

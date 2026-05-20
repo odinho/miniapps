@@ -637,12 +637,12 @@
 			{@const recWake = new Date(prediction.rescueNap.recommendedWakeTime)}
 			{@const recCountdown = recWake.getTime() - now}
 			<div class="rescue-nap-banner" data-testid="rescue-nap-banner">
-				<div class="rescue-nap-title">💡 Reddingslur</div>
+				<div class="rescue-nap-title">💡 Kort ekstralur</div>
 				<div class="rescue-nap-body">
 					{#if recCountdown > 0}
 						Tilrådd å vekka kl. {formatTime(prediction.rescueNap.recommendedWakeTime)} ({formatDuration(recCountdown)})
 					{:else}
-						Tilrådd å vekka no — reddingslurar bør vera korte
+						Tilrådd å vekka no — slike skal vere korte
 					{/if}
 				</div>
 				<div class="rescue-nap-hint">

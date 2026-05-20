@@ -334,7 +334,7 @@
 			>
 				<h2 style="font-size: 1.1rem; margin-bottom: 8px;">Varsel</h2>
 				<div style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 12px;">
-					Få varsel på telefonen når reddingslurar bør endast i lett fase.
+					Få varsel på telefonen ved viktige hendingar i søvnrytmen.
 				</div>
 				{#if notifStatus === 'unsupported'}
 					<div style="font-size: 0.85rem; color: var(--text-light);">

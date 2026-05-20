@@ -160,37 +160,37 @@ export type NotificationKind =
 export type NotificationPrefs = Record<NotificationKind, boolean>;
 
 export const TRIGGER_LABELS: Record<NotificationKind, { title: string; hint: string }> = {
-  rescue_wake: {
-    title: "Reddingslur – vekking snart",
-    hint: "2 min før tilrådd vaknetid ved reddingslurar.",
+  nap_approaching: {
+    title: "Snart lurtid",
+    hint: "30 min før forventa lurstart — godt med litt nedroing først.",
   },
   nap_ending_soon: {
     title: "Luren sluttar snart",
-    hint: "2 min før forventa vaknetid for vanlege lurar.",
+    hint: "2 min før forventa vaknetid.",
   },
   nap_overtime: {
-    title: "Luren er over forventa",
-    hint: "20 min etter forventa slutt — kanskje på tide å vekka.",
+    title: "Luren har vart lenger enn venta",
+    hint: "20 min over forventa slutt — vurder å vekka så det ikkje pressar leggetid.",
+  },
+  nap_overdue: {
+    title: "Lurstart er forbi",
+    hint: "30 min over forventa lurstart. Søvntrykket byggjer seg opp — det kan bli ein masete time.",
   },
   bedtime_approaching: {
     title: "Leggetid snart",
-    hint: "30 min før forventa leggetid.",
-  },
-  nap_overdue: {
-    title: "Lur er forsinka",
-    hint: "30 min etter forventa lurstart. Kan vere noko masete.",
+    hint: "30 min til forventa leggetid.",
   },
   continuation_open: {
-    title: "Forleng luren",
-    hint: "Med ein gong etter ein altfor kort lur — vindauget for å få henne ned att.",
+    title: "Sjanse til å forlenga luren",
+    hint: "Rett etter ein altfor kort lur — kort vindauge for å få henne ned att.",
   },
-  nap_approaching: {
-    title: "Snart lurtid",
-    hint: "30 min før forventa lurstart, så de får roa ned i tide.",
+  rescue_wake: {
+    title: "Vekk frå kort ekstralur",
+    hint: "2 min før tilrådd vaknetid. Ein kort ekstralur skal vere kort så den ikkje stel av neste sove-tid.",
   },
   nap_budget_cap: {
-    title: "Vekk for å treffe trenden",
-    hint: "5 min før tilrådd kapping, når dagens søvnsum er på veg over 7d/30d-trenden. Slå av om du ikkje vil ha trendrettleiing.",
+    title: "Tidleg vekking for å halda trenden",
+    hint: "5 min før tilrådd tidleg vekking, når dagens søvn ligg an til å gå over 7-/30-dagars-snittet. Slå av om du ikkje vil ha trendrettleiing.",
   },
 };
 

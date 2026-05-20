@@ -113,8 +113,8 @@ export function reconcileNotifications(state: ReconcileInput): void {
     const fireAt = wakeByMs - 5 * 60_000;
     const dedupe = `nap_budget_cap:${active.domain_id}`;
     upsert(baby.id, "nap_budget_cap", fireAt, dedupe, {
-      title: "Vekk for å treffe trenden",
-      body: `Tilrådd kapping kl. ${formatTime(pred.napBudget.wakeBy)} – dagens søvn er på veg over snittet`,
+      title: "Tidleg vekking for å halda trenden",
+      body: `Vekk kl. ${formatTime(pred.napBudget.wakeBy)} – dagens søvn ligg an til å gå over snittet`,
       data: { kind: "nap_budget_cap", sleepDomainId: active.domain_id },
     });
   } else {
@@ -127,7 +127,7 @@ export function reconcileNotifications(state: ReconcileInput): void {
     const fireAt =
       new Date(pred.rescueNap.recommendedWakeTime).getTime() - PRE_NOTIFY_MIN * 60_000;
     upsert(baby.id, "rescue_wake", fireAt, dedupe, {
-      title: "Reddingslur – vekking snart",
+      title: "Vekk frå kort ekstralur",
       body: `Tilrådd å vekka kl. ${formatTime(pred.rescueNap.recommendedWakeTime)} (lett fase)`,
       data: { kind: "rescue_wake", sleepDomainId: active.domain_id },
     });
@@ -209,9 +209,9 @@ export function reconcileNotifications(state: ReconcileInput): void {
       ? `nap_approaching:rescue:${rescuePlan.recommendedStart}`
       : `nap_approaching:${napFireTarget}`;
     upsert(baby.id, "nap_approaching", fireAt, dedupe, {
-      title: rescuePlan ? "Reddingslur snart" : "Snart lurtid",
+      title: rescuePlan ? "Kort ekstralur snart" : "Snart lurtid",
       body: rescuePlan
-        ? `Hoppa over morgonluren. Vurder å legge henne ned ca. kl. ${formatTime(napFireTarget)}.`
+        ? `Hoppa over ein lur. Vurder å legge henne ned ca. kl. ${formatTime(napFireTarget)}.`
         : `Forventa kl. ${formatTime(napFireTarget)} — byrj å vinde ned.`,
       data: { kind: "nap_approaching", nextNap: napFireTarget },
     });

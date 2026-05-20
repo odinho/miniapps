@@ -117,7 +117,7 @@
 		},
 		{
 			id: 'skipped-with-rescue',
-			title: 'Hoppa lur + reddingslur',
+			title: 'Hoppa lur + kort ekstralur',
 			caption: 'Strikethrough-blob + soft rescue-blob, ortogonale meldingar',
 			nowH: 11,
 			props: {
