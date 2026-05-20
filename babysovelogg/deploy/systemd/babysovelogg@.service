@@ -10,13 +10,9 @@ User=babysovelogg
 Group=babysovelogg
 UMask=0077
 WorkingDirectory=/srv/babysovelogg/families/%i
-# .env holds NODE_ENV/ORIGIN/VAPID_*/SOCKET_PATH/DB_PATH — managed by ansible.
-# (Keep DB_PATH/SOCKET_PATH there, not in this unit: EnvironmentFile overrides
-# Environment=, so duplicating here would let a stray .env value win.)
+# .env holds NODE_ENV/ORIGIN/HOST/PORT/VAPID_*/DB_PATH — managed by ansible.
 EnvironmentFile=/srv/babysovelogg/families/%i/.env
-ExecStartPre=/usr/bin/rm -f /srv/babysovelogg/families/%i/app.sock
 ExecStart=/usr/local/bin/bun /srv/babysovelogg/code/build/index.js
-ExecStartPost=/bin/sh -c 'until [ -S /srv/babysovelogg/families/%i/app.sock ]; do sleep 0.05; done; chmod 0660 /srv/babysovelogg/families/%i/app.sock'
 Restart=on-failure
 RestartSec=5
 

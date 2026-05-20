@@ -1,6 +1,6 @@
 # babysovelogg per-family vhost. Rendered by ansible into
 # /etc/nginx/conf.d/babysovelogg-<family>.conf.
-# Placeholders: {{family}}, {{host}}, {{tls_ready}}.
+# Placeholders: {{family}}, {{host}}, {{port}}, {{tls_ready}}.
 
 map $http_upgrade $babysovelogg_{{family}}_upgrade {
     default upgrade;
@@ -8,7 +8,7 @@ map $http_upgrade $babysovelogg_{{family}}_upgrade {
 }
 
 upstream babysovelogg_{{family}} {
-    server unix:/srv/babysovelogg/families/{{family}}/app.sock fail_timeout=0;
+    server 127.0.0.1:{{port}} fail_timeout=0;
 }
 
 server {
