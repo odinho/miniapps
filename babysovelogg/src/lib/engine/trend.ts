@@ -278,6 +278,106 @@ function durationOf(s: SleepEntry): number {
   return (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60_000;
 }
 
+interface DriftInputs {
+  prior: TrendTargetState;
+  observedRecentMin: number;
+  classifiedDays: TrendDay[];
+  ageFloorMin: number;
+  now: number;
+}
+
+/**
+ * Anti-ratchet drift logic for the held intervention target.
+ *
+ * Symmetry deliberately broken: upward moves are fast and don't require a
+ * streak (under-capping a baby that actually wants more sleep is more
+ * urgent than over-capping one that wants less); downward moves require
+ * sustained natural-day evidence over at least 2 consecutive evaluations
+ * with enough natural samples. Codex 2026-05-20 (see
+ * `local/codex-trend-split-design.md`) frames this as a closed-loop
+ * control problem: the cap loop forces today's total to (target − lead),
+ * so feeding that back into a symmetric mean-tracker would let any tiny
+ * obedient nudge ratchet the target down forever.
+ *
+ * Constants:
+ *   - 7d natural threshold: ≥ 3 natural days in the last 7
+ *   - 30d natural threshold: ≥ 5 natural days in the last 30
+ *   - downward delta floor: 20 min (natural candidate must be ≥ 20 min
+ *     below current target before a step is even considered)
+ *   - upward delta floor: 20 min above target
+ *   - downward step: min(10, 0.15 × (target − natural))
+ *   - upward step:   min(20, 0.35 × (max(natural, observed) − target))
+ *   - required downward streak: 2 consecutive supporting evaluations
+ *
+ * Tunables are inlined for v1 readability; once Codex flags churn (or a
+ * second consumer needs them) they move to `constants.ts`.
+ */
+function evaluateTrendTargetDrift(input: DriftInputs): TrendTargetState {
+  const { prior, observedRecentMin, classifiedDays, ageFloorMin, now } = input;
+  const updatedAt = new Date(now).toISOString();
+
+  const naturalDays = classifiedDays.filter((d) => d.kind === "natural");
+  const naturalDays7 = naturalDays.filter(
+    (d) => new Date(`${d.date}T00:00:00Z`).getTime() >= now - 7 * 86400_000,
+  ).length;
+  const naturalTotals = naturalDays.map((d) => d.totalMin);
+  const naturalMean = naturalTotals.length >= 3
+    ? naturalTotals.reduce((a, b) => a + b, 0) / naturalTotals.length
+    : null;
+
+  const observedDelta = observedRecentMin - prior.targetMin;
+  const naturalDelta = naturalMean !== null ? naturalMean - prior.targetMin : 0;
+
+  // Upward drift: natural-day evidence OR observed mean clearly above target.
+  if (naturalDelta >= 20 || observedDelta >= 20) {
+    const delta = Math.max(naturalDelta, observedDelta);
+    const step = Math.min(20, 0.35 * delta);
+    return {
+      ...prior,
+      targetMin: prior.targetMin + step,
+      naturalSupportStreak: 0,
+      confidence: naturalMean !== null ? "medium" : "low",
+      source: prior.source,
+      updatedAt,
+    };
+  }
+
+  // Downward drift: needs sustained natural-day evidence well below target.
+  const enoughNatural = naturalDays7 >= 3 || naturalTotals.length >= 5;
+  if (enoughNatural && naturalMean !== null && naturalDelta <= -20) {
+    const newStreak = prior.naturalSupportStreak + 1;
+    if (newStreak >= 2) {
+      const step = Math.min(10, 0.15 * (prior.targetMin - naturalMean));
+      const nextTarget = Math.max(ageFloorMin, prior.targetMin - step);
+      return {
+        ...prior,
+        targetMin: nextTarget,
+        naturalSupportStreak: 0,
+        confidence: "medium",
+        source: "natural-days",
+        updatedAt,
+      };
+    }
+    // Streak still building; hold the target this round.
+    return {
+      ...prior,
+      naturalSupportStreak: newStreak,
+      updatedAt,
+    };
+  }
+
+  // No actionable signal — reset streak so a single off-pattern day
+  // doesn't carry "support" forward into the next compute.
+  return {
+    ...prior,
+    naturalSupportStreak: 0,
+    confidence: prior.confidence === "low" && naturalMean !== null
+      ? "medium"
+      : prior.confidence,
+    updatedAt,
+  };
+}
+
 /**
  * Compute both observed-recent and intervention targets in one pass.
  *
@@ -341,17 +441,26 @@ export function computeTrendTargets(
   const observedRecentMin = Math.round(observed.blendedTrendMin);
   const updatedAt = new Date(now).toISOString();
 
-  // Held-target shape. Stage 2: carry the prior forward unchanged; stage
-  // 3 will add the natural-day drift logic.
+  // Held-target shape: prior carries forward, then drift evaluation
+  // decides whether to step it (gated on natural-day evidence).
   let interventionTargetMin: number;
   let interventionConfidence: TrendTargetConfidence;
   let interventionSourceLabel: string;
   let nextState: TrendTargetState;
   if (prior) {
-    interventionTargetMin = Math.round(prior.targetMin);
-    interventionConfidence = prior.confidence;
-    interventionSourceLabel = `held baseline (${prior.source})`;
-    nextState = { ...prior, updatedAt };
+    const drifted = evaluateTrendTargetDrift({
+      prior,
+      observedRecentMin: observed.blendedTrendMin,
+      classifiedDays,
+      ageFloorMin: floorMin,
+      now,
+    });
+    interventionTargetMin = Math.round(drifted.targetMin);
+    interventionConfidence = drifted.confidence;
+    interventionSourceLabel = drifted.source === "natural-days"
+      ? "natural-day drift"
+      : `held baseline (${drifted.source})`;
+    nextState = drifted;
   } else {
     // Initialize from observed. Bias the baseline UP toward natural-day
     // mean if natural days dominate the window — capped/low days
