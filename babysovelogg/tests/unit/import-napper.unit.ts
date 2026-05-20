@@ -274,21 +274,16 @@ describe("mapNapperToEvents", () => {
       type: "night",
     });
     expect(events[0].payload.startTime).toBe("2026-01-06T17:26:00.000Z");
-    // Auto-closed to 06:00 next morning in the baby-local TZ (which equals
-    // the server's TZ — single-tenant invariant). bun:test runs with TZ=UTC,
-    // so the UTC string here happens to coincide with the local-clock fix;
-    // see the regression note below for a Europe/Oslo example.
+    // Default `babyTz=UTC` means 06:00 UTC.
     expect(events[0].payload.endTime).toBe("2026-01-07T06:00:00.000Z");
   });
 
-  it("uses baby-local 06:00 for auto-close even when system TZ is not UTC", () => {
-    // Sanity-pin that setDate/setHours operate in the *local* clock. We
-    // can't override the JS-runtime TZ mid-process, so this asserts the
-    // shape of the produced Date: hour 6 in *the* server-local zone.
-    const events = map(bedTime("2026-01-06T18:26"));
-    const end = new Date((events[0].payload as { endTime: string }).endTime);
-    expect(end.getHours()).toBe(6);
-    expect(end.getMinutes()).toBe(0);
+  it("uses 06:00 *in the baby's tz* for auto-close, not server clock", () => {
+    // Pass an explicit tz so 06:00 Europe/Oslo (CET in January = UTC+1)
+    // resolves to 05:00 UTC.
+    const csvStr = csv(bedTime("2026-01-06T18:26"));
+    const events = mapNapperToEvents(parseNapperCsv(csvStr), BABY, "Europe/Oslo");
+    expect(events[0].payload.endTime).toBe("2026-01-07T05:00:00.000Z");
   });
 
   it("converts timestamps to UTC ISO strings", () => {

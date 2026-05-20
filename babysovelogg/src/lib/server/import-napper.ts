@@ -1,3 +1,5 @@
+import { setHourInTz } from "$lib/tz.js";
+
 export interface NapperRow {
   start: string;
   end: string;
@@ -51,7 +53,11 @@ interface NightContext {
   nightWakings: NapperRow[];
 }
 
-export function mapNapperToEvents(rows: NapperRow[], babyId: number): ImportEvent[] {
+export function mapNapperToEvents(
+  rows: NapperRow[],
+  babyId: number,
+  babyTz: string = "UTC",
+): ImportEvent[] {
   // Include a batch hash so a second import doesn't collide with the first
   // on (client_id, client_event_id) and get silently deduped. The original
   // numbering was `evt_import_1, evt_import_2, ...` reset per call, which
@@ -89,15 +95,12 @@ export function mapNapperToEvents(rows: NapperRow[], babyId: number): ImportEven
     } else {
       // No explicit wake-up. If the night is older than 24h, auto-close
       // with a 06:00 next-morning estimate to prevent ghost active sleeps.
-      // 06:00 is intended as baby-local clock time; the project is
-      // single-tenant so server TZ == baby TZ and setDate/setHours operate
-      // in that zone (per feedback_server_tz).
+      // 06:00 is baby-local clock time; thread baby.timezone through so
+      // we pick the right UTC instant rather than the server's clock.
       const startMs = new Date(startUtc).getTime();
       const ageMs = Date.now() - startMs;
       if (ageMs > 24 * 60 * 60 * 1000) {
-        const nextMorning = new Date(startMs);
-        nextMorning.setDate(nextMorning.getDate() + 1);
-        nextMorning.setHours(6, 0, 0, 0);
+        const nextMorning = setHourInTz(new Date(startMs + 24 * 60 * 60 * 1000), 6, 0, babyTz);
         emit("sleep.manual", {
           babyId,
           startTime: startUtc,

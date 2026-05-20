@@ -14,7 +14,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
     const csvBody = await request.text();
     const rows = parseNapperCsv(csvBody);
-    const events = mapNapperToEvents(rows, baby.id);
+    const events = mapNapperToEvents(rows, baby.id, baby.timezone ?? "UTC");
 
     if (events.length > 0) {
       processBatchTx(events);
