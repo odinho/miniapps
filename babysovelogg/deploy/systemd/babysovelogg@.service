@@ -1,0 +1,32 @@
+[Unit]
+Description=babysovelogg instance for %i
+After=network.target
+AssertPathExists=/srv/babysovelogg/code/build/index.js
+AssertPathExists=/srv/babysovelogg/families/%i
+
+[Service]
+Type=simple
+User=babysovelogg
+Group=babysovelogg
+UMask=0007
+WorkingDirectory=/srv/babysovelogg/families/%i
+EnvironmentFile=/srv/babysovelogg/families/%i/.env
+Environment=NODE_ENV=production
+Environment=SOCKET_PATH=/srv/babysovelogg/families/%i/app.sock
+Environment=DB_PATH=/srv/babysovelogg/families/%i/data.db
+ExecStart=/usr/local/bin/bun /srv/babysovelogg/code/build/index.js
+Restart=on-failure
+RestartSec=5
+
+# Sandboxing — meetings.service shape.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/srv/babysovelogg/families/%i
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target
