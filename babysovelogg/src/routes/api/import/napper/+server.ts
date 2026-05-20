@@ -33,7 +33,7 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ sleeps, skipped, totalEvents: events.length });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[ERROR] POST /api/import/napper:`, message);
+    console.error("[ERROR] POST /api/import/napper:", message);
     return json({ error: message }, { status: 400 });
   }
 };

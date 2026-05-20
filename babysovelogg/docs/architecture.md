@@ -59,7 +59,7 @@ SvelteKit with `adapter-node`. No external framework — SvelteKit handles routi
 
 ### Key Server Files
 
-- `src/lib/server/db.ts` — SQLite setup (better-sqlite3), schema init
+- `src/lib/server/db.ts` — SQLite setup (bun:sqlite), schema init
 - `src/lib/server/events.ts` — Event store (append with dedup, batch transactions)
 - `src/lib/server/projections.ts` — Applies events to materialized tables, `rebuildAll()`
 - `src/lib/server/schemas.ts` — Valibot validation for event payloads
@@ -178,11 +178,11 @@ a v2 refactor in `docs/followups.md`.
 ### Trend math
 
 `dailyTrendTotalMin` on the Prediction is the blended 7d/30d daily-total
-sleep, computed via `computeTrendTotalMin` (a thin wrapper over
-`getWeekStats` from `stats.ts` — same numbers the stats page rows show).
-Age-norm clamped to the `SLEEP_NEEDS` range. Used by `napBudget` and
-rendered as a "Trendmål" row in `SleepInsightsCard` when it diverges
-from the learnedSchedule total by >30 min.
+sleep, computed via `computeTrendTotalMin` in `trend.ts` (which now wraps
+`computeTrendTargets` for the trend-ratchet split). Age-norm clamped to
+the `SLEEP_NEEDS` range. Used by `napBudget` and rendered on the
+stats/settings UI when it diverges from the learnedSchedule total by
+>30 min.
 
 The trend data fetch is a single 30-day window (server `state.ts:62`)
 shared by both the strategy-hysteresis 21-day slice and the trend

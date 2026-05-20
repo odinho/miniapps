@@ -1,6 +1,6 @@
 # babysovelogg
 
-Baby sleep tracker. SvelteKit 5, better-sqlite3, Playwright + bun:test.
+Baby sleep tracker. SvelteKit 5, bun:sqlite, Playwright + bun:test.
 
 ## Commands
 

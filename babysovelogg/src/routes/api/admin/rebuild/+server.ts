@@ -8,7 +8,7 @@ export const POST: RequestHandler = () => {
     return json(report, { status: report.success ? 200 : 400 });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[ERROR] POST /api/admin/rebuild:`, message);
+    console.error("[ERROR] POST /api/admin/rebuild:", message);
     return json({ error: message }, { status: 500 });
   }
 };

@@ -97,7 +97,7 @@ export const POST: RequestHandler = async ({ request }) => {
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[ERROR] POST /api/events:`, message);
+    console.error("[ERROR] POST /api/events:", message);
     return json({ error: message }, { status: 500 });
   }
 };

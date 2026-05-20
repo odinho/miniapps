@@ -303,7 +303,7 @@ CLI tests (`cli.test.ts`) use `spawnSync` to capture both stdout and stderr. A s
 
 ## What's still wrong
 
-**Playwright lacks inline snapshots.** Vitest tests can use `renderDayState()` with `toMatchInlineSnapshot()` for full-state assertions. Playwright's `expect` doesn't support inline snapshots — only external file snapshots via `toMatchSnapshot()`.
+**Playwright lacks inline snapshots.** bun:test tests can use `renderDayState()` with `toMatchInlineSnapshot()` for full-state assertions. Playwright's `expect` doesn't support inline snapshots — only external file snapshots via `toMatchSnapshot()`.
 
 E2E tests now use `renderDayState()` with `toContain()`/`toMatch()` instead of raw SQL queries. This is better (renderer catches missing projections, failure messages show full state) but not as strong as inline snapshots.
 

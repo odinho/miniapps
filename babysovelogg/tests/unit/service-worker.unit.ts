@@ -4,8 +4,8 @@ import { describe, it, expect } from 'bun:test';
  * Service worker logic tests.
  *
  * The actual service worker runs in a ServiceWorkerGlobalScope and uses the
- * $service-worker module, so we can't import it directly in vitest. Instead,
- * we test the caching strategy decisions as pure functions.
+ * $service-worker module, so we can't import it directly from bun:test.
+ * Instead, we test the caching strategy decisions as pure functions.
  */
 
 // Extract the routing logic from the service worker for testability

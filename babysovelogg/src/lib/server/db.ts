@@ -143,10 +143,8 @@ function initSchema(database: SqliteDb) {
     );
   `);
 
-  // Migration: add off_day flag for sick/travel/spurt days (Codex
-  // 2026-05-13 review §"Sick / spurt / DST days" — promoted from v2 to
-  // v1). Trend math skips flagged days so a parent's worst week doesn't
-  // pull the engine's recommendations sideways.
+  // Migration: add off_day flag for sick/travel/spurt days. Trend math
+  // skips flagged days so a worst week doesn't pull recommendations sideways.
   try {
     database.exec("ALTER TABLE day_start ADD COLUMN off_day INTEGER NOT NULL DEFAULT 0");
   } catch {
@@ -189,22 +187,18 @@ function initSchema(database: SqliteDb) {
       prefs_json TEXT NOT NULL DEFAULT '{}'
     );
 
-    -- Persisted nap-budget mode (Codex 2026-05-13 review §"Mode hysteresis
-    -- isn't real hysteresis"). The engine reads prior mode for hysteresis
-    -- so "established" doesn't self-terminate after ~30 days when mean30
-    -- catches up to mean7.
+    -- Persisted nap-budget mode for hysteresis. Without it "established"
+    -- self-terminates after ~30 days when mean30 catches up to mean7.
     CREATE TABLE IF NOT EXISTS nap_budget_state (
       baby_id INTEGER PRIMARY KEY REFERENCES baby(id),
       mode TEXT NOT NULL,
       entered_at TEXT NOT NULL
     );
 
-    -- Held intervention target for the trend ratchet fix (Codex
-    -- 2026-05-20 design at local/codex-trend-split-design.md).
-    -- A sibling of nap_budget_state so mode hysteresis and target
-    -- holding evolve independently. Target lifts/drops are driven by
-    -- the engine's classifyTrendDay (natural vs policy-affected) and
-    -- the slow-drift rules in computeTrendTargets — see trend.ts.
+    -- Held intervention target for trend ratchet. Sibling of
+    -- nap_budget_state so mode hysteresis and target holding evolve
+    -- independently. Target lifts/drops driven by classifyTrendDay
+    -- (natural vs policy-affected) and slow-drift rules in trend.ts.
     CREATE TABLE IF NOT EXISTS trend_target_state (
       baby_id INTEGER PRIMARY KEY REFERENCES baby(id),
       target_min REAL NOT NULL,

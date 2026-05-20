@@ -365,10 +365,7 @@
 						<!-- Average line -->
 						<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={activeStats.bedtimeChart.avgY} y2={activeStats.bedtimeChart.avgY} stroke="var(--lavender-dark)" stroke-width="1" stroke-dasharray="4,3" />
 						<text x={TS_CHART.W - TS_CHART.PAD_R} y={activeStats.bedtimeChart.avgY - 4} text-anchor="end" fill="var(--lavender-dark)" font-size="10" font-family="var(--font)">snitt {activeStats.bedtimeChart.avgLabel}</text>
-						<!-- Line -->
 						<path d={activeStats.bedtimeChart.linePath} fill="none" stroke="var(--moon)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-						<!-- Dots -->
-						<!-- No dots — clean lines only -->
 						{#each activeStats.bedtimeChart.xLabels as lbl}
 							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
 						{/each}
@@ -404,8 +401,6 @@
 			</div>
 		{/if}
 
-
-		<!-- Wake windows (merged into the scatter replacement below) -->
 
 		<!-- Sleep trends 7d vs 30d -->
 		<div class="stats-section">

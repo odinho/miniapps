@@ -467,12 +467,9 @@ function derivePostPlanFields(input: PostPlanInput): PostPlanOutput {
 
   const bedtimeMs = new Date(bedtime).getTime();
 
-  // ── B8 + stale filter ──
-  // Drop naps that would land within 60 min of bedtime (B8) AND drop
-  // naps whose start time is already >60 min in the past (stale —
-  // parent didn't act on them, no point rendering them as "next" any
-  // longer). Surfaced by the May-2026 review where Oskar's planned
-  // comeback at 14:13 was still rendered as nextNap at now=15:43.
+  // Drop naps within 60 min of bedtime and naps whose start time is
+  // >60 min in the past (stale — parent didn't act on them, no point
+  // surfacing as "next").
   let predictedNaps: PredictedNap[] | null = remaining.filter((n) => {
     const startMs = new Date(n.startTime).getTime();
     const endMs = new Date(n.endTime).getTime();
@@ -482,23 +479,19 @@ function derivePostPlanFields(input: PostPlanInput): PostPlanOutput {
   });
   if (predictedNaps.length === 0) predictedNaps = null;
 
-  // ── Derive nextNap ──
-  // `fallbackNextNap` (= `predictNextNap(wake, ctx)`) is a naive
-  // wake-window projection from the last wake/sleep-end. It's the right
-  // surface when the planner didn't return remaining naps but the day's
-  // quota *isn't* met yet (stale plan, recovery from cut-short). When
-  // the quota IS met (`consumedNaps >= expectedNapCount` with no active
-  // nap), the day's nap budget is done — synthesising a fallback here
-  // produces a phantom past-time nap that then trips `napSkipped` and
-  // a "Hoppa over lur" centre label. bugs.e2e.ts:53 (B11) was the repro.
+  // `fallbackNextNap` is a naive wake-window projection from the last
+  // wake/sleep-end. Use it only when the planner returned no remaining
+  // naps AND the day's quota isn't met yet (stale plan, recovery from
+  // cut-short). When quota IS met with no active nap, suppress — a
+  // phantom past-time fallback nap would trip napSkipped and surface a
+  // misleading "Hoppa over lur" centre label.
   const quotaMet = consumedNaps >= expectedNapCount && activeSleep?.type !== "nap";
   let nextNap: string | null = predictedNaps && predictedNaps.length > 0
     ? predictedNaps[0].startTime
     : (quotaMet ? null : fallbackNextNap);
 
-  // ── Skip detection + napsAllDone ──
-  // 60-min threshold (was 90) — the laxer setting let predictNextNap
-  // produce stale past-time naps that lived past the visibility filter.
+  // Skip detection. 60-min overdue threshold; wider thresholds let
+  // stale past-time naps survive the visibility filter.
   const nextNapMs = nextNap ? new Date(nextNap).getTime() : 0;
   const overdueMs = nextNapMs ? now - nextNapMs : 0;
   const napSkipped = !activeSleep && overdueMs > 60 * 60_000 && overdueMs < 18 * 60 * 60_000;
@@ -990,12 +983,9 @@ function assembleEmergingPrediction(
     },
     ageNorms: result.ageNorms,
     rolling: result.rolling,
-    // Expose learned schedule values even in emerging — the stats page's
-    // norm-vs-baby table reads from this and was showing "—" everywhere
-    // for emerging babies (and the parent had no way to see the numbers
-    // the engine had learned). The same helpers the schedule path uses
-    // are pure functions over ctx; they don't require the strategy to
-    // be `routine_schedule`.
+    // Expose learned schedule values in emerging too — the stats page's
+    // norm-vs-baby table reads from this. The helpers are pure over ctx
+    // and don't require strategy `routine_schedule`.
     learnedSchedule: {
       napDurationMin: getLearnedNapDuration(ctx),
       nightDurationMin: getLearnedNightDuration(ctx),

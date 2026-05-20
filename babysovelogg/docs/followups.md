@@ -605,3 +605,24 @@ Open follow-up: the autoMorning fixture (`Date.prototype.getHours =
 arc-scenes test opts out via a per-file fixture override. Worth
 considering a more surgical fixture (e.g. forceTime(hour, minute))
 for tests that need stable clocks without flattening every Date.
+
+
+## Carryover from archived BUGS-2026-04.md
+
+The April 2026 smoke-test log was archived to
+[`archive/BUGS-2026-04.md`](./archive/BUGS-2026-04.md) when followups.md
+became the canonical todo. Two "must fix" items remained open at that
+time and are worth tracking here:
+
+- **Napper import overlapping/open sleeps (B30).** Importing Napper CSV
+  doesn't check for existing babysovelogg data in the same time range,
+  so an open native night from the same window can collide with an
+  imported open night → multi-hundred-hour ghost sleep. Native data
+  should win over imports. Cap open sleeps to 24 h and flag anomalies.
+  See archive for the original repro (DB row `id=245`, `slp_import_613`).
+
+- **End-sleep form lacks date picker for cross-midnight sessions (B31).**
+  The end-sleep modal uses TimeInput (HH:MM only) and infers the date
+  from context. For a sleep started Apr 5 and ended Apr 6, that
+  inference can pick the wrong day. Add an optional date override, or
+  derive the day more robustly from the previous wake-time anchor.

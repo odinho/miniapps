@@ -617,7 +617,7 @@ function buildGanttChart(
 	const plotW = GANTT.W - GANTT.PAD_L - GANTT.PAD_R;
 	const hoursSpan = 24;
 
-	// Map a fractional hour to x position on the 18:00–18:00 axis
+	// Map a fractional hour to x position on the 00:00–00:00 axis
 	const hourToX = (h: number): number => {
 		let offset = h - GANTT.HOUR_START;
 		if (offset < 0) offset += 24;
