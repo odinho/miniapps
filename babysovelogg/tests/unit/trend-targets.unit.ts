@@ -95,13 +95,13 @@ describe("classifyTrendDay", () => {
   const ref = 780; // 13h reference (matches Halldis's pre-cap trend roughly)
   const tol = 20;  // NAP_BUDGET.TOLERANCE_MIN
 
-  it("classifies a self-wake last-nap day as 'natural'", () => {
+  it("classifies a self-wake last-nap day as 'natural-self-woke'", () => {
     const sleeps = [
       sleep(day(10, 9, 0), day(10, 11, 0), "nap", "self"),
       sleep(day(10, 19, 0), day(11, 8, 0), "night", "self"),
     ];
     const d = classifyTrendDay("2026-04-10", sleeps, ref, tol, undefined);
-    expect(d.kind).toBe("natural");
+    expect(d.kind).toBe("natural-self-woke");
     expect(d.reason).toBe("last nap self-woke");
     expect(d.totalMin).toBe(120 + 13 * 60);
   });
@@ -124,7 +124,7 @@ describe("classifyTrendDay", () => {
       sleep(day(12, 22, 0), day(13, 4, 0), "night", "self"),
     ];
     const d = classifyTrendDay("2026-04-12", sleeps, ref, tol, undefined);
-    expect(d.kind).toBe("natural");
+    expect(d.kind).toBe("natural-untagged");
     expect(d.reason).toBe("untagged complete");
   });
 
@@ -151,8 +151,21 @@ describe("classifyTrendDay", () => {
     ];
     const d = classifyTrendDay("2026-04-15", sleeps, ref, tol, undefined);
     // Last-nap parent-woken but under the 30-min substantial threshold →
-    // falls through to "untagged complete" (natural for now, weakly).
-    expect(d.kind).toBe("natural");
+    // falls through to "untagged complete" (weakly natural).
+    expect(d.kind).toBe("natural-untagged");
+  });
+
+  it("expands off-days to the previous calendar date", () => {
+    // 2026-04-16 is the off-day; 2026-04-15's overnight (start before
+    // midnight) lives in yesterday's bucket and must also be skipped.
+    const offDays = new Set(["2026-04-16"]);
+    const sleeps = [
+      sleep(day(15, 9, 0), day(15, 10, 30), "nap", "self"),
+      sleep(day(15, 19, 0), day(16, 6, 0), "night", "self"),
+    ];
+    const d = classifyTrendDay("2026-04-15", sleeps, ref, tol, offDays);
+    expect(d.kind).toBe("off-day");
+    expect(d.reason).toBe("off-day (expanded)");
   });
 });
 
@@ -262,15 +275,23 @@ describe("computeTrendTargets (stage 1: API only)", () => {
       history.push(...naturalDayAt(isoOffset("2026-04-01", d), 820, "self"));
     }
 
-    let state: TrendTargetState | null = null;
+    // Prior state stamped a day before today's `now` so the per-day
+    // epoch gate (added in stage 3.1) lets drift actually run.
     const now = noonUtc(isoOffset("2026-04-01", 15));
-    // Seed with initial pass.
-    const t0 = computeTrendTargets(last30(history, now), ctxForCtxBase(last30(history, now)), now, null)!;
-    state = { ...t0.state, targetMin: 780, baselineMin: 780 };
+    const state: TrendTargetState = {
+      targetMin: 780,
+      baselineMin: 780,
+      source: "observed-initial",
+      confidence: "medium",
+      naturalSupportStreak: 0,
+      updatedAt: new Date(now - 86400_000).toISOString(),
+    };
 
-    // Run a second pass — the higher-need days should pull the target up.
-    const t1 = computeTrendTargets(last30(history, now), ctxForCtxBase(last30(history, now)), now, state)!;
-    expect(t1.interventionTargetMin).toBeGreaterThan(780);
+    const t = computeTrendTargets(last30(history, now), ctxForCtxBase(last30(history, now)), now, state)!;
+    expect(t.interventionTargetMin).toBeGreaterThan(780);
+    // Baseline should also be raised so a later downward swing can't
+    // erase the "she needs more sleep now" signal.
+    expect(t.state.baselineMin).toBeGreaterThanOrEqual(t.interventionTargetMin);
   });
 
   it("does NOT drift down on policy-affected days even when the observed mean does", () => {
@@ -297,6 +318,53 @@ describe("computeTrendTargets (stage 1: API only)", () => {
     // Held target stays ≥ baseline; observed should be visibly lower.
     expect(t.interventionTargetMin).toBeGreaterThanOrEqual(778);
     expect(t.observedRecentMin).toBeLessThan(780);
+  });
+
+  it("epoch gate: same-day re-evaluation does NOT advance the streak or move the target", () => {
+    // assembleState runs on every state fetch. Without the gate, hitting
+    // /api/state ten times today would advance the natural-support
+    // streak ten times and step the target every other call. Pin that
+    // same-day calls are a no-op against prior state.
+    const sleeps = halldisLikeTrend();
+    const now = new Date(day(9, 5, 25)).getTime();
+    const prior: TrendTargetState = {
+      targetMin: 780,
+      baselineMin: 780,
+      source: "observed-initial",
+      confidence: "medium",
+      naturalSupportStreak: 1,
+      updatedAt: new Date(now).toISOString(), // same UTC date as now
+    };
+    const t = computeTrendTargets(sleeps, ctx11(sleeps), now, prior)!;
+    expect(t.state.targetMin).toBe(780);
+    expect(t.state.naturalSupportStreak).toBe(1); // unchanged
+  });
+
+  it("downward drift requires explicit self-woke evidence (untagged days don't count)", () => {
+    // 30 days of untagged-complete days at 720 min (60 min below target).
+    // Without the self-woke gate this would walk the target down; with
+    // it, the target must hold (no self-wake samples → no support).
+    const history: SleepEntry[] = [];
+    for (let d = 0; d < 30; d++) {
+      // woke_by=null on the nap → classifies as natural-untagged.
+      const date = isoOffset("2026-04-01", d);
+      history.push(
+        { start_time: `${date}T08:20:00.000Z`, end_time: `${date}T09:50:00.000Z`, type: "nap", woke_by: null },
+        { start_time: `${date}T18:00:00.000Z`, end_time: `${isoNextDate(date)}T05:00:00.000Z`, type: "night", woke_by: "self" },
+      );
+    }
+    const now = noonUtc(isoOffset("2026-04-01", 31));
+    const prior: TrendTargetState = {
+      targetMin: 780,
+      baselineMin: 780,
+      source: "observed-initial",
+      confidence: "medium",
+      naturalSupportStreak: 0,
+      updatedAt: new Date(now - 86400_000).toISOString(),
+    };
+    const t = computeTrendTargets(last30(history, now), ctxForCtxBase(last30(history, now)), now, prior)!;
+    // Target stays at 780 (no self-woke samples to support a downward step).
+    expect(t.interventionTargetMin).toBe(780);
   });
 
   it("carries the held target forward when prior state exists (no drift in stage 2)", () => {

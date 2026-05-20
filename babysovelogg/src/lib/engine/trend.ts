@@ -158,8 +158,21 @@ export interface TrendTargetState {
   updatedAt: string;
 }
 
+/**
+ * Per-day classification for the trend-target split.
+ *
+ * Two flavours of "natural" — `natural-self-woke` is the strong signal
+ * (last nap ended `woke_by === "self"`) that the drift logic trusts for
+ * *downward* moves; `natural-untagged` is a complete non-off day with
+ * no last-nap wake reason recorded, which is still useful for the
+ * observed mean and for upward drift but isn't strong enough on its
+ * own to lower the held target. Codex 2026-05-20 review of stage 3
+ * flagged that lumping these together let untagged days yank the
+ * baseline down without explicit self-wake evidence.
+ */
 export type TrendDayKind =
-  | "natural"
+  | "natural-self-woke"
+  | "natural-untagged"
   | "policy-affected"
   | "off-day"
   | "incomplete"
@@ -247,7 +260,15 @@ export function classifyTrendDay(
     lastNap,
   };
 
-  if (offDays?.has(date)) return { ...base, kind: "off-day", reason: "explicit off-day" };
+  // Off-days propagate to the calendar-previous date too: `getWeekStats`
+  // buckets nights by `start_time`, so an off-day's overnight (which
+  // ended on the off-day morning) lives in yesterday's bucket and must
+  // be skipped to keep classification consistent with the off-day
+  // expansion in `computeBlendedTrend`. Codex stage-3 review §"off-day
+  // filtering differs between observed trend and drift evidence".
+  if (offDays?.has(date) || (offDays && isPrevDateOfOffDay(date, offDays))) {
+    return { ...base, kind: "off-day", reason: "off-day (expanded)" };
+  }
   if (nights.length === 0) return { ...base, kind: "incomplete", reason: "no night bucket" };
 
   const nearTarget = totalMin >= reference - toleranceMin;
@@ -263,19 +284,34 @@ export function classifyTrendDay(
     };
   }
   if (lastNap?.woke_by === "self") {
-    return { ...base, kind: "natural", reason: "last nap self-woke" };
+    return { ...base, kind: "natural-self-woke", reason: "last nap self-woke" };
   }
-  // Untagged complete days carry weaker evidence — Codex's memo notes
-  // they're useful for observed trend / upward drift but should NOT be
-  // sole support for moving the intervention target downward. We still
-  // tag them "natural" here; stage 3's drift logic will gate strongly on
-  // explicit self-wake support before lowering the held baseline.
-  return { ...base, kind: "natural", reason: "untagged complete" };
+  // Untagged complete day — useful for the observed mean and for upward
+  // drift, but the downward-drift gate ignores these unless they're
+  // also self-woke. Codex 2026-05-20 §"Downward drift not gated to
+  // explicit natural support".
+  return { ...base, kind: "natural-untagged", reason: "untagged complete" };
+}
+
+function isNaturalKind(d: TrendDay): boolean {
+  return d.kind === "natural-self-woke" || d.kind === "natural-untagged";
+}
+
+function isCompletedKind(d: TrendDay): boolean {
+  return isNaturalKind(d) || d.kind === "policy-affected";
 }
 
 function durationOf(s: SleepEntry): number {
   if (!s.end_time) return 0;
   return (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60_000;
+}
+
+/** True when `date` immediately precedes any off-day in the set — see
+ *  the off-day expansion rationale in `computeBlendedTrend`. */
+function isPrevDateOfOffDay(date: string, offDays: Set<string>): boolean {
+  const nextMs = new Date(`${date}T00:00:00Z`).getTime() + 86400_000;
+  const next = new Date(nextMs).toISOString().slice(0, 10);
+  return offDays.has(next);
 }
 
 interface DriftInputs {
@@ -316,38 +352,71 @@ function evaluateTrendTargetDrift(input: DriftInputs): TrendTargetState {
   const { prior, observedRecentMin, classifiedDays, ageFloorMin, now } = input;
   const updatedAt = new Date(now).toISOString();
 
-  const naturalDays = classifiedDays.filter((d) => d.kind === "natural");
-  const naturalDays7 = naturalDays.filter(
+  // Epoch gate (Codex stage-3 review §"drift can advance multiple times
+  // on the same input"). `assembleState` runs on every state fetch, so
+  // without a per-day gate the streak/step would accumulate across
+  // multiple same-day evaluations. Compare against the *date* of the
+  // prior `updatedAt`, not the wall-clock minute — same local day → hold.
+  const priorDate = prior.updatedAt.slice(0, 10);
+  const nowDate = new Date(now).toISOString().slice(0, 10);
+  if (priorDate === nowDate) {
+    return { ...prior, updatedAt };
+  }
+
+  // Downward-drift evidence is *self-woke only*. Untagged-complete days
+  // are useful for observed averaging and for upward drift but they
+  // aren't strong enough to lower the held target by themselves.
+  const selfWokeDays = classifiedDays.filter((d) => d.kind === "natural-self-woke");
+  const selfWokeDays7 = selfWokeDays.filter(
     (d) => new Date(`${d.date}T00:00:00Z`).getTime() >= now - 7 * 86400_000,
   ).length;
-  const naturalTotals = naturalDays.map((d) => d.totalMin);
-  const naturalMean = naturalTotals.length >= 3
-    ? naturalTotals.reduce((a, b) => a + b, 0) / naturalTotals.length
+  const selfWokeTotals = selfWokeDays.map((d) => d.totalMin);
+  const selfWokeMean = selfWokeTotals.length >= 3
+    ? selfWokeTotals.reduce((a, b) => a + b, 0) / selfWokeTotals.length
+    : null;
+
+  // Upward-drift evidence accepts any natural day (self-woke OR
+  // untagged-complete) plus observed mean — under-capping is the more
+  // urgent direction and a quietly-logged day still tells us the baby
+  // wanted more sleep than we'd been targeting.
+  const naturalDaysAny = classifiedDays.filter(
+    (d) => d.kind === "natural-self-woke" || d.kind === "natural-untagged",
+  );
+  const naturalAnyTotals = naturalDaysAny.map((d) => d.totalMin);
+  const naturalAnyMean = naturalAnyTotals.length >= 3
+    ? naturalAnyTotals.reduce((a, b) => a + b, 0) / naturalAnyTotals.length
     : null;
 
   const observedDelta = observedRecentMin - prior.targetMin;
-  const naturalDelta = naturalMean !== null ? naturalMean - prior.targetMin : 0;
+  const upwardDelta =
+    naturalAnyMean !== null ? naturalAnyMean - prior.targetMin : 0;
+  const selfWokeDelta = selfWokeMean !== null ? selfWokeMean - prior.targetMin : 0;
 
-  // Upward drift: natural-day evidence OR observed mean clearly above target.
-  if (naturalDelta >= 20 || observedDelta >= 20) {
-    const delta = Math.max(naturalDelta, observedDelta);
+  // Upward drift: fast, no streak. Also raises the held baseline so a
+  // legitimate "she needs more sleep now" signal isn't erased by a
+  // later downward swing.
+  if (upwardDelta >= 20 || observedDelta >= 20) {
+    const delta = Math.max(upwardDelta, observedDelta);
     const step = Math.min(20, 0.35 * delta);
+    const nextTarget = prior.targetMin + step;
     return {
       ...prior,
-      targetMin: prior.targetMin + step,
+      targetMin: nextTarget,
+      baselineMin: Math.max(prior.baselineMin, nextTarget),
       naturalSupportStreak: 0,
-      confidence: naturalMean !== null ? "medium" : "low",
+      confidence: naturalAnyMean !== null ? "medium" : "low",
       source: prior.source,
       updatedAt,
     };
   }
 
-  // Downward drift: needs sustained natural-day evidence well below target.
-  const enoughNatural = naturalDays7 >= 3 || naturalTotals.length >= 5;
-  if (enoughNatural && naturalMean !== null && naturalDelta <= -20) {
+  // Downward drift: needs sustained *self-woke* evidence well below
+  // target, plus the 2-consecutive-evaluation streak.
+  const enoughSelfWoke = selfWokeDays7 >= 3 || selfWokeTotals.length >= 5;
+  if (enoughSelfWoke && selfWokeMean !== null && selfWokeDelta <= -20) {
     const newStreak = prior.naturalSupportStreak + 1;
     if (newStreak >= 2) {
-      const step = Math.min(10, 0.15 * (prior.targetMin - naturalMean));
+      const step = Math.min(10, 0.15 * (prior.targetMin - selfWokeMean));
       const nextTarget = Math.max(ageFloorMin, prior.targetMin - step);
       return {
         ...prior,
@@ -358,7 +427,6 @@ function evaluateTrendTargetDrift(input: DriftInputs): TrendTargetState {
         updatedAt,
       };
     }
-    // Streak still building; hold the target this round.
     return {
       ...prior,
       naturalSupportStreak: newStreak,
@@ -366,12 +434,11 @@ function evaluateTrendTargetDrift(input: DriftInputs): TrendTargetState {
     };
   }
 
-  // No actionable signal — reset streak so a single off-pattern day
-  // doesn't carry "support" forward into the next compute.
+  // No actionable signal — reset streak.
   return {
     ...prior,
     naturalSupportStreak: 0,
-    confidence: prior.confidence === "low" && naturalMean !== null
+    confidence: prior.confidence === "low" && selfWokeMean !== null
       ? "medium"
       : prior.confidence,
     updatedAt,
@@ -424,16 +491,12 @@ export function computeTrendTargets(
       ),
     );
 
-  const naturalDays30 = classifiedDays.filter((d) => d.kind === "natural").length;
+  const naturalDays30 = classifiedDays.filter(isNaturalKind).length;
   const policyAffectedDays30 = classifiedDays.filter((d) => d.kind === "policy-affected").length;
   const offDaysDropped = classifiedDays.filter((d) => d.kind === "off-day").length;
-  const completedDays30 = classifiedDays.filter(
-    (d) => d.kind === "natural" || d.kind === "policy-affected",
-  ).length;
+  const completedDays30 = classifiedDays.filter(isCompletedKind).length;
   const completedDays7 = classifiedDays.filter(
-    (d) =>
-      (d.kind === "natural" || d.kind === "policy-affected") &&
-      new Date(`${d.date}T00:00:00Z`).getTime() >= now - 7 * 86400_000,
+    (d) => isCompletedKind(d) && new Date(`${d.date}T00:00:00Z`).getTime() >= now - 7 * 86400_000,
   ).length;
   const ageBand = findByAge(SLEEP_NEEDS, ctx.ageMonths);
   const floorMin = ageBand.range[0] * 60;
@@ -466,7 +529,7 @@ export function computeTrendTargets(
     // mean if natural days dominate the window — capped/low days
     // shouldn't seed the held baseline low. (Stage 3 will tighten this.)
     const naturalTotals = classifiedDays
-      .filter((d) => d.kind === "natural")
+      .filter((d) => d.kind === "natural-self-woke" || d.kind === "natural-untagged")
       .map((d) => d.totalMin);
     const naturalMean = naturalTotals.length >= 3
       ? naturalTotals.reduce((a, b) => a + b, 0) / naturalTotals.length
