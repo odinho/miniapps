@@ -576,7 +576,11 @@ html, body {
   margin-bottom: 6px;
 }
 
-.modal input, .modal select, .settings input {
+/* Text-like inputs only — `.settings input` previously matched checkboxes
+   and the file input, stretching them to 100% width / 48px tall. */
+.modal input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+.modal select,
+.settings input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]) {
   width: 100%;
   padding: 12px 14px;
   border: 2px solid var(--cream-dark);
@@ -590,7 +594,8 @@ html, body {
   min-height: 48px;
 }
 
-.modal input:focus, .settings input:focus {
+.modal input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):focus,
+.settings input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):focus {
   border-color: var(--lavender-dark);
 }
 
