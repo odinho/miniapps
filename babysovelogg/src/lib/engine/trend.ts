@@ -73,8 +73,15 @@ export function computeBlendedTrend(
 
   // Stability gate — recent stdev/mean too high → bad week / sick day /
   // growth spurt is poisoning the target. Defer to "no advice".
-  const sd7 = stdev(totals7.length >= 3 ? totals7 : totals30, mean7);
-  if (sd7 / mean7 > NAP_BUDGET.MAX_STDEV_FRACTION) return null;
+  //
+  // When totals7 is too sparse (<3 samples), we widen the sample to totals30,
+  // and the mean used to center the stdev must match the sample — otherwise a
+  // 1-2-day window centered on a 30-day distribution inflates the variance
+  // and the gate fires for the wrong reason. Codex pair-review 2026-05-20.
+  const stdevSample = totals7.length >= 3 ? totals7 : totals30;
+  const stdevMean = totals7.length >= 3 ? mean7 : mean30;
+  const sd7 = stdev(stdevSample, stdevMean);
+  if (sd7 / stdevMean > NAP_BUDGET.MAX_STDEV_FRACTION) return null;
 
   // Age-norm clamp.
   const ageBand = findByAge(SLEEP_NEEDS, ageMonths);

@@ -79,9 +79,9 @@ describe("multi-baby ablation", () => {
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "positionalDuration:
         halldis: nap -0.1, wake 0
-        baby_1: nap -6.3, wake 0
-        baby_2: nap +1.6, wake 0
-        baby_3: nap -3.4, wake 0
+        baby_1: nap -5.8, wake 0
+        baby_2: nap +2.8, wake 0
+        baby_3: nap -2.8, wake 0
       habitualWake:
         halldis: nap 0, wake +4.7
         baby_1: nap 0, wake +20.2
@@ -93,8 +93,8 @@ describe("multi-baby ablation", () => {
         baby_2: nap 0, wake 0
         baby_3: nap 0, wake 0
       habitualNapStart:
-        halldis: nap +3.4, wake 0
-        baby_1: nap +2.2, wake 0
+        halldis: nap +2, wake 0
+        baby_1: nap +2, wake 0
         baby_2: nap 0, wake 0
         baby_3: nap 0, wake 0
       cycleBias:

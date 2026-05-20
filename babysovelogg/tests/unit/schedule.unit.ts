@@ -280,6 +280,45 @@ describe("incomplete days (missing night) excluded from learning", () => {
   });
 });
 
+// ─── positional wake-window: first nap means first nap ──────────────────────
+//
+// Codex pair-review (2026-05-20) flagged that getPositionalWakeWindows
+// indexes off-by-one because the cache buckets sleeps by start_time local
+// date. The overnight that ends *this* morning started yesterday and lives
+// in yesterday's bucket. The loop then starts at i=1 inside today's bucket,
+// so what should be the second wake window (nap1.end → nap2.start) ends up
+// recorded as position 0 — and predictDayNaps picks it as the first WW.
+// Result: the predicted first nap of the day drifts ~60 min late, matching
+// the user's "rigid 10:53" complaint when Napper suggested 11:18.
+describe("getPositionalWakeWindows: first nap WW comes from morning wake", () => {
+  function buildDistinctWWFixture(): SleepEntry[] {
+    // Seven days where first WW = 150 min (wake 07:00 → nap1 09:30) and
+    // second WW = 210 min (nap1 end 10:30 → nap2 14:00). Both inside the
+    // 8-month bracket so clamping is a no-op; the bug shows as a 60-min
+    // shift in the first predicted nap.
+    const sleeps: SleepEntry[] = [];
+    for (let d = 19; d <= 25; d++) {
+      sleeps.push(sleep(day(d, 9, 30), day(d, 10, 30)));
+      sleeps.push(sleep(day(d, 14, 0), day(d, 15, 0)));
+      sleeps.push(sleep(day(d, 19, 0), day(d + 1, 7, 0), "night"));
+    }
+    return sleeps;
+  }
+
+  it("predicts the first nap at wake + first WW, not wake + second WW", () => {
+    const c: BabyContext = {
+      birthdate: "2025-07-26",
+      ageMonths: 8,
+      tz: "UTC",
+      customNapCount: 2,
+      recentSleeps: buildDistinctWWFixture(),
+      features: { habitualNapStart: false },
+    };
+    const preds = predictDayNaps(day(26, 7, 0), c);
+    expect(preds[0].startTime.slice(11, 16)).toBe("09:30");
+  });
+});
+
 // ─── shineDaytimeSleepMinutes ───────────────────────────────────────────────
 //
 // Direct sanity checks on the SHINE interpolation. The age bands come from

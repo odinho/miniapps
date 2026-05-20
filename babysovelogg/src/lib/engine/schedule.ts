@@ -421,6 +421,28 @@ export function detectNapTransition(
 }
 
 /**
+ * Find the morning-wake anchor for the given day's bucket: end_time of the
+ * overnight that started yesterday and ended this morning. The cache buckets
+ * by `start_time` local date, so a bedtime-at-18:00 night belongs to the
+ * *previous* day's list — looking it up here is what lets position 0 mean
+ * "wake → nap1" instead of "nap1.end → nap2.start".
+ *
+ * Returns null when there's no prior bucket or no night entry in it (true
+ * first onboarding day, or yesterday was logging-incomplete). The caller
+ * just drops position-0 for that day rather than mis-attributing.
+ */
+function morningWakeMs(cache: SleepCache, dayKey: string): number | null {
+  const idx = cache.sortedDayKeys.indexOf(dayKey);
+  if (idx <= 0) return null;
+  const prev = cache.byDay.get(cache.sortedDayKeys[idx - 1]);
+  if (!prev) return null;
+  for (let k = prev.length - 1; k >= 0; k--) {
+    if (prev[k].type === "night") return prev[k].endMs;
+  }
+  return null;
+}
+
+/**
  * Compute per-position average wake windows (1st WW, 2nd WW, etc.) from recent sleeps.
  * First WW is typically shorter, last WW is typically longer.
  * Returns a sparse array indexed by position (0-based).
@@ -435,10 +457,16 @@ function getPositionalWakeWindows(ctx: BabyContext): number[] {
   const gapsByPosition = new Map<number, number[]>();
   for (const [dayKey, daySleeps] of cache.byDay) {
     if (!cache.daysWithNight.has(dayKey)) continue;
+    const priorEndMs = morningWakeMs(cache, dayKey);
     let napPosition = 0;
-    for (let i = 1; i < daySleeps.length; i++) {
+    for (let i = 0; i < daySleeps.length; i++) {
       if (daySleeps[i].type !== "nap") continue; // skip gaps before night sleep
-      const gapMin = (daySleeps[i].startMs - daySleeps[i - 1].endMs) / 60000;
+      const prevEndMs = i === 0 ? priorEndMs : daySleeps[i - 1].endMs;
+      if (prevEndMs == null) {
+        napPosition++;
+        continue;
+      }
+      const gapMin = (daySleeps[i].startMs - prevEndMs) / 60000;
       if (gapMin >= 10 && gapMin <= 480) {
         if (!gapsByPosition.has(napPosition)) gapsByPosition.set(napPosition, []);
         gapsByPosition.get(napPosition)!.push(gapMin);
@@ -505,11 +533,17 @@ function getPositionalDataForNapCount(
 
   for (const dayKey of matchingDayKeys) {
     const daySleeps = cache.byDay.get(dayKey)!;
+    const priorEndMs = morningWakeMs(cache, dayKey);
 
     let napPos = 0;
-    for (let i = 1; i < daySleeps.length; i++) {
+    for (let i = 0; i < daySleeps.length; i++) {
       if (daySleeps[i].type !== "nap") continue;
-      const gapMin = (daySleeps[i].startMs - daySleeps[i - 1].endMs) / 60000;
+      const prevEndMs = i === 0 ? priorEndMs : daySleeps[i - 1].endMs;
+      if (prevEndMs == null) {
+        napPos++;
+        continue;
+      }
+      const gapMin = (daySleeps[i].startMs - prevEndMs) / 60000;
       if (gapMin >= 10 && gapMin <= 480) {
         if (!gapsByPos.has(napPos)) gapsByPos.set(napPos, []);
         gapsByPos.get(napPos)!.push(gapMin);

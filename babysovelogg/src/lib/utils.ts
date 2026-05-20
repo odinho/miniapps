@@ -45,3 +45,18 @@ export function formatTime(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
   return d.toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit", hour12: false });
 }
+
+/**
+ * Display a model-derived time as a soft ±`paddingMin` window around `date`,
+ * with the center first rounded to the nearest 5-minute boundary so a
+ * minute-precise cap like 10:53 reads as "10:50–11:00" instead of carrying
+ * fake precision the underlying model never promised.
+ */
+export function formatTimeWindow(date: Date | string, paddingMin = 5): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  const rounded = new Date(d);
+  rounded.setMinutes(Math.round(d.getMinutes() / 5) * 5, 0, 0);
+  const lo = new Date(rounded.getTime() - paddingMin * 60_000);
+  const hi = new Date(rounded.getTime() + paddingMin * 60_000);
+  return `${formatTime(lo)}–${formatTime(hi)}`;
+}

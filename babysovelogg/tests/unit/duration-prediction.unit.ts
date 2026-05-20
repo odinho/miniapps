@@ -150,7 +150,7 @@ describe("duration and wake-time prediction", () => {
     expect(renderDurationMetrics(result)).toMatchInlineSnapshot(`
       "112 days
       nap dur MAE: 24.3 min (bias +0.8)
-      nap end MAE: 50.8 min
+      nap end MAE: 49.8 min
       wake time MAE: 25.2 min (bias -1.6)"
     `);
 
@@ -203,7 +203,7 @@ describe("duration and wake-time prediction", () => {
 
 describe("confidence interval coverage", () => {
   it("±1 SD ranges contain a reasonable fraction of actuals", () => {
-    expect(renderCIcoverage()).toMatchInlineSnapshot(`"101/156 naps within ±1 SD range (65%)"`);
+    expect(renderCIcoverage()).toMatchInlineSnapshot(`"102/156 naps within ±1 SD range (65%)"`);
 
     // Ranges are ±1 SD so ~68% coverage expected if well-calibrated.
     // We accept ≥40% as a floor — below that the ranges are meaningless.

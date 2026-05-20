@@ -10,7 +10,7 @@
 	import DiaperForm from '$lib/components/DiaperForm.svelte';
 	import WakeUpSheet from '$lib/components/WakeUpSheet.svelte';
 	import EditSleepModal from '$lib/components/EditSleepModal.svelte';
-	import { formatDuration, formatTime } from '$lib/utils.js';
+	import { formatDuration, formatTime, formatTimeWindow } from '$lib/utils.js';
 	import { calcPauseMs } from '$lib/engine/classification.js';
 	import { buildPause, buildResume, isPaused } from '$lib/sleep-actions.js';
 	import { buildSleepInfoRows } from '$lib/settings-utils.js';
@@ -168,17 +168,38 @@
 	);
 
 	// Active-sleep progress meter: predicted wake + ±1 SD band.
-	// Falls back to expectedNapEnd/expectedNightEnd if the engine didn't supply
-	// a range (older app states / tests). No band in that fallback case.
+	//
+	// When the engine has emitted an actionable wake recommendation
+	// (napBudget cap for over-trend days, rescueNap cap for short-prior /
+	// extra naps) we point the arc at *that* deadline instead of the
+	// natural expected wake — otherwise the marker on the arc tells the
+	// parent one time and the banner tells them another. The natural
+	// expected wake is only used when no cap is in play.
+	//
+	// Band: a ±1 SD natural-wake band makes sense around a *predicted*
+	// wake. A cap is a deadline, not a range; we hide the band when a cap
+	// overrides so the arc stops painting a phantom natural window past
+	// the actionable target.
+	const arcActiveWakeOverride = $derived.by(() => {
+		if (!arcActiveSleep || !prediction) return null;
+		if (arcActiveSleep.type === 'nap' && prediction.napBudget?.wakeBy) {
+			return prediction.napBudget.wakeBy;
+		}
+		if (prediction.rescueNap?.recommendedWakeTime) {
+			return prediction.rescueNap.recommendedWakeTime;
+		}
+		return null;
+	});
 	const arcActiveWakeAt = $derived.by(() => {
 		if (!arcActiveSleep || !prediction) return null;
+		if (arcActiveWakeOverride) return arcActiveWakeOverride;
 		if (prediction.expectedWakeRange) return prediction.expectedWakeRange.point;
 		return arcActiveSleep.type === 'night'
 			? prediction.expectedNightEnd
 			: prediction.expectedNapEnd;
 	});
 	const arcActiveWakeBand = $derived(
-		arcActiveSleep && prediction?.expectedWakeRange
+		arcActiveSleep && prediction?.expectedWakeRange && !arcActiveWakeOverride
 			? { lo: prediction.expectedWakeRange.lo, hi: prediction.expectedWakeRange.hi }
 			: null,
 	);
@@ -581,7 +602,7 @@
 				</div>
 				<div class="nap-budget-body">
 					{#if wakeCountdown > 0}
-						Vekk innan kl. {formatTime(nb.wakeBy)} ({formatDuration(wakeCountdown)})
+						Vekk i vindauget {formatTimeWindow(nb.wakeBy)} ({formatDuration(wakeCountdown)})
 					{:else}
 						Vekk no — kappet er over.
 					{/if}

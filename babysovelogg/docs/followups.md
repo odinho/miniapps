@@ -11,6 +11,112 @@ multi-day testing, the unit-of-work flow — live in
 is for tracked product/engine/test work.
 
 
+## Open items from the 2026-05-20 Codex critique (arc / trend / wake-rec)
+
+Codex (`local/codex-arc-trend-critique.md`) flagged a batch of bugs and
+smells in the trend / nap-budget / arc subsystem after the user reported
+the trend target walking downward, a rigid 10:53 wake suggestion, no
+morning surfacing of the trend cap, and clamped arc endpoints. This
+pass shipped four small fixes (positional first-WW, sparse-7d stdev
+mean, rounded wake-by window, napBudget-driven arc marker). What's
+deliberately deferred:
+
+- **Trend ratchet — separate observed average from intervention target.**
+  `computeBlendedTrend` (`src/lib/engine/trend.ts:37`) feeds today's
+  capped totals back into tomorrow's mean. `computeNapBudget`
+  (`src/lib/engine/nap-budget.ts:152-185`) then writes `trend - 5m`
+  back into history every time the parent obeys. Net: a slow downward
+  walk (Halldis: 13.0 → 12.9 → 12.8 over a few days). Fix needs a
+  held baseline / floor that only moves on independent self-wake
+  evidence. Add a closed-loop simulation test (14-30 days of "parent
+  follows advice") that asserts the target does NOT ratchet down.
+
+- **Dynamic arc time domain.** `getDayArcConfig` / `getNightArcConfig`
+  in `src/lib/arc-utils.ts:8-19` return fixed 12-hour windows.
+  `timeToArcFraction` clamps overruns. Composed arc therefore clamps
+  the active bubble end + wake marker into the endpoint when sleep
+  outlives the window — the night-mode screenshot the user sent where
+  the wake target disappears off the right. Need: derive arc start/end
+  from actual wake/bedtime ± padding ± min span; rescale segments into
+  that domain instead of clamping meaning into decoration. The
+  `arc-utils.unit.ts:14-33` tests currently pin the fixed-domain
+  behavior — must be updated alongside.
+
+- **Morning forward-projected day-budget object.** `napBudget` only
+  emits during an active last-of-day nap (`src/lib/engine/state.ts:546`,
+  banner gate `src/routes/+page.svelte:569`). Parents want the
+  "if today runs like a typical day, cap last nap around X" advice in
+  the morning plan, before the nap starts. Build a separate
+  `dayBudgetProjection` field that runs the day forward from now and
+  surfaces the same cap target as a soft window.
+
+- **Active nap-budget ignores pauses.** `computeNapBudget` only takes
+  `{ start_time }` and computes `elapsed = now - start`
+  (`src/lib/engine/nap-budget.ts:113`, `:331`). A 20-min pause is
+  counted as sleep, so banked totals and wakeBy run too aggressive.
+  Thread `activeSleep.pauseTime` / `calcPauseMs` through.
+
+- **Capped naps shouldn't drift learned-typical down.** The cap-respect
+  carve-out in `censorCutShortNaps` keeps app-capped naps in the
+  learnable pool (`src/lib/engine/schedule.ts:810`). That fixed the
+  stale-baseline problem but lets app-induced caps redefine the
+  baby's natural nap duration. Needs the "infer wake reason from
+  trend" v2 already on this followups doc (§napBudget v2), tuned so
+  the learning loop is more conservative than the suggestion loop.
+
+- **Real arbitration between rescue and napBudget.** Today, if
+  `napBudget` exists, `rescueNap` is set to null unconditionally
+  (`src/lib/engine/state.ts:377`). That avoids two banners but never
+  asks which target is earlier or safer. Compare targets, prefer the
+  earlier action time, surface the reason.
+
+- **`scorePlan` target-axis is a no-op.** `selectBestPlan` passes
+  `naturalBedtimeMs` as the target for both the natural and
+  target-guided candidates (`src/lib/engine/schedule.ts:1641-1785`).
+  Target-proximity cost is therefore zero against the already-picked
+  bedtime, not the parent's actual target_bedtime. Tests at
+  `engine-scenarios.unit.ts:2496-2511` reference a "target-nudged"
+  third candidate that doesn't exist. Either implement the third
+  candidate or delete the lore.
+
+- **Day arc start-click can't reach the overnight it labels.**
+  `arcStartLabel` reads `todayWakeUp.wake_time` from the overnight
+  that started before midnight, but `todaySleeps` only contains rows
+  whose `start_time >= midnight`
+  (`src/lib/server/state.ts:57-75`, handler at `+page.svelte:318`).
+  Tapping the day-start endpoint after an overnight either misses or
+  opens the wrong dialog.
+
+- **`isLastNapOfDay` derived after UI filtering.** Remaining
+  predictions are dropped if stale or within 60 min of bedtime, then
+  `isLastNapOfDay = !predictedNaps.length` is computed against the
+  filtered set (`src/lib/engine/state.ts:458-547`). A not-actually-
+  last nap can become "last" because the next prediction was filtered
+  out of display.
+
+- **Dead constant + scattered policy literals.**
+  `NAP_BUDGET.CYCLE_NUDGE_WINDOW_MIN` is defined but never read.
+  `FIRM_PUSH_LEAD_MIN` is defined but the scheduler hardcodes 5
+  (`src/lib/server/notification-scheduler.ts:112`). Many policy
+  thresholds (25-min continuation, 30-min rescue delay, 3-h horizon,
+  60-min stale, 18-h skip guard, 12-h overnight) live as literals in
+  `src/lib/engine/state.ts`. Consolidate into `constants.ts` or kill.
+
+- **Arc time math uses browser local TZ, not baby TZ.**
+  `arc-utils.ts:11,21` use `Date.getHours()`. The rest of the engine
+  is baby-tz-aware. Travel or a remote browser shifts arc geometry
+  while predictions stay in baby tz.
+
+- **Arc fallback ghosts invent 45-min sleep blobs.** Skipped-nap and
+  bedtime fallback both render a 45-min placeholder
+  (`src/lib/arc-utils.ts:168-201`, `arc-scene.ts:449`). It's a
+  visual placeholder that reads as engine output. Pull duration from
+  `getLearnedNapDuration` / confidence ranges instead.
+
+The full Codex report (with file:line repros and severity grouping)
+lives at `local/codex-arc-trend-critique.md` and is intentionally
+*not* committed — Codex pair-review notes belong outside git.
+
 ## Refactor: unify wake-recommendations into a `WakeRecommendation` union
 
 Source: 2026-05-13 napBudget commits. Four `Prediction` fields now
