@@ -5,6 +5,7 @@ import type { ConfidenceResult, PredictionRange } from "$lib/engine/confidence.j
 import type { CalibrationReport } from "$lib/engine/calibration.js";
 import type { Strategy } from "$lib/engine/strategy.js";
 import type { RollingSleepStats, AgeNorms } from "$lib/engine/features.js";
+import type { TrendTargets } from "$lib/engine/trend.js";
 
 export interface Prediction {
 	/** Which prediction strategy produced this result */
@@ -108,6 +109,16 @@ export interface Prediction {
 	 * noisy (stdev/mean above threshold).
 	 */
 	dailyTrendTotalMin: number | null;
+	/**
+	 * Both observed-recent and held-intervention trend numbers, plus
+	 * diagnostics, plus the next state to persist. Null when trend data
+	 * is too sparse or noisy. New shape for the 2026-05-20 split — see
+	 * `local/codex-trend-split-design.md`. UI should prefer reading
+	 * `observedRecentMin` for stats and `interventionTargetMin` for any
+	 * "target / mål" copy. `dailyTrendTotalMin` is preserved for one
+	 * release as a backward-compat alias of `observedRecentMin`.
+	 */
+	trendTargets: TrendTargets | null;
 }
 
 export interface NapBudget {

@@ -157,6 +157,15 @@ export interface BabyContext {
    * the censor and napBudget aligned on one "near trend" definition.
    */
   trendTotalMin?: number | null;
+  /**
+   * Persisted trend-target state from the prior evaluation (held
+   * intervention target + baseline + drift bookkeeping). Threaded into
+   * `computeTrendTargets` so the cap target survives across calls
+   * instead of being recomputed from the rolling window each time.
+   * Null/undefined when no prior state exists or persistence is bypassed
+   * (tests, backtest harness).
+   */
+  priorTrendTargetState?: import("./engine/trend.js").TrendTargetState | null;
   /** User-set preferred bedtime ("HH:MM"), or null for follow-the-baby mode. */
   targetBedtime?: string | null;
   features?: Partial<PredictionFeatures>;

@@ -118,15 +118,38 @@ describe("computeTrendTargets (stage 1: API only)", () => {
     };
   }
 
-  it("returns both observed and intervention targets (equal in stage 1)", () => {
+  it("initializes intervention target ≥ observed (natural-mean tiebreak)", () => {
+    // Stage 2 init: when natural days dominate the window, the seed lifts
+    // toward the natural mean so the held baseline doesn't start low.
+    // Without prior state, intervention target should be >= observed.
     const sleeps = halldisLikeTrend();
     const now = new Date(day(9, 5, 25)).getTime();
     const targets = computeTrendTargets(sleeps, ctx11(sleeps), now);
     expect(targets).not.toBeNull();
     expect(targets!.observedRecentMin).toBeGreaterThan(0);
-    expect(targets!.interventionTargetMin).toBe(targets!.observedRecentMin);
-    expect(targets!.interventionConfidence).toBe("low"); // no held baseline yet
-    expect(targets!.interventionSourceLabel).toBe("observed (stage 1)");
+    expect(targets!.interventionTargetMin).toBeGreaterThanOrEqual(targets!.observedRecentMin);
+    expect(targets!.interventionConfidence).toBe("low"); // no prior held baseline
+    expect(targets!.interventionSourceLabel).toBe("observed (initial)");
+    expect(targets!.state).toBeDefined();
+    expect(targets!.state.source).toBe("observed-initial");
+  });
+
+  it("carries the held target forward when prior state exists (no drift in stage 2)", () => {
+    const sleeps = halldisLikeTrend();
+    const now = new Date(day(9, 5, 25)).getTime();
+    const prior = {
+      targetMin: 800,
+      baselineMin: 800,
+      source: "observed-initial" as const,
+      confidence: "medium" as const,
+      naturalSupportStreak: 0,
+      updatedAt: new Date(day(8, 5, 25)).toISOString(),
+    };
+    const targets = computeTrendTargets(sleeps, ctx11(sleeps), now, prior);
+    expect(targets!.interventionTargetMin).toBe(800);
+    expect(targets!.interventionConfidence).toBe("medium");
+    expect(targets!.state.targetMin).toBe(800);
+    expect(targets!.state.baselineMin).toBe(800);
   });
 
   it("classifies days into natural vs policy-affected in diagnostics", () => {

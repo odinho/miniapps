@@ -18,7 +18,8 @@ import { RESCUE_NAP, NAP_FLOOR_BY_AGE, findByAge } from "./constants.js";
 import { getTodayStats, getSleepDayTotals } from "./stats.js";
 import { computeConfidence, computeWakeRange } from "./confidence.js";
 import { computeNapBudget, isDayOnTrend } from "./nap-budget.js";
-import { computeTrendTotalMin } from "./trend.js";
+import { computeTrendTargets, computeTrendTotalMin } from "./trend.js";
+import type { TrendTargetState } from "./trend.js";
 import { calibrate } from "./calibration.js";
 import { computeStrategySignals } from "./features.js";
 import { selectStrategy } from "./strategy.js";
@@ -64,6 +65,14 @@ export interface DayData {
    * days of cap-respect. Null = no prior state.
    */
   priorNapBudgetState?: { mode: "first-contact" | "established"; enteredAt: string } | null;
+  /**
+   * Last persisted trend-target state (server reads from trend_target_state).
+   * Holds the intervention target across calls so cap-following doesn't
+   * ratchet it downward — see local/codex-trend-split-design.md. Null when
+   * no prior state has been recorded (first evaluation after the feature
+   * lands, or after a manual reset).
+   */
+  priorTrendTargetState?: TrendTargetState | null;
   /**
    * Date keys (YYYY-MM-DD in baby tz) flagged as off-days. Threaded into
    * BabyContext so the trend computation can skip them.
@@ -595,6 +604,7 @@ function buildContext(
   extendedSleeps?: SleepEntry[],
   trendSleeps?: SleepEntry[],
   offDays?: Set<string>,
+  priorTrendTargetState?: TrendTargetState | null,
 ): BabyContext {
   const tz = baby.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   // Compute the blended trend once and thread it through ctx — the censor
@@ -623,6 +633,7 @@ function buildContext(
     trendSleeps,
     offDays,
     trendTotalMin,
+    priorTrendTargetState: priorTrendTargetState ?? null,
   };
 }
 
@@ -652,7 +663,10 @@ export function assembleState(data: DayData) {
   // fall back to whatever wider data we have. The helper itself gates on
   // ≥7 days of complete data.
   const trendEntries = (data.trendSleeps ?? data.strategySleeps ?? recentSleeps).map(toSleepEntry);
-  const ctx = buildContext(baby, recentEntries, now, strategyEntries, trendEntries, data.offDays);
+  const ctx = buildContext(
+    baby, recentEntries, now, strategyEntries, trendEntries, data.offDays,
+    data.priorTrendTargetState ?? null,
+  );
 
   const todaySleepsWithPauses = todaySleeps.map((s) => ({
     ...toSleepEntry(s),
@@ -823,6 +837,7 @@ function assembleNewbornPrediction(
     continuationWindow: null,
     napBudget: null,
     dailyTrendTotalMin: null,
+    trendTargets: null,
     // Newborn fields
     sleepWindow: result.sleepWindow,
     sleepPressure: result.sleepPressure,
@@ -928,6 +943,10 @@ function assembleEmergingPrediction(
     priorNapBudgetState,
   });
 
+  const trendTargets = computeTrendTargets(
+    ctx.trendSleeps ?? ctx.recentSleeps, ctx, now, ctx.priorTrendTargetState,
+  );
+
   return {
     strategy: "emerging_rhythm",
     feasible: true,
@@ -946,7 +965,8 @@ function assembleEmergingPrediction(
     rescueNap: post.rescueNap,
     continuationWindow: post.continuationWindow,
     napBudget: post.napBudget,
-    dailyTrendTotalMin: computeTrendTotalMin(ctx.trendSleeps ?? ctx.recentSleeps, ctx, now),
+    dailyTrendTotalMin: trendTargets?.observedRecentMin ?? null,
+    trendTargets,
     sleepWindow: result.sleepWindow,
     sleepPressure: result.sleepPressure,
     totalSleep24h: result.rolling.totalSleep24h,
@@ -1061,6 +1081,9 @@ function assembleSchedulePrediction(
   // bedtime range, which Timer uses for bedtime / after-bedtime modes.
   const confidence = computeConfidence(post.predictedNaps ?? [], bedtime, ctx.ageMonths, ctx.recentSleeps, ctx.tz);
   const calibration = calibrate(ctx.ageMonths, ctx.recentSleeps, ctx.customNapCount, ctx.tz);
+  const trendTargets = computeTrendTargets(
+    ctx.trendSleeps ?? ctx.recentSleeps, ctx, now, ctx.priorTrendTargetState,
+  );
 
   return {
     strategy,
@@ -1080,7 +1103,8 @@ function assembleSchedulePrediction(
     rescueNap: post.rescueNap,
     continuationWindow: post.continuationWindow,
     napBudget: post.napBudget,
-    dailyTrendTotalMin: computeTrendTotalMin(ctx.trendSleeps ?? ctx.recentSleeps, ctx, now),
+    dailyTrendTotalMin: trendTargets?.observedRecentMin ?? null,
+    trendTargets,
     // Newborn fields — null for schedule-based strategies
     sleepWindow: null,
     sleepPressure: null,

@@ -78,6 +78,7 @@ function makePrediction(overrides: Partial<Prediction> = {}): Prediction {
     continuationWindow: null,
     napBudget: null,
     dailyTrendTotalMin: null,
+    trendTargets: null,
     ...overrides,
   };
 }

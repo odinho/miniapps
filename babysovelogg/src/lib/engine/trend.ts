@@ -131,6 +131,33 @@ export function computeTrendTotalMin(
 // Stage 2 will add persisted held baseline + drift; Stage 3 rewires
 // nap-budget to consume the intervention target.
 
+export type TrendTargetSource = "observed-initial" | "natural-days" | "manual-reset";
+export type TrendTargetConfidence = "low" | "medium" | "high";
+
+/**
+ * Persisted state for the held intervention target. Carried across
+ * evaluations by the server (`trend_target_state` table) so the cap
+ * target doesn't ratchet downward as the parent obeys.
+ *
+ * The shape is deliberately minimal — no observed totals or derived
+ * stats live here, only what the engine needs to decide the next
+ * intervention target. Stats remain in `trendSleeps`.
+ */
+export interface TrendTargetState {
+  /** Current held intervention target (minutes). */
+  targetMin: number;
+  /** Pre-intervention baseline target. Floors how far the target can
+   *  drift down from natural-day evidence; only raised explicitly. */
+  baselineMin: number;
+  source: TrendTargetSource;
+  confidence: TrendTargetConfidence;
+  /** Consecutive evaluations supporting downward drift; the rule requires
+   *  ≥ 2 supporting evaluations before stepping the target down. Resets
+   *  to 0 whenever upward/flat support arrives. */
+  naturalSupportStreak: number;
+  updatedAt: string;
+}
+
 export type TrendDayKind =
   | "natural"
   | "policy-affected"
@@ -166,10 +193,11 @@ export interface TrendTargetsDiagnostics {
 export interface TrendTargets {
   /** Factual observed 7d/30d blend, age-clamped. UI stats. */
   observedRecentMin: number;
-  /** Stable cap target for napBudget. Equal to observed in stage 1. */
+  /** Stable cap target for napBudget. Equal to observed when no prior
+   *  state exists; otherwise carried from the persisted held baseline. */
   interventionTargetMin: number;
   /** How much to trust the intervention target. */
-  interventionConfidence: "low" | "medium" | "high";
+  interventionConfidence: TrendTargetConfidence;
   /** Existing label, e.g. "7d/30d-blanding". */
   observedSourceLabel: string;
   /** Where the intervention target came from. */
@@ -177,6 +205,10 @@ export interface TrendTargets {
   mean7: number;
   mean30: number;
   diagnostics: TrendTargetsDiagnostics;
+  /** Next state to persist. Caller (server) writes when this differs
+   *  from the prior. Carrying it on the output keeps the engine pure —
+   *  no DB calls, just "given prior, here's next state + targets". */
+  state: TrendTargetState;
 }
 
 /**
@@ -249,11 +281,17 @@ function durationOf(s: SleepEntry): number {
 /**
  * Compute both observed-recent and intervention targets in one pass.
  *
- * Stage 1 contract: `interventionTargetMin === observedRecentMin` (the
- * split is wired but the held-baseline drift logic isn't yet implemented).
- * Consumers can adopt the new API now without behavior change; once
- * Stage 2 lands the intervention number will start to hold against
- * cap-following ratchet.
+ * Stage 2 contract:
+ *   - If `prior` exists, the intervention target carries the held value
+ *     forward (no drift yet — that's stage 3). Confidence rises to
+ *     `medium` once a baseline is being held.
+ *   - Without `prior`, the target initializes from `observedRecentMin`.
+ *   - The returned `state` is what the caller (server) should persist
+ *     when it differs from the prior.
+ *
+ * Drift logic (per Codex design at local/codex-trend-split-design.md)
+ * lands in stage 3. Until then, the held target is stable across calls
+ * but doesn't yet respond to natural-day evidence.
  *
  * Returns null when the data is too sparse or noisy to trust (matches
  * `computeBlendedTrend`'s gate — null = "no advice").
@@ -262,6 +300,7 @@ export function computeTrendTargets(
   trendSleeps: SleepEntry[],
   ctx: BabyContext,
   now: number,
+  prior?: TrendTargetState | null,
 ): TrendTargets | null {
   const observed = computeBlendedTrend(trendSleeps, ctx.tz, now, ctx.ageMonths, ctx.offDays);
   if (!observed) return null;
@@ -300,13 +339,51 @@ export function computeTrendTargets(
   const floorMin = ageBand.range[0] * 60;
 
   const observedRecentMin = Math.round(observed.blendedTrendMin);
+  const updatedAt = new Date(now).toISOString();
+
+  // Held-target shape. Stage 2: carry the prior forward unchanged; stage
+  // 3 will add the natural-day drift logic.
+  let interventionTargetMin: number;
+  let interventionConfidence: TrendTargetConfidence;
+  let interventionSourceLabel: string;
+  let nextState: TrendTargetState;
+  if (prior) {
+    interventionTargetMin = Math.round(prior.targetMin);
+    interventionConfidence = prior.confidence;
+    interventionSourceLabel = `held baseline (${prior.source})`;
+    nextState = { ...prior, updatedAt };
+  } else {
+    // Initialize from observed. Bias the baseline UP toward natural-day
+    // mean if natural days dominate the window — capped/low days
+    // shouldn't seed the held baseline low. (Stage 3 will tighten this.)
+    const naturalTotals = classifiedDays
+      .filter((d) => d.kind === "natural")
+      .map((d) => d.totalMin);
+    const naturalMean = naturalTotals.length >= 3
+      ? naturalTotals.reduce((a, b) => a + b, 0) / naturalTotals.length
+      : null;
+    const seed = naturalMean !== null
+      ? Math.max(observedRecentMin, Math.round(naturalMean))
+      : observedRecentMin;
+    interventionTargetMin = seed;
+    interventionConfidence = "low";
+    interventionSourceLabel = "observed (initial)";
+    nextState = {
+      targetMin: seed,
+      baselineMin: seed,
+      source: "observed-initial",
+      confidence: "low",
+      naturalSupportStreak: 0,
+      updatedAt,
+    };
+  }
 
   return {
     observedRecentMin,
-    interventionTargetMin: observedRecentMin,
-    interventionConfidence: "low",
+    interventionTargetMin,
+    interventionConfidence,
     observedSourceLabel: observed.sourceLabel,
-    interventionSourceLabel: "observed (stage 1)",
+    interventionSourceLabel,
     mean7: observed.mean7,
     mean30: observed.mean30,
     diagnostics: {
@@ -318,6 +395,7 @@ export function computeTrendTargets(
       floorMin,
       classifiedDays,
     },
+    state: nextState,
   };
 }
 

@@ -2,6 +2,7 @@ import { db } from "./db.js";
 import { assembleState } from "$lib/engine/state.js";
 import { getPrefs } from "./notification-prefs.js";
 import { getNapBudgetState, setNapBudgetState } from "./nap-budget-state.js";
+import { getTrendTargetState, setTrendTargetState } from "./trend-target-state.js";
 import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow } from "$lib/types.js";
 import { todayInTz } from "$lib/tz.js";
 
@@ -159,6 +160,7 @@ export function getState(now?: number) {
   // and rejected — see docs/napbudget-codex-review-2026-05-13.md.
   const napBudgetOptedIn = getPrefs(baby.id).nap_budget_cap;
   const priorNapBudgetState = getNapBudgetState(baby.id);
+  const priorTrendTargetState = getTrendTargetState(baby.id);
 
   // Off-days from day_start. Pulled wider than the trend window so the
   // engine can also skip them in any future per-day analysis.
@@ -181,6 +183,7 @@ export function getState(now?: number) {
     lastDiaperTime: lastDiaper?.time ?? null,
     napBudgetOptedIn,
     priorNapBudgetState,
+    priorTrendTargetState,
     offDays,
     now,
   });
@@ -198,5 +201,29 @@ export function getState(now?: number) {
     });
   }
 
+  // Persist the held intervention target after the engine has run.
+  // Only writes when the engine actually emitted trendTargets (gated on
+  // having enough data) and only when one of the held-state fields
+  // actually changed — keeps the updatedAt timestamp stable in steady
+  // state so it remains a useful "last meaningful change" signal.
+  const nextTrend = result.prediction?.trendTargets?.state ?? null;
+  if (nextTrend && !sameTrendTargetState(priorTrendTargetState, nextTrend)) {
+    setTrendTargetState(baby.id, nextTrend);
+  }
+
   return result;
+}
+
+function sameTrendTargetState(
+  a: { targetMin: number; baselineMin: number; source: string; confidence: string; naturalSupportStreak: number } | null,
+  b: { targetMin: number; baselineMin: number; source: string; confidence: string; naturalSupportStreak: number },
+): boolean {
+  if (!a) return false;
+  return (
+    a.targetMin === b.targetMin &&
+    a.baselineMin === b.baselineMin &&
+    a.source === b.source &&
+    a.confidence === b.confidence &&
+    a.naturalSupportStreak === b.naturalSupportStreak
+  );
 }

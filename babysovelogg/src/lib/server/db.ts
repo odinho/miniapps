@@ -198,6 +198,22 @@ function initSchema(database: SqliteDb) {
       mode TEXT NOT NULL,
       entered_at TEXT NOT NULL
     );
+
+    -- Held intervention target for the trend ratchet fix (Codex
+    -- 2026-05-20 design at local/codex-trend-split-design.md).
+    -- A sibling of nap_budget_state so mode hysteresis and target
+    -- holding evolve independently. Target lifts/drops are driven by
+    -- the engine's classifyTrendDay (natural vs policy-affected) and
+    -- the slow-drift rules in computeTrendTargets — see trend.ts.
+    CREATE TABLE IF NOT EXISTS trend_target_state (
+      baby_id INTEGER PRIMARY KEY REFERENCES baby(id),
+      target_min REAL NOT NULL,
+      baseline_min REAL NOT NULL,
+      source TEXT NOT NULL,
+      confidence TEXT NOT NULL,
+      natural_support_streak INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL
+    );
   `);
 }
 

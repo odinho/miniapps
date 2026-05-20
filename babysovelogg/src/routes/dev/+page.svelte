@@ -106,6 +106,7 @@
 			continuationWindow: null,
 			napBudget: null,
 			dailyTrendTotalMin: null,
+			trendTargets: null,
 			...o,
 		};
 	}
