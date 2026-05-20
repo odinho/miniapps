@@ -53,14 +53,20 @@
 		try {
 			const newTime = dateTimeToIso(timeDate, timeHM);
 			const timeChanged = newTime !== entry.time;
+			// `diaper_only` potty entries don't carry an amount (the UI hides the
+			// pills), so we explicitly null it out instead of letting a stale
+			// `selectedAmount` from a prior type stick.
+			const amount = selectedType === 'diaper_only' ? null : selectedAmount;
 			const event = buildDiaperUpdateEvent({
 				diaperDomainId: entry.domain_id,
 				type: selectedType,
-				amount: selectedAmount,
-				note: notes.trim() || undefined,
+				amount,
+				// Empty trim → null so the projection clears the stored note.
+				note: notes.trim() || null,
 				time: timeChanged ? newTime : undefined,
 			});
-			await sync.sendEvents([event]);
+			const result = await sync.sendEvents([event]);
+			if (result == null) return;
 			onClose?.();
 		} finally {
 			busy = false;

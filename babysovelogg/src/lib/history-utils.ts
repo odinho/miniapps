@@ -285,8 +285,10 @@ export function buildSleepDeleteEvent(sleepDomainId: string) {
 export interface DiaperUpdatePayload {
 	diaperDomainId: string;
 	type: string;
-	amount: string;
-	note?: string;
+	/** `null` clears the field; `undefined` leaves it untouched. */
+	amount: string | null;
+	/** `null` clears the field; `undefined` leaves it untouched. */
+	note?: string | null;
 	time?: string;
 }
 
@@ -297,7 +299,7 @@ export function buildDiaperUpdateEvent(payload: DiaperUpdatePayload) {
 			diaperDomainId: payload.diaperDomainId,
 			type: payload.type,
 			amount: payload.amount,
-			...(payload.note ? { note: payload.note } : {}),
+			...(payload.note !== undefined ? { note: payload.note } : {}),
 			...(payload.time ? { time: payload.time } : {}),
 		},
 		domainId: payload.diaperDomainId,

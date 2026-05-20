@@ -577,6 +577,26 @@ describe('buildDiaperUpdateEvent', () => {
 		});
 		expect(event.payload).not.toHaveProperty('note');
 	});
+
+	test('includes null note so the projection clears the stored value', () => {
+		const event = buildDiaperUpdateEvent({
+			diaperDomainId: 'diaper-001',
+			type: 'wet',
+			amount: 'lite',
+			note: null,
+		});
+		expect(event.payload).toHaveProperty('note');
+		expect((event.payload as { note: string | null }).note).toBeNull();
+	});
+
+	test('passes through null amount for diaper_only entries', () => {
+		const event = buildDiaperUpdateEvent({
+			diaperDomainId: 'diaper-001',
+			type: 'diaper_only',
+			amount: null,
+		});
+		expect((event.payload as { amount: string | null }).amount).toBeNull();
+	});
 });
 
 describe('buildDiaperDeleteEvent', () => {
