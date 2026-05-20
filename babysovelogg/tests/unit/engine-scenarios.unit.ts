@@ -157,7 +157,7 @@ function baseBaby(overrides: Partial<Baby>): Baby {
     id: 1, name: "Test",
     birthdate: "2025-09-15",
     created_at: `${TODAY}T00:00:00.000Z`,
-    custom_nap_count: null, potty_mode: 0,
+    custom_nap_count: null, potty_mode: 0, track_diaper: 0,
     timezone: TZ, target_bedtime: null,
     created_by_event_id: null, updated_by_event_id: null,
     ...overrides,

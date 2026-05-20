@@ -69,6 +69,7 @@
 	const ageMonths = $derived(s.ageMonths);
 	const todayWakeUp = $derived(s.todayWakeUp);
 	const pottyMode = $derived(baby?.potty_mode === 1);
+	const trackDiaper = $derived(baby?.track_diaper === 1);
 
 	const paused = $derived(isPaused(activeSleep?.pauses));
 	const strategy = $derived(prediction?.strategy ?? 'routine_schedule');
@@ -571,9 +572,11 @@
 					{paused ? '▶️ Fortset' : '⏸️ Pause'}
 				</button>
 			{/if}
-			<button class="arc-action-btn diaper" onclick={openDiaper} data-testid="fab">
-				{pottyMode ? '🚽 Do' : '🧷 Bleie'}
-			</button>
+			{#if trackDiaper}
+				<button class="arc-action-btn diaper" onclick={openDiaper} data-testid="fab">
+					{pottyMode ? '🚽 Do' : '🧷 Bleie'}
+				</button>
+			{/if}
 		</div>
 
 		{#if prediction?.continuationWindow && (!activeSleep || activeSleep.end_time)}
@@ -719,11 +722,13 @@
 					<span class="summary-label">totalt</span>
 				</span>
 			{/if}
-			<span class="summary-sep">·</span>
-			<span>
-				<span class="stat-value">{s.diaperCount}</span>
-				<span class="summary-label">{pottyMode ? 'dobesøk' : (s.diaperCount === 1 ? 'bleie' : 'bleier')}</span>
-			</span>
+			{#if trackDiaper}
+				<span class="summary-sep">·</span>
+				<span>
+					<span class="stat-value">{s.diaperCount}</span>
+					<span class="summary-label">{pottyMode ? 'dobesøk' : (s.diaperCount === 1 ? 'bleie' : 'bleier')}</span>
+				</span>
+			{/if}
 		</button>
 	</div>
 

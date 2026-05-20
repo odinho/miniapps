@@ -40,6 +40,10 @@ export function applyEvent(event: AppEvent): void {
         sets.push("potty_mode = ?");
         vals.push(payload.pottyMode ? 1 : 0);
       }
+      if (payload.trackDiaper !== undefined) {
+        sets.push("track_diaper = ?");
+        vals.push(payload.trackDiaper ? 1 : 0);
+      }
       if (payload.timezone !== undefined) {
         sets.push("timezone = ?");
         vals.push(payload.timezone);

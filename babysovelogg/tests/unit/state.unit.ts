@@ -14,7 +14,7 @@ const baseBaby: Baby = {
   birthdate: "2025-06-12",
   created_at: "2026-01-01T00:00:00.000Z",
   custom_nap_count: null,
-  potty_mode: 0,
+  potty_mode: 0, track_diaper: 0,
   timezone: null,
   target_bedtime: null,
   created_by_event_id: null,

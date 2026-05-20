@@ -34,6 +34,7 @@
 	let birthdate = $state('');
 	let selectedNapCount = $state<number | null>(null);
 	let pottyEnabled = $state(false);
+	let trackDiaperEnabled = $state(false);
 	let targetBedtime = $state<string | null>(null);
 	let bedtimeEnabled = $state(false);
 	let nameError = $state(false);
@@ -49,6 +50,7 @@
 			birthdate = baby.birthdate;
 			selectedNapCount = baby.custom_nap_count;
 			pottyEnabled = baby.potty_mode === 1;
+			trackDiaperEnabled = baby.track_diaper === 1;
 			targetBedtime = baby.target_bedtime;
 			bedtimeEnabled = !!baby.target_bedtime;
 		}
@@ -163,6 +165,7 @@
 				birthdate,
 				customNapCount: selectedNapCount,
 				pottyMode: pottyEnabled,
+				trackDiaper: trackDiaperEnabled,
 				targetBedtime: bedtimeEnabled ? (targetBedtime || '19:00') : null,
 			},
 			isOnboarding,
@@ -302,20 +305,35 @@
 				{/if}
 			</div>
 
-			<!-- Potty mode toggle -->
+			<!-- Diaper / potty tracking toggle -->
 			<div class="form-group">
-				<span class="form-label">Bleie / potte</span>
-				<div class="type-pills">
-					{#each POTTY_OPTIONS as opt}
-						<button
-							class="type-pill"
-							class:active={pottyEnabled === opt.value}
-							onclick={() => (pottyEnabled = opt.value)}
-						>
-							{opt.label}
-						</button>
-					{/each}
-				</div>
+				<label class="track-diaper-toggle" class:on={trackDiaperEnabled}>
+					<div class="track-diaper-text">
+						<div class="track-diaper-title">Spor bleier / potte</div>
+						<div class="track-diaper-hint">
+							Vis ein snøggknapp på heimsida for å logga bleieskift eller dobesøk.
+						</div>
+					</div>
+					<input
+						type="checkbox"
+						class="toggle"
+						bind:checked={trackDiaperEnabled}
+						data-testid="track-diaper-toggle"
+					/>
+				</label>
+				{#if trackDiaperEnabled}
+					<div class="type-pills" style="margin-top: 12px;">
+						{#each POTTY_OPTIONS as opt}
+							<button
+								class="type-pill"
+								class:active={pottyEnabled === opt.value}
+								onclick={() => (pottyEnabled = opt.value)}
+							>
+								{opt.label}
+							</button>
+						{/each}
+					</div>
+				{/if}
 			</div>
 		{/if}
 
@@ -482,6 +500,49 @@
 	}
 
 	.notif-pref-hint {
+		font-size: 0.78rem;
+		color: var(--text-light);
+		line-height: 1.4;
+		margin-top: 3px;
+	}
+
+	/* Diaper/potty tracking toggle — same card shape as .notif-pref so the
+	   "click anywhere on the card" affordance feels consistent across
+	   settings. */
+	.track-diaper-toggle {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		padding: 12px 14px;
+		background: var(--white);
+		border: 1px solid var(--cream-dark);
+		border-radius: var(--radius-sm);
+		cursor: pointer;
+		transition: border-color 0.15s ease, background-color 0.15s ease;
+	}
+
+	.track-diaper-toggle:hover {
+		border-color: var(--lavender-dark);
+	}
+
+	.track-diaper-toggle.on {
+		background: color-mix(in srgb, var(--lavender) 38%, var(--white));
+		border-color: var(--lavender-dark);
+	}
+
+	.track-diaper-text {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.track-diaper-title {
+		font-size: 0.95rem;
+		font-weight: 600;
+		color: var(--text);
+		line-height: 1.25;
+	}
+
+	.track-diaper-hint {
 		font-size: 0.78rem;
 		color: var(--text-light);
 		line-height: 1.4;

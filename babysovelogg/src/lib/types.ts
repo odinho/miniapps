@@ -7,6 +7,7 @@ export interface Baby {
   created_at: string;
   custom_nap_count: number | null;
   potty_mode: number;
+  track_diaper: number;
   timezone: string | null;
   target_bedtime: string | null; // "HH:MM" in 24h format, or null for follow-the-baby mode
   created_by_event_id: number | null;

@@ -56,6 +56,7 @@ const payloadSchemas = {
     birthdate: optStr,
     customNapCount: optNum,
     pottyMode: v.nullish(v.boolean()),
+    trackDiaper: v.nullish(v.boolean()),
     timezone: optStr,
     targetBedtime: optStr, // "HH:MM" or null to clear
   }),
