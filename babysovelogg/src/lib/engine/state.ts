@@ -483,9 +483,18 @@ function derivePostPlanFields(input: PostPlanInput): PostPlanOutput {
   if (predictedNaps.length === 0) predictedNaps = null;
 
   // ── Derive nextNap ──
+  // `fallbackNextNap` (= `predictNextNap(wake, ctx)`) is a naive
+  // wake-window projection from the last wake/sleep-end. It's the right
+  // surface when the planner didn't return remaining naps but the day's
+  // quota *isn't* met yet (stale plan, recovery from cut-short). When
+  // the quota IS met (`consumedNaps >= expectedNapCount` with no active
+  // nap), the day's nap budget is done — synthesising a fallback here
+  // produces a phantom past-time nap that then trips `napSkipped` and
+  // a "Hoppa over lur" centre label. bugs.e2e.ts:53 (B11) was the repro.
+  const quotaMet = consumedNaps >= expectedNapCount && activeSleep?.type !== "nap";
   let nextNap: string | null = predictedNaps && predictedNaps.length > 0
     ? predictedNaps[0].startTime
-    : fallbackNextNap;
+    : (quotaMet ? null : fallbackNextNap);
 
   // ── Skip detection + napsAllDone ──
   // 60-min threshold (was 90) — the laxer setting let predictNextNap

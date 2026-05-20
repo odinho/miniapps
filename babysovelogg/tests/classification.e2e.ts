@@ -62,10 +62,15 @@ test("At 17:45 with nap quota met, sleep is classified as night", async ({ page 
   expect(renderDayState(getDb(), babyId)).toMatch(/pågår natt/);
 });
 
-test("At 17:00 with all naps skipped, sleep is classified as night", async ({ page }) => {
-  await forceHour(page, 17);
-  // 9-month baby has 2 expected naps, 0 completed, wake at 07:00
-  // Predicted naps are >90 min overdue → naps detected as skipped → napsAllDone
+test("At 20:00 with all naps skipped, sleep is classified as night", async ({ page }) => {
+  // Originally ran at h=17. The engine since added rescue-nap logic that
+  // takes priority in the 16–20 ambiguous zone — at 17:00 with all naps
+  // overdue, the home page deliberately masks `napsAllDone` so the parent
+  // can still start a rescue nap (`+page.svelte` rescue-mask, 2026-05-12).
+  // h=20 exercises the unambiguous night branch in `classifySleepType`,
+  // which is what the test's intent (skipped-nap day → night) actually
+  // depends on.
+  await forceHour(page, 20);
   const babyId = createBaby("Testa", "2025-06-12");
   seedScheduleHistory(babyId);
   setWakeUpTime(babyId);

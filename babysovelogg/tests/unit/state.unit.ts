@@ -796,6 +796,55 @@ describe("assembleState", () => {
     expect(next - cutShortEndMs).toBeGreaterThanOrEqual(165 * 60_000);
   });
 
+  it("B11 regression: 60-min nap with 60-min learned history flips napsAllDone (not skipped)", () => {
+    // bugs.e2e.ts:53 reproduction. With seedScheduleHistory(babyId, 1) the
+    // engine learns napDuration≈60min and (custom) napCount=1. A single
+    // 60-min nap should clear the day's quota and the engine should NOT
+    // synthesise a fallback nextNap that then trips napSkipped.
+    //
+    // Pre-fix bug: `derivePostPlanFields` set
+    //   nextNap = fallbackNextNap = predictNextNap(wakeTime, ctx)
+    // when remaining was empty, regardless of whether consumed >= expected.
+    // The fallback landed at ~12:30, by now=15:00 it was 2.5h overdue, and
+    // `napSkipped` fired, producing a phantom "Hoppa over lur 12:30" centre.
+    const baby11mo: Baby = { ...baseBaby, birthdate: "2025-06-12", custom_nap_count: 1 };
+    // Build 14 days of 1-nap-per-day history matching seedScheduleHistory(., 1).
+    const history: SleepLogRow[] = [];
+    for (let d = 11; d <= 25; d++) {
+      const dateStr = `2026-03-${String(d).padStart(2, "0")}`;
+      history.push(
+        sleepRow({ id: d * 10 + 1, start_time: `${dateStr}T09:00:00Z`, end_time: `${dateStr}T10:00:00Z`, type: "nap", woke_by: "self", domain_id: `slp_h${d}a` }),
+        sleepRow({ id: d * 10 + 2, start_time: `${dateStr}T19:30:00Z`, end_time: `${dateStr}T23:59:00Z`, type: "night", domain_id: `slp_h${d}b` }),
+      );
+    }
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-03-26",
+      wake_time: "2026-03-26T06:00:00.000Z",
+      created_at: "2026-03-26T06:00:00.000Z",
+      created_by_event_id: null,
+    };
+    const todaysNap = sleepRow({
+      start_time: "2026-03-26T09:00:00.000Z",
+      end_time: "2026-03-26T10:00:00.000Z", // 60 min
+      type: "nap",
+      woke_by: "self",
+    });
+
+    const result = assembleState(
+      dayData({
+        baby: baby11mo,
+        recentSleeps: history,
+        todaySleeps: [todaysNap],
+        todayWakeUp: wakeUp,
+        now: new Date("2026-03-26T15:00:00.000Z").getTime(),
+      }),
+    );
+
+    expect(result.prediction!.skippedNap).toBeNull();
+    expect(result.prediction!.napsAllDone).toBe(true);
+    expect(result.prediction!.nextNap).toBe(result.prediction!.bedtime);
+  });
+
   it("a sufficiently long completed nap still flips napsAllDone for 1-nap baby", () => {
     // Sanity: the cut-short fix doesn't break the normal 1-nap-done flow.
     const baby10mo: Baby = { ...baseBaby, birthdate: "2025-06-12", custom_nap_count: 1 };

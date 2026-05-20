@@ -81,7 +81,11 @@ test("Newborn context card shows sleep stats and guidance", async ({ page }) => 
   setWakeUpTime(babyId);
 
   await page.goto("/");
-  await expect(page.getByTestId("context-card")).toBeVisible({ timeout: 5000 });
+  const card = page.getByTestId("context-card");
+  await expect(card).toBeVisible({ timeout: 5000 });
+  // ContextCard collapses by default; expand it to read the inner rows.
+  // The card header is a button (`aria-expanded` flips on click).
+  await card.getByRole("button").first().click();
 
   // Context card should have guidance text
   const guidanceText = page.getByTestId("guidance-text");

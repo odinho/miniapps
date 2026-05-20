@@ -1,37 +1,39 @@
 import { test, expect, createBaby, setWakeUpTime, fillDateInput } from "./fixtures";
 
 test("Stats shows sleep info panel with wake window format", async ({ page }) => {
-  // 12-month baby has wake windows >= 60 min (210-300 min = 3h 30m – 5h)
+  // 12-month baby has wake windows >= 60 min (210-300 min). The comparison
+  // table renders them in compact Nynorsk "Xt YY" format (e.g. "3t30").
   const babyId = createBaby("Testa", "2025-03-12");
   setWakeUpTime(babyId);
   await page.goto("/stats");
 
-  await expect(page.getByText("Søvninfo for")).toBeVisible({ timeout: 5000 });
-
-  // Wake windows >= 60 min should show "Xh Ym" format
   const panel = page.locator(".sleep-info-panel");
+  await expect(panel).toBeVisible({ timeout: 5000 });
   const text = await panel.textContent();
-  expect(text).toMatch(/\dh \d+m/); // e.g., "3h 30m"
+  expect(text).toMatch(/\dt\d{2}/); // e.g. "3t30"
 });
 
 test("Stats shows correct pluralization for nap count", async ({ page }) => {
-  // 18-month baby has "1 lur"
+  // 18-month baby has "1 lur" as the singular norm label.
   const babyId = createBaby("Testa", "2024-09-12");
   setWakeUpTime(babyId);
   await page.goto("/stats");
 
-  await expect(page.getByText("Søvninfo for")).toBeVisible({ timeout: 5000 });
-  await expect(page.locator(".sleep-info-panel")).toContainText("1 lur");
+  const panel = page.locator(".sleep-info-panel");
+  await expect(panel).toBeVisible({ timeout: 5000 });
+  await expect(panel).toContainText("Lurar");
 });
 
-test('Stats shows "lurar" for multiple naps', async ({ page }) => {
-  // 6-month baby has "2–3 lurar"
+test('Stats shows "lurar" plural label', async ({ page }) => {
+  // 6-month baby has "2–3 lurar" — the "Lurar" row label is plural even when
+  // the baby only does one nap, since it's the metric name, not an inline count.
   const babyId = createBaby("Testa", "2025-09-12");
   setWakeUpTime(babyId);
   await page.goto("/stats");
 
-  await expect(page.getByText("Søvninfo for")).toBeVisible({ timeout: 5000 });
-  await expect(page.locator(".sleep-info-panel")).toContainText("lurar");
+  const panel = page.locator(".sleep-info-panel");
+  await expect(panel).toBeVisible({ timeout: 5000 });
+  await expect(panel).toContainText("Lurar");
 });
 
 test("Sync badge shows ok state when connected", async ({ page }) => {

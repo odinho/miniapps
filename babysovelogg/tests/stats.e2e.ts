@@ -46,7 +46,9 @@ test("Stats page renders bar chart", async ({ page }) => {
   );
 
   await page.goto("/stats");
-  await expect(page.locator(".stats-chart")).toBeVisible({ timeout: 5000 });
+  // The stats page has several `.stats-chart` SVGs (trend, bedtime, etc.);
+  // use `.first()` so the locator is unique under strict mode.
+  await expect(page.locator(".stats-chart").first()).toBeVisible({ timeout: 5000 });
   // Should have bars (rect elements in the SVG)
   const bars = page.locator(".stats-chart rect");
   await expect(bars.first()).toBeVisible();
@@ -102,7 +104,10 @@ test("Stats legends show Norwegian labels", async ({ page }) => {
   );
 
   await page.goto("/stats");
-  await expect(page.locator(".stats-legend")).toBeVisible({ timeout: 5000 });
-  await expect(page.locator(".stats-legend")).toContainText("Lurar");
-  await expect(page.locator(".stats-legend")).toContainText("Natt");
+  // Multiple `.stats-legend` blocks exist (trend + total-vs-norm + døgnrytme);
+  // the trend block is the first and is the canonical "Lurar / Natt" legend.
+  const trendLegend = page.locator(".stats-legend").first();
+  await expect(trendLegend).toBeVisible({ timeout: 5000 });
+  await expect(trendLegend).toContainText("Lurar");
+  await expect(trendLegend).toContainText("Natt");
 });
