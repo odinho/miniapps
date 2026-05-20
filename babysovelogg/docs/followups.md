@@ -11,6 +11,89 @@ multi-day testing, the unit-of-work flow — live in
 is for tracked product/engine/test work.
 
 
+## Cycle estimator v2 — replace the subharmonic finder
+
+Source: 2026-05-20 Codex investigation (`local/codex-cycle-estimator.md`)
+prompted by the user asking why `estimateSleepCycleFromData` returned
+37 min for an 11mo. Reading the actual literature (Lopp et al. 2017:
+NREM/REM cycles ~57.5 ± 2.4 min at 9 months; Grigg-Damberger: 50-60
+min for healthy term infants) plus all 202 prod naps showed the
+current function is a subharmonic finder, not a cycle estimator:
+
+- Search range 35-60 admits biologically implausible cycles. With nap
+  durations clustered at common multiples (e.g. 110 min on Halldis),
+  c=55, c=37, c=27.5 all fit at zero distance. No prior over plausible
+  c, no penalty for higher multiples, no margin requirement → smaller
+  divisors win when naps are common multiples.
+- Codex checked all 35 self-wake naps in prod since 2026-01-06: the
+  scorer picks c=40, not 55. Restricting to 50-65 picks 52-53. The
+  full-history "self-only" instinct is directionally right but the
+  math itself is broken; equal-weighted all-history is also wrong
+  because January data is a different age/regime/logging context.
+- The current function silently mislabels its output as "lært syklus"
+  in the UI (`SleepInsightsCard.svelte:74`, `+page.svelte:618`)
+  without surfacing confidence. NapBudget cap-cycle math
+  (`nap-budget.ts:153`) and rescue/short-nap thresholds
+  (`state.ts:840`, `state.ts:966`) consume it the same way.
+
+Concrete v2 (from Codex's memo):
+
+```ts
+export interface SleepCycleEstimate {
+  minutes: number;
+  source: "age-default" | "learned";
+  confidence: "low" | "medium" | "high";
+  sampleCount: number;
+  scoreMargin: number;
+  candidateRange: [number, number];
+}
+export function estimateSleepCycleDetails(ctx: BabyContext): SleepCycleEstimate;
+```
+
+Pieces:
+1. `getSleepCyclePrior(ageMonths)` — research-backed Gaussian prior.
+   6-12mo: mean 55, range 50-65. 12-24mo: mean 60, range 55-70.
+   newborn/emerging: return age-default unless physiological data.
+2. `collectCycleNapSamples(ctx)` separate from `censorCutShortNaps` —
+   strict `woke_by === "self"` only, long-horizon (180d or all-history
+   while DB is tiny), age/regime-weighted (downweight different
+   dominant-nap-count days), exclude off-days. **Do not include
+   `woken` and do not import the cap-respect carve-out** — those
+   carve-outs are right for learned nap duration, poison for cycle
+   estimation.
+3. Add a new `ctx.cycleSleeps` long-horizon window in
+   `src/lib/server/state.ts` — separate from the 7d recent and 30d
+   trend fetches. Start at 180 days or all-since-birth.
+4. Prior-weighted scoring inside the candidate range. Score = Gaussian
+   prior penalty × multi-cycle fit. Require margin to beat
+   age-default before returning `source: "learned"`.
+5. UI: don't say "lært" if source is age-default or confidence is low.
+6. Late-wake re-anchor: continue using age-default OR a dedicated
+   `estimatePhaseShiftCycleMin(ctx)` that only accepts medium/high
+   confidence inside the age-plausible range.
+
+Also fix the censoring loophole flagged in the same investigation:
+`censorCutShortNaps` falls back to returning all naps unchanged when
+`stableMedianMin` < 3 samples (`schedule.ts:1124`). Acceptable for
+duration learning; not acceptable for cycle estimation. The v2 sample
+collector should handle the no-self-wake case explicitly with low
+confidence + age-default fallback.
+
+Tests to add:
+- Halldis-shape fixture (1-nap, 6 woken + 1 self): cycle estimate
+  should return age-default with low confidence + a margin field
+  showing learned candidates within 0.005 of each other.
+- Same baby with all 5+ self-wakes at ~110 min: should return ~55
+  with medium/high confidence.
+- 7mo fixture with all self-wakes at ~50 min: should return ~50 with
+  high confidence (the prior allows it).
+- Synthetic "all naps at 111 min" cluster: scorer must not pick c=37.
+
+Priority: after the trend intervention-target split. The cycle
+estimator's brittleness is real but its current impact is bounded
+(UI label + napBudget cap-cycle math + rescue thresholds), whereas
+the trend ratchet is the higher-visibility live user complaint.
+
 ## Open items from the 2026-05-20 Codex critique (arc / trend / wake-rec)
 
 Codex (`local/codex-arc-trend-critique.md`) flagged a batch of bugs and

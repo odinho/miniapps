@@ -245,14 +245,18 @@ export function predictDayNaps(
     && useHabitualNapStart
     && ctx.strategy === "routine_schedule"
     && !isOffDayForWake(ctx, wakeUpTime);
-  // Use the age-research default cycle, not the data-fit estimator, as the
-  // snap unit. `estimateSleepCycleFromData` searches 35-60 min and can lock
-  // onto a much-too-short value (e.g. 37 min for an 11mo whose 90-110 min
-  // naps happen to cluster well at 2-3× a 37 min unit). The user's mental
-  // model of "snap into the next sleep cycle" maps to the canonical
-  // ~50-60 min infant cycle, not a clustering artifact. Codex review
-  // 2026-05-20 flagged the cycle source as a concern; this comment is the
-  // deliberate exception to "use the learned value".
+  // Use the age-research default cycle, not the data-fit estimator, as
+  // the snap unit. `estimateSleepCycleFromData` is a subharmonic finder,
+  // not a sleep-cycle estimator: when naps cluster at common multiples
+  // (110 min on Halldis), c=55, c=37, c=27.5 all fit at zero distance
+  // and the scorer biases toward smaller divisors with no prior over
+  // biological plausibility. Codex 2026-05-20 dug into all 202 prod naps
+  // and the literature (Lopp et al. 2017: NREM/REM cycles ~57.5 min at
+  // 9mo; Grigg-Damberger: 50-60 min for healthy term infants) — the
+  // current estimator overclaims what parent-logged nap durations can
+  // support. Until v2 (see followups.md → "Cycle estimator v2"), the
+  // age-default is the conservative truth. The user's "snap into next
+  // cycle" intuition maps to that, not to a clustering artifact.
   const cycleMinForReAnchor = getSleepCycleMinutes(ctx.ageMonths);
   const recentWakeAnchorMin = reAnchorEligible
     ? recentWakeMedianMinute(ctx, wakeUpTime)

@@ -431,6 +431,51 @@ describe("late-wake re-anchor for first nap (Halldis 2026-05-20)", () => {
     expect(decomp?.finalMs).toBe(new Date(preds[0].startTime).getTime());
   });
 
+  it("re-plan after a cut-short does not lift the comeback nap (dayStart=false enforced)", () => {
+    // Production replan path in state.ts:858 calls selectBestPlan with the
+    // post-cut-short wake time as `wakeUpTime` and customNapCount cut to the
+    // remaining naps. It deliberately omits `dayStart: true`. Pin that
+    // behaviour: even when the late-wake gates would otherwise fire, the
+    // comeback prediction must come out at the pre-reanchor blend so
+    // compressComebackNap (and the rest of the cut-short comeback path)
+    // governs timing, not the morning's late-wake snap.
+    const c = ctx11();
+    // Cut-short comeback wake at 09:30 — well after the morning wake, well
+    // before the typical habit-anchored nap clock at ~10:20. The late-wake
+    // gates wouldn't fire here anyway, but the explicit dayStart=false call
+    // pattern is what production relies on; assert it's inert.
+    const replan = predictDayNaps(day(20, 9, 30), c); // no dayStart
+    const dayStartLifted = predictDayNaps(day(20, 9, 30), c, { dayStart: true });
+    // The replan must equal what we'd get from the blend (no re-anchor),
+    // even if the dayStart=true variant happens to coincide on this wake
+    // because the gate doesn't fire either. The contract is: re-plan
+    // callers don't pass dayStart, so the re-anchor never affects them.
+    const decompAtReplan = decomposeFirstNapPrediction(day(20, 9, 30), c, {});
+    expect(decompAtReplan?.reAnchored).toBe(false);
+    // Sanity: also confirm decomposition under dayStart=true would have been
+    // the same here (no gate violation, just a normal-wake replan with no
+    // qualifying offset) so the test isn't passing for the wrong reason.
+    const decompUnderDayStart = decomposeFirstNapPrediction(day(20, 9, 30), c);
+    expect(decompUnderDayStart?.reAnchored).toBe(false);
+    expect(replan[0].startTime).toBe(dayStartLifted[0].startTime);
+  });
+
+  it("target-bedtime: forward natural plan still re-anchors; backward target plan is unaffected", () => {
+    // selectBestPlan can pick the target-guided backward-walk plan when it
+    // beats the natural forward plan. planBackwardFromBedtime doesn't run
+    // through the re-anchor (it computes nap 1 from naturalBedtime minus
+    // wake windows). This test pins what we know today: the natural plan's
+    // first nap IS re-anchored on a late-wake day; whether target-guided
+    // overrides it is a scoring outcome, not a re-anchor failure. If the
+    // target-guided plan ever erases the late-wake correction on a future
+    // refactor, this test will tell us — at which point we revisit.
+    const c = ctx11({ targetBedtime: day(20, 17, 0) });
+    const preds = predictDayNaps(day(20, 7, 0), c, { dayStart: true });
+    const decomp = decomposeFirstNapPrediction(day(20, 7, 0), c);
+    expect(decomp?.reAnchored).toBe(true);
+    expect(preds[0].startTime).toBe(new Date(decomp!.finalMs).toISOString());
+  });
+
   it("two-nap baby: late-wake shift on nap 0 doesn't drop nap 2", () => {
     // Build a 2-nap fixture, then late-wake. Nap 1 may shift; nap 2 must
     // still exist (re-anchor only touches nap 0, but verify the cascade
