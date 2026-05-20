@@ -211,11 +211,12 @@ export function movingAvgWakeTime(bedtime: string, ctx: BabyContext, _todayNapMi
 
   if (nights.length === 0) return ageDefaultWakeTime(bedtime, ctx, _todayNapMin);
 
-  // Average minutes-since-midnight in UTC, then stamp the result onto a UTC
-  // ISO. The whole baseline pipeline operates in UTC for math; conversion to
-  // baby-local clock happens at display time via tz.ts helpers. There is a
-  // small DST-spanning bias here (UTC clock shifts ±60 min) but it's a
-  // population-style baseline used only as a fallback below the schedule path.
+  // Average minutes-since-midnight in UTC. The baby's circadian rhythm
+  // doesn't shift with DST — a baby used to bedtime at 18:00 local before
+  // the spring-forward will still want the same UTC instant after, which the
+  // parent will read as 19:00 local. Averaging in UTC preserves that
+  // rhythm; averaging in local would erase it. Display layer handles the
+  // wall-clock conversion via tz.ts.
   const avgMinutes = nights.reduce((sum, n) => {
     const d = new Date(n.end_time!);
     return sum + d.getUTCHours() * 60 + d.getUTCMinutes();

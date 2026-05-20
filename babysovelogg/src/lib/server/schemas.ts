@@ -45,7 +45,7 @@ const localDate = v.pipe(
   v.check((s) => /^\d{4}-\d{2}-\d{2}$/.test(s), "Invalid local date (expected YYYY-MM-DD)"),
 );
 
-const payloadSchemas: Record<string, v.BaseSchema<unknown, unknown, v.BaseIssue<unknown>>> = {
+const payloadSchemas = {
   "baby.created": v.object({
     name: v.string(),
     birthdate: v.string(),
@@ -151,7 +151,15 @@ const payloadSchemas: Record<string, v.BaseSchema<unknown, unknown, v.BaseIssue<
     babyId: v.number(),
     date: localDate,
   }),
-};
+} as const;
+
+/**
+ * Canonical event-type union, derived from the keys of `payloadSchemas` so
+ * additions/removals here propagate to every consumer. Use it (rather than a
+ * parallel string union) for switch statements that branch on event type so
+ * TypeScript catches missing cases.
+ */
+export type AppEventType = keyof typeof payloadSchemas;
 
 function summarizeIssues(issues: v.BaseIssue<unknown>[]): string {
   return issues
@@ -179,7 +187,7 @@ export function validateBatch(body: unknown):
   const errors: string[] = [];
   for (let i = 0; i < bodyResult.output.events.length; i++) {
     const evt = bodyResult.output.events[i];
-    const schema = payloadSchemas[evt.type];
+    const schema = (payloadSchemas as Record<string, v.BaseSchema<unknown, unknown, v.BaseIssue<unknown>>>)[evt.type];
     if (!schema) {
       errors.push(`events[${i}]: unknown event type "${evt.type}"`);
       continue;
@@ -198,7 +206,7 @@ export function validateEventPayload(
   type: string,
   payload: unknown,
 ): { ok: true } | { ok: false; error: string } {
-  const schema = payloadSchemas[type];
+  const schema = (payloadSchemas as Record<string, v.BaseSchema<unknown, unknown, v.BaseIssue<unknown>>>)[type];
   if (!schema) return { ok: false, error: `unknown event type "${type}"` };
   const result = v.safeParse(schema, payload);
   if (!result.success) return { ok: false, error: summarizeIssues(result.issues) };

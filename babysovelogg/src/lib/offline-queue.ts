@@ -5,32 +5,11 @@
 
 import type { AppState } from "./stores/app.svelte.js";
 import type { SleepLogRow, DayStartRow } from "./types.js";
+import type { AppEventType } from "./server/schemas.js";
 import { isoToDateInTz } from "./tz.js";
 
 const QUEUE_KEY = "babysovelogg_event_queue";
 const STATE_CACHE_KEY = "babysovelogg_cached_state";
-
-/**
- * Closed set of event types the offline queue optimistically projects. Keep
- * in sync with `src/lib/server/projections.ts` / `schemas.ts`. The
- * `applyOptimisticEvent` switch uses a `never` exhaustiveness check to make
- * TypeScript fail at compile time when a new type is added without a case.
- */
-export type OptimisticEventType =
-	| "sleep.started"
-	| "sleep.ended"
-	| "sleep.paused"
-	| "sleep.resumed"
-	| "sleep.pause_deleted"
-	| "sleep.tagged"
-	| "sleep.updated"
-	| "sleep.manual"
-	| "sleep.deleted"
-	| "sleep.restarted"
-	| "diaper.logged"
-	| "day.started"
-	| "day.marked_off"
-	| "day.unmarked_off";
 
 export interface QueuedEvent {
 	type: string;
@@ -105,11 +84,11 @@ export function applyOptimisticEvent(
 ): AppState {
 	const s: AppState = structuredClone(state);
 
-	// Unknown event types pass through unchanged. Within the recognised set
-	// the switch below must be exhaustive — see the `never` check at the end.
-	if (!isOptimisticType(type)) return s;
-
-	switch (type) {
+	// `type` is narrowed to AppEventType inside the switch so the `never`
+	// branch at the bottom rejects adding a new event type in schemas.ts
+	// without an explicit case here (use `: break;` for deliberate no-ops).
+	const evt = type as AppEventType;
+	switch (evt) {
 		case "sleep.started": {
 			s.activeSleep = {
 				id: 0,
@@ -357,36 +336,29 @@ export function applyOptimisticEvent(
 			break;
 		}
 
+		// Deliberate no-ops — these events exist in the wire protocol but
+		// don't have an optimistic projection (the client either rarely
+		// emits them offline, or the affected state isn't visible locally
+		// until the server roundtrips and replaces AppState).
+		case "baby.created":
+		case "baby.updated":
+		case "day.deleted":
+		case "diaper.updated":
+		case "diaper.deleted":
+			break;
+
 		default: {
-			// Exhaustiveness: any new OptimisticEventType added to the union
-			// without a matching case makes this assignment fail at compile time.
-			const _exhaustive: never = type;
+			// Exhaustiveness: when a new event is added to AppEventType
+			// (schemas.ts) without a matching case here, this assignment
+			// becomes `string` → `never` and the build fails. Forces an
+			// explicit decision: either project the new event optimistically
+			// or drop it into the no-op block above.
+			const _exhaustive: never = evt;
 			void _exhaustive;
 		}
 	}
 
 	return s;
-}
-
-const OPTIMISTIC_TYPES: ReadonlySet<string> = new Set<OptimisticEventType>([
-	"sleep.started",
-	"sleep.ended",
-	"sleep.paused",
-	"sleep.resumed",
-	"sleep.pause_deleted",
-	"sleep.tagged",
-	"sleep.updated",
-	"sleep.manual",
-	"sleep.deleted",
-	"sleep.restarted",
-	"diaper.logged",
-	"day.started",
-	"day.marked_off",
-	"day.unmarked_off",
-]);
-
-function isOptimisticType(t: string): t is OptimisticEventType {
-	return OPTIMISTIC_TYPES.has(t);
 }
 
 /** Apply all queued events to a state (used on boot when offline). */
