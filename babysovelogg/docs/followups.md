@@ -626,3 +626,22 @@ time and are worth tracking here:
   from context. For a sleep started Apr 5 and ended Apr 6, that
   inference can pick the wrong day. Add an optional date override, or
   derive the day more robustly from the previous wake-time anchor.
+
+
+## Pre-existing E2E visual-snapshot drift (2026-05-20)
+
+`bun run test:e2e` fails 11 tests on stale Chromium screenshots, all
+pre-existing as of `bea1be7` (independent of the May 2026 slop-cleanup
+batches). The diffs are tiny (0.01–0.02 pixel ratio against the 0.005
+threshold), so this is most likely accumulated anti-alias / font-render
+drift across Chromium versions rather than a behavioural regression.
+
+Failing tests:
+- `tests/arc-scenes.e2e.ts` — 8 of 10 scenes
+- `tests/bugs.e2e.ts` B11 (predicted-nap overtime label)
+- `tests/diaper-stats.e2e.ts` (no-diaper section)
+- `tests/stats.e2e.ts` ("7 dagar" / "30 dagar" headers)
+
+Action: refresh snapshots with `bunx playwright test --update-snapshots`
+on a clean run, or tighten the per-test fixture so the visual output
+stops drifting per Chromium minor.

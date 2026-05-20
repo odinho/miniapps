@@ -6,18 +6,19 @@ import { validateBatch } from "$lib/server/schemas.js";
 import { getState } from "$lib/server/state.js";
 import { broadcast } from "$lib/server/broadcast.js";
 import { reconcileNotifications, fireDueNotifications } from "$lib/server/notification-scheduler.js";
+import { parseIntParam, safeJson } from "$lib/server/request-helpers.js";
 import type { EventRow } from "$lib/types.js";
 
 export const GET: RequestHandler = ({ url }) => {
-  const since = url.searchParams.get("since");
+  const since = parseIntParam(url, "since", { min: 0 });
   const typeFilter = url.searchParams.get("type");
   const domainIdFilter = url.searchParams.get("domainId");
-  const limit = url.searchParams.get("limit");
-  const offset = url.searchParams.get("offset");
+  const limit = parseIntParam(url, "limit", { min: 1, max: 10_000 });
+  const offset = parseIntParam(url, "offset", { min: 0 });
 
-  // Simple path: just since filter
-  if (!typeFilter && !domainIdFilter && !limit) {
-    return json(getEvents(since ? parseInt(since) : undefined));
+  // Simple path: no filters, no pagination → bypass the count query.
+  if (!typeFilter && !domainIdFilter && limit == null && offset == null) {
+    return json(getEvents(since));
   }
 
   // Advanced query with filters and pagination
@@ -26,11 +27,11 @@ export const GET: RequestHandler = ({ url }) => {
   const params: (string | number)[] = [];
   const countParams: (string | number)[] = [];
 
-  if (since) {
+  if (since != null) {
     sql += " AND id > ?";
     countSql += " AND id > ?";
-    params.push(parseInt(since));
-    countParams.push(parseInt(since));
+    params.push(since);
+    countParams.push(since);
   }
   if (typeFilter) {
     sql += " AND type = ?";
@@ -48,13 +49,15 @@ export const GET: RequestHandler = ({ url }) => {
   const total = (db.prepare(countSql).get(...countParams) as { total: number }).total;
 
   sql += " ORDER BY id DESC";
-  if (limit) {
+  // SQLite requires LIMIT when OFFSET is present; emit LIMIT -1 (no cap) when
+  // the caller supplied an offset but not a limit.
+  if (limit != null || offset != null) {
     sql += " LIMIT ?";
-    params.push(parseInt(limit));
+    params.push(limit ?? -1);
   }
-  if (offset) {
+  if (offset != null) {
     sql += " OFFSET ?";
-    params.push(parseInt(offset));
+    params.push(offset);
   }
 
   const rows = db.prepare(sql).all(...params) as EventRow[];
@@ -64,7 +67,10 @@ export const GET: RequestHandler = ({ url }) => {
 
 export const POST: RequestHandler = async ({ request }) => {
   try {
-    const body = await request.json();
+    const body = await safeJson(request);
+    if (body == null) {
+      return json({ error: "invalid_json" }, { status: 400 });
+    }
 
     // Level 1+2 validation
     const validation = validateBatch(body);

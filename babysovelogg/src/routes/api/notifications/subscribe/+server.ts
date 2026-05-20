@@ -1,6 +1,7 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types.js";
 import { db } from "$lib/server/db.js";
+import { safeJson } from "$lib/server/request-helpers.js";
 import type { Baby } from "$lib/types.js";
 
 interface SubscribeBody {
@@ -15,7 +16,9 @@ export const POST: RequestHandler = async ({ request }) => {
   const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby | undefined;
   if (!baby) return json({ error: "no_baby" }, { status: 400 });
 
-  const body = (await request.json()) as SubscribeBody;
+  const body = await safeJson<SubscribeBody>(request);
+  if (!body) return json({ error: "invalid_json" }, { status: 400 });
+
   const { subscription, userAgent } = body;
   if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
     return json({ error: "invalid_subscription" }, { status: 400 });
@@ -35,7 +38,8 @@ export const POST: RequestHandler = async ({ request }) => {
 };
 
 export const DELETE: RequestHandler = async ({ request }) => {
-  const body = (await request.json()) as { endpoint?: string };
+  const body = await safeJson<{ endpoint?: string }>(request);
+  if (!body) return json({ error: "invalid_json" }, { status: 400 });
   if (!body.endpoint) return json({ error: "endpoint_required" }, { status: 400 });
 
   const result = db
