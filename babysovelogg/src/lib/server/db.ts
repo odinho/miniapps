@@ -19,12 +19,16 @@ export interface SqliteDb {
 export let db: SqliteDb;
 
 /** Idempotently add a column. SQLite errors on duplicate ADD COLUMN; treat
- *  that case as a successful no-op so initSchema can run on every boot. */
-function tryAddColumn(database: SqliteDb, table: string, column: string, type: string) {
+ *  that case as a successful no-op so initSchema can run on every boot.
+ *  Returns true when the column was actually added (lets callers run a
+ *  one-time backfill paired with the migration). */
+function tryAddColumn(database: SqliteDb, table: string, column: string, type: string): boolean {
   try {
     database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+    return true;
   } catch {
     // Column already exists — ignore.
+    return false;
   }
 }
 
@@ -56,6 +60,7 @@ function initSchema(database: SqliteDb) {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       custom_nap_count INTEGER,
       potty_mode INTEGER DEFAULT 0,
+      track_diaper INTEGER NOT NULL DEFAULT 0,
       timezone TEXT,
       created_by_event_id INTEGER,
       updated_by_event_id INTEGER
@@ -112,6 +117,14 @@ function initSchema(database: SqliteDb) {
   tryAddColumn(database, "baby", "target_bedtime", "TEXT");
   tryAddColumn(database, "sleep_log", "onset_note", "TEXT");
   tryAddColumn(database, "sleep_log", "wake_mood", "TEXT");
+
+  // track_diaper gates the diaper/potty UI. New babies created after this
+  // column exists default to 0 (off) at the event layer; existing rows get
+  // backfilled to 1 so families already using diaper logging keep it on
+  // through this upgrade. Default 0 below covers brand-new rows.
+  if (tryAddColumn(database, "baby", "track_diaper", "INTEGER NOT NULL DEFAULT 0")) {
+    database.exec("UPDATE baby SET track_diaper = 1");
+  }
 
   // Migration: merge "happy" mood into "normal"
   database.exec("UPDATE sleep_log SET mood = 'normal' WHERE mood = 'happy'");
