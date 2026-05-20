@@ -211,17 +211,19 @@ export function movingAvgWakeTime(bedtime: string, ctx: BabyContext, _todayNapMi
 
   if (nights.length === 0) return ageDefaultWakeTime(bedtime, ctx, _todayNapMin);
 
-  // Average the time-of-day portion (minutes since midnight UTC)
+  // Average the time-of-day portion in local clock minutes. Using
+  // getUTCHours here biases the average across DST transitions because the
+  // UTC-clock jumps ±60 min while the baby's local wake stays the same.
+  // Server TZ == baby TZ (single-tenant invariant), so getHours/getMinutes
+  // is the local clock the parent actually experiences.
   const avgMinutes = nights.reduce((sum, n) => {
     const d = new Date(n.end_time!);
-    return sum + d.getUTCHours() * 60 + d.getUTCMinutes();
+    return sum + d.getHours() * 60 + d.getMinutes();
   }, 0) / nights.length;
 
-  const tomorrowDate = new Date(new Date(bedtime).getTime() + 12 * 3600_000)
-    .toISOString().slice(0, 10);
-  const h = String(Math.floor(avgMinutes / 60)).padStart(2, "0");
-  const m = String(Math.round(avgMinutes % 60)).padStart(2, "0");
-  return new Date(`${tomorrowDate}T${h}:${m}:00.000Z`).toISOString();
+  const tomorrow = new Date(new Date(bedtime).getTime() + 12 * 3600_000);
+  tomorrow.setHours(Math.floor(avgMinutes / 60), Math.round(avgMinutes % 60), 0, 0);
+  return tomorrow.toISOString();
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

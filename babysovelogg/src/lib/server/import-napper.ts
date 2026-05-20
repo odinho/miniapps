@@ -46,24 +46,21 @@ function toUtc(timestamp: string): string {
   return new Date(timestamp).toISOString();
 }
 
-let eventCounter = 0;
-
-function makeEventId(): string {
-  return `evt_import_${++eventCounter}`;
-}
-
-function makeSleepId(): string {
-  return `slp_import_${++eventCounter}`;
-}
-
 interface NightContext {
   bedTime: NapperRow;
   nightWakings: NapperRow[];
 }
 
 export function mapNapperToEvents(rows: NapperRow[], babyId: number): ImportEvent[] {
+  // Include a batch hash so a second import doesn't collide with the first
+  // on (client_id, client_event_id) and get silently deduped. The original
+  // numbering was `evt_import_1, evt_import_2, ...` reset per call, which
+  // meant every re-import shared the same keys as the first.
   const clientId = "napper-import";
-  eventCounter = 0;
+  const batchHash = Math.random().toString(36).slice(2, 10);
+  let eventCounter = 0;
+  const makeEventId = () => `evt_import_${batchHash}_${++eventCounter}`;
+  const makeSleepId = () => `slp_import_${batchHash}_${++eventCounter}`;
 
   const sorted = [...rows].toSorted(
     (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
@@ -92,12 +89,15 @@ export function mapNapperToEvents(rows: NapperRow[], babyId: number): ImportEven
     } else {
       // No explicit wake-up. If the night is older than 24h, auto-close
       // with a 06:00 next-morning estimate to prevent ghost active sleeps.
+      // 06:00 is intended as baby-local clock time; the project is
+      // single-tenant so server TZ == baby TZ and setDate/setHours operate
+      // in that zone (per feedback_server_tz).
       const startMs = new Date(startUtc).getTime();
       const ageMs = Date.now() - startMs;
       if (ageMs > 24 * 60 * 60 * 1000) {
         const nextMorning = new Date(startMs);
-        nextMorning.setUTCDate(nextMorning.getUTCDate() + 1);
-        nextMorning.setUTCHours(6, 0, 0, 0);
+        nextMorning.setDate(nextMorning.getDate() + 1);
+        nextMorning.setHours(6, 0, 0, 0);
         emit("sleep.manual", {
           babyId,
           startTime: startUtc,
