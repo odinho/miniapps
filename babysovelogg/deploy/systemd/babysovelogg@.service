@@ -8,13 +8,15 @@ AssertPathExists=/srv/babysovelogg/families/%i
 Type=simple
 User=babysovelogg
 Group=babysovelogg
-UMask=0007
+UMask=0077
 WorkingDirectory=/srv/babysovelogg/families/%i
+# .env holds NODE_ENV/ORIGIN/VAPID_*/SOCKET_PATH/DB_PATH — managed by ansible.
+# (Keep DB_PATH/SOCKET_PATH there, not in this unit: EnvironmentFile overrides
+# Environment=, so duplicating here would let a stray .env value win.)
 EnvironmentFile=/srv/babysovelogg/families/%i/.env
-Environment=NODE_ENV=production
-Environment=SOCKET_PATH=/srv/babysovelogg/families/%i/app.sock
-Environment=DB_PATH=/srv/babysovelogg/families/%i/data.db
+ExecStartPre=/usr/bin/rm -f /srv/babysovelogg/families/%i/app.sock
 ExecStart=/usr/local/bin/bun /srv/babysovelogg/code/build/index.js
+ExecStartPost=/bin/sh -c 'until [ -S /srv/babysovelogg/families/%i/app.sock ]; do sleep 0.05; done; chmod 0660 /srv/babysovelogg/families/%i/app.sock'
 Restart=on-failure
 RestartSec=5
 

@@ -43,7 +43,7 @@ Local (replace `<server>` with the host that holds your instances):
 
 ```sh
 bun run build
-rsync -avz --delete --exclude=.git \
+rsync -avz --delete --delay-updates --exclude=.git \
     build/ node_modules/ package.json \
     <server>:/srv/babysovelogg/code/
 ssh <server> 'sudo systemctl restart "babysovelogg@*.service"'
