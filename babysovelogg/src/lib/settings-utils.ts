@@ -173,7 +173,7 @@ export interface NormBudgetStrings {
 /** Norm budget for a specific nap count at this age.
  *  When napCount differs from the age norm, nap duration scales to keep total nap time
  *  roughly constant (e.g., 2×45m → 1×90m). Returns display strings with ranges. */
-export function buildNormBudget(ageMonths: number, napCount: number): NormBudgetStrings {
+function buildNormBudget(ageMonths: number, napCount: number): NormBudgetStrings {
 	const sleepNeed = findByAge(SLEEP_NEEDS, ageMonths);
 	const ww = findByAge(WAKE_WINDOWS, ageMonths);
 	const norms = findByAge(NAP_COUNTS, ageMonths);

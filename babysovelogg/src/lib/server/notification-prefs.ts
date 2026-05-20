@@ -13,7 +13,7 @@ export type NotificationKind =
 export type NotificationPrefs = Record<NotificationKind, boolean>;
 
 /** Default: all notifications on except nap_overdue (can be noisy). */
-export const DEFAULT_PREFS: NotificationPrefs = {
+const DEFAULT_PREFS: NotificationPrefs = {
   rescue_wake: true,
   nap_ending_soon: true,
   nap_overtime: true,

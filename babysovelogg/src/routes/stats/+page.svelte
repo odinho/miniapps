@@ -11,7 +11,6 @@
 	import { appState } from '$lib/stores/app.svelte.js';
 	import { calculateAgeMonths } from '$lib/engine/schedule.js';
 	import {
-		buildSleepInfoRows,
 		buildPredictionRows,
 		buildComparisonTable,
 		getNextSleepMilestone,
@@ -21,7 +20,6 @@
 	const s = $derived(appState.state);
 	const baby = $derived(s.baby);
 	const ageMonths = $derived(baby ? calculateAgeMonths(baby.birthdate) : 0);
-	const sleepInfoRows = $derived(baby ? buildSleepInfoRows(ageMonths) : []);
 	const nextMilestone = $derived(baby ? getNextSleepMilestone(ageMonths) : null);
 	const selectedNapCount = $derived(baby?.custom_nap_count ?? null);
 	const pottyMode = $derived(baby?.potty_mode === 1);
@@ -67,7 +65,6 @@
 	);
 
 	let loading = $state(true);
-	let showSleepDetail = $state(false);
 	let error = $state(false);
 	let empty = $state(false);
 	let stats = $state<ComputedStats | null>(null);
@@ -579,7 +576,7 @@
 									rx="4"
 								/>
 							{/if}
-							{#each activeStats.wakeScatter.dots as dot, i}
+							{#each activeStats.wakeScatter.dots as dot}
 								<circle cx={dot.x} cy={dot.y} r="5" fill="var(--peach-dark)" stroke="var(--white)" stroke-width="1" opacity="0.7" />
 								<text x={dot.x} y={dot.y - 8} text-anchor="middle" fill="var(--text-light)" font-size="8" font-family="var(--font)">{formatDuration(dot.minutes * 60000)}</text>
 							{/each}

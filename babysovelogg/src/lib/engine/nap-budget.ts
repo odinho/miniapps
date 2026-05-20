@@ -26,9 +26,7 @@ import {
 } from "./constants.js";
 import { isoToDateInTz } from "$lib/tz.js";
 import { estimateSleepCycleFromData } from "./schedule.js";
-import { computeBlendedTrend, computeTrendTargets, computeTrendTotalMin } from "./trend.js";
-
-export { computeTrendTotalMin };
+import { computeBlendedTrend, computeTrendTargets } from "./trend.js";
 
 interface ComputeNapBudgetInput {
   /** Active nap. Must be type === 'nap'. */

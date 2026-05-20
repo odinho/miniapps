@@ -370,15 +370,6 @@
 		}
 	}
 
-	/** Arc end endpoint click: in day mode it's bedtime prediction (no-op), in night mode open wakeup */
-	function onArcEndClick() {
-		if (isNightMode) {
-			// Night mode end = morning → no action (prediction)
-		} else {
-			// Day mode end = bedtime prediction → no action
-		}
-	}
-
 	function onEditSleepClose() {
 		editingSleep = null;
 	}
@@ -559,7 +550,6 @@
 				rescueWindow={arcRescueWindow}
 				onSleepClick={onArcBubbleClick}
 				onStartClick={onArcStartClick}
-				onEndClick={onArcEndClick}
 			/>
 			<Timer
 				{activeSleep}

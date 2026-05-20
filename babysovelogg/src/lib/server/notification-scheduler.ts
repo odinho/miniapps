@@ -66,14 +66,6 @@ function cancelByKind(babyId: number, kind: NotificationKind): void {
   ).run(babyId, kind);
 }
 
-function cancelByDedupe(dedupeKey: string): void {
-  db.prepare(
-    `UPDATE notification_schedule
-     SET cancelled_at = datetime('now')
-     WHERE dedupe_key = ? AND sent_at IS NULL AND cancelled_at IS NULL`,
-  ).run(dedupeKey);
-}
-
 /**
  * Called after every state update. Upserts/cancels notification rows based on
  * current state and per-baby preferences. Idempotent.
@@ -305,12 +297,3 @@ export function startNotificationLoop(intervalMs = 30_000): void {
   }, intervalMs);
 }
 
-export function stopNotificationLoop(): void {
-  if (loopHandle) {
-    clearInterval(loopHandle);
-    loopHandle = null;
-  }
-}
-
-// Exported for testing
-export { cancelByDedupe };

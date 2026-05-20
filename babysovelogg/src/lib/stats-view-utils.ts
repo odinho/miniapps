@@ -193,7 +193,7 @@ function gallandRange(ageMonths: number): { min: number; max: number; typical: n
 	return { min: typical - 3, max: typical + 3, typical };
 }
 
-export function buildSleepVsNorm(
+function buildSleepVsNorm(
 	allDays: { date: string; totalHours: number }[],
 	birthdate: string,
 ): SleepVsNormData {
@@ -287,7 +287,7 @@ export interface StackedAreaData {
 	maxHours: number;
 }
 
-export function buildStackedArea(
+function buildStackedArea(
 	allDays: { date: string; napMin: number; nightMin: number }[],
 ): StackedAreaData {
 	// Filter out days with no data to avoid misleading drops to zero
@@ -364,7 +364,7 @@ export interface NightStretchChartData {
 	maxHours: number;
 }
 
-export function buildNightStretchChart(
+function buildNightStretchChart(
 	stretches: NightStretch[],
 ): NightStretchChartData {
 	if (stretches.length === 0) {
@@ -438,7 +438,7 @@ export interface BedtimeChartData {
 	avgLabel: string;
 }
 
-export function buildBedtimeChart(
+function buildBedtimeChart(
 	bedtimes: BedtimePoint[],
 ): BedtimeChartData {
 	if (bedtimes.length === 0) {
@@ -510,7 +510,7 @@ export interface NapCountChartData {
 	maxCount: number;
 }
 
-export function buildNapCountChart(
+function buildNapCountChart(
 	days: { date: string; napCount: number }[],
 ): NapCountChartData {
 	const filtered = days.filter((d) => d.napCount > 0);
@@ -606,7 +606,7 @@ export interface GanttChartData {
 	height: number;
 }
 
-export function buildGanttChart(
+function buildGanttChart(
 	sleeps: SleepEntry[],
 	days: number,
 	tz?: string,
@@ -728,7 +728,7 @@ function getLocalHourFrac(date: Date, tz: string): number {
 
 // ── Chart E: Heatmap geometry ─────────────────────────────────
 
-export const HEATMAP = {
+const HEATMAP = {
 	W: 360,
 	CELL_W: 13,
 	CELL_H: 14,
@@ -755,7 +755,7 @@ export interface HeatmapChartData {
 	width: number;
 }
 
-export function buildHeatmapChart(heatmapRows: HeatmapRow[], days: number): HeatmapChartData {
+function buildHeatmapChart(heatmapRows: HeatmapRow[], days: number): HeatmapChartData {
 	const rows = heatmapRows.slice(-days);
 	if (rows.length === 0) return { cells: [], dateLabels: [], hourLabels: [], height: 0, width: 0 };
 
@@ -810,7 +810,7 @@ export interface WakeScatterData {
 	maxMin: number;
 }
 
-export function buildWakeScatter(
+function buildWakeScatter(
 	gaps: WakeWindowGap[],
 	recommendedRange?: { min: number; max: number },
 ): WakeScatterData {
@@ -878,7 +878,7 @@ export interface SleepPressureChartData {
  * Shows how awake-time accumulates (pressure rises) and resets during sleep.
  * X-axis = time of day (05:00–22:00), Y-axis = minutes awake since last sleep.
  */
-export function buildSleepPressureChart(
+function buildSleepPressureChart(
 	sleeps: SleepEntry[],
 	tz?: string,
 ): SleepPressureChartData {

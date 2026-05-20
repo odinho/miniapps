@@ -64,9 +64,3 @@ export function setTrendTargetState(babyId: number, state: TrendTargetState): vo
   );
 }
 
-/** Manual reset — wipes the held baseline, forcing re-initialization
- *  on the next compute pass. Exposed for tests, debug routes, and a
- *  future user-facing "reset target" affordance. */
-export function clearTrendTargetState(babyId: number): void {
-  db.prepare("DELETE FROM trend_target_state WHERE baby_id = ?").run(babyId);
-}

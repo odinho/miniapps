@@ -51,7 +51,7 @@ export interface PushPayload {
  * Send a push to one subscription. Returns { ok: true } or { ok: false, gone: boolean }.
  * If `gone` is true, the subscription is invalid (404/410) and should be removed from DB.
  */
-export async function sendPush(
+async function sendPush(
   sub: PushSubscriptionData,
   payload: PushPayload,
 ): Promise<{ ok: true } | { ok: false; gone: boolean; error: string }> {

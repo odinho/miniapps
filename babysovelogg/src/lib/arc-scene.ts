@@ -66,12 +66,12 @@ export interface ComposeArcInput {
   geometry?: ArcGeometry;
 }
 
-export type BubbleStatus = "completed" | "active" | "predicted";
-export type SleepKind = "nap" | "night";
+type BubbleStatus = "completed" | "active" | "predicted";
+type SleepKind = "nap" | "night";
 /** Stroke colour token. The component maps this to CSS vars. */
-export type SceneColor = "moon" | "peach";
+type SceneColor = "moon" | "peach";
 
-export interface SceneBubble {
+interface SceneBubble {
   /** Stable scene key — bubble path d or "dot:cx,cy,r" for the dot variant. */
   d: string;
   /** Same shape as d when this bubble is rendered as a path. Empty for dot variants. */
@@ -93,12 +93,12 @@ export interface SceneBubble {
   label: { x: number; y: number; text: string; opacity: number } | null;
 }
 
-export interface ScenePoint {
+interface ScenePoint {
   x: number;
   y: number;
 }
 
-export interface SceneEndpoint {
+interface SceneEndpoint {
   pt: ScenePoint;
   icon: string;
   glow: string;
@@ -113,13 +113,13 @@ export interface SceneEndpoint {
   activeHalo: { color: SceneColor } | null;
 }
 
-export interface SceneNowMarker {
+interface SceneNowMarker {
   visible: boolean;
   outer: ScenePoint;
   inner: ScenePoint;
 }
 
-export interface ScenePlannedTrack {
+interface ScenePlannedTrack {
   visible: boolean;
   d: string;
   color: SceneColor;
@@ -133,24 +133,24 @@ export interface ScenePlannedTrack {
   wakeDot: { cx: number; cy: number; r: number } | null;
 }
 
-export interface SceneBand {
+interface SceneBand {
   visible: boolean;
   d: string;
   color: SceneColor;
 }
 
-export interface SceneSkippedBlob {
+interface SceneSkippedBlob {
   visible: boolean;
   d: string;
   label: { x: number; y: number; text: string };
 }
 
-export interface SceneRescueBlob {
+interface SceneRescueBlob {
   visible: boolean;
   d: string;
 }
 
-export interface ArcScene {
+interface ArcScene {
   config: ArcConfig;
   geometry: ArcGeometry;
   /** Background track path covering the full arc. */
@@ -197,10 +197,6 @@ const VERY_SHORT_THRESHOLD_OTHER = 0.015;
  * label-position duplication.
  */
 const HALO_PROXIMITY = 0.05;
-
-const NIGHT_TRACK_STROKE = "night";
-const DAY_TRACK_STROKE = "day";
-export type TrackTint = typeof NIGHT_TRACK_STROKE | typeof DAY_TRACK_STROKE;
 
 function colorForType(t: SleepKind): SceneColor {
   return t === "night" ? "moon" : "peach";

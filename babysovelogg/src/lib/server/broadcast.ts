@@ -10,10 +10,6 @@ export function removeClient(controller: ReadableStreamDefaultController) {
   sseClients.delete(controller);
 }
 
-export function clientCount(): number {
-  return sseClients.size;
-}
-
 export function broadcast(eventType: string, data: Record<string, unknown>) {
   const msg = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
   const encoded = encoder.encode(msg);

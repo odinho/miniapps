@@ -1872,7 +1872,7 @@ const DAILY_SHIFT_CAP_LATER_MS = 30 * 60_000;
 const DAILY_SHIFT_CAP_EARLIER_MS = 15 * 60_000;
 
 /** Convert a "HH:MM" target bedtime to an ISO timestamp for today in the baby's timezone. */
-export function targetBedtimeToISO(hhmm: string, now: number, tz: string): string {
+function targetBedtimeToISO(hhmm: string, now: number, tz: string): string {
   const [h, m] = hhmm.split(":").map(Number);
   return setHourInTz(new Date(now), h, m, tz).toISOString();
 }

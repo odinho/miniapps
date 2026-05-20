@@ -29,17 +29,8 @@ function stringify(args: unknown[]): string {
   return args.map(String).join(" ");
 }
 
-export function expectConsoleLog(pattern: string | RegExp) {
-  _expected.log.push(toRegExp(pattern));
-}
-export function expectConsoleInfo(pattern: string | RegExp) {
-  _expected.info.push(toRegExp(pattern));
-}
 export function expectConsoleError(pattern: string | RegExp) {
   _expected.error.push(toRegExp(pattern));
-}
-export function expectConsoleWarn(pattern: string | RegExp) {
-  _expected.warn.push(toRegExp(pattern));
 }
 
 function checkLevel(level: Level) {
@@ -321,15 +312,6 @@ export function setWakeUpTime(babyId: number, wakeTime?: Date) {
   db.prepare(
     "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, 'night', ?)",
   ).run(babyId, nightStart.toISOString(), wake.toISOString(), did);
-}
-
-/** Timezone-safe version that takes explicit ISO strings for deterministic snapshots. */
-export function setWakeUpTimeUTC(babyId: number, date: string, wakeTimeISO: string) {
-  const nightStart = new Date(new Date(wakeTimeISO).getTime() - 12 * 3600000).toISOString();
-  const did = generateId("slp");
-  db.prepare(
-    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, 'night', ?)",
-  ).run(babyId, nightStart, wakeTimeISO, did);
 }
 
 export function addCompletedSleep(
