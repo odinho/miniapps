@@ -30,16 +30,6 @@
 		return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 	}
 
-	let displayValue = $state(toDisplay(value));
-
-	// Sync display when value changes externally
-	$effect(() => {
-		const expected = toDisplay(value);
-		if (displayValue !== expected) {
-			displayValue = expected;
-		}
-	});
-
 	function handleInput(e: Event) {
 		const input = e.target as HTMLInputElement;
 		let v = input.value.replace(/[^\d.]/g, '');
@@ -57,19 +47,19 @@
 		}
 		if (v.length > 10) v = v.slice(0, 10);
 
-		displayValue = v;
 		input.value = v;
 	}
 
-	function handleBlur() {
-		const iso = toIso(displayValue);
+	function handleBlur(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const iso = toIso(input.value);
 		if (iso) {
 			value = iso;
-			displayValue = toDisplay(iso);
+			input.value = toDisplay(iso);
 			onchange?.(iso);
 		} else {
 			// Reset to current value
-			displayValue = toDisplay(value);
+			input.value = toDisplay(value);
 		}
 	}
 
@@ -80,7 +70,7 @@
 			d.setDate(d.getDate() + (e.key === 'ArrowUp' ? 1 : -1));
 			const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 			value = iso;
-			displayValue = toDisplay(iso);
+			(e.target as HTMLInputElement).value = toDisplay(iso);
 			onchange?.(iso);
 		}
 	}
@@ -90,7 +80,7 @@
 	type="text"
 	inputmode="numeric"
 	class="date-input"
-	value={displayValue}
+	value={toDisplay(value)}
 	placeholder="DD.MM.YYYY"
 	maxlength="10"
 	oninput={handleInput}

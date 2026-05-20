@@ -327,15 +327,17 @@ export async function dismissSheet(page: Page) {
 }
 
 /** Fill a custom DateInput component (DD.MM.YYYY text input) with an ISO date string (YYYY-MM-DD).
- *  Sets the display value directly and triggers blur to convert to ISO internally. */
+ *  Types character-by-character so per-keystroke reactivity bugs surface
+ *  (a one-shot `el.value = ...; dispatch('input')` collapses all `$effect`
+ *  runs into a single microtask and hides feedback loops). */
 export async function fillDateInput(locator: import("@playwright/test").Locator, isoDate: string) {
   const [y, m, d] = isoDate.split("-");
-  const display = `${d}.${m}.${y}`;
-  await locator.evaluate((el: HTMLInputElement, val: string) => {
-    el.value = val;
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-    el.dispatchEvent(new Event("blur", { bubbles: true }));
-  }, display);
+  // Type only digits — DateInput auto-inserts the dots.
+  const digits = `${d}${m}${y}`;
+  await locator.click();
+  await locator.fill("");
+  await locator.pressSequentially(digits, { delay: 10 });
+  await locator.blur();
 }
 
 /** Fill a custom TimeInput component (HH:MM text input). */
