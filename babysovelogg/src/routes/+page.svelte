@@ -739,6 +739,7 @@
 			startTime={tagSheetStartTime}
 			lastDiaperTime={s.lastDiaperTime}
 			{pottyMode}
+			{trackDiaper}
 			onClose={onTagSheetClose}
 			onOpenDiaper={onTagSheetOpenDiaper}
 		/>

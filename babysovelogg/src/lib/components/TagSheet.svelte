@@ -15,11 +15,12 @@
 		startTime: string;
 		lastDiaperTime: string | null;
 		pottyMode?: boolean;
+		trackDiaper?: boolean;
 		onClose?: () => void;
 		onOpenDiaper?: () => void;
 	}
 
-	let { sleepDomainId, startTime, lastDiaperTime, pottyMode = false, onClose, onOpenDiaper }: Props =
+	let { sleepDomainId, startTime, lastDiaperTime, pottyMode = false, trackDiaper = false, onClose, onOpenDiaper }: Props =
 		$props();
 
 	let mood = $state<string | null>(null);
@@ -33,7 +34,7 @@
 	let busy = $state(false);
 
 	const displayTime = $derived(formatTime(adjustedStartTime));
-	const showDiaperNudge = $derived(shouldShowDiaperNudge(lastDiaperTime));
+	const showDiaperNudge = $derived(trackDiaper && shouldShowDiaperNudge(lastDiaperTime));
 
 	const latencyFeedback = $derived.by(() => {
 		if (!fallAsleepTime) return null;
