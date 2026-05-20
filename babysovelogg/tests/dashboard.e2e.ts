@@ -5,6 +5,7 @@ import {
   setWakeUpTime,
   addCompletedSleep,
   dismissSheet,
+  getDb,
 } from "./fixtures";
 
 test("Dashboard shows baby name and sleep button", async ({ page }) => {
@@ -96,8 +97,19 @@ test('Pluralization: 2 naps shows "2 lurar"', async ({ page }) => {
 });
 
 test('Stats: hides "totalt" when equal to nap time (no night sleep)', async ({ page }) => {
+  // The "no night sleep" path requires wake to come from a day_start
+  // marker, not the more common overnight-end_time path: after the
+  // 2026-05-20 sleep-day fix, even a "yesterday 19:00 → today 07:00"
+  // overnight contributes ~12h to today's daily total, so totalt would
+  // never equal naptime when setWakeUpTime is used. Set up wake the
+  // marker-only way for this test.
   const babyId = createBaby("Testa");
-  setWakeUpTime(babyId);
+  const todayDate = new Date().toISOString().slice(0, 10);
+  const wakeIso = new Date(new Date(`${todayDate}T07:00:00Z`)).toISOString();
+  const db = getDb();
+  db.prepare(
+    "INSERT INTO day_start (baby_id, date, wake_time, created_at) VALUES (?, ?, ?, ?)",
+  ).run(babyId, todayDate, wakeIso, wakeIso);
   const now = new Date();
   addCompletedSleep(
     babyId,

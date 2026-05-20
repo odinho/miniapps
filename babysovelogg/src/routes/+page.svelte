@@ -19,7 +19,7 @@
 	import DstBanner from '$lib/components/DstBanner.svelte';
 	import ContextCard from '$lib/components/ContextCard.svelte';
 	import ManualSleepModal from '$lib/components/ManualSleepModal.svelte';
-	import SleepInsightsCard from '$lib/components/SleepInsightsCard.svelte';
+	import TodayCard from '$lib/components/TodayCard.svelte';
 	import { isoToDateInTz } from '$lib/tz.js';
 
 	// --- modal state ---
@@ -75,8 +75,16 @@
 	const isNewborn = $derived(strategy === 'newborn_guidance');
 	const isEmerging = $derived(strategy === 'emerging_rhythm');
 	const showContextCard = $derived(isNewborn || isEmerging);
-	const showInsightsCard = $derived(!showContextCard && prediction?.learnedSchedule && prediction?.calibration?.trust !== 'age-default');
-	const showPopulationNorms = $derived(!showContextCard && !showInsightsCard && prediction?.calibration?.trust === 'age-default');
+	/**
+	 * Heim's "I dag" card replaces the older multi-day Søvnoversikt panel
+	 * (the 2026-05-20 mislabeling complaint). It surfaces actuals so far
+	 * today + a forward-looking "Neste" line. Show whenever the engine
+	 * isn't in newborn/emerging mode AND the parent has any learned
+	 * calibration — otherwise the calibration-light path renders the
+	 * population-norms block instead.
+	 */
+	const showTodayCard = $derived(!showContextCard && prediction?.calibration?.trust !== 'age-default');
+	const showPopulationNorms = $derived(!showContextCard && !showTodayCard && prediction?.calibration?.trust === 'age-default');
 	const populationNormsRows = $derived(showPopulationNorms ? buildSleepInfoRows(ageMonths) : []);
 	let pauseBusy = $state(false);
 
@@ -271,13 +279,20 @@
 	});
 
 	const liveTotalMs = $derived.by(() => {
-		const napBase = (stats?.totalNapMinutes ?? 0) * 60_000;
-		const nightBase = (stats?.totalNightMinutes ?? 0) * 60_000;
+		// Wake-to-wake totals include the morning overnight that started
+		// before midnight — without this, the bottom summary silently dropped
+		// ~10–12h of night sleep the day after a normal overnight
+		// (2026-05-20 user report). Falls back to `stats` if dayTotals is
+		// missing (older cached state shape during offline reload).
+		const dt = s.dayTotals;
+		const napBase = (dt?.napMinutes ?? stats?.totalNapMinutes ?? 0) * 60_000;
+		const todayNightBase = (dt?.todayNightMinutes ?? stats?.totalNightMinutes ?? 0) * 60_000;
+		const priorNightBase = (dt?.priorNightMinutes ?? 0) * 60_000;
 		let activeMs = 0;
 		if (activeSleep && !activeSleep.end_time) {
 			activeMs = Math.max(0, now - new Date(activeSleep.start_time).getTime() - calcPauseMs(activeSleep.pauses ?? []));
 		}
-		return napBase + nightBase + activeMs;
+		return napBase + todayNightBase + priorNightBase + activeMs;
 	});
 
 	const showTotal = $derived(
@@ -671,11 +686,13 @@
 			</div>
 		{/if}
 
-		{#if showInsightsCard && prediction?.learnedSchedule}
-			<SleepInsightsCard
-				schedule={prediction.learnedSchedule}
-				calibration={prediction.calibration}
-				dailyTrendTotalMin={prediction.dailyTrendTotalMin}
+		{#if showTodayCard}
+			<TodayCard
+				priorOvernightSleep={s.priorOvernightSleep}
+				dayTotals={s.dayTotals}
+				todaySleeps={s.todaySleeps}
+				{prediction}
+				{activeSleep}
 			/>
 		{/if}
 
