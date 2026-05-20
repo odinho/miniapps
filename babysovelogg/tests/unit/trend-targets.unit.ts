@@ -265,6 +265,64 @@ describe("computeTrendTargets (stage 1: API only)", () => {
     expect(observedDrop).toBeGreaterThan(15);
   });
 
+  it("holds intervention target under a realistic target-5+jitter cap pattern", () => {
+    // The "target - 30" stress test above proves the split mechanically.
+    // This test is the *realistic* version: production napBudget caps at
+    // `trend - EARLY_WAKE_LEAD_MIN (5 min)` in established mode, with
+    // day-to-day jitter from variable banked-overnight and learned-nap-
+    // duration values. We expect the held intervention target to hold
+    // and the observed mean to drop by a smaller, more lifelike amount.
+    //
+    // KNOWN LIMITATION: the policy-affected classifier uses observed
+    // (not held) as its "near target" reference. Under aggressive caps
+    // this lines up. Under target-5+jitter it still does — observed
+    // drifts but is always within tolerance of the actual day total. If
+    // we ever switch the reference to held target without explicit
+    // cap-event attribution, this test's pass becomes a tautology.
+    // Codex stage-3 review §"policy classification uses observed
+    // reference". When that lands, revisit the assertion below.
+    const history: SleepEntry[] = [];
+    for (let d = 0; d < 14; d++) {
+      const date = isoOffset("2026-04-01", d);
+      history.push(...naturalDayAt(date, 780, "self"));
+    }
+
+    let state: TrendTargetState | null = null;
+    const targets: number[] = [];
+    const observedSeries: number[] = [];
+    let rng = 1;
+    const jitter = (): number => {
+      // Deterministic pseudo-random ±5 min so the test is reproducible.
+      rng = (rng * 1103515245 + 12345) % 0x7fffffff;
+      return ((rng % 11) - 5);
+    };
+
+    for (let d = 0; d < 30; d++) {
+      const date = isoOffset("2026-04-15", d);
+      const now = noonUtc(date);
+      const recent = last30(history, now);
+      const ctx = ctxForCtxBase(recent);
+      const result: NonNullable<ReturnType<typeof computeTrendTargets>> =
+        computeTrendTargets(recent, ctx, now, state)!;
+      targets.push(result.interventionTargetMin);
+      observedSeries.push(result.observedRecentMin);
+
+      // Cap day total = target - 5 + jitter. Last nap woken (the cap
+      // is what the parent acted on); night natural.
+      const capTotal = result.interventionTargetMin - 5 + jitter();
+      history.push(...naturalDayAt(date, capTotal, "woken"));
+      state = result.state;
+    }
+
+    const drift = Math.max(...targets) - Math.min(...targets);
+    expect(drift).toBeLessThanOrEqual(10);
+    // Observed should drop modestly — this is the realistic ratchet
+    // signal we're protecting against. Don't over-assert magnitude.
+    const observedDrop = observedSeries[0] - observedSeries.at(-1)!;
+    expect(observedDrop).toBeGreaterThan(2);
+    expect(observedDrop).toBeLessThan(15);
+  });
+
   it("drifts upward faster when natural higher-need days arrive", () => {
     // 7 natural days at 780, then 7 natural days at 820 (+40 min trend up).
     const history: SleepEntry[] = [];

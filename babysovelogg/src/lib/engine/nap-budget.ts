@@ -26,7 +26,7 @@ import {
 } from "./constants.js";
 import { isoToDateInTz } from "$lib/tz.js";
 import { estimateSleepCycleFromData } from "./schedule.js";
-import { computeBlendedTrend, computeTrendTotalMin } from "./trend.js";
+import { computeBlendedTrend, computeTrendTargets, computeTrendTotalMin } from "./trend.js";
 
 export { computeTrendTotalMin };
 
@@ -114,17 +114,29 @@ export function computeNapBudget(input: ComputeNapBudgetInput): NapBudget | null
   const elapsedMin = (now - napStartMs) / 60_000;
   if (elapsedMin < NAP_BUDGET.MIN_ELAPSED_BEFORE_CAP_MIN) return null;
 
-  // ── Gate 3: trend stability. Need ≥7 days of complete data, and
-  //    recent variance must be low enough that the trend is signal.
-  const trend = computeBlendedTrend(trendSleeps, ctx.tz, now, ctx.ageMonths, ctx.offDays);
-  if (!trend) return null;
+  // ── Gate 3: trend targets. Stage 4 of the trend split — Codex
+  //    2026-05-20: cap math compares against the held *intervention*
+  //    target so cap-following doesn't ratchet the target down (the
+  //    rolling observed mean still does, but it stops driving the cap).
+  //    Mode-hysteresis math stays on observed mean7/mean30 because the
+  //    "has the parent been respecting caps?" signal is observed by
+  //    definition.
+  const trendTargets = ctx.trendTargets
+    ?? computeTrendTargets(trendSleeps, ctx, now, ctx.priorTrendTargetState ?? null);
+  if (!trendTargets) return null;
+  const trend = {
+    blendedTrendMin: trendTargets.interventionTargetMin,
+    sourceLabel: trendTargets.interventionSourceLabel,
+    mean7: trendTargets.mean7,
+    mean30: trendTargets.mean30,
+  };
 
   // ── Gate 4: today's projection. Uses a rolling 24h window so last
   //    night's sleep counts toward today's budget — that matches the
   //    parent's actual reasoning ("she slept 12.44 h last night + 1.5 h
-  //    nap = 14 h vs 13 h trend"). The trend target comes from
-  //    start-anchored daily averages, which in steady-state equal the
-  //    rolling-24h mean, just shifted.
+  //    nap = 14 h vs 13 h trend"). Projection vs *intervention* target,
+  //    not observed: if today is already projecting at the held target
+  //    the cap math has nothing to do.
   const bankedMin = computeBankedToday(trendSleeps, todaySleeps, activeNap, ctx.tz, now);
   const projectedIfRunsFull = bankedMin + estimateRemainingNapMin(activeNap, now, ctx, learnedNapDurationMin);
   if (projectedIfRunsFull <= trend.blendedTrendMin) {

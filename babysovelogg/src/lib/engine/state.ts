@@ -18,7 +18,7 @@ import { RESCUE_NAP, NAP_FLOOR_BY_AGE, findByAge } from "./constants.js";
 import { getTodayStats, getSleepDayTotals } from "./stats.js";
 import { computeConfidence, computeWakeRange } from "./confidence.js";
 import { computeNapBudget, isDayOnTrend } from "./nap-budget.js";
-import { computeTrendTargets, computeTrendTotalMin } from "./trend.js";
+import { computeTrendTargets } from "./trend.js";
 import type { TrendTargetState } from "./trend.js";
 import { calibrate } from "./calibration.js";
 import { computeStrategySignals } from "./features.js";
@@ -607,20 +607,25 @@ function buildContext(
   priorTrendTargetState?: TrendTargetState | null,
 ): BabyContext {
   const tz = baby.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-  // Compute the blended trend once and thread it through ctx — the censor
-  // (cap-respect carve-out) and the napBudget engine both consume the
-  // same number, so they can't disagree on what "near trend" means.
-  const trendTotalMin = computeTrendTotalMin(
+  // Compute observed + intervention trend numbers once and thread both
+  // through ctx so the censor's cap-respect carve-out, the napBudget
+  // engine, and `Prediction.trendTargets` all read the same evaluation.
+  // (Stage 4 of the trend split — Codex design at
+  // `local/codex-trend-split-design.md`.)
+  const trendCtxStub: BabyContext = {
+    birthdate: baby.birthdate,
+    ageMonths: calculateAgeMonths(baby.birthdate, new Date(now)),
+    tz,
+    customNapCount: baby.custom_nap_count ?? null,
+    recentSleeps,
+    offDays,
+    priorTrendTargetState: priorTrendTargetState ?? null,
+  };
+  const trendTargets = computeTrendTargets(
     trendSleeps ?? extendedSleeps ?? recentSleeps,
-    {
-      birthdate: baby.birthdate,
-      ageMonths: calculateAgeMonths(baby.birthdate, new Date(now)),
-      tz,
-      customNapCount: baby.custom_nap_count ?? null,
-      recentSleeps,
-      offDays,
-    },
+    trendCtxStub,
     now,
+    priorTrendTargetState ?? null,
   );
   return {
     birthdate: baby.birthdate,
@@ -632,7 +637,9 @@ function buildContext(
     extendedSleeps,
     trendSleeps,
     offDays,
-    trendTotalMin,
+    trendTotalMin: trendTargets?.observedRecentMin ?? null,
+    interventionTrendTargetMin: trendTargets?.interventionTargetMin ?? null,
+    trendTargets,
     priorTrendTargetState: priorTrendTargetState ?? null,
   };
 }
@@ -943,10 +950,6 @@ function assembleEmergingPrediction(
     priorNapBudgetState,
   });
 
-  const trendTargets = computeTrendTargets(
-    ctx.trendSleeps ?? ctx.recentSleeps, ctx, now, ctx.priorTrendTargetState,
-  );
-
   return {
     strategy: "emerging_rhythm",
     feasible: true,
@@ -965,8 +968,8 @@ function assembleEmergingPrediction(
     rescueNap: post.rescueNap,
     continuationWindow: post.continuationWindow,
     napBudget: post.napBudget,
-    dailyTrendTotalMin: trendTargets?.observedRecentMin ?? null,
-    trendTargets,
+    dailyTrendTotalMin: ctx.trendTargets?.observedRecentMin ?? null,
+    trendTargets: ctx.trendTargets ?? null,
     sleepWindow: result.sleepWindow,
     sleepPressure: result.sleepPressure,
     totalSleep24h: result.rolling.totalSleep24h,
@@ -1081,10 +1084,6 @@ function assembleSchedulePrediction(
   // bedtime range, which Timer uses for bedtime / after-bedtime modes.
   const confidence = computeConfidence(post.predictedNaps ?? [], bedtime, ctx.ageMonths, ctx.recentSleeps, ctx.tz);
   const calibration = calibrate(ctx.ageMonths, ctx.recentSleeps, ctx.customNapCount, ctx.tz);
-  const trendTargets = computeTrendTargets(
-    ctx.trendSleeps ?? ctx.recentSleeps, ctx, now, ctx.priorTrendTargetState,
-  );
-
   return {
     strategy,
     feasible: selected?.feasible ?? true,
@@ -1103,8 +1102,8 @@ function assembleSchedulePrediction(
     rescueNap: post.rescueNap,
     continuationWindow: post.continuationWindow,
     napBudget: post.napBudget,
-    dailyTrendTotalMin: trendTargets?.observedRecentMin ?? null,
-    trendTargets,
+    dailyTrendTotalMin: ctx.trendTargets?.observedRecentMin ?? null,
+    trendTargets: ctx.trendTargets ?? null,
     // Newborn fields — null for schedule-based strategies
     sleepWindow: null,
     sleepPressure: null,

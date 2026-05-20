@@ -1161,9 +1161,19 @@ function censorCutShortNaps(
   // 12 h (age-band-min for 9-12mo) but 1 h below a 13 h trend would
   // still qualify, slightly under-stating learnedNapDuration on real
   // cap-respect days.
+  // Cap-respect day-target uses the *intervention* number — that's what
+  // napBudget recommends to, so "was this day plausibly cap-respecting?"
+  // must compare against the same target. Falls back to observed (trend
+  // total) when intervention isn't set yet (older ctx, tests), and to
+  // the age-band floor when neither is available. Codex 2026-05-20
+  // design at `local/codex-trend-split-design.md` §"Which target should
+  // each consumer use?".
   const ageBandMinTotalMin = findByAge(SLEEP_NEEDS, ctx.ageMonths).range[0] * 60;
-  const dayTargetMin = ctx.trendTotalMin != null
-    ? ctx.trendTotalMin - NAP_BUDGET.TOLERANCE_MIN
+  const referenceTotalMin = ctx.interventionTrendTargetMin
+    ?? ctx.trendTotalMin
+    ?? null;
+  const dayTargetMin = referenceTotalMin != null
+    ? referenceTotalMin - NAP_BUDGET.TOLERANCE_MIN
     : ageBandMinTotalMin;
   // Anything below 30 min is a micro-nap regardless of position — never
   // qualifies for the cap-respect carve-out.

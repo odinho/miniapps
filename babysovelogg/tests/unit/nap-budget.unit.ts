@@ -272,7 +272,13 @@ describe("computeNapBudget — emits a cap when over trend", () => {
     expect(out!.context.blendedTrendMin).toBeGreaterThan(11 * 60);
     expect(out!.context.blendedTrendMin).toBeLessThan(15 * 60);
     expect(out!.context.toleranceMin).toBe(NAP_BUDGET.TOLERANCE_MIN);
-    expect(out!.context.sourceLabel).toMatch(/blanding|snitt/);
+    // Stage 4 of the trend split: context source label now reflects the
+    // *intervention* target (what the engine recommends toward), not the
+    // raw observed blend. When no prior trend-target state exists the
+    // initialiser tags it "observed (initial)"; once cap-following lifts
+    // the held baseline it becomes "held baseline (…)". Match either
+    // along with the legacy observed labels.
+    expect(out!.context.sourceLabel).toMatch(/blanding|snitt|observed|held|natural-day/);
   });
 });
 

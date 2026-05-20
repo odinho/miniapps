@@ -158,6 +158,19 @@ export interface BabyContext {
    */
   trendTotalMin?: number | null;
   /**
+   * Held intervention target — what `computeNapBudget` caps toward and
+   * what `censorCutShortNaps`'s cap-respect carve-out compares against.
+   * Diverges from `trendTotalMin` (= observed mean) once cap-following
+   * begins; staying split is the entire point of the trend ratchet fix.
+   * Codex 2026-05-20 design at `local/codex-trend-split-design.md`.
+   */
+  interventionTrendTargetMin?: number | null;
+  /** Full TrendTargets object (observed + intervention + diagnostics +
+   *  next state). Stashed once in `buildContext` so downstream
+   *  consumers don't recompute and `Prediction.trendTargets` reads the
+   *  same object the engine acted on. */
+  trendTargets?: import("./engine/trend.js").TrendTargets | null;
+  /**
    * Persisted trend-target state from the prior evaluation (held
    * intervention target + baseline + drift bookkeeping). Threaded into
    * `computeTrendTargets` so the cap target survives across calls
