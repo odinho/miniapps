@@ -6,6 +6,7 @@
 	import { WAKE_MOODS } from '$lib/constants.js';
 	import { formatDuration, formatTime } from '$lib/utils.js';
 	import { toggleOffDay, localDateForOffDay } from '$lib/off-day-actions.js';
+	import { calcPauseMs } from '$lib/engine/classification.js';
 	import TimeInput from './TimeInput.svelte';
 
 	interface Props {
@@ -36,11 +37,14 @@
 
 	const summary = $derived(getBedtimeSummary(sleepSnapshot));
 
-	// Reactive sleep duration
+	// Reactive sleep duration. Subtract any completed pauses so the "1t 12m"
+	// label matches what the rest of the app reports (the engine's totals
+	// already net out pauses; this used to show raw end-start).
 	const sleepDurationMs = $derived.by(() => {
 		const start = new Date(sleepSnapshot.start_time).getTime();
 		const end = new Date(`${wakeDate}T${wakeTime}:00`).getTime();
-		return Math.max(0, end - start);
+		const pauseMs = calcPauseMs(sleepSnapshot.pauses ?? [], end);
+		return Math.max(0, end - start - pauseMs);
 	});
 
 	const MAX_NAP_HOURS = 4;
