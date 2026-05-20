@@ -297,7 +297,7 @@ describe('formatAge', () => {
 });
 
 describe('buildComparisonTable', () => {
-	it('shows norm and actual side by side', () => {
+	it('shows norm and learned side by side', () => {
 		const rows = buildComparisonTable(9, {
 			napDurationMin: 120,
 			nightDurationMin: 660,
@@ -306,9 +306,24 @@ describe('buildComparisonTable', () => {
 			expectedNapCount: 1,
 			});
 		expect(rows.length).toBeGreaterThanOrEqual(5);
-		// Every row should have both norm and actual
+		// Every row should have both norm and a learned value
 		for (const r of rows.filter(row => row.norm)) {
-			expect(r.actual).not.toBe('—');
+			expect(r.learned).not.toBe('—');
+		}
+		// Without today data, every today slot is undefined (no third column rendered)
+		expect(rows.every(r => r.today === undefined)).toBe(true);
+	});
+
+	it('legacy `actual` alias mirrors `learned`', () => {
+		const rows = buildComparisonTable(9, {
+			napDurationMin: 120,
+			nightDurationMin: 660,
+			wakeWindowMin: 270,
+			bedtimeWakeWindowMin: 300,
+			expectedNapCount: 1,
+			});
+		for (const r of rows) {
+			expect(r.actual).toBe(r.learned);
 		}
 	});
 
@@ -326,7 +341,7 @@ describe('buildComparisonTable', () => {
 		// The nap count row should show the difference
 		const napRow = rows.find(r => r.label === 'Lurar');
 		expect(napRow?.norm).toBe('2');
-		expect(napRow?.actual).toBe('1');
+		expect(napRow?.learned).toBe('1');
 		expect(napRow?.altNorm).toBe('1');
 	});
 
@@ -345,7 +360,72 @@ describe('buildComparisonTable', () => {
 	it('shows dashes when no learned data', () => {
 		const rows = buildComparisonTable(9, null);
 		for (const r of rows.filter(row => row.norm)) {
-			expect(r.actual).toBe('—');
+			expect(r.learned).toBe('—');
 		}
+	});
+
+	it('populates today column when dayTotals + sleeps are provided', () => {
+		const rows = buildComparisonTable(
+			11,
+			{
+				napDurationMin: 123,
+				nightDurationMin: 659,
+				wakeWindowMin: 298,
+				bedtimeWakeWindowMin: 386,
+				expectedNapCount: 1,
+			},
+			{
+				dayTotals: {
+					napMinutes: 113,
+					todayNightMinutes: 0,
+					priorNightMinutes: 770,
+					totalMinutes: 883,
+					includesPriorNight: true,
+				},
+				todaySleeps: [
+					{
+						start_time: '2026-05-20T11:29:00.000Z',
+						end_time: '2026-05-20T13:22:00.000Z',
+						type: 'nap',
+					} as never,
+				],
+				completedNapCount: 1,
+				expectedNapCount: 1,
+				dailyTrendTotalMin: 780,
+			},
+		);
+
+		const napCount = rows.find(r => r.label === 'Lurar');
+		expect(napCount?.today).toBe('1 av 1');
+		const napDur = rows.find(r => r.label === 'Lurvarigheit');
+		expect(napDur?.today).toBe('1t53');
+		const night = rows.find(r => r.label === 'Nattesøvn');
+		expect(night?.today).toBe('12t50');
+		const total = rows.find(r => r.label === 'Søvn totalt');
+		expect(total?.today).toBe('14t43');
+		const trend = rows.find(r => r.label === 'Trendmål (7d/30d)');
+		expect(trend?.today).toBe('13t');
+		expect(trend?.learned).toBe('—');
+	});
+
+	it('omits Trendmål row when trend is null (sparse data)', () => {
+		const rows = buildComparisonTable(
+			9,
+			{
+				napDurationMin: 90,
+				nightDurationMin: 660,
+				wakeWindowMin: 180,
+				bedtimeWakeWindowMin: 220,
+				expectedNapCount: 2,
+			},
+			{
+				dayTotals: null,
+				todaySleeps: [],
+				completedNapCount: 0,
+				expectedNapCount: 2,
+				dailyTrendTotalMin: null,
+			},
+		);
+		expect(rows.some(r => r.label === 'Trendmål (7d/30d)')).toBe(false);
 	});
 });

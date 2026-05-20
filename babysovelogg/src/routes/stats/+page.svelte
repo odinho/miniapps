@@ -17,7 +17,6 @@
 		getNextSleepMilestone,
 		formatAge,
 	} from '$lib/settings-utils.js';
-	import SleepInsightsCard from '$lib/components/SleepInsightsCard.svelte';
 
 	const s = $derived(appState.state);
 	const baby = $derived(s.baby);
@@ -26,10 +25,26 @@
 	const nextMilestone = $derived(baby ? getNextSleepMilestone(ageMonths) : null);
 	const selectedNapCount = $derived(baby?.custom_nap_count ?? null);
 	const pottyMode = $derived(baby?.potty_mode === 1);
+	const completedNapCount = $derived(
+		s.todaySleeps.filter((sl) => sl.type === 'nap' && sl.end_time).length,
+	);
 	const comparisonRows = $derived(
-		baby ? buildComparisonTable(ageMonths, s.prediction?.learnedSchedule ?? null) : [],
+		baby
+			? buildComparisonTable(
+				ageMonths,
+				s.prediction?.learnedSchedule ?? null,
+				{
+					dayTotals: s.dayTotals,
+					todaySleeps: s.todaySleeps,
+					completedNapCount,
+					expectedNapCount: s.prediction?.expectedNapCount ?? completedNapCount,
+					dailyTrendTotalMin: s.prediction?.dailyTrendTotalMin ?? null,
+				},
+			)
+			: [],
 	);
 	const hasAltNorm = $derived(comparisonRows.some(r => r.altNorm !== undefined));
+	const hasTodayColumn = $derived(comparisonRows.some(r => r.today !== undefined));
 
 	const predictionRows = $derived(
 		baby
@@ -126,39 +141,47 @@
 	{#if baby}
 		<div class="stats-section">
 			<div class="stats-section-head">
-				<h3 class="stats-section-title">{baby.name} vs. norm ({formatAge(baby.birthdate)})</h3>
+				<h3 class="stats-section-title">
+					{#if hasTodayColumn}I dag vs. typisk vs. norm{:else}{baby.name} vs. norm{/if}
+					<span class="stats-section-age">({formatAge(baby.birthdate)})</span>
+				</h3>
 				<details class="help-disclosure">
 					<summary aria-label="Forklaring">?</summary>
 					<p>
-						Norm-tala er typiske verdiar for alderen — frå publisert forsking
-						(Galland 2012, AAP). {baby.name}-tala er det appen har lært frå dei
-						siste 7 dagane. Når barnet har eit anna lurmønster enn alderssnittet
-						(t.d. 1 lur i staden for 2), viser me begge normsetta inline.
+						{#if hasTodayColumn}«I dag»-tala er det som faktisk har skjedd i dag — natta som enda i morges + lurar som er ferdige.{/if}
+						«Lærd typisk» er det appen har lært frå dei siste 7 dagane.
+						«Norm» er publiserte aldersnormer (Galland 2012, AAP). Når barnet har eit anna
+						lurmønster enn alderssnittet, viser me begge normsetta inline.
+						{#if hasTodayColumn}Trendmål er glidande snitt over 7d/30d som engine brukar som «dagsmål».{/if}
 					</p>
 				</details>
 			</div>
 			<!--
-				Card-list layout: one row per metric, the baby's value on the
-				right (the punchline), the norm range as sub-text below. The
-				earlier 3- or 4-column table overflowed on mobile and clipped
-				the baby column — exactly the column the parent came to read.
+				Card-list layout: one row per metric. Today's actual is the
+				right-aligned punchline when present (the answer the parent
+				came for). Sub-text below shows learned-typical + norm so
+				the comparison stays visible without a real <table> (which
+				clipped the baby column on narrow screens — 2026-05-14).
 				When the baby's nap count differs from age norm we show both
-				norms inline ("2-lur 1t04 · 1-lur 2t08") so the comparison
-				still works without a second column.
+				normsetts inline so the comparison still works.
 			-->
 			<div class="comparison-panel sleep-info-panel">
 				{#each comparisonRows as row}
 					{@const napHead = comparisonRows.find(r => r.label === 'Lurar')}
+					{@const punchline = row.today ?? row.learned}
+					{@const normLine = hasAltNorm && row.altNorm && row.norm !== row.altNorm
+						? `${napHead?.norm ?? ''}-lur: ${row.norm} · ${napHead?.altNorm ?? ''}-lur: ${row.altNorm}`
+						: row.norm === '—' ? null : `Norm ${row.norm}`}
 					<div class="comparison-row">
 						<div class="comparison-row-head">
 							<span class="comparison-row-label">{row.label}</span>
-							<span class="comparison-row-actual">{row.actual}</span>
+							<span class="comparison-row-actual" class:comparison-row-actual--today={row.today != null}>{punchline}</span>
 						</div>
 						<div class="comparison-row-norm">
-							{#if hasAltNorm && row.altNorm && row.norm !== row.altNorm}
-								{napHead?.norm ?? ''}-lur: {row.norm} · {napHead?.altNorm ?? ''}-lur: {row.altNorm}
-							{:else}
-								Norm {row.norm}
+							{#if row.today != null && row.learned !== '—'}
+								Lærd typisk {row.learned}{#if normLine} · {normLine}{/if}
+							{:else if normLine}
+								{normLine}
 							{/if}
 						</div>
 					</div>
@@ -194,23 +217,6 @@
 							<div class="stats-trend-val">{row.value}</div>
 						</div>
 					{/each}
-				</div>
-			{/if}
-
-			<!--
-				Pull in the home-page SleepInsightsCard so the stats page carries
-				the same learned-schedule overview the parent sees on the home
-				screen — feedback was that "Appen reknar med" felt sparse compared
-				to the front. Card collapses by default; same trust badge + trend
-				comparison logic.
-			-->
-			{#if s.prediction?.learnedSchedule}
-				<div style="margin-top: 12px;">
-					<SleepInsightsCard
-						schedule={s.prediction.learnedSchedule}
-						calibration={s.prediction.calibration}
-						dailyTrendTotalMin={s.prediction.dailyTrendTotalMin}
-					/>
 				</div>
 			{/if}
 
@@ -722,6 +728,19 @@
 		text-align: right;
 		/* Allow the value to shrink-wrap; never let it get clipped. */
 		flex-shrink: 0;
+	}
+
+	/* Distinguish "today" punchline from the fallback "learned" value so the
+	   parent reads it as a fresh number, not the multi-day average. */
+	.comparison-row-actual--today {
+		color: var(--text);
+	}
+
+	.stats-section-age {
+		font-size: 0.85rem;
+		color: var(--text-light);
+		font-weight: 400;
+		margin-left: 4px;
 	}
 
 	.comparison-row-norm {

@@ -8,7 +8,8 @@ import {
 	shineDaytimeSleepMinutes,
 	type PredictedNap,
 } from './engine/schedule.js';
-import type { SleepEntry } from './types.js';
+import type { SleepEntry, SleepLogRow } from './types.js';
+import type { SleepDayTotals } from './engine/stats.js';
 import { formatDuration, formatDurationCompact, formatTime } from './utils.js';
 
 // --- Nap count options for custom override pills ---
@@ -205,16 +206,47 @@ export function buildNormBudget(ageMonths: number, napCount: number): NormBudget
 
 export interface ComparisonRow {
 	label: string;
+	/** Today's actual value (undefined when there's no daily equivalent — e.g. Søvnsyklus). */
+	today?: string;
+	/** Multi-day learned-typical value (formerly `actual`). */
+	learned: string;
+	/** Population norm for the age band. */
 	norm: string;
-	actual: string;
-	/** Alternative norm for the baby's actual nap count if it differs from age norm */
+	/** Alternative norm for the baby's actual nap count if it differs from age norm. */
 	altNorm?: string;
+	/**
+	 * Legacy alias for `learned`. Kept so older callers continue to compile;
+	 * new code should read `learned` directly.
+	 */
+	actual: string;
 }
 
-/** Build norm vs actual comparison table. */
+/** Input bundle for today's-actuals column. Optional — when omitted, rows
+ *  fall back to "—" in the `today` slot, matching the prior 2-column behavior. */
+export interface ComparisonTodayInput {
+	/** Wake-to-wake totals so far today (from server `dayTotals`). */
+	dayTotals: SleepDayTotals | null;
+	/** Today's sleep rows so the table can list per-nap actual durations. */
+	todaySleeps: SleepLogRow[];
+	/** Number of naps completed today (excludes active sleep). */
+	completedNapCount: number;
+	/** Number of naps the engine expects in total today. */
+	expectedNapCount: number;
+	/** Blended 7d/30d daily-total target (minutes), or null when sparse. */
+	dailyTrendTotalMin: number | null;
+}
+
+/** Build the metric × source comparison table.
+ *
+ * Three "value sources" coexist per row: today's actuals (when applicable),
+ * the baby's learned-typical, and the age norm. The stats page renders
+ * today's value as the right-aligned punchline; learned + norm sit in the
+ * sub-text underneath.
+ */
 export function buildComparisonTable(
 	ageMonths: number,
 	learned: { napDurationMin: number; nightDurationMin: number; wakeWindowMin: number; bedtimeWakeWindowMin: number; expectedNapCount: number } | null,
+	today?: ComparisonTodayInput,
 ): ComparisonRow[] {
 	const naps = findByAge(NAP_COUNTS, ageMonths);
 	const normNapCount = naps.naps;
@@ -228,52 +260,105 @@ export function buildComparisonTable(
 
 	const rows: ComparisonRow[] = [];
 
-	rows.push({
+	// Today's per-nap durations as a compact list: "1t 53m" or "1t 53m + 45m".
+	const todayNapDurStr = today
+		? formatTodayNapDurations(today.todaySleeps, fc)
+		: undefined;
+	const todayPriorNightStr = today?.dayTotals?.includesPriorNight
+		? fc(today.dayTotals.priorNightMinutes)
+		: undefined;
+	const todayTotalStr = today?.dayTotals && today.dayTotals.totalMinutes > 0
+		? fc(today.dayTotals.totalMinutes)
+		: undefined;
+
+	const napCountTodayStr = today
+		? `${today.completedNapCount} av ${today.expectedNapCount}`
+		: undefined;
+
+	const pushRow = (r: Omit<ComparisonRow, 'actual'>): void => {
+		rows.push({ ...r, actual: r.learned });
+	};
+
+	pushRow({
 		label: 'Lurar',
+		today: napCountTodayStr,
+		learned: learned ? `${babyNapCount}` : '—',
 		norm: `${normNapCount}`,
-		actual: learned ? `${babyNapCount}` : '—',
 		altNorm: alt ? `${babyNapCount}` : undefined,
 	});
 
-	rows.push({
+	pushRow({
 		label: 'Lurvarigheit',
+		today: todayNapDurStr,
+		learned: learned ? fc(learned.napDurationMin) : '—',
 		norm: norm.napDur,
-		actual: learned ? fc(learned.napDurationMin) : '—',
 		altNorm: alt?.napDur,
 	});
 
-	rows.push({
+	pushRow({
 		label: 'Nattesøvn',
+		today: todayPriorNightStr,
+		learned: learned ? fc(learned.nightDurationMin) : '—',
 		norm: norm.nightH,
-		actual: learned ? fc(learned.nightDurationMin) : '—',
 		altNorm: alt?.nightH,
 	});
 
-	rows.push({
+	pushRow({
 		label: 'Vakevindu',
+		learned: learned ? fc(learned.wakeWindowMin) : '—',
 		norm: norm.wakeWindow,
-		actual: learned ? fc(learned.wakeWindowMin) : '—',
 		altNorm: alt?.wakeWindow,
 	});
 
-	rows.push({
+	pushRow({
 		label: 'Før leggetid',
+		learned: learned ? fc(learned.bedtimeWakeWindowMin) : '—',
 		norm: norm.bedtimeWW,
-		actual: learned ? fc(learned.bedtimeWakeWindowMin) : '—',
 		altNorm: alt?.bedtimeWW,
 	});
 
 	const babyTotalMin = learned
 		? learned.nightDurationMin + learned.napDurationMin * learned.expectedNapCount
 		: 0;
-	rows.push({
+	pushRow({
 		label: 'Søvn totalt',
+		today: todayTotalStr,
+		learned: learned ? fc(babyTotalMin) : '—',
 		norm: norm.totalSleep,
-		actual: learned ? fc(babyTotalMin) : '—',
 		altNorm: alt?.totalSleep,
 	});
 
+	if (today?.dailyTrendTotalMin != null) {
+		// Trendmål has no per-day "today" value — the trend IS the multi-day
+		// number. Surface it as the punchline in the today slot so the row
+		// reads naturally against the others, with the label carrying the
+		// time-window framing.
+		pushRow({
+			label: 'Trendmål (7d/30d)',
+			today: fc(today.dailyTrendTotalMin),
+			learned: '—',
+			norm: '—',
+		});
+	}
+
 	return rows;
+}
+
+function formatTodayNapDurations(
+	todaySleeps: SleepLogRow[],
+	fc: (min: number) => string,
+): string | undefined {
+	const completed = todaySleeps.filter(
+		(s) => s.type === 'nap' && s.end_time,
+	);
+	if (completed.length === 0) return undefined;
+	const parts = completed
+		.toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+		.map((s) => {
+			const ms = new Date(s.end_time!).getTime() - new Date(s.start_time).getTime();
+			return fc(Math.round(ms / 60000));
+		});
+	return parts.join(' + ');
 }
 
 // --- Prediction panel ---
