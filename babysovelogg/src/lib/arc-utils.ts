@@ -97,7 +97,12 @@ export interface SleepBubble {
   predictionIndex?: number;
 }
 
-/** Build bubble list from app state inputs. */
+/** Build bubble list from app state inputs.
+ *
+ * `now` is required to filter predicted naps that overlap with the active
+ * sleep — it has to be plumbed in so `composeArc()` stays pure (same inputs
+ * → same outputs). Callers that have no clock context can pass `new Date()`.
+ */
 export function collectBubbles(
   todaySleeps: Array<{ start_time: string; end_time: string | null; type: "nap" | "night" }>,
   activeSleep: {
@@ -111,6 +116,7 @@ export function collectBubbles(
     bedtime?: string;
     predictedNaps?: Array<{ startTime: string; endTime: string }>;
   } | null,
+  now: Date,
 ): SleepBubble[] {
   const bubbles: SleepBubble[] = [];
 
@@ -146,7 +152,7 @@ export function collectBubbles(
     const activeEndMs = activeSleep
       ? (activeSleep.isPaused && activeSleep.pauseTime
           ? new Date(activeSleep.pauseTime).getTime()
-          : Date.now())
+          : now.getTime())
       : 0;
     prediction!.predictedNaps!.forEach((pred, idx) => {
       // Skip predictions that overlap with the active sleep

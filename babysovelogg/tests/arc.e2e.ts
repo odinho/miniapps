@@ -63,7 +63,9 @@ test("Active sleep has pulsing animation class", async ({ page }) => {
 
   await page.goto("/");
   await expect(page.locator(".sleep-arc")).toBeVisible();
-  await expect(page.locator(".arc-bubble-active")).toHaveCount(1);
+  // Active sleep is visualised either as a bubble on the arc or — when it
+  // hugs an endpoint — as a halo around the endpoint icon. Both wear the
+  // `arc-active-pulse` class.
   await expect(page.locator(".arc-active-pulse")).toHaveCount(1);
 });
 
@@ -128,9 +130,10 @@ test("Starting nap via UI shows active bubble on arc", async ({ page }) => {
   // Dismiss the tag sheet that appears
   await dismissSheet(page);
 
-  // Active bubble must be visible on the arc
-  await expect(page.locator(".arc-bubble-active")).toHaveCount(1, { timeout: 5000 });
-  await expect(page.locator(".arc-active-pulse")).toHaveCount(1);
+  // Active sleep is visualised either as a bubble on the arc or — when it
+  // hugs an endpoint — as a halo on the endpoint icon. Both wear
+  // `arc-active-pulse`.
+  await expect(page.locator(".arc-active-pulse")).toHaveCount(1, { timeout: 5000 });
 });
 
 test("Active bubble persists after navigating away and back", async ({ page }) => {
@@ -141,16 +144,15 @@ test("Active bubble persists after navigating away and back", async ({ page }) =
   addActiveSleep(babyId, today.toISOString(), "nap");
 
   await page.goto("/");
-  await expect(page.locator(".arc-bubble-active")).toHaveCount(1);
+  await expect(page.locator(".arc-active-pulse")).toHaveCount(1);
 
   // Navigate away and back — dashboard re-renders from current state
   await page.goto("/history");
   await page.waitForTimeout(300);
   await page.goto("/");
 
-  // Active bubble should still be on the arc after re-render
-  await expect(page.locator(".arc-bubble-active")).toHaveCount(1, { timeout: 5000 });
-  await expect(page.locator(".arc-active-pulse")).toHaveCount(1);
+  // Active sleep should still be on the arc after re-render
+  await expect(page.locator(".arc-active-pulse")).toHaveCount(1, { timeout: 5000 });
 });
 
 test("Active bubble survives offline event + SSE reconnect", async ({ page }) => {
@@ -169,13 +171,12 @@ test("Active bubble survives offline event + SSE reconnect", async ({ page }) =>
   await expect(page.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 5000 });
   await dismissSheet(page);
 
-  // Active bubble should appear from optimistic state
-  await expect(page.locator(".arc-bubble-active")).toHaveCount(1, { timeout: 5000 });
+  // Active sleep should appear from optimistic state
+  await expect(page.locator(".arc-active-pulse")).toHaveCount(1, { timeout: 5000 });
 
-  // Come back online — this should flush the queue and keep the active bubble
+  // Come back online — this should flush the queue and keep the active sleep
   await page.context().setOffline(false);
   await page.waitForTimeout(1000);
 
-  // Active bubble should still be present
-  await expect(page.locator(".arc-bubble-active")).toHaveCount(1);
+  await expect(page.locator(".arc-active-pulse")).toHaveCount(1);
 });

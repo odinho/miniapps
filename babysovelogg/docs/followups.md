@@ -11,65 +11,6 @@ multi-day testing, the unit-of-work flow — live in
 is for tracked product/engine/test work.
 
 
-## Trend intervention-target split — stage 5+ followups
-
-Source: 2026-05-20 design at `local/codex-trend-split-design.md` and
-the stage-3/stage-4 reviews. Stages 1–4 shipped: held intervention
-target with anti-ratchet drift, persistence, napBudget + cap-respect
-wired. Closed-loop test passes (30 days of cap-following hold the
-target within 15 min). Remaining items:
-
-- **Drift epoch gate is time-based, not data-based.** Currently same
-  UTC day → no-op. A data-based gate (`evaluatedThroughDate` /
-  fingerprint of the latest classified completed day) would also
-  catch "same date, but the parent logged a self-wake nap that
-  flipped the natural-support streak" properly. File:
-  `src/lib/engine/trend.ts:337-340`.
-
-- **Policy-affected classifier uses observed as the near-target
-  reference.** Held target and observed diverge once cap-following
-  begins; the classifier still uses observed. Under target-5+jitter
-  this lines up; if we ever switch to held target without explicit
-  cap-event attribution, the test that pins this becomes a
-  tautology. Real fix is cap-event persistence (log when napBudget
-  fires and the parent acted on it). File:
-  `src/lib/engine/trend.ts:200-218`.
-
-- **UI / API copy still says observed trend is the cap target.**
-  `dailyTrendTotalMin` is preserved for one release as
-  `observedRecentMin`; `NapBudget.context.blendedTrendMin` now ships
-  intervention; `SleepInsightsCard` labels say "Trendmål" against
-  what is now observed. Audit + update copy:
-  `src/lib/components/SleepInsightsCard.svelte:74,82-87`,
-  `src/routes/+page.svelte:600`,
-  `src/lib/stores/app.svelte.ts:103-111`.
-
-- **Backtest harness uses observed, not held intervention target.**
-  `src/lib/engine/backtest.ts` doesn't replay `TrendTargetState`. For
-  historical schedule validation this is fine — that's the right
-  semantic for an unattended observer. For "did the held target
-  improve outcomes vs the observed baseline?" we'd need a stateful
-  replay that carries `TrendTargetState` across days. Followup if
-  the question matters.
-
-- **Low-confidence firm caps.** Currently a `firm` urgency cap can
-  fire from a low-confidence intervention target. Codex flags this
-  as a product decision rather than a bug — if confidence should
-  cap urgency at `advisory` when the held target is low-confidence,
-  add the gate in `src/lib/engine/nap-budget.ts:225-229`.
-
-- **`source`/`confidence` semantics are loose.** `state.source`
-  stays `"observed-initial"` after upward natural drift; `"high"`
-  confidence is unreachable. Acceptable while not user-facing; fix
-  if/when the diagnostics surface to UI.
-
-- **Sleep-day bucketing for trend / off-day expansion.** Codex flags
-  the current calendar-day start-anchored bucketing + symmetric
-  off-day expansion (drop date + previous date) as imprecise. The
-  better shape: trend bucketing follows sleep-days (overnight ending
-  on the morning belongs to that sleep-day), off-day exclusion
-  becomes single-day, classification stays aligned.
-
 ## Cycle estimator v2 — replace the subharmonic finder
 
 Source: 2026-05-20 Codex investigation (`local/codex-cycle-estimator.md`)
@@ -481,68 +422,32 @@ These are non-bug improvements both reviewers want:
 - `nextNap` consistency across shuffled `todaySleeps` order (currently
   every test assumes prod's DESC ordering).
 
-## Arc test coverage — keep visual-rendering regressions from slipping
+## Arc visual rendering — what landed 2026-05-17
 
-The Arc has now regressed three times on rendering bugs the unit
-tests couldn't catch (1: night-mode duplicate "06:00 / 06:03" wake
-labels; 2: post-bedtime overrun visualisation; 3: 2026-05-17 — peach
-wake-band in night mode cued as "elapsed paint", invisible 13-min
-active bubble, marker/endpoint label duplicate when wakeFrac fell
-inside `1 - ARC_ENDPOINT_PROXIMITY`). Each time we landed a fix and
-each time the unit tests passed before *and* after — because the
-tests cover `arc-utils.ts` math (`timeToArcFraction`,
-`isAtArcEndpoint`, `fracToPoint`) but not what the SVG component
-actually composes from those primitives.
+Levels #1 and #2 from the prior proposal shipped:
 
-Three levels of coverage to consider, picking the lightest first:
+- `src/lib/arc-scene.ts` — pure `composeArc({...}): ArcScene`. All
+  geometry rules (very-short→dot, endpoint-proximity marker dedup,
+  active wake-band colour, overrun behaviour, endpoint-halo for
+  near-endpoint active sleeps) live here.
+- `tests/unit/arc-scene.unit.ts` — object-level assertions on the
+  four canonical scenarios plus the orthogonality of skipped/rescue.
+- `Arc.svelte` consumes the scene and is mostly markup now. Endpoint
+  icons now render *after* bubbles so a near-endpoint bubble cap no
+  longer fuses with the endpoint glow (the 2026-05-17 screenshot
+  complaint). Wake target became a small dot at the bubble outer
+  edge + label, replacing the disconnected perpendicular tick.
+- `/dev/arc-scenes` page with 8 canonical scenes on a deterministic
+  clock. `tests/arc-scenes.e2e.ts` pins each as its own
+  `toHaveScreenshot()` so diffs stay scoped.
+- `playwright.config.ts` now uses the full Chromium binary + Oslo
+  TZ; the headless-shell variant had a TZ bug where `getHours()`
+  read UTC even with `timezoneId: 'Europe/Oslo'`. Documented inline.
 
-1. **Snapshot the rendered-element bundle, not the SVG string.**
-   `Arc.svelte` already derives a structured `renderedBubbles[]`,
-   `plannedTrack`, `activeWakeBandPath`, plus geometry for the now-
-   marker, skipped blob, and rescue blob. Extract those derivations
-   into a pure `composeArc({sleeps, activeSleep, prediction, now,
-   config})` returning a plain `ArcScene` object — bubbles with their
-   labels, paths, colours, dot/path discriminator, marker visibility,
-   wake-band fraction range. Then assert *that object* in unit tests
-   for the scenarios that have bitten us:
-   - Active night sleep at +13 min: bubble dot rendered, wake-band
-     coloured `var(--moon)`, marker suppressed because its label
-     equals the right-endpoint label.
-   - Active nap mid-cycle: bubble path present, wake-band peach,
-     marker only when its label differs from the endpoint.
-   - Cut-short → continuation: rescue blob present, skipped blob
-     absent.
-   - Post-bedtime overrun: now-marker still visible, planned-track
-     tick still visible past the bubble end.
-   This catches the dedup/color/visibility class of bug without a
-   browser. The composition function would be the single home for
-   the rules currently scattered across the Svelte component.
+Level #3 (ASCII renderer) is still open if anyone wants it.
 
-2. **Playwright visual snapshots for a handful of canonical scenes.**
-   `arc.e2e.ts` already exists; today it asserts "arc visible" but
-   not what's *in* it. Pin 6-8 canonical scenes (active nap mid-
-   cycle, active night just-started, after-bedtime with cycle hint,
-   skipped + rescue blob, etc.) with `expect(arc).toHaveScreenshot()`
-   on a deterministic clock. Costs a screenshot diff CI step; in
-   return, the kind of bug a screenshot would show but
-   `composeArc({})` might not (e.g. SVG stacking order, opacity
-   compositing, `<text>` baseline alignment with non-Latin chars).
-
-3. **A small CLI dev surface that prints `ArcScene` as ASCII.** Like
-   the `renderTimeline` follow-up above but for the arc — top of the
-   clock, two endpoints, "now" tick, bubbles between, marker labels.
-   Cheap, debuggable in a terminal, useful in commit messages.
-
-Recommendation: start with #1. The 2026-05-17 bugs were all
-expressible as object-level assertions (`expect(scene.wakeBand.color
-).toBe('moon')`, `expect(scene.markers.find(m => m.label === '05:49').
-length).toBe(1)`). The composition extraction is also useful on its
-own — `Arc.svelte`'s logic gets pure, the Svelte file shrinks to
-mostly markup.
-
-Concrete first targets if/when this gets picked up:
-- `src/lib/arc-scene.ts` exporting `composeArc({sleeps, activeSleep,
-  prediction, now, config}): ArcScene`.
-- `tests/unit/arc-scene.unit.ts` with the four scenarios above.
-- Migrate `Arc.svelte` to consume the helper instead of computing
-  inline (no behaviour change, mostly a move).
+Open follow-up: the autoMorning fixture (`Date.prototype.getHours =
+() => 8`) collides with deterministic time-of-day scenes. The
+arc-scenes test opts out via a per-file fixture override. Worth
+considering a more surgical fixture (e.g. forceTime(hour, minute))
+for tests that need stable clocks without flattening every Date.

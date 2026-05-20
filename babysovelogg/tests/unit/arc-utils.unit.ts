@@ -125,11 +125,14 @@ describe("describeArc", () => {
 });
 
 describe("collectBubbles", () => {
+  const NOW = new Date("2026-03-27T12:00:00");
+
   it("collects completed sleeps", () => {
     const bubbles = collectBubbles(
       [{ start_time: "2026-03-27T09:00:00", end_time: "2026-03-27T10:00:00", type: "nap" }],
       null,
       null,
+      NOW,
     );
     expect(bubbles).toHaveLength(1);
     expect(bubbles[0].status).toBe("completed");
@@ -141,6 +144,7 @@ describe("collectBubbles", () => {
       [{ start_time: "2026-03-27T09:00:00", end_time: null, type: "nap" }],
       { start_time: "2026-03-27T09:00:00", type: "nap" },
       null,
+      NOW,
     );
     // The open-ended sleep is skipped, but active is added
     expect(bubbles).toHaveLength(1);
@@ -152,6 +156,7 @@ describe("collectBubbles", () => {
       [],
       { start_time: "2026-03-27T09:00:00", type: "nap", isPaused: true, pauseTime: "2026-03-27T09:30:00" },
       null,
+      NOW,
     );
     expect(bubbles).toHaveLength(1);
     expect(bubbles[0].status).toBe("active");
@@ -169,6 +174,7 @@ describe("collectBubbles", () => {
           { startTime: "2026-03-27T15:30:00", endTime: "2026-03-27T16:15:00" },
         ],
       },
+      NOW,
     );
     expect(bubbles).toHaveLength(2);
     expect(bubbles[0].status).toBe("predicted");
@@ -181,6 +187,7 @@ describe("collectBubbles", () => {
       [],
       null,
       { nextNap: "2026-03-27T13:00:00" },
+      NOW,
     );
     expect(bubbles).toHaveLength(1);
     expect(bubbles[0].status).toBe("predicted");
@@ -193,9 +200,32 @@ describe("collectBubbles", () => {
       [],
       { start_time: "2026-03-27T09:00:00", type: "nap" },
       { nextNap: "2026-03-27T13:00:00" },
+      NOW,
     );
     expect(bubbles).toHaveLength(1);
     expect(bubbles[0].status).toBe("active");
+  });
+
+  it("filters out predicted naps that overlap with an active sleep using the passed-in clock", () => {
+    // Active sleep started at 12:00 and is ongoing. Now is 12:30. Predicted
+    // naps starting before 12:30 must be dropped — and the filter must use
+    // the explicit `now`, not Date.now(). This pins the purity contract.
+    const bubbles = collectBubbles(
+      [],
+      { start_time: "2026-03-27T12:00:00", type: "nap" },
+      {
+        nextNap: "2026-03-27T12:15:00",
+        predictedNaps: [
+          { startTime: "2026-03-27T12:15:00", endTime: "2026-03-27T13:00:00" }, // before now → drop
+          { startTime: "2026-03-27T15:00:00", endTime: "2026-03-27T15:45:00" }, // after now → keep
+        ],
+      },
+      new Date("2026-03-27T12:30:00"),
+    );
+    expect(bubbles.filter((b) => b.status === "predicted")).toHaveLength(1);
+    expect(bubbles.find((b) => b.status === "predicted")!.startTime).toEqual(
+      new Date("2026-03-27T15:00:00"),
+    );
   });
 
   it("emits bedtime ghost when nextNap points to a real future nap distinct from bedtime", () => {
@@ -210,13 +240,13 @@ describe("collectBubbles", () => {
       predictedNaps: [
         { startTime: "2026-03-27T13:00:00", endTime: "2026-03-27T13:45:00" },
       ],
-    });
+    }, NOW);
     expect(withNaps.filter((b) => b.type === "night")).toHaveLength(0);
 
     const onlyBedtimeFuture = collectBubbles([], null, {
       nextNap: "2026-03-27T13:00:00",
       bedtime: "2026-03-27T19:00:00",
-    });
+    }, NOW);
     const nightBubbles = onlyBedtimeFuture.filter((b) => b.type === "night");
     expect(nightBubbles).toHaveLength(1);
     expect(nightBubbles[0].status).toBe("predicted");
@@ -230,7 +260,7 @@ describe("collectBubbles", () => {
     const bubbles = collectBubbles([], null, {
       nextNap: "2026-03-27T18:30:00",
       bedtime: "2026-03-27T18:30:00",
-    });
+    }, NOW);
     expect(bubbles.filter((b) => b.status === "predicted")).toHaveLength(0);
   });
 });
