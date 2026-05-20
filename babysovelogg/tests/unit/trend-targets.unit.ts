@@ -323,6 +323,44 @@ describe("computeTrendTargets (stage 1: API only)", () => {
     expect(observedDrop).toBeLessThan(15);
   });
 
+  it("drifts downward (slowly) when natural self-woke days consistently support it", () => {
+    // The held target is not frozen — when the parent has genuine
+    // self-wake days well below the held target for two consecutive
+    // evaluations, the engine should step the target down by ≤ 10 min
+    // and tag the source `"natural-days"`. Proves the anti-ratchet
+    // protection doesn't lock the baby out of legitimate downward
+    // adjustment.
+    const history: SleepEntry[] = [];
+    for (let d = 0; d < 14; d++) {
+      // Self-woke days at 740 min (40 below the seeded 780 target).
+      history.push(...naturalDayAt(isoOffset("2026-04-01", d), 740, "self"));
+    }
+
+    const day1 = noonUtc(isoOffset("2026-04-15", 0));
+    const day2 = noonUtc(isoOffset("2026-04-15", 1));
+    const prior: TrendTargetState = {
+      targetMin: 780,
+      baselineMin: 780,
+      source: "observed-initial",
+      confidence: "medium",
+      naturalSupportStreak: 0,
+      updatedAt: new Date(day1 - 86400_000).toISOString(),
+    };
+
+    // First evaluation — builds the streak, target holds.
+    const r1: NonNullable<ReturnType<typeof computeTrendTargets>> =
+      computeTrendTargets(last30(history, day1), ctxForCtxBase(last30(history, day1)), day1, prior)!;
+    expect(r1.interventionTargetMin).toBe(780);
+    expect(r1.state.naturalSupportStreak).toBe(1);
+
+    // Second evaluation (next day, fresh data) — streak satisfied, step down.
+    const r2: NonNullable<ReturnType<typeof computeTrendTargets>> =
+      computeTrendTargets(last30(history, day2), ctxForCtxBase(last30(history, day2)), day2, r1.state)!;
+    expect(r2.interventionTargetMin).toBeLessThan(780);
+    expect(780 - r2.interventionTargetMin).toBeLessThanOrEqual(10);
+    expect(r2.state.source).toBe("natural-days");
+  });
+
   it("drifts upward faster when natural higher-need days arrive", () => {
     // 7 natural days at 780, then 7 natural days at 820 (+40 min trend up).
     const history: SleepEntry[] = [];

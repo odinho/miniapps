@@ -11,6 +11,65 @@ multi-day testing, the unit-of-work flow — live in
 is for tracked product/engine/test work.
 
 
+## Trend intervention-target split — stage 5+ followups
+
+Source: 2026-05-20 design at `local/codex-trend-split-design.md` and
+the stage-3/stage-4 reviews. Stages 1–4 shipped: held intervention
+target with anti-ratchet drift, persistence, napBudget + cap-respect
+wired. Closed-loop test passes (30 days of cap-following hold the
+target within 15 min). Remaining items:
+
+- **Drift epoch gate is time-based, not data-based.** Currently same
+  UTC day → no-op. A data-based gate (`evaluatedThroughDate` /
+  fingerprint of the latest classified completed day) would also
+  catch "same date, but the parent logged a self-wake nap that
+  flipped the natural-support streak" properly. File:
+  `src/lib/engine/trend.ts:337-340`.
+
+- **Policy-affected classifier uses observed as the near-target
+  reference.** Held target and observed diverge once cap-following
+  begins; the classifier still uses observed. Under target-5+jitter
+  this lines up; if we ever switch to held target without explicit
+  cap-event attribution, the test that pins this becomes a
+  tautology. Real fix is cap-event persistence (log when napBudget
+  fires and the parent acted on it). File:
+  `src/lib/engine/trend.ts:200-218`.
+
+- **UI / API copy still says observed trend is the cap target.**
+  `dailyTrendTotalMin` is preserved for one release as
+  `observedRecentMin`; `NapBudget.context.blendedTrendMin` now ships
+  intervention; `SleepInsightsCard` labels say "Trendmål" against
+  what is now observed. Audit + update copy:
+  `src/lib/components/SleepInsightsCard.svelte:74,82-87`,
+  `src/routes/+page.svelte:600`,
+  `src/lib/stores/app.svelte.ts:103-111`.
+
+- **Backtest harness uses observed, not held intervention target.**
+  `src/lib/engine/backtest.ts` doesn't replay `TrendTargetState`. For
+  historical schedule validation this is fine — that's the right
+  semantic for an unattended observer. For "did the held target
+  improve outcomes vs the observed baseline?" we'd need a stateful
+  replay that carries `TrendTargetState` across days. Followup if
+  the question matters.
+
+- **Low-confidence firm caps.** Currently a `firm` urgency cap can
+  fire from a low-confidence intervention target. Codex flags this
+  as a product decision rather than a bug — if confidence should
+  cap urgency at `advisory` when the held target is low-confidence,
+  add the gate in `src/lib/engine/nap-budget.ts:225-229`.
+
+- **`source`/`confidence` semantics are loose.** `state.source`
+  stays `"observed-initial"` after upward natural drift; `"high"`
+  confidence is unreachable. Acceptable while not user-facing; fix
+  if/when the diagnostics surface to UI.
+
+- **Sleep-day bucketing for trend / off-day expansion.** Codex flags
+  the current calendar-day start-anchored bucketing + symmetric
+  off-day expansion (drop date + previous date) as imprecise. The
+  better shape: trend bucketing follows sleep-days (overnight ending
+  on the morning belongs to that sleep-day), off-day exclusion
+  becomes single-day, classification stays aligned.
+
 ## Cycle estimator v2 — replace the subharmonic finder
 
 Source: 2026-05-20 Codex investigation (`local/codex-cycle-estimator.md`)
