@@ -83,7 +83,7 @@ describe('buildEndSleep', () => {
 
 	it('creates a sleep.ended event', () => {
 		const sleep = makeSleep();
-		const result = buildEndSleep(sleep, 1);
+		const result = buildEndSleep(sleep);
 
 		expect(result.events[0].type).toBe('sleep.ended');
 		expect(result.events[0].payload.sleepDomainId).toBe('slp_test1');
@@ -93,7 +93,7 @@ describe('buildEndSleep', () => {
 
 	it('returns a snapshot of the sleep', () => {
 		const sleep = makeSleep({ mood: 'normal' });
-		const result = buildEndSleep(sleep, 1);
+		const result = buildEndSleep(sleep);
 		expect(result.sleepSnapshot).toEqual(sleep);
 		// Should be a copy, not the same reference
 		expect(result.sleepSnapshot).not.toBe(sleep);
@@ -101,7 +101,7 @@ describe('buildEndSleep', () => {
 
 	it('only emits sleep.ended for night sleep (no day.started)', () => {
 		const sleep = makeSleep({ type: 'night' });
-		const result = buildEndSleep(sleep, 1);
+		const result = buildEndSleep(sleep);
 		expect(result.events).toHaveLength(1);
 		expect(result.events[0].type).toBe('sleep.ended');
 	});

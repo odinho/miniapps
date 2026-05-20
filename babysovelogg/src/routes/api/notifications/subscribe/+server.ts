@@ -1,8 +1,7 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types.js";
-import { db } from "$lib/server/db.js";
+import { db, getCurrentBaby } from "$lib/server/db.js";
 import { safeJson } from "$lib/server/request-helpers.js";
-import type { Baby } from "$lib/types.js";
 
 interface SubscribeBody {
   subscription: {
@@ -13,7 +12,7 @@ interface SubscribeBody {
 }
 
 export const POST: RequestHandler = async ({ request }) => {
-  const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby | undefined;
+  const baby = getCurrentBaby();
   if (!baby) return json({ error: "no_baby" }, { status: 400 });
 
   const body = await safeJson<SubscribeBody>(request);

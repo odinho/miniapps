@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { DiaperLogRow } from '$lib/types.js';
 	import { sync } from '$lib/stores/sync.svelte.js';
 	import { appState } from '$lib/stores/app.svelte.js';
 	import { MOODS, METHODS, FALL_ASLEEP_BUCKETS } from '$lib/constants.js';
@@ -14,13 +13,13 @@
 	interface Props {
 		sleepDomainId: string;
 		startTime: string;
-		diapers: DiaperLogRow[];
+		lastDiaperTime: string | null;
 		pottyMode?: boolean;
 		onClose?: () => void;
 		onOpenDiaper?: () => void;
 	}
 
-	let { sleepDomainId, startTime, diapers, pottyMode = false, onClose, onOpenDiaper }: Props =
+	let { sleepDomainId, startTime, lastDiaperTime, pottyMode = false, onClose, onOpenDiaper }: Props =
 		$props();
 
 	let mood = $state<string | null>(null);
@@ -34,7 +33,7 @@
 	let busy = $state(false);
 
 	const displayTime = $derived(formatTime(adjustedStartTime));
-	const showDiaperNudge = $derived(shouldShowDiaperNudge(diapers));
+	const showDiaperNudge = $derived(shouldShowDiaperNudge(lastDiaperTime));
 
 	const latencyFeedback = $derived.by(() => {
 		if (!fallAsleepTime) return null;

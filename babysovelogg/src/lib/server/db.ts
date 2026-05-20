@@ -1,5 +1,6 @@
 import { Database as BunDatabase } from "bun:sqlite";
 import path from "path";
+import type { Baby } from "$lib/types.js";
 
 /** Minimal SQLite interface matching the subset used by this app. */
 export interface SqliteStatement {
@@ -16,6 +17,16 @@ export interface SqliteDb {
 }
 
 export let db: SqliteDb;
+
+/** Idempotently add a column. SQLite errors on duplicate ADD COLUMN; treat
+ *  that case as a successful no-op so initSchema can run on every boot. */
+function tryAddColumn(database: SqliteDb, table: string, column: string, type: string) {
+  try {
+    database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+  } catch {
+    // Column already exists — ignore.
+  }
+}
 
 function initSchema(database: SqliteDb) {
   database.exec(`
@@ -96,34 +107,14 @@ function initSchema(database: SqliteDb) {
     );
   `);
 
-  // Migration: add timezone column to existing baby tables
-  try {
-    database.exec("ALTER TABLE baby ADD COLUMN timezone TEXT");
-  } catch {
-    // Column already exists — ignore
-  }
-
-  // Migration: add target_bedtime column
-  try {
-    database.exec("ALTER TABLE baby ADD COLUMN target_bedtime TEXT");
-  } catch {
-    // Column already exists — ignore
-  }
+  // Migrations: add late-added columns idempotently.
+  tryAddColumn(database, "baby", "timezone", "TEXT");
+  tryAddColumn(database, "baby", "target_bedtime", "TEXT");
+  tryAddColumn(database, "sleep_log", "onset_note", "TEXT");
+  tryAddColumn(database, "sleep_log", "wake_mood", "TEXT");
 
   // Migration: merge "happy" mood into "normal"
   database.exec("UPDATE sleep_log SET mood = 'normal' WHERE mood = 'happy'");
-
-  // Migration: add onset_note and wake_mood columns
-  try {
-    database.exec("ALTER TABLE sleep_log ADD COLUMN onset_note TEXT");
-  } catch {
-    // Column already exists — ignore
-  }
-  try {
-    database.exec("ALTER TABLE sleep_log ADD COLUMN wake_mood TEXT");
-  } catch {
-    // Column already exists — ignore
-  }
 
   // Migration: simplify latency buckets (4→3, aligned with Galland 2012)
   database.exec("UPDATE sleep_log SET fall_asleep_time = '5-20' WHERE fall_asleep_time = '5-15'");
@@ -145,16 +136,8 @@ function initSchema(database: SqliteDb) {
 
   // Migration: add off_day flag for sick/travel/spurt days. Trend math
   // skips flagged days so a worst week doesn't pull recommendations sideways.
-  try {
-    database.exec("ALTER TABLE day_start ADD COLUMN off_day INTEGER NOT NULL DEFAULT 0");
-  } catch {
-    // Column already exists — ignore
-  }
-  try {
-    database.exec("ALTER TABLE day_start ADD COLUMN off_day_reason TEXT");
-  } catch {
-    // Column already exists — ignore
-  }
+  tryAddColumn(database, "day_start", "off_day", "INTEGER NOT NULL DEFAULT 0");
+  tryAddColumn(database, "day_start", "off_day_reason", "TEXT");
 
   database.exec(`
     CREATE TABLE IF NOT EXISTS notification_subscriptions (
@@ -230,6 +213,13 @@ export function closeDb() {
   try {
     db?.close();
   } catch {}
+}
+
+/** Return the most-recently-created baby, or undefined if none exists. The
+ *  app is currently single-baby; route handlers and the state assembler all
+ *  read "the current baby" via this query. */
+export function getCurrentBaby(): Baby | undefined {
+  return db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby | undefined;
 }
 
 // Auto-initialize for production

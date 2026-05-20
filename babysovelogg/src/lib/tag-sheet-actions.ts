@@ -1,5 +1,3 @@
-import type { DiaperLogRow } from '$lib/types.js';
-
 /** Payload for a sleep.tagged event. */
 export type TagPayload = {
 	sleepDomainId: string;
@@ -66,16 +64,11 @@ export function nudgeTime(isoTime: string, minutes: number): string {
 
 /** Check if a diaper nudge should be shown. Returns true if no diaper logged in the last `thresholdMs`. */
 export function shouldShowDiaperNudge(
-	diapers: DiaperLogRow[],
+	lastDiaperTime: string | null,
 	thresholdMs: number = 2 * 60 * 60 * 1000,
 ): boolean {
-	if (diapers.length === 0) return true;
-	const now = Date.now();
-	const latest = diapers.reduce((max, d) => {
-		const t = new Date(d.time).getTime();
-		return t > max ? t : max;
-	}, 0);
-	return now - latest > thresholdMs;
+	if (!lastDiaperTime) return true;
+	return Date.now() - new Date(lastDiaperTime).getTime() > thresholdMs;
 }
 
 /** Collect all events to send when the tag sheet is dismissed. */

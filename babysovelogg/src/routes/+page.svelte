@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { SleepLogRow, DiaperLogRow } from '$lib/types.js';
+	import type { SleepLogRow } from '$lib/types.js';
 	import { goto } from '$app/navigation';
 	import { appState } from '$lib/stores/app.svelte.js';
 	import { sync } from '$lib/stores/sync.svelte.js';
@@ -251,14 +251,6 @@
 		// Day: end = predicted bedtime
 		return prediction?.bedtime ? formatTime(prediction.bedtime) : null;
 	});
-
-	// Synthesize a minimal DiaperLogRow array for TagSheet's diaper nudge check.
-	// The nudge only needs the latest diaper time — we don't have the full array in state.
-	const diaperStub = $derived<DiaperLogRow[]>(
-		s.lastDiaperTime
-			? [{ id: 0, baby_id: baby?.id ?? 0, time: s.lastDiaperTime, type: '', amount: null, note: null, deleted: 0, domain_id: '', created_by_event_id: null, updated_by_event_id: null }]
-			: [],
-	);
 
 	// --- live stats (includes active sleep contribution) ---
 	let now = $state(Date.now());
@@ -740,7 +732,7 @@
 		<TagSheet
 			sleepDomainId={tagSheetSleepId}
 			startTime={tagSheetStartTime}
-			diapers={diaperStub}
+			lastDiaperTime={s.lastDiaperTime}
 			{pottyMode}
 			onClose={onTagSheetClose}
 			onOpenDiaper={onTagSheetOpenDiaper}

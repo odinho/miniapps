@@ -79,7 +79,7 @@ export function reconcileNotifications(state: ReconcileInput): void {
   const pred = state.prediction;
   const isNappingActive = !!(active && active.type === "nap" && !active.end_time);
   const isAwake = !active || !!active.end_time;
-  const tz = baby.timezone ?? "Europe/Oslo";
+  const tz = baby.timezone ?? "UTC";
 
   // ── Nap budget cap (trend-anchored) ─────────────────────────────
   // Fires when the engine recommends a cap and it's `firm` urgency

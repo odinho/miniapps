@@ -1,8 +1,7 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types.js";
-import { db } from "$lib/server/db.js";
+import { getCurrentBaby } from "$lib/server/db.js";
 import { safeJson } from "$lib/server/request-helpers.js";
-import type { Baby } from "$lib/types.js";
 import {
   getPrefs,
   setPrefs,
@@ -12,13 +11,13 @@ import {
 } from "$lib/server/notification-prefs.js";
 
 export const GET: RequestHandler = () => {
-  const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby | undefined;
+  const baby = getCurrentBaby();
   if (!baby) return json({ error: "no_baby" }, { status: 400 });
   return json({ prefs: getPrefs(baby.id), kinds: ALL_KINDS });
 };
 
 export const PUT: RequestHandler = async ({ request }) => {
-  const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby | undefined;
+  const baby = getCurrentBaby();
   if (!baby) return json({ error: "no_baby" }, { status: 400 });
 
   const body = await safeJson<Partial<NotificationPrefs>>(request);

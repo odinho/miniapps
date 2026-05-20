@@ -17,7 +17,6 @@ export type ConnectionStatus = "disconnected" | "connecting" | "connected";
 interface DomainEvent {
 	type: string;
 	payload: Record<string, unknown>;
-	domainId?: string;
 }
 
 function createSync() {
@@ -185,7 +184,6 @@ function createSync() {
 				payload: e.payload,
 				clientId,
 				clientEventId: generateId(),
-				...(e.domainId ? { domainId: e.domainId } : {}),
 			}));
 
 			// Try the network request — only queue offline on actual network failure

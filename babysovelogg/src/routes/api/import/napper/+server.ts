@@ -1,15 +1,14 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types.js";
-import { db } from "$lib/server/db.js";
+import { getCurrentBaby } from "$lib/server/db.js";
 import { processBatchTx } from "$lib/server/events.js";
 import { parseNapperCsv, mapNapperToEvents } from "$lib/server/import-napper.js";
 import { getState } from "$lib/server/state.js";
 import { broadcast } from "$lib/server/broadcast.js";
-import type { Baby } from "$lib/types.js";
 
 export const POST: RequestHandler = async ({ request }) => {
   try {
-    const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby | undefined;
+    const baby = getCurrentBaby();
     if (!baby) return json({ error: "No baby configured" }, { status: 404 });
 
     const csvBody = await request.text();

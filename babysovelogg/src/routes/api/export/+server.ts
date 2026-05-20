@@ -1,7 +1,7 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types.js";
-import { db } from "$lib/server/db.js";
-import type { Baby, SleepLogRow, SleepPauseRow } from "$lib/types.js";
+import { db, getCurrentBaby } from "$lib/server/db.js";
+import type { SleepLogRow, SleepPauseRow } from "$lib/types.js";
 
 function csvField(value: string): string {
   if (value.includes(",") || value.includes('"') || value.includes("\n")) {
@@ -11,7 +11,7 @@ function csvField(value: string): string {
 }
 
 export const GET: RequestHandler = ({ url }) => {
-  const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby | undefined;
+  const baby = getCurrentBaby();
   if (!baby) return json({ error: "No baby configured" }, { status: 404 });
 
   const format = url.searchParams.get("format") || "json";

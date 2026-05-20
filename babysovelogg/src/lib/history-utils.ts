@@ -270,7 +270,6 @@ export function buildSleepUpdateEvent(payload: SleepUpdatePayload) {
 			wakeMood: payload.wakeMood,
 			notes: payload.notes || null,
 		},
-		domainId: payload.sleepDomainId,
 	};
 }
 
@@ -278,7 +277,6 @@ export function buildSleepDeleteEvent(sleepDomainId: string) {
 	return {
 		type: 'sleep.deleted',
 		payload: { sleepDomainId },
-		domainId: sleepDomainId,
 	};
 }
 
@@ -302,7 +300,6 @@ export function buildDiaperUpdateEvent(payload: DiaperUpdatePayload) {
 			...(payload.note !== undefined ? { note: payload.note } : {}),
 			...(payload.time ? { time: payload.time } : {}),
 		},
-		domainId: payload.diaperDomainId,
 	};
 }
 
@@ -310,7 +307,6 @@ export function buildDiaperDeleteEvent(diaperDomainId: string) {
 	return {
 		type: 'diaper.deleted',
 		payload: { diaperDomainId },
-		domainId: diaperDomainId,
 	};
 }
 

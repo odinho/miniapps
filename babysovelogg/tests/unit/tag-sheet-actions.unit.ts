@@ -8,23 +8,6 @@ import {
 	shouldShowDiaperNudge,
 	collectTagSheetEvents,
 } from '$lib/tag-sheet-actions.js';
-import type { DiaperLogRow } from '$lib/types.js';
-
-function makeDiaper(overrides: Partial<DiaperLogRow> = {}): DiaperLogRow {
-	return {
-		id: 1,
-		baby_id: 1,
-		time: '2026-03-27T12:00:00.000Z',
-		type: 'wet',
-		amount: null,
-		note: null,
-		deleted: 0,
-		domain_id: 'dip_test1',
-		created_by_event_id: null,
-		updated_by_event_id: null,
-		...overrides,
-	};
-}
 
 describe('buildTagEvent', () => {
 	it('returns null when nothing is selected', () => {
@@ -125,43 +108,30 @@ describe('shouldShowDiaperNudge', () => {
 	});
 	afterEach(() => setSystemTime());
 
-	it('shows nudge when no diapers exist', () => {
-		expect(shouldShowDiaperNudge([])).toBe(true);
+	it('shows nudge when no diaper has been logged', () => {
+		expect(shouldShowDiaperNudge(null)).toBe(true);
 	});
 
 	it('shows nudge when latest diaper is older than 2 hours', () => {
-		const diapers = [makeDiaper({ time: '2026-03-27T11:00:00.000Z' })];
-		expect(shouldShowDiaperNudge(diapers)).toBe(true);
+		expect(shouldShowDiaperNudge('2026-03-27T11:00:00.000Z')).toBe(true);
 	});
 
 	it('hides nudge when latest diaper is within 2 hours', () => {
-		const diapers = [makeDiaper({ time: '2026-03-27T12:30:00.000Z' })];
-		expect(shouldShowDiaperNudge(diapers)).toBe(false);
+		expect(shouldShowDiaperNudge('2026-03-27T12:30:00.000Z')).toBe(false);
 	});
 
-	it('checks the latest diaper, not the first', () => {
-		const diapers = [
-			makeDiaper({ time: '2026-03-27T10:00:00.000Z' }),
-			makeDiaper({ time: '2026-03-27T13:00:00.000Z' }),
-		];
-		expect(shouldShowDiaperNudge(diapers)).toBe(false);
-	});
-
-	it('shows nudge when latest diaper is exactly 2 hours ago', () => {
-		const diapers = [makeDiaper({ time: '2026-03-27T12:00:00.000Z' })];
+	it('treats exactly-2h as "still fresh"', () => {
 		// now=14:00, diaper=12:00, diff=exactly 2h => not >2h, so false
-		expect(shouldShowDiaperNudge(diapers)).toBe(false);
+		expect(shouldShowDiaperNudge('2026-03-27T12:00:00.000Z')).toBe(false);
 	});
 
 	it('shows nudge when latest diaper is 2h + 1ms ago', () => {
-		const diapers = [makeDiaper({ time: '2026-03-27T11:59:59.999Z' })];
-		expect(shouldShowDiaperNudge(diapers)).toBe(true);
+		expect(shouldShowDiaperNudge('2026-03-27T11:59:59.999Z')).toBe(true);
 	});
 
 	it('accepts custom threshold', () => {
-		const diapers = [makeDiaper({ time: '2026-03-27T13:00:00.000Z' })];
 		// 1 hour ago, threshold 30 min
-		expect(shouldShowDiaperNudge(diapers, 30 * 60 * 1000)).toBe(true);
+		expect(shouldShowDiaperNudge('2026-03-27T13:00:00.000Z', 30 * 60 * 1000)).toBe(true);
 	});
 });
 

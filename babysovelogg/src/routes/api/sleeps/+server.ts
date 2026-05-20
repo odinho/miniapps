@@ -1,11 +1,11 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types.js";
-import { db } from "$lib/server/db.js";
+import { db, getCurrentBaby } from "$lib/server/db.js";
 import { parseIntParam } from "$lib/server/request-helpers.js";
-import type { Baby, SleepLogRow, SleepPauseRow } from "$lib/types.js";
+import type { SleepLogRow, SleepPauseRow } from "$lib/types.js";
 
 export const GET: RequestHandler = ({ url }) => {
-  const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby | undefined;
+  const baby = getCurrentBaby();
   if (!baby) return json([]);
 
   const from = url.searchParams.get("from");

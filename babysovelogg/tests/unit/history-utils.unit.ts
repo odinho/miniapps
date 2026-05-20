@@ -485,7 +485,6 @@ describe('buildSleepUpdateEvent', () => {
 			wakeMood: null,
 		});
 		expect(event.type).toBe('sleep.updated');
-		expect(event.domainId).toBe('sleep-001');
 		expect(event.payload.sleepDomainId).toBe('sleep-001');
 		expect(event.payload.startTime).toBe('2026-03-27T08:00:00.000Z');
 		expect(event.payload.type).toBe('nap');
@@ -541,7 +540,6 @@ describe('buildSleepDeleteEvent', () => {
 		const event = buildSleepDeleteEvent('sleep-001');
 		expect(event.type).toBe('sleep.deleted');
 		expect(event.payload.sleepDomainId).toBe('sleep-001');
-		expect(event.domainId).toBe('sleep-001');
 	});
 });
 
@@ -556,7 +554,6 @@ describe('buildDiaperUpdateEvent', () => {
 		expect(event.payload.diaperDomainId).toBe('diaper-001');
 		expect(event.payload.type).toBe('wet');
 		expect(event.payload.amount).toBe('middels');
-		expect(event.domainId).toBe('diaper-001');
 	});
 
 	test('includes note when provided', () => {
@@ -604,7 +601,6 @@ describe('buildDiaperDeleteEvent', () => {
 		const event = buildDiaperDeleteEvent('diaper-001');
 		expect(event.type).toBe('diaper.deleted');
 		expect(event.payload.diaperDomainId).toBe('diaper-001');
-		expect(event.domainId).toBe('diaper-001');
 	});
 });
 

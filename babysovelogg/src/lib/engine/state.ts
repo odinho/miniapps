@@ -608,7 +608,11 @@ function buildContext(
   offDays?: Set<string>,
   priorTrendTargetState?: TrendTargetState | null,
 ): BabyContext {
-  const tz = baby.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Fall back to UTC rather than the server's resolved TZ — baby.timezone is
+  // the source of truth; if it's missing we keep behaviour deterministic
+  // across deployments (UTC) instead of leaking the server's TZ into the
+  // engine's day-boundary math.
+  const tz = baby.timezone || "UTC";
   // Compute observed + intervention trend numbers once and thread both
   // through ctx so the censor's cap-respect carve-out, the napBudget
   // engine, and `Prediction.trendTargets` all read the same evaluation.

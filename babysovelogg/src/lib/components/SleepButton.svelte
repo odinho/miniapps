@@ -27,7 +27,7 @@
 		try {
 			if (isSleeping && activeSleep) {
 				const domainId = activeSleep.domain_id;
-				const result = buildEndSleep(activeSleep, baby.id);
+				const result = buildEndSleep(activeSleep);
 				await sync.sendEvents(result.events);
 				await tick();
 				onSleepEnded?.(domainId, result.sleepSnapshot, result.endTime);
