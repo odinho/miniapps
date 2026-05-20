@@ -74,11 +74,20 @@ Local (replace `<server>` with the host that holds your instances):
 
 ```sh
 bun run build
-rsync -avz --delete --delay-updates --exclude=.git \
-    build/ node_modules/ package.json \
+rsync -avz --delete --delay-updates --chown=babysovelogg:babysovelogg \
+    build node_modules package.json \
     <server>:/srv/babysovelogg/code/
 ssh <server> 'sudo systemctl restart "babysovelogg@*.service"'
 ```
+
+Two things to notice in that rsync:
+- **No trailing slash** on `build` or `node_modules` — without the slash
+  rsync preserves the source directory name, so you end up with
+  `/srv/babysovelogg/code/build/index.js` (what the unit expects). With
+  trailing slashes the *contents* are copied and the layout is wrong.
+- **`--chown=babysovelogg:babysovelogg`** — rsync as root over SSH preserves
+  UID/GID, which would otherwise be your local user's (UID 1000 = some
+  unrelated account on the server).
 
 Roll out to one family first to sanity-check before fanning out:
 

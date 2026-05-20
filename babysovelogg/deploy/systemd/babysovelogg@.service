@@ -15,6 +15,13 @@ EnvironmentFile=/srv/babysovelogg/families/%i/.env
 ExecStart=/usr/local/bin/bun /srv/babysovelogg/code/build/index.js
 Restart=on-failure
 RestartSec=5
+# adapter-node closes the HTTP server on SIGTERM but the notification
+# scheduler's setInterval keeps the event loop alive, so the process
+# only exits when SIGKILL hits. Cap that wait so restarts are fast.
+# (SHUTDOWN_TIMEOUT shortens adapter-node's wait for in-flight requests
+# from the default 30s.)
+Environment=SHUTDOWN_TIMEOUT=5
+TimeoutStopSec=10
 
 # Sandboxing — meetings.service shape.
 NoNewPrivileges=true
