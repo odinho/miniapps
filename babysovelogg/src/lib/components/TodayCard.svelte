@@ -19,6 +19,12 @@
 
 	let { priorOvernightSleep, dayTotals, todaySleeps, prediction, activeSleep }: Props = $props();
 
+	// Collapsed by default — the bottom summary row in `+page.svelte` already
+	// carries the headline numbers (lur count, lurtid, totalt, dobesøk), so
+	// "I dag" stays a thin tap-to-expand affordance for the time-window
+	// detail (`18:19–07:00`, `11:28–13:22`, etc.) that's only here.
+	let collapsed = $state(true);
+
 	const fcMs = (min: number): string => formatDurationCompact(min * 60_000);
 
 	const completedNaps = $derived(
@@ -57,54 +63,65 @@
 </script>
 
 {#if showCard}
-	<div class="today-card" data-testid="today-card">
-		<div class="today-card-title">I dag</div>
-		<div class="today-rows">
-			{#if priorNightMin > 0 && priorOvernightSleep?.end_time}
-				<div class="today-row" data-testid="today-row-night">
-					<div class="today-row-head">
-						<span class="today-row-label">Natt</span>
-						<span class="today-row-value">{fcMs(priorNightMin)}</span>
+	<div class="today-card" data-testid="today-card" class:collapsed>
+		<button
+			type="button"
+			class="today-card-title"
+			aria-expanded={!collapsed}
+			data-testid="today-card-toggle"
+			onclick={() => (collapsed = !collapsed)}
+		>
+			<span>I dag</span>
+			<span class="today-card-chevron" aria-hidden="true">{collapsed ? '▾' : '▴'}</span>
+		</button>
+		{#if !collapsed}
+			<div class="today-rows">
+				{#if priorNightMin > 0 && priorOvernightSleep?.end_time}
+					<div class="today-row" data-testid="today-row-night">
+						<div class="today-row-head">
+							<span class="today-row-label">Natt</span>
+							<span class="today-row-value">{fcMs(priorNightMin)}</span>
+						</div>
+						<div class="today-row-sub">
+							{formatTime(priorOvernightSleep.start_time)}–{formatTime(priorOvernightSleep.end_time)}
+						</div>
 					</div>
-					<div class="today-row-sub">
-						{formatTime(priorOvernightSleep.start_time)}–{formatTime(priorOvernightSleep.end_time)}
+				{/if}
+				{#each completedNaps as nap, i}
+					{@const durMin = Math.round(
+						(new Date(nap.end_time!).getTime() - new Date(nap.start_time).getTime()) / 60_000,
+					)}
+					<div class="today-row" data-testid="today-row-nap-{i}">
+						<div class="today-row-head">
+							<span class="today-row-label">
+								{completedNaps.length === 1 ? 'Lur' : `Lur ${i + 1}`}
+							</span>
+							<span class="today-row-value">{fcMs(durMin)}</span>
+						</div>
+						<div class="today-row-sub">
+							{formatTime(nap.start_time)}–{formatTime(nap.end_time!)}
+						</div>
 					</div>
-				</div>
-			{/if}
-			{#each completedNaps as nap, i}
-				{@const durMin = Math.round(
-					(new Date(nap.end_time!).getTime() - new Date(nap.start_time).getTime()) / 60_000,
-				)}
-				<div class="today-row" data-testid="today-row-nap-{i}">
-					<div class="today-row-head">
-						<span class="today-row-label">
-							{completedNaps.length === 1 ? 'Lur' : `Lur ${i + 1}`}
+				{/each}
+				{#if hasMultipleRows && totalMin > 0}
+					<div class="today-row today-row-total" data-testid="today-row-total">
+						<div class="today-row-head">
+							<span class="today-row-label">I alt så langt</span>
+							<span class="today-row-value">{fcMs(totalMin)}</span>
+						</div>
+					</div>
+				{/if}
+				{#if nextLine}
+					<div class="today-next" data-testid="today-next">
+						<span class="today-next-label">{nextLine.label}</span>
+						<span class="today-next-value">
+							kl. {formatTime(nextLine.time)}
+							<span class="today-next-countdown">({formatDuration(new Date(nextLine.time).getTime() - Date.now())})</span>
 						</span>
-						<span class="today-row-value">{fcMs(durMin)}</span>
 					</div>
-					<div class="today-row-sub">
-						{formatTime(nap.start_time)}–{formatTime(nap.end_time!)}
-					</div>
-				</div>
-			{/each}
-			{#if hasMultipleRows && totalMin > 0}
-				<div class="today-row today-row-total" data-testid="today-row-total">
-					<div class="today-row-head">
-						<span class="today-row-label">I alt så langt</span>
-						<span class="today-row-value">{fcMs(totalMin)}</span>
-					</div>
-				</div>
-			{/if}
-			{#if nextLine}
-				<div class="today-next" data-testid="today-next">
-					<span class="today-next-label">{nextLine.label}</span>
-					<span class="today-next-value">
-						kl. {formatTime(nextLine.time)}
-						<span class="today-next-countdown">({formatDuration(new Date(nextLine.time).getTime() - Date.now())})</span>
-					</span>
-				</div>
-			{/if}
-		</div>
+				{/if}
+			</div>
+		{/if}
 	</div>
 {/if}
 
@@ -116,12 +133,33 @@
 		margin: 0 16px;
 	}
 
+	/* Collapsed: tighten the vertical padding so the card reads as a thin
+	   tap-target between the arc-action buttons and the bottom summary row. */
+	.today-card.collapsed {
+		padding: 6px 16px;
+	}
+
 	.today-card-title {
 		font-size: 0.8rem;
 		font-weight: 600;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 		color: var(--text-light);
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		width: 100%;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		font-family: inherit;
+	}
+
+	.today-card-chevron {
+		font-size: 0.75rem;
+		opacity: 0.6;
+		font-weight: 400;
 	}
 
 	.today-rows {
