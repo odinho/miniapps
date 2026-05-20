@@ -567,7 +567,12 @@ html, body {
   margin-bottom: 16px;
 }
 
-.modal label, .settings label, .modal .form-label, .settings .form-label {
+/* Field-caption styling for the small uppercase label above an input.
+   Scoped to direct children of `.form-group` so wrapping labels (e.g. a
+   label that contains a checkbox + its description) don't get uppercased
+   and shrunk. */
+.modal .form-group > label, .settings .form-group > label,
+.modal .form-label, .settings .form-label {
   display: block;
   font-size: 0.8rem;
   color: var(--text-light);

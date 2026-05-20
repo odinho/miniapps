@@ -367,24 +367,20 @@
 					</div>
 
 					{#if notifPrefs && notifKinds.length > 0}
-						<div style="margin-top: 16px; display: flex; flex-direction: column; gap: 10px;" data-testid="notif-prefs">
+						<div class="notif-prefs" data-testid="notif-prefs">
 							{#each notifKinds as kind}
-								<label style="display: flex; gap: 10px; align-items: flex-start; cursor: pointer;">
+								<label class="notif-pref" class:on={notifPrefs[kind]}>
+									<div class="notif-pref-text">
+										<div class="notif-pref-title">{TRIGGER_LABELS[kind].title}</div>
+										<div class="notif-pref-hint">{TRIGGER_LABELS[kind].hint}</div>
+									</div>
 									<input
 										type="checkbox"
+										class="toggle"
 										checked={notifPrefs[kind]}
 										onchange={() => onPrefToggle(kind)}
 										data-testid="notif-pref-{kind}"
-										style="margin-top: 3px; flex-shrink: 0;"
 									/>
-									<div style="flex: 1;">
-										<div style="font-size: 0.9rem; font-weight: 500;">
-											{TRIGGER_LABELS[kind].title}
-										</div>
-										<div style="font-size: 0.75rem; color: var(--text-light); line-height: 1.3;">
-											{TRIGGER_LABELS[kind].hint}
-										</div>
-									</div>
 								</label>
 							{/each}
 						</div>
@@ -443,3 +439,95 @@
 		{toast.text}
 	</div>
 {/if}
+
+<style>
+	.notif-prefs {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		margin-top: 16px;
+	}
+
+	.notif-pref {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		padding: 12px 14px;
+		background: var(--white);
+		border: 1px solid var(--cream-dark);
+		border-radius: var(--radius-sm);
+		cursor: pointer;
+		transition: border-color 0.15s ease, background-color 0.15s ease;
+	}
+
+	.notif-pref:hover {
+		border-color: var(--lavender-dark);
+	}
+
+	.notif-pref.on {
+		background: color-mix(in srgb, var(--lavender) 38%, var(--white));
+		border-color: var(--lavender-dark);
+	}
+
+	.notif-pref-text {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.notif-pref-title {
+		font-size: 0.95rem;
+		font-weight: 600;
+		color: var(--text);
+		line-height: 1.25;
+	}
+
+	.notif-pref-hint {
+		font-size: 0.78rem;
+		color: var(--text-light);
+		line-height: 1.4;
+		margin-top: 3px;
+	}
+
+	/* Toggle switch — accessible <input type="checkbox"> styled as a pill. */
+	.toggle {
+		appearance: none;
+		-webkit-appearance: none;
+		flex-shrink: 0;
+		width: 40px;
+		height: 22px;
+		margin: 0;
+		padding: 0;
+		border: none;
+		border-radius: 999px;
+		background: var(--cream-dark);
+		position: relative;
+		cursor: pointer;
+		transition: background-color 0.2s ease;
+	}
+
+	.toggle::after {
+		content: '';
+		position: absolute;
+		top: 2px;
+		left: 2px;
+		width: 18px;
+		height: 18px;
+		border-radius: 50%;
+		background: var(--white);
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+		transition: transform 0.2s ease;
+	}
+
+	.toggle:checked {
+		background: var(--lavender-dark);
+	}
+
+	.toggle:checked::after {
+		transform: translateX(18px);
+	}
+
+	.toggle:focus-visible {
+		outline: 2px solid var(--lavender-dark);
+		outline-offset: 2px;
+	}
+</style>
