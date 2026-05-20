@@ -97,9 +97,9 @@ export function computeBlendedTrend(
 
 /**
  * The blended 7d / 30d trend total (minutes), age-norm clamped. Exposed
- * so UI surfaces (the static SleepInsightsCard) and consumers like the
- * cut-short censor can compare a day's total against the *actual* daily
- * target — not the conservative age-band floor.
+ * so UI surfaces (the stats comparison table's Trendmål row) and consumers
+ * like the cut-short censor can compare a day's total against the *actual*
+ * daily target — not the conservative age-band floor.
  *
  * Returns null when the data is too sparse or noisy to trust.
  */
