@@ -11,6 +11,134 @@ multi-day testing, the unit-of-work flow — live in
 is for tracked product/engine/test work.
 
 
+## Trend intervention-target split — stage 5+ followups
+
+Source: 2026-05-20 design pass + four-stage implementation (commits
+`b9b0161` → `3691db3`). Stages 1–4 shipped: held intervention target
+with anti-ratchet drift, persistence in `trend_target_state` table,
+`computeNapBudget` + `censorCutShortNaps` cap-respect wired to the
+intervention number, `isDayOnTrend` deliberately left on observed
+for rescue/continuation. Closed-loop test passes (30 days of
+cap-following → target drift ≤ 15 min, observed drops materially).
+Migration: `CREATE TABLE IF NOT EXISTS` runs on schema init; first
+`/api/state` call after deploy seeds the row from `max(observed,
+natural-day mean of last 30)` and persists it. No manual migration.
+
+Remaining items, in priority order:
+
+- **Drift epoch gate is time-based, not data-based.** Currently
+  same UTC date as `prior.updatedAt` → no-op. A data-based gate
+  (`evaluatedThroughDate` / fingerprint of the latest classified
+  completed day) would also catch "same date but parent logged a
+  self-wake nap that satisfied the streak". `src/lib/engine/trend.ts`
+  `evaluateTrendTargetDrift` epoch check.
+
+- **Policy classifier uses observed as the near-target reference.**
+  Held target and observed diverge once cap-following begins; the
+  classifier still uses observed for the "near target" check. Under
+  target-5+jitter this lines up; if/when we switch the reference to
+  the held target without explicit cap-event attribution, the
+  classification becomes circular. Real fix: log a `nap_budget_event`
+  row when the cap fires and the parent acts on it, then classify
+  policy-affected from explicit attribution.
+  `src/lib/engine/trend.ts` `classifyTrendDay`.
+
+- **UI / API copy still labels observed-trend as "Trendmål".**
+  `dailyTrendTotalMin` is preserved for one release as
+  `observedRecentMin`; the napBudget banner's `context.blendedTrendMin`
+  now ships intervention; stats UI labels need a sweep so "Trendmål"
+  consistently means the intervention target wherever it's a target,
+  and "Snitt siste 7d/30d" wherever it's a stat. Audit:
+  `src/routes/+page.svelte` (banner), `src/routes/stats/+page.svelte`,
+  `src/lib/stores/app.svelte.ts:103-111` (the field comment).
+
+- **Backtest harness doesn't replay `TrendTargetState`.**
+  `src/lib/engine/backtest.ts` keeps using observed via the
+  `computeTrendTotalMin` wrapper — correct for "what would an
+  unattended observer predict?" but wrong for "did the held target
+  improve outcomes?". A stateful replay that carries
+  `TrendTargetState` across days would let us measure intervention-
+  target performance against history.
+
+- **Low-confidence firm caps.** A `firm` urgency cap can fire from
+  a low-confidence held target (Codex stage-4 review flagged it as a
+  product decision rather than a bug). If we want confidence to gate
+  urgency, cap low-confidence napBudget at `advisory` in
+  `src/lib/engine/nap-budget.ts` near the urgency calc.
+
+- **`state.source` / `state.confidence` semantics loose.**
+  `source` stays `"observed-initial"` even after upward natural
+  drift (only downward sets `"natural-days"`). `confidence: "high"`
+  is currently unreachable. Acceptable while the diagnostics aren't
+  user-facing; tighten when they surface.
+
+- **Sleep-day bucketing replacement of off-day expansion.** Codex
+  flags the current calendar-day start-anchored bucketing +
+  symmetric off-day expansion (drop date + previous date) as
+  imprecise. The cleaner shape: trend bucketing follows sleep-days
+  (overnight ending on the morning belongs to that sleep-day),
+  off-day exclusion becomes single-day. Bigger refactor; pin only
+  when the imprecision causes a visible miss.
+
+## Adaptation layer — long-term ideas (parked, not yet planned)
+
+Source: 2026-05-20 Codex adaptation pass. Big-picture architecture
+ideas that exceed the scope of any single in-flight followup. Park
+here so they're available when we next touch the relevant code.
+None are urgent; capture for future reference.
+
+- **Sample reliability mass instead of sample count.** Today the
+  engine treats every completed sleep as one observation. Reality:
+  a self-woke clean nap, a parent-woken cap, an imported Napper
+  inferred night, and a fragmented sick-day night are all
+  different-quality observations. A `sampleReliability(s, feature)`
+  helper that returns a per-feature weight (duration learning vs
+  wake-window learning vs trend learning need different reliability
+  curves) would replace `blendEstimate`'s "trust by sample count"
+  shape across `getLearnedNapDuration`, `getLearnedNightDuration`,
+  `getWakeWindow`, and the trend target.
+
+- **Fast / slow estimates everywhere.** Pair each learned quantity
+  (WW, nap dur, night dur, nap count, habitual wake/bedtime) with
+  a fast (2–3-sample half-life) and a slow (10–21-day) estimate.
+  Use fast for same-week adaptation, slow for stability,
+  `fast - slow` as change detection. Triggers a "first nap shifting"
+  or "nap transition" state when divergence exceeds a threshold.
+
+- **Intentional schedule-shift detection.** The current re-anchor
+  fires on `wakeOffset >= cycleMin` alone, which is noisy (one
+  bad-sleep night looks the same as deliberate later-bedtime). A
+  multi-signal detector (monotonic wake drift over N days +
+  late-bedtime actions + cap-following streak + parent override
+  history) would let "intentional shift" mode briefly weight
+  today's anchors over historical ones without false positives.
+
+- **Onset latency feeds wake-window learning.** `assessLatency`
+  already classifies too-early / too-late put-downs. Repeated
+  `20+` latency at the first nap should lengthen position 0's WW
+  faster than passive start-time averaging. Today the signal
+  reaches guidance UI but not the learner.
+
+- **Prediction residual tracking.** Store or recompute
+  (predicted nap start − actual start), (predicted nap end −
+  actual self-wake), (predicted bedtime − actual night start),
+  (predicted night end − actual wake). Signed residuals are
+  adaptation gold; 3 consecutive +35-min residuals on first nap
+  should adapt on day 3, not after a 7-day average.
+
+- **Imported data vs in-app reliability.** `parseNapperCsv`
+  imports mood/comment fields, but imported categories and inferred
+  nights should carry a lower source-quality weight until validated
+  by fresh in-app logs. Today imported and fresh samples count
+  equally.
+
+- **One-tap feedback after recommendations.** "too early / about
+  right / too late" buttons after a nap finishes are a faster
+  signal than waiting for passive sleep logs. Trains residual
+  bias directly. Codex notes this is one of the cheaper big-impact
+  product additions if we want to keep the user-feedback loop
+  tight.
+
 ## Cycle estimator v2 — replace the subharmonic finder
 
 Source: 2026-05-20 Codex investigation (`local/codex-cycle-estimator.md`)
@@ -93,6 +221,32 @@ Priority: after the trend intervention-target split. The cycle
 estimator's brittleness is real but its current impact is bounded
 (UI label + napBudget cap-cycle math + rescue thresholds), whereas
 the trend ratchet is the higher-visibility live user complaint.
+
+**Research citations to draw from when implementing v2** (Codex
+literature read 2026-05-20 — kept here so they survive memo cleanup):
+
+- Lopp et al. 2017, *Developmental Changes in Ultradian Sleep Cycles
+  across Early Childhood* — Jenni et al. cited at mean cycle duration
+  **57.5 ± 2.4 min at 9 months**. Longitudinal nocturnal EEG +
+  survival analysis of cycle/episode duration distributions.
+  <https://journals.sagepub.com/doi/10.1177/0748730416685451>
+- Grigg-Damberger 2016, *The Visual Scoring of Sleep in Infants 0 to
+  2 Months of Age* — healthy term infant cycles 50–60 min, broad
+  newborn range. <https://pmc.ncbi.nlm.nih.gov/articles/PMC4773630/>
+- Akacem et al. 2015 — napping toddlers have later melatonin onset
+  and shorter night sleep; nap duration is NOT a clean multiple of
+  intrinsic cycle length, parental/environmental factors dominate.
+  <https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0125181>
+- Nakagawa et al. 2016 — at 1.5y, nap duration and nap timing
+  correlate with shorter/later night sleep.
+  <https://www.nature.com/articles/srep27246>
+- SHINE 2020 — parent-reported day sleep overestimated by 29-31 min
+  vs actigraphy; relevant when seeding priors from parent logs.
+  <https://academic.oup.com/sleep/article/44/4/zsaa217/5937496>
+
+Implication for v2: parent-logged nap durations are NOT a direct
+signal of NREM/REM cycle length. The age-prior (mean 55 ±5 for
+6-12mo) carries more weight than data fits in this estimator.
 
 ## Open items from the 2026-05-20 Codex critique (arc / trend / wake-rec)
 
