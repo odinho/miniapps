@@ -15,13 +15,14 @@ EnvironmentFile=/srv/babysovelogg/families/%i/.env
 ExecStart=/usr/local/bin/bun /srv/babysovelogg/code/build/index.js
 Restart=on-failure
 RestartSec=5
-# adapter-node closes the HTTP server on SIGTERM but the notification
-# scheduler's setInterval keeps the event loop alive, so the process
-# only exits when SIGKILL hits. Cap that wait so restarts are fast.
-# (SHUTDOWN_TIMEOUT shortens adapter-node's wait for in-flight requests
-# from the default 30s.)
-Environment=SHUTDOWN_TIMEOUT=5
-TimeoutStopSec=10
+# Bun's adapter-node graceful shutdown never lets the process exit
+# (Bun bug: httpServer.close() callback doesn't fire after
+# closeAllConnections). So we accept SIGKILL after 5s — the
+# hooks.server.ts cleanup runs on SIGTERM when hooks are loaded, which
+# closes the DB cleanly before the kill. WAL-mode SQLite handles the
+# rest. Lower TimeoutStopSec if 5s feels too long; raise to allow
+# slow in-flight requests to complete.
+TimeoutStopSec=5
 
 # Sandboxing — meetings.service shape.
 NoNewPrivileges=true

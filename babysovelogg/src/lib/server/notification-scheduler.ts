@@ -322,5 +322,18 @@ export function startNotificationLoop(intervalMs = 30_000): void {
       console.error("[notification-loop]", err);
     });
   }, intervalMs);
+  // Don't let this timer keep the event loop alive on its own — the HTTP
+  // server is what holds the process up. When adapter-node closes the
+  // server on SIGTERM, an unref'd interval lets the process exit cleanly
+  // instead of waiting for systemd's SIGKILL.
+  loopHandle.unref?.();
+}
+
+/** Stop the background loop. Lets the event loop drain on shutdown. */
+export function stopNotificationLoop(): void {
+  if (loopHandle) {
+    clearInterval(loopHandle);
+    loopHandle = null;
+  }
 }
 
