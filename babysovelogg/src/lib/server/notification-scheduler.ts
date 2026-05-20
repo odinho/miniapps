@@ -270,9 +270,14 @@ export async function fireDueNotifications(now: Date = new Date()): Promise<numb
       try {
         const payload = JSON.parse(row.payload_json);
         const result = await sendPushToBaby(row.baby_id, payload);
-        db.prepare("UPDATE notification_schedule SET sent_at = datetime('now') WHERE id = ?").run(
-          row.id,
-        );
+        // Mark sent only when there were no transient failures. Both `sent`
+        // and `removed` (404/410 → subscription deleted) count as terminal;
+        // `failed` means a transient error that the next poll can retry.
+        if (result.failed === 0) {
+          db.prepare("UPDATE notification_schedule SET sent_at = datetime('now') WHERE id = ?").run(
+            row.id,
+          );
+        }
         return result.sent > 0;
       } catch (err) {
         // eslint-disable-next-line no-console

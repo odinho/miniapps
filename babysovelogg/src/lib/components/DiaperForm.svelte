@@ -63,7 +63,11 @@
 			const event = pottyMode
 				? buildPottyEvent(babyId, time, selectedPottyResult!, selectedDiaperStatus ?? 'dry', notes)
 				: buildDiaperEvent(babyId, time, selectedType!, selectedAmount ?? 'middels', notes);
-			await sync.sendEvents([event]);
+			const result = await sync.sendEvents([event]);
+			if (result == null) {
+				// Server rejected. Keep the form open so the parent can retry.
+				return;
+			}
 			onClose?.();
 		} finally {
 			busy = false;

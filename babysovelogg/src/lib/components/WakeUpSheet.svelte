@@ -104,11 +104,16 @@
 			if (event) events.push(event);
 
 			if (events.length > 0) {
-				await sync.sendEvents(events);
+				const result = await sync.sendEvents(events);
+				if (result == null) {
+					// Server rejected (4xx/5xx). Keep the sheet open so the parent can
+					// retry rather than silently losing the wake event.
+					return;
+				}
 			}
+			onClose?.();
 		} finally {
 			busy = false;
-			onClose?.();
 		}
 	}
 

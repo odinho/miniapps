@@ -10,10 +10,12 @@ import { db } from "./db.js";
  */
 
 let configured = false;
+let configureAttempted = false;
 let publicKey: string | null = null;
 
 function configure() {
-  if (configured) return;
+  if (configureAttempted) return;
+  configureAttempted = true;
   const pub = process.env.VAPID_PUBLIC_KEY;
   const priv = process.env.VAPID_PRIVATE_KEY;
   const subject = process.env.VAPID_SUBJECT ?? "mailto:noreply@babysovelogg.local";

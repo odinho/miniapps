@@ -123,9 +123,28 @@ export async function unsubscribe(): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
-export async function sendTest(): Promise<unknown> {
+export interface TestNotifResult {
+  ok: boolean;
+  sent: number;
+  removed: number;
+  failed: number;
+  error?: string;
+}
+
+export async function sendTest(): Promise<TestNotifResult> {
   const res = await fetch("/api/notifications/test", { method: "POST" });
-  return res.json();
+  if (!res.ok) {
+    return { ok: false, sent: 0, removed: 0, failed: 0, error: `http_${res.status}` };
+  }
+  const body = (await res.json()) as Partial<TestNotifResult>;
+  const sent = body.sent ?? 0;
+  return {
+    ok: sent > 0,
+    sent,
+    removed: body.removed ?? 0,
+    failed: body.failed ?? 0,
+    error: sent === 0 ? "no_active_subscriptions" : body.error,
+  };
 }
 
 export type NotificationKind =

@@ -40,6 +40,7 @@
 	let dateError = $state(false);
 	let saving = $state(false);
 	let toast = $state<{ text: string; type: 'success' | 'error' | 'warning' } | null>(null);
+	let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// Keep form in sync when baby data changes (e.g. after SSE update)
 	$effect(() => {
@@ -82,11 +83,18 @@
 
 	async function onPrefToggle(kind: NotificationKind) {
 		if (!notifPrefs) return;
+		const previous = notifPrefs;
 		const next = !notifPrefs[kind];
 		// Optimistic update
 		notifPrefs = { ...notifPrefs, [kind]: next };
 		const result = await setNotifPrefs({ [kind]: next });
-		if (result) notifPrefs = result;
+		if (result) {
+			notifPrefs = result;
+		} else {
+			// Roll back on server failure so the UI doesn't drift from server truth.
+			notifPrefs = previous;
+			showToast('Kunne ikkje lagra valet', 'error');
+		}
 	}
 
 	async function onNotifToggle() {
@@ -116,8 +124,14 @@
 		if (notifBusy) return;
 		notifBusy = true;
 		try {
-			await sendTestNotif();
-			showToast('Test sendt', 'success');
+			const result = await sendTestNotif();
+			if (result.ok) {
+				showToast('Test sendt', 'success');
+			} else if (result.error === 'no_active_subscriptions') {
+				showToast('Ingen aktive varselabonnement', 'warning');
+			} else {
+				showToast('Kunne ikkje senda test', 'error');
+			}
 		} finally {
 			notifBusy = false;
 		}
@@ -126,8 +140,10 @@
 	// --- actions ---
 	function showToast(text: string, type: 'success' | 'error' | 'warning') {
 		toast = { text, type };
-		setTimeout(() => {
+		if (toastTimer) clearTimeout(toastTimer);
+		toastTimer = setTimeout(() => {
 			toast = null;
+			toastTimer = null;
 		}, 3000);
 	}
 
@@ -153,7 +169,11 @@
 		);
 
 		try {
-			await sync.sendEvents([event]);
+			const sendResult = await sync.sendEvents([event]);
+			if (sendResult == null) {
+				showToast(appState.error ?? 'Feil ved lagring', 'error');
+				return;
+			}
 			goto('/');
 		} catch (err) {
 			showToast(`Feil ved lagring: ${err instanceof Error ? err.message : 'ukjend feil'}`, 'error');
