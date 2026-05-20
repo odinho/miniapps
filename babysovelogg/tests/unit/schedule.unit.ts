@@ -6,6 +6,7 @@ import {
   predictNextNap,
   getExpectedNapCount,
   predictDayNaps,
+  decomposeFirstNapPrediction,
   recommendBedtime,
   detectNapTransition,
   findByAge,
@@ -15,6 +16,7 @@ import {
   SLEEP_NEEDS,
 } from "$lib/engine/schedule.js";
 import type { SleepEntry, BabyContext } from "$lib/types.js";
+import { DEFAULT_FEATURES } from "$lib/types.js";
 
 // --- helpers ---
 
@@ -277,6 +279,182 @@ describe("incomplete days (missing night) excluded from learning", () => {
     const predsWithout = predictDayNaps(day(27, 7, 0), withoutIncomplete);
 
     expect(renderNaps(predsWith)).toBe(renderNaps(predsWithout));
+  });
+});
+
+// ─── late-wake re-anchor: lift first nap when wake is a real late outlier ──
+//
+// Codex pair-review (2026-05-20, follow-up) endorsed the user's "snap into a
+// new sleep cycle" intuition over Claude's earlier max(pressure, habit)
+// proposal. The bounded form: when today's wake clock is at least one sleep
+// cycle later than the recent typical wake, lift the habit anchor by an
+// integer number of cycles (capped at one for v1), then cap that lift at the
+// pressure-only estimate and take max(habitBlend, lifted).
+//
+// This pins both ends of the gradient with Halldis-shape data: a stable
+// wake day must still predict the clock-stable nap; a +90-min late-wake day
+// must shift the prediction by roughly one cycle.
+describe("late-wake re-anchor for first nap (Halldis 2026-05-20)", () => {
+  function halldisLikeHistory(): SleepEntry[] {
+    // 7 prior days of Halldis-shape data:
+    //  wake clock: 05:00, 05:00, 05:20, 05:25, 05:20, 05:50, 07:00
+    //  nap clock:  10:38, 10:18, 10:18, 10:16, 10:30, 10:20, 10:03  (stable)
+    //  night:      18:00 → next-day wake
+    //
+    // tz=UTC fixture so day() ISO maps straight to clock hours.
+    const wakes: Array<[number, number, number]> = [
+      [13, 5, 0],
+      [14, 5, 0],
+      [15, 5, 20],
+      [16, 5, 25],
+      [17, 5, 20],
+      [18, 5, 50],
+      [19, 7, 0],
+    ];
+    const naps: Array<[number, number, number, number, number]> = [
+      [13, 10, 38, 12, 8],
+      [14, 10, 18, 11, 48],
+      [15, 10, 18, 11, 48],
+      [16, 10, 16, 11, 46],
+      [17, 10, 30, 12, 0],
+      [18, 10, 20, 11, 50],
+      [19, 10, 3, 11, 33],
+    ];
+    const out: SleepEntry[] = [];
+    // Night before day 13 so position 0 has a prior overnight to read.
+    out.push(sleep(day(12, 18, 0), day(wakes[0][0], wakes[0][1], wakes[0][2]), "night"));
+    for (let i = 0; i < wakes.length; i++) {
+      const [nd, nsh, nsm, neh, nem] = naps[i];
+      out.push(sleep(day(nd, nsh, nsm), day(nd, neh, nem)));
+      const next = i + 1 < wakes.length ? wakes[i + 1] : ([20, 5, 25] as [number, number, number]);
+      out.push(sleep(day(wakes[i][0], 18, 0), day(next[0], next[1], next[2]), "night"));
+    }
+    return out;
+  }
+
+  function ctx11(overrides: Partial<BabyContext> = {}): BabyContext {
+    return {
+      birthdate: "2025-06-19",
+      ageMonths: 11,
+      tz: "UTC",
+      customNapCount: 1,
+      recentSleeps: halldisLikeHistory(),
+      strategy: "routine_schedule",
+      ...overrides,
+    };
+  }
+
+  function predictedFirstNap(wake: string, ctxOverrides: Partial<BabyContext> = {}): Date {
+    const preds = predictDayNaps(wake, ctx11(ctxOverrides), { dayStart: true });
+    return new Date(preds[0].startTime);
+  }
+
+  it("stable wake (05:25) keeps the prediction at the clock-stable habit", () => {
+    const start = predictedFirstNap(day(20, 5, 25));
+    // Expect close to habit ~10:20 (within 10:00–10:40 window).
+    expect(start.getUTCHours()).toBe(10);
+    expect(start.getUTCMinutes()).toBeGreaterThanOrEqual(0);
+    expect(start.getUTCMinutes()).toBeLessThanOrEqual(40);
+  });
+
+  it("late wake (07:00, +95 min) lifts the prediction by roughly one cycle", () => {
+    // Without the re-anchor, the habit anchor at ~10:20 dominates and the
+    // engine predicts ~10:30–10:53. With the re-anchor we expect 11:00 or
+    // a few minutes after — one sleep cycle past habit, clamped at pressure.
+    const start = predictedFirstNap(day(20, 7, 0));
+    const minutesPastEleven = (start.getUTCHours() - 11) * 60 + start.getUTCMinutes();
+    expect(minutesPastEleven).toBeGreaterThanOrEqual(-5);
+    expect(minutesPastEleven).toBeLessThanOrEqual(30);
+  });
+
+  // ─── Safety gates: each must keep the re-anchor inert when violated ───
+
+  it("dayStart=false leaves the prediction at the pre-reanchor blend", () => {
+    // The mid-day re-plan path (cut-short, post-nap) calls selectBestPlan
+    // without dayStart=true. Index 0 there means "next remaining nap", not
+    // "first nap after morning wake" — re-anchor must not fire.
+    const c = ctx11();
+    const lifted = predictDayNaps(day(20, 7, 0), c, { dayStart: true })[0];
+    const inert = predictDayNaps(day(20, 7, 0), c)[0]; // no dayStart
+    expect(new Date(lifted.startTime).getTime()).toBeGreaterThan(new Date(inert.startTime).getTime());
+  });
+
+  it("emerging_rhythm strategy never re-anchors", () => {
+    const c = ctx11({ strategy: "emerging_rhythm" });
+    const preds = predictDayNaps(day(20, 7, 0), c, { dayStart: true });
+    const decomp = decomposeFirstNapPrediction(day(20, 7, 0), c);
+    expect(decomp?.reAnchored).toBe(false);
+    expect(decomp?.finalMs).toBe(new Date(preds[0].startTime).getTime());
+  });
+
+  it("off-day suppresses the re-anchor", () => {
+    const c = ctx11({ offDays: new Set([day(20, 0, 0).slice(0, 10)]) });
+    const decomp = decomposeFirstNapPrediction(day(20, 7, 0), c);
+    expect(decomp?.reAnchored).toBe(false);
+  });
+
+  it("habitualNapStart feature off → no re-anchor", () => {
+    const c = ctx11({ features: { ...DEFAULT_FEATURES, habitualNapStart: false } });
+    const decomp = decomposeFirstNapPrediction(day(20, 7, 0), c);
+    expect(decomp?.reAnchored).toBe(false);
+  });
+
+  it("sub-cycle late offset (just under 55 min) does not snap", () => {
+    // Build a fresh history with median wake ≈ 05:25; today wake 06:15 → +50 min < 55 min cycle.
+    const c = ctx11();
+    const decomp = decomposeFirstNapPrediction(day(20, 6, 15), c);
+    expect(decomp?.wakeOffsetMin).toBeGreaterThanOrEqual(40);
+    expect(decomp?.wakeOffsetMin).toBeLessThan(55);
+    expect(decomp?.reAnchored).toBe(false);
+  });
+
+  it("negative wake offset (early wake) does not snap", () => {
+    // Today wake at 04:00 — earlier than the recent median; gate is positive-only.
+    const c = ctx11();
+    const decomp = decomposeFirstNapPrediction(day(20, 4, 0), c);
+    expect(decomp?.wakeOffsetMin).toBeLessThan(0);
+    expect(decomp?.reAnchored).toBe(false);
+  });
+
+  it("two-cycle late wake is capped at one cycle (v1)", () => {
+    // Offset 130 min ≈ 2.4 cycles; v1 must snap by exactly one cycle.
+    const c = ctx11();
+    const decomp = decomposeFirstNapPrediction(day(20, 7, 35), c);
+    expect(decomp?.wakeOffsetMin).toBeGreaterThanOrEqual(110);
+    expect(decomp?.cyclesSnapped).toBe(1);
+  });
+
+  it("decomposition.finalMs equals predictDayNaps[0].startTime", () => {
+    const c = ctx11();
+    const decomp = decomposeFirstNapPrediction(day(20, 7, 0), c);
+    const preds = predictDayNaps(day(20, 7, 0), c, { dayStart: true });
+    expect(decomp?.finalMs).toBe(new Date(preds[0].startTime).getTime());
+  });
+
+  it("two-nap baby: late-wake shift on nap 0 doesn't drop nap 2", () => {
+    // Build a 2-nap fixture, then late-wake. Nap 1 may shift; nap 2 must
+    // still exist (re-anchor only touches nap 0, but verify the cascade
+    // doesn't collapse the day).
+    const sleeps: SleepEntry[] = [];
+    sleeps.push(sleep(day(12, 18, 0), day(13, 5, 25), "night"));
+    for (let d = 13; d <= 19; d++) {
+      sleeps.push(sleep(day(d, 9, 0), day(d, 10, 30)));   // nap 1
+      sleeps.push(sleep(day(d, 13, 30), day(d, 14, 30))); // nap 2
+      sleeps.push(sleep(day(d, 18, 0), day(d + 1, 5, 25), "night"));
+    }
+    const c: BabyContext = {
+      birthdate: "2025-09-20",
+      ageMonths: 8,
+      tz: "UTC",
+      customNapCount: 2,
+      recentSleeps: sleeps,
+      strategy: "routine_schedule",
+    };
+    const preds = predictDayNaps(day(20, 7, 0), c, { dayStart: true });
+    expect(preds.length).toBe(2);
+    // Second nap should still come after the first by at least one wake window.
+    const gap = new Date(preds[1].startTime).getTime() - new Date(preds[0].endTime).getTime();
+    expect(gap / 60_000).toBeGreaterThan(60);
   });
 });
 

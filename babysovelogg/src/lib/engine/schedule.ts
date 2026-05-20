@@ -196,8 +196,25 @@ export function resolveNapCount(ctx: BabyContext): number {
   return getLearnedNapCount(ctx) ?? findByAge(NAP_COUNTS, ctx.ageMonths).naps;
 }
 
+export interface PredictDayNapsOptions {
+  /**
+   * True only for morning-plan calls anchored to today's first wake-up.
+   * Required to enable the late-wake re-anchor (which would misfire on
+   * post-nap / post-cut-short re-plans where index 0 is "next remaining
+   * nap", not "first nap after morning wake"). State assembly's morning
+   * `selectBestPlan(todayWakeUp.wake_time, ...)` opts in explicitly; the
+   * adjusted-replan calls deliberately don't. Direct callers (backtest
+   * harness, scripts) leave it unset and stay inert by default.
+   */
+  dayStart?: boolean;
+}
+
 /** Predict all naps for the day based on wake-up time and recent sleep patterns. */
-export function predictDayNaps(wakeUpTime: string, ctx: BabyContext): PredictedNap[] {
+export function predictDayNaps(
+  wakeUpTime: string,
+  ctx: BabyContext,
+  options: PredictDayNapsOptions = {},
+): PredictedNap[] {
   const expectedNaps = resolveNapCount(ctx);
   const defaultWW = getWakeWindow(ctx);
   // During transitions, filter positional data to days matching the predicted nap count.
@@ -217,6 +234,30 @@ export function predictDayNaps(wakeUpTime: string, ctx: BabyContext): PredictedN
     habitualWeights = computeHabitualNapWeights(expectedNaps, napData.startSamples, napData.wwSamples);
   }
 
+  // Late-wake re-anchor inputs. Only the morning day-start call on a
+  // routine_schedule baby may lift the prediction by one cycle; everyone
+  // else (emerging assembly, mid-day re-plans, off-days) is inert.
+  // Codex pair-review 2026-05-20: index 0 inside the per-nap loop is the
+  // *next remaining nap* on re-plans, not "first nap after morning wake",
+  // so the dayStart gate must be explicit.
+  const reAnchorEligible =
+    options.dayStart === true
+    && useHabitualNapStart
+    && ctx.strategy === "routine_schedule"
+    && !isOffDayForWake(ctx, wakeUpTime);
+  // Use the age-research default cycle, not the data-fit estimator, as the
+  // snap unit. `estimateSleepCycleFromData` searches 35-60 min and can lock
+  // onto a much-too-short value (e.g. 37 min for an 11mo whose 90-110 min
+  // naps happen to cluster well at 2-3× a 37 min unit). The user's mental
+  // model of "snap into the next sleep cycle" maps to the canonical
+  // ~50-60 min infant cycle, not a clustering artifact. Codex review
+  // 2026-05-20 flagged the cycle source as a concern; this comment is the
+  // deliberate exception to "use the learned value".
+  const cycleMinForReAnchor = getSleepCycleMinutes(ctx.ageMonths);
+  const recentWakeAnchorMin = reAnchorEligible
+    ? recentWakeMedianMinute(ctx, wakeUpTime)
+    : null;
+
   const predictions: PredictedNap[] = [];
   let currentWake = new Date(wakeUpTime);
 
@@ -232,7 +273,18 @@ export function predictDayNaps(wakeUpTime: string, ctx: BabyContext): PredictedN
     const weight = habitualWeights[i] ?? 0;
     if (habitualMs !== undefined && weight > 0 && habitualMs > currentWake.getTime()) {
       const blendedMs = pressureStart.getTime() * (1 - weight) + habitualMs * weight;
-      napStart = new Date(Math.round(blendedMs));
+      const candidateMs = i === 0 && reAnchorEligible
+        ? applyLateWakeReAnchor({
+            blendMs: blendedMs,
+            habitualMs,
+            pressureMs: pressureStart.getTime(),
+            wakeMs: currentWake.getTime(),
+            recentWakeAnchorMin,
+            cycleMin: cycleMinForReAnchor,
+            tz: ctx.tz,
+          }).candidateMs
+        : blendedMs;
+      napStart = new Date(Math.round(candidateMs));
     } else {
       napStart = pressureStart;
     }
@@ -248,6 +300,212 @@ export function predictDayNaps(wakeUpTime: string, ctx: BabyContext): PredictedN
   }
 
   return predictions;
+}
+
+/**
+ * Decomposed first-nap prediction. All numeric times are epoch ms.
+ *
+ * Useful for tests and the debug CLI — the production code path hides
+ * intermediates inside a blend + (optionally) a re-anchor, and a previous
+ * pass missed the fact that the visible "10:53" prediction was coming out
+ * of a habit anchor dominating a late-wake outlier. With this shape every
+ * component (pressure, habit, weight, blend, recent-wake anchor, offset,
+ * cycle, snap) is observable.
+ */
+export interface FirstNapDecomposition {
+  pressureMs: number;
+  habitualMs: number | null;
+  habitWeight: number;
+  blendMs: number;
+  /** Recent wake median (minute-of-day, in baby tz). null when too sparse. */
+  recentWakeAnchorMin: number | null;
+  /** Today wake minute-of-day in baby tz. */
+  todayWakeMin: number;
+  wakeOffsetMin: number | null;
+  cycleMin: number;
+  /** How many cycles the habit anchor was lifted by (0 = no re-anchor). */
+  cyclesSnapped: number;
+  reAnchored: boolean;
+  finalMs: number;
+}
+
+/**
+ * Recompute the first nap prediction with every intermediate value
+ * exposed. Takes the same options as {@link predictDayNaps} so the
+ * decomposition reports what production actually evaluates — pass
+ * `{ dayStart: true }` to mirror the morning-plan path, omit it to see
+ * the inert/blend-only result other callers get. Returns null when
+ * there's no first nap (e.g. `expectedNaps === 0`). Intended for debug
+ * and tests; production code should call `predictDayNaps`.
+ */
+export function decomposeFirstNapPrediction(
+  wakeUpTime: string,
+  ctx: BabyContext,
+  options: PredictDayNapsOptions = { dayStart: true },
+): FirstNapDecomposition | null {
+  const expectedNaps = resolveNapCount(ctx);
+  if (expectedNaps < 1) return null;
+
+  const defaultWW = getWakeWindow(ctx);
+  const { wws: positionalWWs } = getPositionalDataForNapCount(ctx, expectedNaps);
+
+  const useHabitualNapStart = feat(ctx, "habitualNapStart") && ctx.ageMonths >= 5;
+  let habitualMs: number | undefined;
+  let habitWeight = 0;
+  if (useHabitualNapStart) {
+    const napData = collectHabitualNapData(ctx, expectedNaps);
+    habitualMs = computeHabitualNapStarts(wakeUpTime, ctx, expectedNaps, napData.startSamples)[0];
+    habitWeight = computeHabitualNapWeights(expectedNaps, napData.startSamples, napData.wwSamples)[0] ?? 0;
+  }
+
+  const wakeDate = new Date(wakeUpTime);
+  const wakeMs = wakeDate.getTime();
+  const ww = positionalWWs[0] ?? defaultWW;
+  const pressureMs = wakeMs + ww * 60_000;
+
+  let blendMs: number;
+  if (habitualMs !== undefined && habitWeight > 0 && habitualMs > wakeMs) {
+    blendMs = pressureMs * (1 - habitWeight) + habitualMs * habitWeight;
+  } else {
+    blendMs = pressureMs;
+  }
+
+  // Mirror predictDayNaps' gating so the decomposition's `reAnchored` flag
+  // reflects production semantics — Codex review 2026-05-20.
+  const reAnchorEligible =
+    options.dayStart === true
+    && useHabitualNapStart
+    && ctx.strategy === "routine_schedule"
+    && !isOffDayForWake(ctx, wakeUpTime);
+  // Age-research default cycle; see the matching note in `predictDayNaps`.
+  const cycleMin = getSleepCycleMinutes(ctx.ageMonths);
+  const recentWakeAnchorMin = reAnchorEligible ? recentWakeMedianMinute(ctx, wakeUpTime) : null;
+  const todayWakeMin = getLocalMinuteOfDay(wakeDate, ctx.tz);
+  const reAnchorOutcome = reAnchorEligible
+    ? applyLateWakeReAnchor({
+        blendMs,
+        habitualMs,
+        pressureMs,
+        wakeMs,
+        recentWakeAnchorMin,
+        cycleMin,
+        tz: ctx.tz,
+      })
+    : { candidateMs: blendMs, cyclesSnapped: 0, reAnchored: false };
+
+  return {
+    pressureMs,
+    habitualMs: habitualMs ?? null,
+    habitWeight,
+    blendMs,
+    recentWakeAnchorMin,
+    todayWakeMin,
+    wakeOffsetMin: recentWakeAnchorMin !== null ? todayWakeMin - recentWakeAnchorMin : null,
+    cycleMin,
+    cyclesSnapped: reAnchorOutcome.cyclesSnapped,
+    reAnchored: reAnchorOutcome.reAnchored,
+    finalMs: Math.round(reAnchorOutcome.candidateMs),
+  };
+}
+
+/**
+ * True when the baby's `offDays` set covers the local date of `wakeUpTime`.
+ * Used to suppress same-day adaptive behaviour on sick / travel / DST days
+ * — Codex review 2026-05-20 flagged that the re-anchor was happy to lift
+ * predictions on the exact days the parent already told the engine to back
+ * off. Mirrors `computeNapBudget`'s off-day gate (`nap-budget.ts:107`).
+ */
+function isOffDayForWake(ctx: BabyContext, wakeUpTime: string): boolean {
+  if (!ctx.offDays || ctx.offDays.size === 0) return false;
+  return ctx.offDays.has(isoToDateInTz(wakeUpTime, ctx.tz));
+}
+
+/**
+ * Weighted-median wake clock (minute-of-day, in baby tz) across the
+ * recent overnight sleeps available in `ctx.recentSleeps` (the same
+ * window the rest of the prediction path consumes — 7 days from the
+ * server). Excludes any night whose end-time is at or after `wakeUpTime`
+ * so today's own wake doesn't drag the median toward itself when this
+ * morning is itself a late-wake outlier.
+ *
+ * Returns null when fewer than 3 prior nights are available — sparser
+ * histories don't carry a useful "typical wake" signal.
+ */
+function recentWakeMedianMinute(ctx: BabyContext, wakeUpTime: string): number | null {
+  const cache = getCache(ctx);
+  const wakeMs = new Date(wakeUpTime).getTime();
+  const past = cache.nights.filter((n) => n.endMs < wakeMs).toSorted((a, b) => b.endMs - a.endMs);
+  if (past.length < 3) return null;
+  const samples: WeightedSample[] = [];
+  for (let i = 0; i < past.length; i++) {
+    const minute = getLocalMinuteOfDay(new Date(past[i].endMs), ctx.tz);
+    samples.push({ value: minute, weight: Math.pow(0.85, i) });
+  }
+  return weightedMedian(samples);
+}
+
+interface LateWakeReAnchorInput {
+  blendMs: number;
+  habitualMs: number | undefined;
+  pressureMs: number;
+  wakeMs: number;
+  recentWakeAnchorMin: number | null;
+  cycleMin: number;
+  tz: string;
+}
+
+interface LateWakeReAnchorOutcome {
+  candidateMs: number;
+  cyclesSnapped: number;
+  reAnchored: boolean;
+}
+
+/**
+ * Bounded late-wake re-anchor. When today's wake clock is at least one
+ * full sleep cycle later than the baby's recent typical wake, lift the
+ * habit anchor by an integer cycle so a clock-stable habit doesn't drag
+ * the predicted first nap earlier than the baby's circadian pressure
+ * supports. The lift is capped at one cycle (v1) and at the
+ * pressure-only estimate, and only ever fires when:
+ *
+ *   - the engine has a real habit anchor to begin with,
+ *   - the pressure-based estimate is already later than habit
+ *     (otherwise the existing blend is fine),
+ *   - the recent wake-clock anchor is well-defined,
+ *   - today's wake offset is ≥ one cycle (so `floor(offset/cycle) ≥ 1`).
+ *
+ * The result is `max(blend, min(habit + snap, pressure))`: we never go
+ * earlier than the existing blend, and we never go past raw pressure.
+ *
+ * Codex pair-review 2026-05-20 endorsed this shape over an earlier
+ * `max(pressure, blend)` proposal, which would have overshot Halldis's
+ * actual nap timing on a +90 min late-wake day (pressure-only ~11:59
+ * Oslo vs the parent's observed ~11:15).
+ */
+function applyLateWakeReAnchor(input: LateWakeReAnchorInput): LateWakeReAnchorOutcome {
+  const { blendMs, habitualMs, pressureMs, wakeMs, recentWakeAnchorMin, cycleMin, tz } = input;
+  const inert: LateWakeReAnchorOutcome = { candidateMs: blendMs, cyclesSnapped: 0, reAnchored: false };
+
+  if (habitualMs === undefined) return inert;
+  if (recentWakeAnchorMin === null) return inert;
+  if (pressureMs <= habitualMs) return inert;
+
+  const todayWakeMin = getLocalMinuteOfDay(new Date(wakeMs), tz);
+  const offsetMin = todayWakeMin - recentWakeAnchorMin;
+  if (offsetMin < cycleMin) return inert;
+
+  const cyclesConsidered = Math.min(Math.floor(offsetMin / cycleMin), 1);
+  if (cyclesConsidered <= 0) return inert;
+
+  const shiftedHabitMs = habitualMs + cyclesConsidered * cycleMin * 60_000;
+  const cappedShiftedMs = Math.min(shiftedHabitMs, pressureMs);
+  const candidateMs = Math.max(blendMs, cappedShiftedMs);
+  const reAnchored = candidateMs > blendMs;
+
+  // Only report `cyclesSnapped` when the snap actually moved the
+  // candidate past the existing blend; if the blend already lay past the
+  // shifted habit then no lift happened and the diagnostic must say so.
+  return { candidateMs, cyclesSnapped: reAnchored ? cyclesConsidered : 0, reAnchored };
 }
 
 /**
@@ -1789,11 +2047,16 @@ export function selectBestPlan(
   activeSleep: SleepLogRow | undefined,
   ctx: BabyContext,
   now: number,
+  options: { dayStart?: boolean } = {},
 ): SelectedPlan {
   const wakeUpMs = new Date(wakeUpTime).getTime();
 
-  // Natural plan: forward walk + learned bedtime
-  const naturalNaps = predictDayNaps(wakeUpTime, ctx);
+  // Natural plan: forward walk + learned bedtime. `dayStart` only flows
+  // through here so the late-wake re-anchor inside `predictDayNaps` can
+  // distinguish "morning plan from today's first wake" from in-day
+  // re-plans (cut-short, completed nap), where index 0 of the resulting
+  // naps array means "next remaining nap" rather than "first nap of day".
+  const naturalNaps = predictDayNaps(wakeUpTime, ctx, options);
   const sleepsForBedtime = buildSleepsForBedtime(todaySleeps, activeSleep, naturalNaps, ctx, now);
   const naturalBedtime = recommendBedtime(sleepsForBedtime, ctx, now);
   const naturalPlan: PlanCandidate = { naps: naturalNaps, bedtime: naturalBedtime };
