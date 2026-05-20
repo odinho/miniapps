@@ -10,6 +10,28 @@ import { isoToDateInTz } from "./tz.js";
 const QUEUE_KEY = "babysovelogg_event_queue";
 const STATE_CACHE_KEY = "babysovelogg_cached_state";
 
+/**
+ * Closed set of event types the offline queue optimistically projects. Keep
+ * in sync with `src/lib/server/projections.ts` / `schemas.ts`. The
+ * `applyOptimisticEvent` switch uses a `never` exhaustiveness check to make
+ * TypeScript fail at compile time when a new type is added without a case.
+ */
+export type OptimisticEventType =
+	| "sleep.started"
+	| "sleep.ended"
+	| "sleep.paused"
+	| "sleep.resumed"
+	| "sleep.pause_deleted"
+	| "sleep.tagged"
+	| "sleep.updated"
+	| "sleep.manual"
+	| "sleep.deleted"
+	| "sleep.restarted"
+	| "diaper.logged"
+	| "day.started"
+	| "day.marked_off"
+	| "day.unmarked_off";
+
 export interface QueuedEvent {
 	type: string;
 	payload: Record<string, unknown>;
@@ -81,7 +103,11 @@ export function applyOptimisticEvent(
 	type: string,
 	payload: Record<string, unknown>,
 ): AppState {
-	const s: AppState = JSON.parse(JSON.stringify(state));
+	const s: AppState = structuredClone(state);
+
+	// Unknown event types pass through unchanged. Within the recognised set
+	// the switch below must be exhaustive — see the `never` check at the end.
+	if (!isOptimisticType(type)) return s;
 
 	switch (type) {
 		case "sleep.started": {
@@ -203,6 +229,14 @@ export function applyOptimisticEvent(
 				if (payload.onsetNote !== undefined)
 					target.onset_note = (payload.onsetNote as string) || null;
 				if (payload.type !== undefined) target.type = payload.type as string;
+				// Tag-style fields are also accepted on sleep.updated by the
+				// projection — mirror them so the offline view doesn't diverge
+				// when a parent edits notes/mood/method while offline.
+				if (payload.mood !== undefined) target.mood = (payload.mood as string) || null;
+				if (payload.method !== undefined) target.method = (payload.method as string) || null;
+				if (payload.fallAsleepTime !== undefined)
+					target.fall_asleep_time = (payload.fallAsleepTime as string) || null;
+				if (payload.notes !== undefined) target.notes = (payload.notes as string) || null;
 			}
 			break;
 		}
@@ -302,9 +336,57 @@ export function applyOptimisticEvent(
 			break;
 		}
 
+		case "day.marked_off": {
+			const date = payload.date as string;
+			const reason = (payload.reason as string | null | undefined) ?? null;
+			if (!s.offDays.includes(date)) {
+				s.offDays = [...s.offDays, date];
+			}
+			if (s.todayWakeUp && s.todayWakeUp.date === date) {
+				s.todayWakeUp = { ...s.todayWakeUp, off_day: 1, off_day_reason: reason };
+			}
+			break;
+		}
+
+		case "day.unmarked_off": {
+			const date = payload.date as string;
+			s.offDays = s.offDays.filter((d) => d !== date);
+			if (s.todayWakeUp && s.todayWakeUp.date === date) {
+				s.todayWakeUp = { ...s.todayWakeUp, off_day: 0, off_day_reason: null };
+			}
+			break;
+		}
+
+		default: {
+			// Exhaustiveness: any new OptimisticEventType added to the union
+			// without a matching case makes this assignment fail at compile time.
+			const _exhaustive: never = type;
+			void _exhaustive;
+		}
 	}
 
 	return s;
+}
+
+const OPTIMISTIC_TYPES: ReadonlySet<string> = new Set<OptimisticEventType>([
+	"sleep.started",
+	"sleep.ended",
+	"sleep.paused",
+	"sleep.resumed",
+	"sleep.pause_deleted",
+	"sleep.tagged",
+	"sleep.updated",
+	"sleep.manual",
+	"sleep.deleted",
+	"sleep.restarted",
+	"diaper.logged",
+	"day.started",
+	"day.marked_off",
+	"day.unmarked_off",
+]);
+
+function isOptimisticType(t: string): t is OptimisticEventType {
+	return OPTIMISTIC_TYPES.has(t);
 }
 
 /** Apply all queued events to a state (used on boot when offline). */
