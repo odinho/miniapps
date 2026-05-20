@@ -10,4 +10,10 @@ babysovelogg-bugs*/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+# Backup/scratch DBs created during ops + investigations (e.g. `db.sqlite.prod`,
+# `db.sqlite.backup`, `db.sqlite.test-backup`). Tracked DBs would bloat the
+# repo and may contain real baby data.
+db.sqlite.*
 *.key
+# Throw-away test scratch (CSV exports, fixture conversions in flight).
+tmp-test/
