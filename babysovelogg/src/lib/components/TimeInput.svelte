@@ -18,8 +18,11 @@
 		// Already HH:MM format
 		const colonMatch = v.match(/^(\d{1,2}):(\d{1,2})$/);
 		if (colonMatch) {
-			const h = Math.min(23, Math.max(0, parseInt(colonMatch[1])));
-			const m = Math.min(59, Math.max(0, parseInt(colonMatch[2])));
+			const h = parseInt(colonMatch[1], 10);
+			const m = parseInt(colonMatch[2], 10);
+			// Reject out-of-range input outright — silently clamping "99:99" to
+			// "23:59" lets a typo land as a perfectly plausible time.
+			if (h > 23 || m > 59) return null;
 			return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 		}
 

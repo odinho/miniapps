@@ -417,13 +417,19 @@
 
 	async function saveMorningWakeTime() {
 		if (morningBusy || !baby) return;
+		// Validate before constructing Date — calling toISOString() on an Invalid
+		// Date (which is what `new Date("…")` returns for garbage input) throws.
+		if (!/^\d{4}-\d{2}-\d{2}$/.test(morningDate) || !/^\d{2}:\d{2}$/.test(morningTime)) return;
+		const candidate = new Date(`${morningDate}T${morningTime}:00`);
+		if (Number.isNaN(candidate.getTime())) return;
+
 		morningBusy = true;
 		try {
-			const wakeTime = new Date(`${morningDate}T${morningTime}:00`).toISOString();
-			await sync.sendEvents([{
+			const result = await sync.sendEvents([{
 				type: 'day.started',
-				payload: { babyId: baby.id, wakeTime },
+				payload: { babyId: baby.id, wakeTime: candidate.toISOString() },
 			}]);
+			if (result == null) return;
 			showMorningDialog = false;
 		} finally {
 			morningBusy = false;

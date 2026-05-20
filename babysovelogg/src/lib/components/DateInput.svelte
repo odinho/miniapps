@@ -20,8 +20,13 @@
 	function toIso(display: string): string | null {
 		const match = display.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
 		if (!match) return null;
-		const d = parseInt(match[1]), m = parseInt(match[2]), y = parseInt(match[3]);
+		const d = parseInt(match[1], 10), m = parseInt(match[2], 10), y = parseInt(match[3], 10);
 		if (m < 1 || m > 12 || d < 1 || d > 31 || y < 2020 || y > 2099) return null;
+		// Verify the day actually exists in that month (rejects 31.02, 31.04, etc.):
+		// constructing the Date with an overflow day silently rolls into the next
+		// month, so a round-trip check catches it.
+		const dt = new Date(y, m - 1, d);
+		if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
 		return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 	}
 
