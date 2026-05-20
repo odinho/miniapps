@@ -10,21 +10,26 @@ import { db } from "./db.js";
  */
 
 let configured = false;
-let configureAttempted = false;
+let warnedMissingKeys = false;
 let publicKey: string | null = null;
 
 function configure() {
-  if (configureAttempted) return;
-  configureAttempted = true;
+  // Re-check on every call so env vars set after module load still take
+  // effect; only the "missing keys" warning is memoized so it doesn't fire
+  // on every send when push isn't configured.
+  if (configured) return;
   const pub = process.env.VAPID_PUBLIC_KEY;
   const priv = process.env.VAPID_PRIVATE_KEY;
   const subject = process.env.VAPID_SUBJECT ?? "mailto:noreply@babysovelogg.local";
   if (!pub || !priv) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      "[webpush] VAPID keys not set — push notifications disabled. " +
-        "Run `bun scripts/generate-vapid-keys.ts` and set VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY.",
-    );
+    if (!warnedMissingKeys) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[webpush] VAPID keys not set — push notifications disabled. " +
+          "Run `bun scripts/generate-vapid-keys.ts` and set VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY.",
+      );
+      warnedMissingKeys = true;
+    }
     return;
   }
   webpush.setVapidDetails(subject, pub, priv);

@@ -30,7 +30,15 @@ interface NotificationRow {
   fire_at: string;
   dedupe_key: string;
   payload_json: string;
+  attempts: number;
 }
+
+// Bound transient retries: at most 3 tries, and never more than ~5 min past
+// the original fire_at — by then the notification is stale anyway and the
+// parent would rather not see an old alert pop up. With the 30s poll loop
+// this means a failed push gets ~3 quick attempts and then drops.
+const SEND_MAX_ATTEMPTS = 3;
+const SEND_MAX_AGE_MS = 5 * 60 * 1000;
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -270,13 +278,27 @@ export async function fireDueNotifications(now: Date = new Date()): Promise<numb
       try {
         const payload = JSON.parse(row.payload_json);
         const result = await sendPushToBaby(row.baby_id, payload);
-        // Mark sent only when there were no transient failures. Both `sent`
-        // and `removed` (404/410 → subscription deleted) count as terminal;
-        // `failed` means a transient error that the next poll can retry.
+        const attempts = (row.attempts ?? 0) + 1;
+        // Terminal: every send either succeeded or removed a dead subscription.
         if (result.failed === 0) {
-          db.prepare("UPDATE notification_schedule SET sent_at = datetime('now') WHERE id = ?").run(
-            row.id,
-          );
+          db.prepare(
+            "UPDATE notification_schedule SET sent_at = datetime('now'), attempts = ? WHERE id = ?",
+          ).run(attempts, row.id);
+        } else {
+          // Transient failure. Give up if we've tried too many times or the
+          // fire_at is past its staleness window — otherwise leave for retry.
+          const tooStale = now.getTime() - new Date(row.fire_at).getTime() > SEND_MAX_AGE_MS;
+          const exhausted = attempts >= SEND_MAX_ATTEMPTS;
+          if (exhausted || tooStale) {
+            db.prepare(
+              "UPDATE notification_schedule SET cancelled_at = datetime('now'), attempts = ? WHERE id = ?",
+            ).run(attempts, row.id);
+          } else {
+            db.prepare("UPDATE notification_schedule SET attempts = ? WHERE id = ?").run(
+              attempts,
+              row.id,
+            );
+          }
         }
         return result.sent > 0;
       } catch (err) {

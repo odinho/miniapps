@@ -484,6 +484,62 @@ describe("fireDueNotifications", () => {
     };
     expect(row.sent_at).toBeNull();
   });
+
+  // VAPID isn't configured in the test environment, so every push for a
+  // real subscription returns `failed`. Use that to exercise the
+  // retry/abandon path without mocking webpush.
+  function insertFailingSub() {
+    db.prepare(
+      `INSERT INTO notification_subscriptions (baby_id, endpoint, p256dh, auth)
+       VALUES (1, 'https://example.test/x', 'p256dh', 'auth')`,
+    ).run();
+  }
+
+  it("increments attempts on transient failure but does not mark sent", async () => {
+    insertFailingSub();
+    db.prepare(
+      `INSERT INTO notification_schedule (baby_id, kind, fire_at, dedupe_key, payload_json)
+       VALUES (1, 'rescue_wake', ?, 'retry-1', '{"title":"x","body":"y"}')`,
+    ).run(new Date(Date.now() - 30_000).toISOString());
+    await fireDueNotifications();
+    const row = db
+      .prepare("SELECT sent_at, cancelled_at, attempts FROM notification_schedule")
+      .get() as { sent_at: string | null; cancelled_at: string | null; attempts: number };
+    expect(row.sent_at).toBeNull();
+    expect(row.cancelled_at).toBeNull();
+    expect(row.attempts).toBe(1);
+  });
+
+  it("cancels the row after 3 failed attempts", async () => {
+    insertFailingSub();
+    db.prepare(
+      `INSERT INTO notification_schedule (baby_id, kind, fire_at, dedupe_key, payload_json, attempts)
+       VALUES (1, 'rescue_wake', ?, 'retry-cap', '{"title":"x","body":"y"}', 2)`,
+    ).run(new Date(Date.now() - 30_000).toISOString());
+    await fireDueNotifications();
+    const row = db
+      .prepare("SELECT sent_at, cancelled_at, attempts FROM notification_schedule")
+      .get() as { sent_at: string | null; cancelled_at: string | null; attempts: number };
+    expect(row.sent_at).toBeNull();
+    expect(row.cancelled_at).not.toBeNull();
+    expect(row.attempts).toBe(3);
+  });
+
+  it("cancels a stale row (fire_at older than 5 min) without waiting for 3 attempts", async () => {
+    insertFailingSub();
+    const now = new Date();
+    const stale = new Date(now.getTime() - 6 * 60 * 1000).toISOString();
+    db.prepare(
+      `INSERT INTO notification_schedule (baby_id, kind, fire_at, dedupe_key, payload_json)
+       VALUES (1, 'rescue_wake', ?, 'retry-stale', '{"title":"x","body":"y"}')`,
+    ).run(stale);
+    await fireDueNotifications(now);
+    const row = db
+      .prepare("SELECT sent_at, cancelled_at, attempts FROM notification_schedule")
+      .get() as { sent_at: string | null; cancelled_at: string | null; attempts: number };
+    expect(row.cancelled_at).not.toBeNull();
+    expect(row.attempts).toBe(1);
+  });
 });
 
 describe("reconcileNotifications – nap_budget_cap", () => {

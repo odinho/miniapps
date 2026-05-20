@@ -192,6 +192,10 @@ function initSchema(database: SqliteDb) {
       updated_at TEXT NOT NULL
     );
   `);
+
+  // Per-row attempt counter so transient push failures retry a small
+  // number of times before being abandoned (see notification-scheduler).
+  tryAddColumn(database, "notification_schedule", "attempts", "INTEGER NOT NULL DEFAULT 0");
 }
 
 /** Initialize (or re-initialize) the database. Defaults to file-based db.sqlite. */
