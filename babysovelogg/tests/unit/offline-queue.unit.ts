@@ -21,6 +21,8 @@ function makeState(overrides: Partial<AppState> = {}): AppState {
 		activeSleep: null,
 		todaySleeps: [],
 		stats: { napCount: 1, totalNapMinutes: 45, totalNightMinutes: 600, sleeps: [] },
+		dayTotals: null,
+		priorOvernightSleep: null,
 		prediction: null,
 		ageMonths: 9,
 		diaperCount: 3,

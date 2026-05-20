@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   getTodayStats,
+  getSleepDayTotals,
   getWeekStats,
   getAverageWakeWindow,
   getWakeWindowGaps,
@@ -79,6 +80,84 @@ describe("getTodayStats", () => {
       ]),
     ]);
     expect(stats.totalNapMinutes).toBe(90); // 120 - 30
+  });
+});
+
+// --- getSleepDayTotals ---
+
+describe("getSleepDayTotals", () => {
+  it("returns today's stats when no prior overnight", () => {
+    const todayNap = sleep(t(9, 0), t(10, 30), "nap");
+    const totals = getSleepDayTotals([todayNap], null);
+    expect(totals).toMatchObject({
+      napMinutes: 90,
+      todayNightMinutes: 0,
+      priorNightMinutes: 0,
+      totalMinutes: 90,
+      includesPriorNight: false,
+    });
+  });
+
+  it("adds prior overnight's duration to total when present", () => {
+    // Last night: 19:30 → next-day 06:30 = 11h = 660 min
+    const priorOvernight = sleep(
+      "2026-03-25T19:30:00.000Z",
+      "2026-03-26T06:30:00.000Z",
+      "night",
+    );
+    const todayNap = sleep(t(9, 0), t(10, 30), "nap");
+    const totals = getSleepDayTotals([todayNap], priorOvernight);
+    expect(totals).toMatchObject({
+      napMinutes: 90,
+      todayNightMinutes: 0,
+      priorNightMinutes: 660,
+      totalMinutes: 750,
+      includesPriorNight: true,
+    });
+  });
+
+  it("subtracts pause minutes from prior overnight", () => {
+    // 19:30 → 06:30 = 660 raw; 15 min pause → 645
+    const priorOvernight = sleep(
+      "2026-03-25T19:30:00.000Z",
+      "2026-03-26T06:30:00.000Z",
+      "night",
+      [
+        { pause_time: "2026-03-26T02:00:00.000Z", resume_time: "2026-03-26T02:15:00.000Z" },
+      ],
+    );
+    const totals = getSleepDayTotals([], priorOvernight);
+    expect(totals.priorNightMinutes).toBe(645);
+    expect(totals.totalMinutes).toBe(645);
+  });
+
+  it("ignores a null-ended prior overnight (still in progress)", () => {
+    const priorOvernight = sleep("2026-03-25T22:00:00.000Z", null, "night");
+    const totals = getSleepDayTotals([], priorOvernight);
+    expect(totals).toMatchObject({
+      napMinutes: 0,
+      priorNightMinutes: 0,
+      totalMinutes: 0,
+      includesPriorNight: false,
+    });
+  });
+
+  it("Halldis scenario: 12h50m night + 1h53m nap totals 14h43m", () => {
+    // Reproduces the 2026-05-20 user report.
+    const priorOvernight = sleep(
+      "2026-05-19T18:46:00.000Z",
+      "2026-05-20T07:36:00.000Z",
+      "night",
+    );
+    const nap = sleep(
+      "2026-05-20T11:29:00.000Z",
+      "2026-05-20T13:22:00.000Z",
+      "nap",
+    );
+    const totals = getSleepDayTotals([nap], priorOvernight);
+    expect(totals.priorNightMinutes).toBe(770); // 12h50m
+    expect(totals.napMinutes).toBe(113);        // 1h53m
+    expect(totals.totalMinutes).toBe(883);      // 14h43m
   });
 });
 

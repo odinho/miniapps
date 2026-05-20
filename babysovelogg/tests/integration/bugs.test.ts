@@ -151,6 +151,108 @@ test("Wakeup derived from overnight night sleep — no day.started needed", asyn
   expect(state.todayWakeUp.wake_time).toBe(nightEnd);
 });
 
+// --- Sleep-day totals: prior overnight contributes to today's daily total ---
+
+test("dayTotals includes the overnight that ended this morning", async () => {
+  // Reproduces the 2026-05-20 Halldis report: parent saw a daytime UI where
+  // "today" omitted the morning's overnight. `todaySleeps` filters
+  // start_time >= midnight; the new dayTotals + priorOvernightSleep fields
+  // expose the prior night so UI surfaces can use the parent's natural
+  // "wake-to-wake" framing.
+  const babyId = createBaby("Halldis");
+  // Force baby tz to UTC so today-boundary math is deterministic.
+  db.prepare("UPDATE baby SET timezone = ? WHERE id = ?").run("UTC", babyId);
+
+  // Overnight 19:00 yesterday → 07:00 today (12h, in UTC)
+  const overnightId = generateSleepId();
+  await postEvents([
+    makeEvent("sleep.started", {
+      babyId,
+      startTime: "2026-05-19T19:00:00.000Z",
+      type: "night",
+      sleepDomainId: overnightId,
+    }),
+  ]);
+  await postEvents([
+    makeEvent("sleep.ended", {
+      sleepDomainId: overnightId,
+      endTime: "2026-05-20T07:00:00.000Z",
+    }),
+  ]);
+
+  // Today's nap 11:00 → 12:30 (90 min)
+  const napId = generateSleepId();
+  await postEvents([
+    makeEvent("sleep.started", {
+      babyId,
+      startTime: "2026-05-20T11:00:00.000Z",
+      type: "nap",
+      sleepDomainId: napId,
+    }),
+  ]);
+  await postEvents([
+    makeEvent("sleep.ended", {
+      sleepDomainId: napId,
+      endTime: "2026-05-20T12:30:00.000Z",
+    }),
+  ]);
+
+  const nowMs = new Date("2026-05-20T13:30:00.000Z").getTime();
+  const state = await (await get(`/api/state?now=${nowMs}`)).json();
+
+  // `stats` (calendar-day) does NOT include the morning overnight.
+  expect(state.stats.totalNightMinutes).toBe(0);
+  expect(state.stats.totalNapMinutes).toBe(90);
+
+  // `dayTotals` (sleep-day) DOES include it.
+  expect(state.dayTotals).toMatchObject({
+    napMinutes: 90,
+    todayNightMinutes: 0,
+    priorNightMinutes: 720, // 12h
+    totalMinutes: 810,
+    includesPriorNight: true,
+  });
+
+  // The full prior-overnight row is exposed so UI can render its time range.
+  expect(state.priorOvernightSleep).toMatchObject({
+    start_time: "2026-05-19T19:00:00.000Z",
+    end_time: "2026-05-20T07:00:00.000Z",
+    type: "night",
+  });
+});
+
+test("dayTotals returns priorNightMinutes=0 when no overnight ended today", async () => {
+  const babyId = createBaby("Testa");
+  db.prepare("UPDATE baby SET timezone = ? WHERE id = ?").run("UTC", babyId);
+
+  const napId = generateSleepId();
+  await postEvents([
+    makeEvent("sleep.started", {
+      babyId,
+      startTime: "2026-05-20T11:00:00.000Z",
+      type: "nap",
+      sleepDomainId: napId,
+    }),
+  ]);
+  await postEvents([
+    makeEvent("sleep.ended", {
+      sleepDomainId: napId,
+      endTime: "2026-05-20T12:30:00.000Z",
+    }),
+  ]);
+
+  const nowMs = new Date("2026-05-20T13:30:00.000Z").getTime();
+  const state = await (await get(`/api/state?now=${nowMs}`)).json();
+
+  expect(state.dayTotals).toMatchObject({
+    napMinutes: 90,
+    priorNightMinutes: 0,
+    totalMinutes: 90,
+    includesPriorNight: false,
+  });
+  expect(state.priorOvernightSleep).toBeNull();
+});
+
 // --- B5+B6: Diaper note and type visibility ---
 
 test("B5: diaper with dirty type preserves type in response", async () => {

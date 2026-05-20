@@ -8,7 +8,15 @@ import { todayInTz } from "$lib/tz.js";
 export function getState(now?: number) {
   const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby | undefined;
   if (!baby)
-    return { baby: null, activeSleep: null, todaySleeps: [], stats: null, prediction: null };
+    return {
+      baby: null,
+      activeSleep: null,
+      todaySleeps: [],
+      stats: null,
+      dayTotals: null,
+      priorOvernightSleep: null,
+      prediction: null,
+    };
 
   let activeSleep = db
     .prepare(
@@ -30,7 +38,10 @@ export function getState(now?: number) {
     baby.timezone = serverTz;
   }
   const tz = baby.timezone;
-  const { dateStr: todayDateStr, midnightIso } = todayInTz(tz);
+  // Compute the date boundary against the same `now` the engine uses so
+  // integration tests passing `?now=...` get a deterministic result, and
+  // production calls without `now` fall back to the real wall clock.
+  const { dateStr: todayDateStr, midnightIso } = todayInTz(tz, now);
 
   const todaySleeps = db
     .prepare(
@@ -54,19 +65,22 @@ export function getState(now?: number) {
   // re-anchor on the next reconcile from the night entry anyway.
   const placeholderWake = `${todayDateStr}T00:00:00.000Z`;
   const dayStartHasRealWake = !!dayStartRow && dayStartRow.wake_time !== placeholderWake;
-  const overnightSleep = db
+  // Fetch the full overnight row (not just end_time): UI surfaces want the
+  // duration for the "Søvn i dag" total, and engine assembly attaches its
+  // pauses for an accurate pause-adjusted figure.
+  const priorOvernightRow = db
     .prepare(
-      "SELECT end_time FROM sleep_log WHERE baby_id = ? AND type = 'night' AND start_time < ? AND end_time >= ? AND deleted = 0 ORDER BY end_time DESC LIMIT 1",
+      "SELECT * FROM sleep_log WHERE baby_id = ? AND type = 'night' AND start_time < ? AND end_time >= ? AND deleted = 0 ORDER BY end_time DESC LIMIT 1",
     )
-    .get(baby.id, midnightIso, midnightIso) as { end_time: string } | undefined;
+    .get(baby.id, midnightIso, midnightIso) as SleepLogRow | undefined;
   let todayWakeUp: DayStartRow | undefined;
-  if (overnightSleep) {
+  if (priorOvernightRow?.end_time) {
     todayWakeUp = {
       id: dayStartRow?.id ?? 0,
       baby_id: baby.id,
       date: todayDateStr,
-      wake_time: overnightSleep.end_time,
-      created_at: overnightSleep.end_time,
+      wake_time: priorOvernightRow.end_time,
+      created_at: priorOvernightRow.end_time,
       created_by_event_id: null,
       off_day: dayStartRow?.off_day ?? 0,
       off_day_reason: dayStartRow?.off_day_reason ?? null,
@@ -108,15 +122,19 @@ export function getState(now?: number) {
     .all(baby.id, thirtyDaysAgo) as SleepLogRow[];
   const trendSleeps = strategySleeps;
 
-  // Batch-fetch pauses for all today's sleeps (avoids N+1 query)
-  const todaySleepIds = todaySleeps.map((s) => s.id);
+  // Batch-fetch pauses for today's sleeps + the prior overnight (avoids
+  // N+1). The overnight's pauses matter for accurate sleep-day totals: a
+  // 15-min mid-night wake should subtract from "Søvn i dag", not stay
+  // counted as sleep.
+  const sleepIdsToHydrate = todaySleeps.map((s) => s.id);
+  if (priorOvernightRow) sleepIdsToHydrate.push(priorOvernightRow.id);
   const pausesBySleep = new Map<number, SleepPauseRow[]>();
-  if (todaySleepIds.length > 0) {
+  if (sleepIdsToHydrate.length > 0) {
     const allPauses = db
       .prepare(
-        `SELECT * FROM sleep_pauses WHERE sleep_id IN (${todaySleepIds.map(() => "?").join(",")}) ORDER BY pause_time ASC`,
+        `SELECT * FROM sleep_pauses WHERE sleep_id IN (${sleepIdsToHydrate.map(() => "?").join(",")}) ORDER BY pause_time ASC`,
       )
-      .all(...todaySleepIds) as SleepPauseRow[];
+      .all(...sleepIdsToHydrate) as SleepPauseRow[];
     for (const p of allPauses) {
       if (!pausesBySleep.has(p.sleep_id)) pausesBySleep.set(p.sleep_id, []);
       pausesBySleep.get(p.sleep_id)!.push(p);
@@ -157,6 +175,7 @@ export function getState(now?: number) {
     strategySleeps,
     trendSleeps,
     todayWakeUp,
+    priorOvernightSleep: priorOvernightRow,
     pausesBySleep,
     diaperCount: todayDiapers?.count ?? 0,
     lastDiaperTime: lastDiaper?.time ?? null,

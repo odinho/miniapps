@@ -1,5 +1,5 @@
 import type { Baby, SleepLogRow, DayStartRow } from "$lib/types.js";
-import type { DayStats } from "$lib/engine/stats.js";
+import type { DayStats, SleepDayTotals } from "$lib/engine/stats.js";
 import type { PredictedNap } from "$lib/engine/schedule.js";
 import type { ConfidenceResult, PredictionRange } from "$lib/engine/confidence.js";
 import type { CalibrationReport } from "$lib/engine/calibration.js";
@@ -100,13 +100,12 @@ export interface Prediction {
 	 */
 	napBudget: NapBudget | null;
 	/**
-	 * Blended 7d/30d daily-total trend (minutes), age-norm clamped. Same number
-	 * the napBudget feature uses to decide whether to cap. Exposed at the
-	 * Prediction level so the static UI (SleepInsightsCard) can show it
-	 * alongside the learned-typical totals — otherwise the overview would
-	 * keep advertising "14.2 h tomorrow" even after the engine recommends
-	 * capping naps to land near 13 h. Null when trend data is too sparse
-	 * (<7 complete days) or too noisy (stdev/mean above threshold).
+	 * Blended 7d/30d daily-total trend (minutes), age-norm clamped. Same
+	 * number the napBudget feature uses to decide whether to cap. Surfaced
+	 * to UI for the stats comparison table's "Trendmål" row so parents see
+	 * the engine's real target alongside age-norm and learned-typical
+	 * totals. Null when trend data is too sparse (<7 complete days) or too
+	 * noisy (stdev/mean above threshold).
 	 */
 	dailyTrendTotalMin: number | null;
 }
@@ -194,6 +193,18 @@ export interface AppState {
 	activeSleep: SleepLogRow | null;
 	todaySleeps: SleepLogRow[];
 	stats: DayStats | null;
+	/**
+	 * Wake-to-wake "sleep day" totals: nap + today-night + the morning overnight.
+	 * Use this for daily-total UI ("Søvn i dag"). `stats` stays unchanged for
+	 * engine and legacy consumers — it omits the morning night.
+	 */
+	dayTotals: SleepDayTotals | null;
+	/**
+	 * The completed overnight that ended this morning (start_time before
+	 * midnight, end_time today), or null. Surfaced so Heim can show
+	 * "Natt (i går → i dag) XtYm" without re-querying.
+	 */
+	priorOvernightSleep: SleepLogRow | null;
 	prediction: Prediction | null;
 	ageMonths: number;
 	diaperCount: number;
@@ -212,6 +223,8 @@ const emptyState: AppState = {
 	activeSleep: null,
 	todaySleeps: [],
 	stats: null,
+	dayTotals: null,
+	priorOvernightSleep: null,
 	prediction: null,
 	ageMonths: 0,
 	diaperCount: 0,

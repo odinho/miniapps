@@ -60,6 +60,45 @@ export function getTodayStats(sleeps: SleepEntry[]): DayStats {
   };
 }
 
+/** Wake-to-wake "sleep day" totals — the parent's natural way to count.
+ *
+ * `todaySleeps` is filtered server-side to `start_time >= midnight`, so the
+ * overnight that ended *this* morning (started yesterday evening) is not in
+ * that list. For "Søvn i dag" the parent expects that morning night to
+ * belong to today — passing it as `priorOvernight` adds its pause-adjusted
+ * duration to the night minutes.
+ */
+export interface SleepDayTotals {
+  napMinutes: number;
+  /** Night sleep that *started* today (rare — only an unusual deep-night log). */
+  todayNightMinutes: number;
+  /** The overnight that ended this morning. 0 when none provided. */
+  priorNightMinutes: number;
+  /** napMinutes + todayNightMinutes + priorNightMinutes. */
+  totalMinutes: number;
+  /** True iff the prior overnight contributed a non-zero duration. */
+  includesPriorNight: boolean;
+}
+
+export function getSleepDayTotals(
+  todaySleeps: SleepEntry[],
+  priorOvernight: SleepEntry | null,
+): SleepDayTotals {
+  const today = getTodayStats(todaySleeps);
+  let priorNightMinutes = 0;
+  if (priorOvernight?.end_time) {
+    const raw = durationMinutes(priorOvernight);
+    if (raw > 0) priorNightMinutes = Math.round(raw);
+  }
+  return {
+    napMinutes: today.totalNapMinutes,
+    todayNightMinutes: today.totalNightMinutes,
+    priorNightMinutes,
+    totalMinutes: today.totalNapMinutes + today.totalNightMinutes + priorNightMinutes,
+    includesPriorNight: priorNightMinutes > 0,
+  };
+}
+
 /** Get aggregated stats for a week of sleeps, grouped by day.
  *  When tz is provided, groups by local date in the baby's timezone. */
 export function getWeekStats(sleeps: SleepEntry[], tz?: string): WeekStats {

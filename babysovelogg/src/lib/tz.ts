@@ -51,13 +51,31 @@ export function setHourInTz(date: Date, hour: number, minute: number, tz: string
 }
 
 /** Get today's date (YYYY-MM-DD) and the UTC ISO string for midnight in the given timezone.
- *  midnightIso is suitable for SQL `>=` comparisons against UTC timestamps. */
-export function todayInTz(tz: string): { dateStr: string; midnightIso: string } {
-	const now = new Date();
+ *  midnightIso is suitable for SQL `>=` comparisons against UTC timestamps.
+ *
+ *  `nowMs` is optional so tests (and the API's `?now=` query param) can pin
+ *  both the date calculation and engine clock to the same instant — without
+ *  this, `getState(now)` would use the real wall clock here and the engine
+ *  clock elsewhere, making integration tests date-dependent.
+ *
+ *  Offset is sampled at the *target midnight UTC candidate* (not "now"), so
+ *  a DST transition that happens within the same calendar day doesn't shift
+ *  midnight by 1 hour. Codex pair-review 2026-05-20.
+ */
+export function todayInTz(tz: string, nowMs?: number): { dateStr: string; midnightIso: string } {
+	const now = new Date(nowMs ?? Date.now());
 	const dateStr = now.toLocaleDateString("en-CA", { timeZone: tz });
-	const utcStr = now.toLocaleString("en-US", { timeZone: "UTC" });
-	const localStr = now.toLocaleString("en-US", { timeZone: tz });
-	const offsetMs = new Date(localStr).getTime() - new Date(utcStr).getTime();
-	const midnightIso = new Date(new Date(`${dateStr}T00:00:00Z`).getTime() - offsetMs).toISOString();
+	const candidate = new Date(`${dateStr}T00:00:00Z`);
+	const offsetMs = tzOffsetAt(candidate.getTime(), tz);
+	const midnightIso = new Date(candidate.getTime() - offsetMs).toISOString();
 	return { dateStr, midnightIso };
+}
+
+/** Offset between `tz` and UTC at the given UTC instant, in milliseconds.
+ *  Positive when tz is ahead of UTC (e.g. Oslo summer = +7200000). */
+function tzOffsetAt(ms: number, tz: string): number {
+	const d = new Date(ms);
+	const utc = d.toLocaleString("en-US", { timeZone: "UTC" });
+	const local = d.toLocaleString("en-US", { timeZone: tz });
+	return new Date(local).getTime() - new Date(utc).getTime();
 }

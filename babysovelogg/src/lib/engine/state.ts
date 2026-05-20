@@ -15,7 +15,7 @@ import {
   estimateSleepCycleFromData,
 } from "./schedule.js";
 import { RESCUE_NAP, NAP_FLOOR_BY_AGE, findByAge } from "./constants.js";
-import { getTodayStats } from "./stats.js";
+import { getTodayStats, getSleepDayTotals } from "./stats.js";
 import { computeConfidence, computeWakeRange } from "./confidence.js";
 import { computeNapBudget, isDayOnTrend } from "./nap-budget.js";
 import { computeTrendTotalMin } from "./trend.js";
@@ -40,6 +40,15 @@ export interface DayData {
   /** Long-horizon sleeps (30-day lookback) for daily-total trend math in napBudget. Falls back to strategySleeps if absent. */
   trendSleeps?: SleepLogRow[];
   todayWakeUp: DayStartRow | undefined;
+  /**
+   * The overnight that ended *this* morning (start_time before midnight,
+   * end_time today). Carried separately from `todaySleeps` because that
+   * list is filtered to `start_time >= midnight` for the engine planner.
+   * UI surfaces that want the parent's natural "sleep day" total use this
+   * to add the morning night onto today's totals. Undefined when no such
+   * overnight exists (still in progress, or none logged).
+   */
+  priorOvernightSleep?: SleepLogRow | undefined;
   pausesBySleep: Map<number, SleepPauseRow[]>;
   diaperCount: number;
   lastDiaperTime: string | null;
@@ -651,6 +660,16 @@ export function assembleState(data: DayData) {
   }));
   const stats = getTodayStats(todaySleepsWithPauses);
 
+  // Sleep-day totals (wake-to-wake): adds the prior overnight's duration so
+  // surfaces that read "Søvn i dag" don't silently drop the morning night.
+  // See the 2026-05-20 user report — "ho hadde langt over 10t59min nattesøvn
+  // i dag" — caused by the calendar-midnight cutoff in todaySleeps.
+  const priorOvernight = data.priorOvernightSleep;
+  const priorOvernightEntry: SleepEntry | null = priorOvernight
+    ? { ...toSleepEntry(priorOvernight), pauses: pausesBySleep.get(priorOvernight.id) || [] }
+    : null;
+  const dayTotals = getSleepDayTotals(todaySleepsWithPauses, priorOvernightEntry);
+
   const strategy = determineStrategy(strategyEntries, baby.birthdate, ctx.tz, now);
   ctx.strategy = strategy;
 
@@ -676,6 +695,19 @@ export function assembleState(data: DayData) {
     activeSleep,
     todaySleeps,
     stats,
+    /**
+     * Wake-to-wake totals. Same nap + today-night numbers as `stats`, plus
+     * the previous overnight's duration. Use this for daily-total UI
+     * (`Søvn i dag`), not `stats`. `stats` stays unchanged for engine and
+     * legacy consumers.
+     */
+    dayTotals,
+    /**
+     * The completed overnight that ended this morning (start_time before
+     * midnight, end_time today), or null. Surfaces an actual "last night"
+     * row on Heim without requiring the UI to re-query.
+     */
+    priorOvernightSleep: priorOvernight ?? null,
     prediction,
     ageMonths: ctx.ageMonths,
     diaperCount: data.diaperCount,

@@ -126,6 +126,8 @@ function createSync() {
 			activeSleep: (raw.activeSleep as AppState["activeSleep"]) ?? null,
 			todaySleeps: (raw.todaySleeps as AppState["todaySleeps"]) ?? [],
 			stats: (raw.stats as AppState["stats"]) ?? null,
+			dayTotals: (raw.dayTotals as AppState["dayTotals"]) ?? null,
+			priorOvernightSleep: (raw.priorOvernightSleep as AppState["priorOvernightSleep"]) ?? null,
 			prediction: (raw.prediction as AppState["prediction"]) ?? null,
 			ageMonths: (raw.ageMonths as number) ?? 0,
 			diaperCount: (raw.diaperCount as number) ?? 0,
