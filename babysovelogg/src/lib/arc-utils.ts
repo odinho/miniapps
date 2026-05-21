@@ -5,33 +5,73 @@ export interface ArcConfig {
   arcEndHour: number;
 }
 
-export function getDayArcConfig(wakeUpTime?: string | null): ArcConfig {
+// The arc time-fraction math must agree with the labels painted on the
+// endpoints — otherwise an active sleep that started at the label time
+// renders far up the arc instead of at the endpoint. The 2026-05-21 bug
+// report: bedtime 19:52, end label 06:17, but the hardcoded 18→30 night
+// window placed the active sleep bubble at frac ≈ 0.156. Both configs
+// take ISO anchors so the labels and the math share a single source of
+// truth.
+
+export function getDayArcConfig(wakeUpTime?: string | null, bedtime?: string | null): ArcConfig {
   let arcStartHour = 6;
   if (wakeUpTime) {
     const wake = new Date(wakeUpTime);
     arcStartHour = wake.getHours() + wake.getMinutes() / 60;
   }
-  return { arcStartHour, arcEndHour: arcStartHour + 12 };
+  let arcEndHour = arcStartHour + 12;
+  if (bedtime) {
+    const bt = new Date(bedtime);
+    const btHour = bt.getHours() + bt.getMinutes() / 60;
+    if (btHour > arcStartHour) arcEndHour = btHour;
+  }
+  return { arcStartHour, arcEndHour };
 }
 
-export function getNightArcConfig(): ArcConfig {
-  return { arcStartHour: 18, arcEndHour: 30 };
+export function getNightArcConfig(
+  bedtime?: string | null,
+  nightEnd?: string | null,
+): ArcConfig {
+  let arcStartHour = 18;
+  if (bedtime) {
+    const bt = new Date(bedtime);
+    let h = bt.getHours() + bt.getMinutes() / 60;
+    if (h < 12) h += 24;
+    arcStartHour = h;
+  }
+  let arcEndHour = 30;
+  if (nightEnd) {
+    const ne = new Date(nightEnd);
+    let h = ne.getHours() + ne.getMinutes() / 60;
+    if (h < 12) h += 24;
+    arcEndHour = h;
+  }
+  if (arcEndHour <= arcStartHour) arcEndHour = arcStartHour + 12;
+  return { arcStartHour, arcEndHour };
 }
 
 function hourOfDay(d: Date): number {
   return d.getHours() + d.getMinutes() / 60;
 }
 
+// Night arcs cross midnight (arcEndHour > 24). For times after midnight,
+// hourOfDay() returns 0..6 but the arc thinks of them as 24..30. Wrap when
+// the arc itself crosses midnight; the < 12 cutoff distinguishes
+// "post-midnight morning" from "before-bedtime evening" (bedtimes never
+// happen before noon).
+function applyNightWrap(h: number, config: ArcConfig): number {
+  if (config.arcEndHour > 24 && h < 12) return h + 24;
+  return h;
+}
+
 export function timeToArcFraction(d: Date, config: ArcConfig): number {
-  let h = hourOfDay(d);
-  if (config.arcStartHour >= 18 && h < 12) h += 24;
+  const h = applyNightWrap(hourOfDay(d), config);
   const frac = (h - config.arcStartHour) / (config.arcEndHour - config.arcStartHour);
   return Math.max(0, Math.min(1, frac));
 }
 
 export function timeToArcFractionRaw(d: Date, config: ArcConfig): number {
-  let h = hourOfDay(d);
-  if (config.arcStartHour >= 18 && h < 12) h += 24;
+  const h = applyNightWrap(hourOfDay(d), config);
   return (h - config.arcStartHour) / (config.arcEndHour - config.arcStartHour);
 }
 

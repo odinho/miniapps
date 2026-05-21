@@ -52,6 +52,8 @@
 		arcPred: ArcPred;
 		arcIsNight: boolean;
 		arcWakeUpTime?: string | null;
+		arcBedtime?: string | null;
+		arcNightEnd?: string | null;
 		arcStartLabel: string | null;
 		arcEndLabel: string | null;
 		arcBands: Array<{ lo: string; hi: string }>;
@@ -747,6 +749,8 @@
 								prediction={s.arcPred}
 								isNightMode={s.arcIsNight}
 								wakeUpTime={s.arcWakeUpTime ?? null}
+								bedtime={s.arcBedtime ?? null}
+								nightEnd={s.arcNightEnd ?? null}
 								startTimeLabel={s.arcStartLabel}
 								endTimeLabel={s.arcEndLabel}
 								napConfidenceBands={s.arcBands}

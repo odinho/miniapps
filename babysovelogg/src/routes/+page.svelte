@@ -229,10 +229,29 @@
 			: null,
 	);
 
-	// Arc endpoint time labels
+	// Arc endpoint ISO anchors. The Arc uses these BOTH as displayed labels and
+	// as the time-window the time→fraction math runs in — so an active sleep
+	// starting at the bedtime label sits at the start endpoint instead of
+	// floating up the arc (2026-05-21 bug). Day arcs use bedtime on the end.
+	const arcBedtimeIso = $derived.by(() => {
+		if (isNightMode) {
+			const nightSleep = activeSleep?.type === 'night' ? activeSleep :
+				todaySleeps.toReversed().find(sl => sl.type === 'night');
+			if (nightSleep) return nightSleep.start_time;
+			// No logged night yet: predicted bedtime is the next-best anchor.
+			return prediction?.bedtime ?? null;
+		}
+		// Day arc end = predicted bedtime (when available).
+		return isNewborn ? null : prediction?.bedtime ?? null;
+	});
+	const arcNightEndIso = $derived(
+		isNightMode ? prediction?.expectedNightEnd ?? null : null,
+	);
+
 	const arcStartLabel = $derived.by(() => {
 		if (isNightMode) {
-			// Night: start = bedtime (last night sleep start or active sleep start)
+			// Night: only show a label when we have a logged sleep — predicted bedtimes
+			// shouldn't impersonate "this is when she went to bed".
 			const nightSleep = activeSleep?.type === 'night' ? activeSleep :
 				todaySleeps.toReversed().find(sl => sl.type === 'night');
 			return nightSleep ? formatTime(nightSleep.start_time) : null;
@@ -243,13 +262,10 @@
 
 	const arcEndLabel = $derived.by(() => {
 		if (isNightMode) {
-			// Night: end = expected wake-up from learned night duration
 			if (prediction?.expectedNightEnd) return formatTime(prediction.expectedNightEnd);
 			return null;
 		}
-		// Newborn: no bedtime concept
 		if (isNewborn) return null;
-		// Day: end = predicted bedtime
 		return prediction?.bedtime ? formatTime(prediction.bedtime) : null;
 	});
 
@@ -540,6 +556,8 @@
 				prediction={arcPrediction}
 				isNightMode={isNightMode}
 				wakeUpTime={todayWakeUp?.wake_time}
+				bedtime={arcBedtimeIso}
+				nightEnd={arcNightEndIso}
 				startTimeLabel={arcStartLabel}
 				endTimeLabel={arcEndLabel}
 				napConfidenceBands={arcNapConfidenceBands}

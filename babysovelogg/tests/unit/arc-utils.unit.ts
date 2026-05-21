@@ -26,10 +26,67 @@ describe("getDayArcConfig", () => {
 });
 
 describe("getNightArcConfig", () => {
-  it("returns 18–30", () => {
+  it("returns 18–30 by default", () => {
     const c = getNightArcConfig();
     expect(c.arcStartHour).toBe(18);
     expect(c.arcEndHour).toBe(30);
+  });
+
+  it("anchors to the actual bedtime when supplied", () => {
+    // 2026-05-21 bug: bedtime 19:52, end label 06:17, but math used 18→30
+    // so a fresh active sleep rendered ~15% up the arc instead of at the
+    // moon endpoint. The dynamic-anchor variant fixes this.
+    const bt = new Date();
+    bt.setHours(19, 52, 0, 0);
+    const ne = new Date();
+    ne.setHours(6, 17, 0, 0);
+    const c = getNightArcConfig(bt.toISOString(), ne.toISOString());
+    expect(c.arcStartHour).toBeCloseTo(19 + 52 / 60, 5);
+    expect(c.arcEndHour).toBeCloseTo(24 + 6 + 17 / 60, 5);
+  });
+
+  it("wraps a pre-noon bedtime (post-midnight) into the 18+ frame", () => {
+    // Bedtime that landed past midnight: getHours() returns 0..6 but the
+    // arc thinks of it as 24..30. Without wrap the arcEnd <= arcStart
+    // guard would kick in.
+    const bt = new Date();
+    bt.setHours(0, 30, 0, 0); // 00:30
+    const ne = new Date();
+    ne.setHours(7, 0, 0, 0); // 07:00 next morning
+    const c = getNightArcConfig(bt.toISOString(), ne.toISOString());
+    expect(c.arcStartHour).toBeCloseTo(24 + 0.5, 5);
+    expect(c.arcEndHour).toBeCloseTo(24 + 7, 5);
+  });
+
+  it("guards against degenerate windows (nightEnd ≤ bedtime)", () => {
+    // Bad data: predicted wake earlier than bedtime. Fall back to a 12h window.
+    const bt = new Date();
+    bt.setHours(22, 0, 0, 0);
+    const ne = new Date();
+    ne.setHours(21, 0, 0, 0);
+    const c = getNightArcConfig(bt.toISOString(), ne.toISOString());
+    expect(c.arcEndHour).toBe(c.arcStartHour + 12);
+  });
+});
+
+describe("getDayArcConfig with bedtime anchor", () => {
+  it("anchors arcEnd to the predicted bedtime", () => {
+    const wake = new Date();
+    wake.setHours(6, 30, 0, 0);
+    const bt = new Date();
+    bt.setHours(19, 15, 0, 0);
+    const c = getDayArcConfig(wake.toISOString(), bt.toISOString());
+    expect(c.arcStartHour).toBeCloseTo(6.5, 5);
+    expect(c.arcEndHour).toBeCloseTo(19.25, 5);
+  });
+
+  it("ignores a bedtime earlier than wake (bad data)", () => {
+    const wake = new Date();
+    wake.setHours(7, 0, 0, 0);
+    const bt = new Date();
+    bt.setHours(5, 0, 0, 0);
+    const c = getDayArcConfig(wake.toISOString(), bt.toISOString());
+    expect(c.arcEndHour).toBe(c.arcStartHour + 12);
   });
 });
 

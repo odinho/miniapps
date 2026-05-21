@@ -40,6 +40,15 @@
 		 * blob spanning earliest..latest, distinct from the strikethrough above.
 		 */
 		rescueWindow?: { earliest: string; latest: string } | null;
+		/**
+		 * Actual bedtime ISO. Night mode anchors arcStart to this; day mode
+		 * anchors arcEnd to it. Keeps the displayed endpoint labels and the
+		 * time-fraction math sharing a single source of truth so an active
+		 * sleep at the start label sits at the start endpoint.
+		 */
+		bedtime?: string | null;
+		/** Expected night-end ISO (`prediction.expectedNightEnd`). Anchors the night arc's arcEnd. */
+		nightEnd?: string | null;
 		/** Override internal clock (ms since epoch). Used by the dev playground. */
 		nowMs?: number;
 		onStartClick?: () => void;
@@ -61,6 +70,8 @@
 		activeWakeBand = null,
 		skippedNap = null,
 		rescueWindow = null,
+		bedtime = null,
+		nightEnd = null,
 		nowMs,
 		onStartClick,
 		onEndClick,
@@ -96,6 +107,8 @@
 			activeWakeBand,
 			skippedNap,
 			rescueWindow,
+			bedtime,
+			nightEnd,
 			geometry: G,
 		}),
 	);

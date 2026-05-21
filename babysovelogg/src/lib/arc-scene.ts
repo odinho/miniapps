@@ -63,6 +63,13 @@ export interface ComposeArcInput {
   activeWakeBand?: { lo: string; hi: string } | null;
   skippedNap?: { plannedAt: string } | null;
   rescueWindow?: { earliest: string; latest: string } | null;
+  /** Night-mode start anchor (ISO): bedtime — actual logged start of the
+   * current night sleep, or the predicted bedtime when nothing is logged
+   * yet. Falls through to a fixed 18:00 default. Day-mode end anchor too:
+   * predicted bedtime anchors the right side of the day arc. */
+  bedtime?: string | null;
+  /** Night-mode end anchor (ISO): expectedNightEnd. Falls through to 06:00. */
+  nightEnd?: string | null;
   geometry?: ArcGeometry;
 }
 
@@ -225,10 +232,14 @@ export function composeArc(input: ComposeArcInput): ArcScene {
     activeWakeBand = null,
     skippedNap = null,
     rescueWindow = null,
+    bedtime = null,
+    nightEnd = null,
     geometry = DEFAULT_ARC_GEOMETRY,
   } = input;
 
-  const config = isNightMode ? getNightArcConfig() : getDayArcConfig(wakeUpTime);
+  const config = isNightMode
+    ? getNightArcConfig(bedtime, nightEnd)
+    : getDayArcConfig(wakeUpTime, bedtime);
   const { cx, cy, r, trackWidth } = geometry;
 
   const trackD = describeArc(cx, cy, r, 0, 1);

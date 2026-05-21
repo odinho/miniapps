@@ -262,6 +262,68 @@ describe("composeArc — endpoint label propagation", () => {
   });
 });
 
+describe("composeArc — dynamic night-arc anchoring (2026-05-21 regression)", () => {
+  // Bug: night arc was hardcoded to 18→06 in time-fraction math while the
+  // endpoint labels are dynamic ("19:52" → "06:17"). An active sleep that
+  // started at 19:52 rendered ~15% up the arc instead of at the moon
+  // endpoint. The user (Halldis, 11 mnd) screenshotted at 19:58 with the
+  // active sleep just-started bubble floating up the arc.
+  //
+  // Invariant: an active sleep that started at the bedtime anchor must
+  // sit AT the start endpoint (within HALO_PROXIMITY → halo, not bubble).
+  // The now-marker must also be near the start when only minutes have
+  // passed.
+  const bedtimeIso = at(19, 52);
+  const wakeIso = at(30, 17); // 06:17 next morning (24 + 6 + 17/60)
+  const nowDate = atDate(19, 58); // 6 min after bedtime
+
+  const scene = composeArc({
+    todaySleeps: [],
+    activeSleep: { start_time: bedtimeIso, type: "night" },
+    prediction: null,
+    isNightMode: true,
+    now: nowDate,
+    bedtime: bedtimeIso,
+    nightEnd: wakeIso,
+    startTimeLabel: "19:52",
+    endTimeLabel: "06:17",
+  });
+
+  it("anchors the active sleep at the start endpoint, not 15% up the arc", () => {
+    expect(scene.bubbles.find((b) => b.status === "active")).toBeUndefined();
+    expect(scene.start.activeHalo).not.toBeNull();
+    expect(scene.start.activeHalo!.color).toBe("moon");
+  });
+
+  it("places the now-marker near the start endpoint (~1% along the arc)", () => {
+    // 6 min into an ~10h25m night arc → frac ≈ 0.0096. The marker sits on
+    // the same angle as the start endpoint, just at a different radius —
+    // compare angular position via the underlying fraction.
+    expect(scene.nowMarker.visible).toBe(true);
+    const cfg = scene.config;
+    const nowH = nowDate.getHours() + nowDate.getMinutes() / 60;
+    const frac = (nowH - cfg.arcStartHour) / (cfg.arcEndHour - cfg.arcStartHour);
+    expect(frac).toBeLessThan(0.02);
+  });
+
+  it("falls back to fixed 18→30 when no bedtime anchor is passed", () => {
+    // Backward-compat: existing dev playground scenarios don't pass the
+    // ISO anchors and should keep the legacy fixed-window behavior.
+    const scene2 = composeArc({
+      todaySleeps: [],
+      activeSleep: { start_time: bedtimeIso, type: "night" },
+      prediction: null,
+      isNightMode: true,
+      now: nowDate,
+      startTimeLabel: "19:52",
+      endTimeLabel: "06:17",
+    });
+    // Under fixed 18→30, frac at 19:58 = (19.967-18)/12 ≈ 0.164 — the
+    // bubble renders as a path (long enough), not a halo.
+    expect(scene2.start.activeHalo).toBeNull();
+  });
+});
+
 describe("composeArc — completed sleep label", () => {
   it("labels completed naps over 10 min with their duration", () => {
     const scene = composeArc(
