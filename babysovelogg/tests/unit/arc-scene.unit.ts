@@ -200,7 +200,8 @@ describe("composeArc — active sleep overruns its predicted wake", () => {
   // Active nap that has run past the predicted wake. The bubble extends to
   // "now" (past wakeFrac). The planned-track wake-tick must still be visible
   // so the parent sees the target they're overrunning. The active wake-band
-  // is hidden once now > band.hi (overtime).
+  // also stays visible past `band.hi` so the parent can see whether they're
+  // inside or outside the expected window.
   const startIso = at(12, 0);
   const wakeIso = at(13, 0); // predicted wake at 13:00
   const nowDate = atDate(13, 30); // 30 min past predicted wake
@@ -224,12 +225,97 @@ describe("composeArc — active sleep overruns its predicted wake", () => {
     expect(scene.plannedTrack.wakeMarker).not.toBeNull();
   });
 
-  it("active wake-band is hidden (overtime — band.hi is in the past)", () => {
-    expect(scene.activeWakeBand.visible).toBe(false);
+  it("active wake-band stays visible past hi (parent sees in vs out)", () => {
+    expect(scene.activeWakeBand.visible).toBe(true);
   });
 
   it("now-marker is still on the arc (well within day-arc range)", () => {
     expect(scene.nowMarker.visible).toBe(true);
+  });
+});
+
+describe("composeArc — arc extends to fit now during overrun", () => {
+  // User report 2026-05-21 follow-up: past the predicted wake (or predicted
+  // bedtime in day mode), the now-marker clamped off the arc and the parent
+  // lost sight of "where we are". The fix extends arcEnd to max(plan, now)
+  // and slides the end endpoint icon up the arc to the planned position.
+
+  it("night-mode overrun: now-marker at fraction 1, end icon slides up", () => {
+    const bedtimeIso = at(19, 0);
+    const wakeIso = at(30, 0); // 06:00 next morning
+    const nowDate = atDate(30, 30); // 06:30 — 30 min past wake
+
+    const scene = composeArc({
+      todaySleeps: [],
+      activeSleep: { start_time: bedtimeIso, type: "night" },
+      prediction: null,
+      isNightMode: true,
+      now: nowDate,
+      bedtime: bedtimeIso,
+      nightEnd: wakeIso,
+      startTimeLabel: "19:00",
+      endTimeLabel: "06:00",
+    });
+
+    expect(scene.nowMarker.visible).toBe(true);
+    // Arc was 11h (19→06) plan + 30 min overrun = 11.5h actual span.
+    // Now sits at the right edge; planned wake at 30/11.5 ≈ 0.957.
+    const arcSpan = scene.config.arcEndHour - scene.config.arcStartHour;
+    expect(arcSpan).toBeCloseTo(11.5, 2);
+    // The end endpoint icon slides UP the right side: at frac < 1 the
+    // point sits higher on screen than at frac 1. Start endpoint is at
+    // bottom-left; end endpoint should be visibly higher than start.
+    expect(scene.end.pt.y).toBeLessThan(scene.start.pt.y - 10);
+  });
+
+  it("day-mode overrun: now past predicted bedtime extends the arc", () => {
+    const wakeUp = at(7, 0);
+    const predictedBedtime = at(19, 0);
+    const nowDate = atDate(19, 30);
+
+    const scene = composeArc({
+      todaySleeps: [],
+      activeSleep: null,
+      prediction: null,
+      isNightMode: false,
+      now: nowDate,
+      wakeUpTime: wakeUp,
+      bedtime: predictedBedtime,
+      startTimeLabel: "07:00",
+      endTimeLabel: "19:00",
+    });
+
+    expect(scene.nowMarker.visible).toBe(true);
+    // arcEnd extended from 19 to 19.5.
+    expect(scene.config.arcEndHour).toBeCloseTo(19.5, 2);
+    // Predicted bedtime at frac 12/12.5 = 0.96 — end icon visibly slid
+    // up the right side (y closer to top than at frac 1).
+    const baselineEndAtFracOne = 160 + 130 * Math.sin(Math.PI / 4);
+    expect(scene.end.pt.y).toBeLessThan(baselineEndAtFracOne - 5);
+  });
+
+  it("no overrun: end endpoint stays at fraction 1 (bottom-right)", () => {
+    const bedtimeIso = at(19, 0);
+    const wakeIso = at(30, 0);
+    const nowDate = atDate(23, 0); // mid-arc, well before wake
+
+    const scene = composeArc({
+      todaySleeps: [],
+      activeSleep: { start_time: bedtimeIso, type: "night" },
+      prediction: null,
+      isNightMode: true,
+      now: nowDate,
+      bedtime: bedtimeIso,
+      nightEnd: wakeIso,
+      startTimeLabel: "19:00",
+      endTimeLabel: "06:00",
+    });
+
+    // arcEnd shouldn't extend; end endpoint stays at frac 1 (mirror of start
+    // across the vertical center, at the same y).
+    expect(scene.config.arcEndHour).toBe(30);
+    expect(scene.end.pt.x).toBeCloseTo(2 * 160 - scene.start.pt.x, 1);
+    expect(scene.end.pt.y).toBeCloseTo(scene.start.pt.y, 1);
   });
 });
 
@@ -306,22 +392,6 @@ describe("composeArc — dynamic night-arc anchoring (2026-05-21 regression)", (
     expect(frac).toBeLessThan(0.02);
   });
 
-  it("falls back to fixed 18→30 when no bedtime anchor is passed", () => {
-    // Backward-compat: existing dev playground scenarios don't pass the
-    // ISO anchors and should keep the legacy fixed-window behavior.
-    const scene2 = composeArc({
-      todaySleeps: [],
-      activeSleep: { start_time: bedtimeIso, type: "night" },
-      prediction: null,
-      isNightMode: true,
-      now: nowDate,
-      startTimeLabel: "19:52",
-      endTimeLabel: "06:17",
-    });
-    // Under fixed 18→30, frac at 19:58 = (19.967-18)/12 ≈ 0.164 — the
-    // bubble renders as a path (long enough), not a halo.
-    expect(scene2.start.activeHalo).toBeNull();
-  });
 });
 
 describe("composeArc — completed sleep label", () => {

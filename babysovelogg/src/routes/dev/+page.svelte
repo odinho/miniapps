@@ -266,7 +266,8 @@
 				arcEndLabel: hm(o(+480)),
 				arcBands: [],
 				arcActiveWakeAt: o(-20),
-				// Band hi is in the past → Arc should hide it (overtime)
+				// Band hi is in the past; Arc keeps painting it so the parent
+				// can see they're outside the expected window.
 				arcActiveWakeBand: wakeBand(-20, 15),
 			},
 			{

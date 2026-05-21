@@ -30,6 +30,7 @@ const SCENE_IDS = [
   "morning-empty",
   "after-bedtime",
   "active-nap-paused",
+  "night-past-wake",
 ] as const;
 
 for (const id of SCENE_IDS) {
@@ -64,4 +65,14 @@ test("arc scenes: active-night-13min renders an endpoint halo (near-endpoint pat
   const card = page.getByTestId("arc-scene-active-night-13min");
   await expect(card.locator(".arc-bubble-active")).toHaveCount(0);
   await expect(card.locator(".arc-endpoint-halo")).toHaveCount(1);
+});
+
+test("arc scenes: night-past-wake keeps the now-marker visible after overrun", async ({ page, baseURL }) => {
+  // 2026-05-21 user follow-up: past expectedNightEnd the now-marker
+  // clamped off the arc. Arc now extends to fit `now` and the end icon
+  // slides up to the planned-wake position. The now-marker line must
+  // exist in the SVG so the parent still sees where the clock is.
+  await page.goto(`${baseURL}/dev/arc-scenes`);
+  const card = page.getByTestId("arc-scene-night-past-wake");
+  await expect(card.locator(".sleep-arc line")).toHaveCount(1);
 });

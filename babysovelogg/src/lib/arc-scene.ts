@@ -238,13 +238,21 @@ export function composeArc(input: ComposeArcInput): ArcScene {
   } = input;
 
   const config = isNightMode
-    ? getNightArcConfig(bedtime, nightEnd)
-    : getDayArcConfig(wakeUpTime, bedtime);
+    ? getNightArcConfig(bedtime, nightEnd, now)
+    : getDayArcConfig(wakeUpTime, bedtime, now);
   const { cx, cy, r, trackWidth } = geometry;
 
   const trackD = describeArc(cx, cy, r, 0, 1);
   const startPt = fracToPoint(0, cx, cy, r);
-  const endPt = fracToPoint(1, cx, cy, r);
+  // End endpoint slides up the arc during overrun: the time window extends
+  // to fit `now`, but the icon stays anchored to the *planned* end event
+  // (expectedNightEnd / predicted bedtime) so the parent still sees where
+  // the plan was. Without an end anchor, frac is 1 (legacy bottom-right).
+  const endEventIso = isNightMode ? nightEnd : bedtime;
+  const endEventFrac = endEventIso
+    ? Math.max(0, Math.min(1, timeToArcFraction(new Date(endEventIso), config)))
+    : 1;
+  const endPt = fracToPoint(endEventFrac, cx, cy, r);
   const startIcon = isNightMode ? "\u{1F319}" : "\u{2600}\u{FE0F}";
   const endIcon = isNightMode ? "\u{2600}\u{FE0F}" : "\u{1F319}";
   const glow = isNightMode ? "rgba(100, 90, 150, 0.3)" : "rgba(232, 223, 245, 0.6)";
@@ -391,22 +399,21 @@ export function composeArc(input: ComposeArcInput): ArcScene {
     return { visible: true, d: describeArc(cx, cy, r, loFrac, hiFrac), color: "peach" };
   });
 
-  // Active wake band: same colour family as the active sleep. The 2026-05-17
-  // regression was a peach band painted at the right end of a *night* arc,
-  // which the parent read as "elapsed nap paint at the wrong end".
+  // Active wake band: same colour family as the active sleep. Stays
+  // visible past `band.hi` so the parent can see whether now is inside or
+  // outside the expected wake window during overrun. The 2026-05-17 wrong-
+  // colour bug (peach band on a night arc) is still guarded by sourcing
+  // colour from `activeSleep.type`.
   let activeWakeBandOut: SceneBand = { visible: false, d: "", color: "peach" };
   if (activeSleep && activeWakeBand) {
-    const hiMs = new Date(activeWakeBand.hi).getTime();
-    if (hiMs >= now.getTime()) {
-      const loFrac = timeToArcFraction(new Date(activeWakeBand.lo), config);
-      const hiFrac = timeToArcFraction(new Date(activeWakeBand.hi), config);
-      if (hiFrac > loFrac && hiFrac - loFrac >= 0.005) {
-        activeWakeBandOut = {
-          visible: true,
-          d: describeArc(cx, cy, r, loFrac, hiFrac),
-          color: colorForType(activeSleep.type),
-        };
-      }
+    const loFrac = timeToArcFraction(new Date(activeWakeBand.lo), config);
+    const hiFrac = timeToArcFraction(new Date(activeWakeBand.hi), config);
+    if (hiFrac > loFrac && hiFrac - loFrac >= 0.005) {
+      activeWakeBandOut = {
+        visible: true,
+        d: describeArc(cx, cy, r, loFrac, hiFrac),
+        color: colorForType(activeSleep.type),
+      };
     }
   }
 

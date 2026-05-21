@@ -39,6 +39,8 @@
 		} | null;
 		isNightMode: boolean;
 		wakeUpTime?: string | null;
+		bedtime?: string | null;
+		nightEnd?: string | null;
 		startTimeLabel?: string | null;
 		endTimeLabel?: string | null;
 		napConfidenceBands?: Array<{ lo: string; hi: string }>;
@@ -70,6 +72,8 @@
 				activeSleep: { start_time: iso(18, 30), type: 'night' },
 				prediction: null,
 				isNightMode: true,
+				bedtime: iso(18, 30),
+				nightEnd: iso(29, 49),
 				startTimeLabel: hm(18, 30),
 				endTimeLabel: hm(29, 49),
 				activeWakeAt: iso(29, 49),
@@ -89,6 +93,7 @@
 				prediction: null,
 				isNightMode: false,
 				wakeUpTime: iso(7, 0),
+				bedtime: iso(19, 0),
 				startTimeLabel: hm(7, 0),
 				endTimeLabel: hm(19, 0),
 				activeWakeAt: iso(14, 0),
@@ -99,7 +104,7 @@
 		{
 			id: 'overrun-past-wake',
 			title: 'Overtid — forbi forventa vake',
-			caption: 'Bobla strekker seg forbi planlagt vake, tick framleis synleg',
+			caption: 'Bobla strekker seg forbi planlagt vake, band framleis synleg',
 			nowH: 13,
 			nowM: 30,
 			props: {
@@ -108,6 +113,7 @@
 				prediction: null,
 				isNightMode: false,
 				wakeUpTime: iso(7, 0),
+				bedtime: iso(19, 0),
 				startTimeLabel: hm(7, 0),
 				endTimeLabel: hm(19, 0),
 				activeWakeAt: iso(13, 0),
@@ -126,6 +132,7 @@
 				prediction: { nextNap: iso(19, 0), bedtime: iso(19, 0) },
 				isNightMode: false,
 				wakeUpTime: iso(7, 0),
+				bedtime: iso(19, 0),
 				startTimeLabel: hm(7, 0),
 				endTimeLabel: hm(19, 0),
 				skippedNap: { plannedAt: iso(9, 30) },
@@ -151,6 +158,7 @@
 				},
 				isNightMode: false,
 				wakeUpTime: iso(7, 0),
+				bedtime: iso(19, 0),
 				startTimeLabel: hm(7, 0),
 				endTimeLabel: hm(19, 0),
 				napConfidenceBands: [
@@ -171,6 +179,7 @@
 				prediction: { nextNap: iso(10, 0), bedtime: iso(19, 0) },
 				isNightMode: false,
 				wakeUpTime: iso(7, 0),
+				bedtime: iso(19, 0),
 				startTimeLabel: hm(7, 0),
 				endTimeLabel: hm(19, 0),
 				nowMs: baseMs + 8 * 3600_000,
@@ -191,6 +200,7 @@
 				prediction: { nextNap: iso(18, 0), bedtime: iso(18, 0) },
 				isNightMode: false,
 				wakeUpTime: iso(7, 0),
+				bedtime: iso(19, 0),
 				startTimeLabel: hm(7, 0),
 				endTimeLabel: hm(19, 0),
 				nowMs: baseMs + 18 * 3600_000 + 30 * 60_000,
@@ -212,11 +222,36 @@
 				prediction: null,
 				isNightMode: false,
 				wakeUpTime: iso(7, 0),
+				bedtime: iso(19, 0),
 				startTimeLabel: hm(7, 0),
 				endTimeLabel: hm(19, 0),
 				activeWakeAt: iso(13, 30),
 				activeWakeBand: { lo: iso(13, 15), hi: iso(13, 45) },
 				nowMs: baseMs + 13 * 3600_000,
+			},
+		},
+		{
+			id: 'night-past-wake',
+			title: 'Natt — sove forbi forventa vake',
+			caption: 'Arc utvidar seg til no, sol-ikon glir opp til forventa vake',
+			nowH: 31,
+			nowM: 30,
+			props: {
+				// 2h 30m overrun (planned wake 06:00, now 07:30). Snapshot keeps
+				// the slide visually obvious — a small 30-min overrun shifted
+				// the icon by ~17 px and wasn't strong enough to guard slide
+				// distance.
+				todaySleeps: [],
+				activeSleep: { start_time: iso(19, 0), type: 'night' },
+				prediction: null,
+				isNightMode: true,
+				bedtime: iso(19, 0),
+				nightEnd: iso(30, 0),
+				startTimeLabel: hm(19, 0),
+				endTimeLabel: hm(30, 0),
+				activeWakeAt: iso(30, 0),
+				activeWakeBand: { lo: iso(29, 40), hi: iso(30, 20) },
+				nowMs: baseMs + 31 * 3600_000 + 30 * 60_000,
 			},
 		},
 	];

@@ -13,7 +13,16 @@ export interface ArcConfig {
 // take ISO anchors so the labels and the math share a single source of
 // truth.
 
-export function getDayArcConfig(wakeUpTime?: string | null, bedtime?: string | null): ArcConfig {
+// `now` extends arcEnd when the baby has overrun the predicted wake / bedtime
+// — without this the now-marker clamps off the right edge and parents lose
+// sight of "where we are". The expected-end icon then slides up the arc
+// (see `composeArc.endEventFrac`) so the visual still pins the original plan.
+
+export function getDayArcConfig(
+  wakeUpTime?: string | null,
+  bedtime?: string | null,
+  now?: Date,
+): ArcConfig {
   let arcStartHour = 6;
   if (wakeUpTime) {
     const wake = new Date(wakeUpTime);
@@ -25,12 +34,17 @@ export function getDayArcConfig(wakeUpTime?: string | null, bedtime?: string | n
     const btHour = bt.getHours() + bt.getMinutes() / 60;
     if (btHour > arcStartHour) arcEndHour = btHour;
   }
+  if (now) {
+    const nowHour = now.getHours() + now.getMinutes() / 60;
+    if (nowHour > arcEndHour) arcEndHour = nowHour;
+  }
   return { arcStartHour, arcEndHour };
 }
 
 export function getNightArcConfig(
   bedtime?: string | null,
   nightEnd?: string | null,
+  now?: Date,
 ): ArcConfig {
   let arcStartHour = 18;
   if (bedtime) {
@@ -47,6 +61,11 @@ export function getNightArcConfig(
     arcEndHour = h;
   }
   if (arcEndHour <= arcStartHour) arcEndHour = arcStartHour + 12;
+  if (now) {
+    let nowH = now.getHours() + now.getMinutes() / 60;
+    if (nowH < 12) nowH += 24;
+    if (nowH > arcEndHour) arcEndHour = nowH;
+  }
   return { arcStartHour, arcEndHour };
 }
 
