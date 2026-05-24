@@ -20,8 +20,8 @@ test('Stats page shows Norwegian headers "7 dagar" / "30 dagar"', async ({ page 
   );
 
   await page.goto("/stats");
-  await expect(page.getByRole("heading", { name: "Siste 7 dagar" })).toBeVisible({ timeout: 5000 });
-  // Trend table has "7 dagar" and "30 dagar" columns
+  // The standalone "Siste 7 dagar" heading was removed in the I-dag-card
+  // refactor; the trend table still carries the same window labels.
   await expect(page.locator(".stats-trend-header")).toContainText("7 dagar");
   await expect(page.locator(".stats-trend-header")).toContainText("30 dagar");
 });

@@ -161,7 +161,12 @@ test("Active bubble survives offline event + SSE reconnect", async ({ page }) =>
   setWakeUpTime(babyId);
 
   await page.goto("/");
-  await expect(page.getByTestId("sleep-button")).toBeVisible();
+  // Wait for the dashboard to be fully populated (state loaded, baby name
+  // present). Without this, going offline can race the initial /api/state
+  // and the SleepButton clicks before activeSleep wiring has the baby in
+  // scope — the optimistic update then never fires.
+  await expect(page.getByTestId("dashboard")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByTestId("baby-name")).toHaveText("Testa", { timeout: 5000 });
 
   // Go offline before starting nap
   await page.context().setOffline(true);

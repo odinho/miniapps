@@ -82,7 +82,12 @@ export function applyOptimisticEvent(
 	type: string,
 	payload: Record<string, unknown>,
 ): AppState {
-	const s: AppState = structuredClone(state);
+	// JSON round-trip rather than structuredClone: the caller often passes a
+	// Svelte 5 `$state` proxy, and structuredClone throws on those because
+	// the proxy's internal hooks aren't structured-clone-serializable. JSON
+	// is sufficient because AppState is plain JSON-safe data (no Date,
+	// Map, etc).
+	const s: AppState = JSON.parse(JSON.stringify(state));
 
 	// `type` is narrowed to AppEventType inside the switch so the `never`
 	// branch at the bottom rejects adding a new event type in schemas.ts

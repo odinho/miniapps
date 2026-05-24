@@ -162,7 +162,13 @@ export function createBaby(name = "Testa", birthdate = "2025-06-12"): number {
       "INSERT INTO events (type, payload, client_id, client_event_id) VALUES ('baby.created', ?, ?, ?)",
     )
     .run(JSON.stringify({ name, birthdate }), clientId, clientEventId);
-  const info = _db.prepare("INSERT INTO baby (name, birthdate) VALUES (?, ?)").run(name, birthdate);
+  // track_diaper defaults to 0 in the schema (opt-in for new families).
+  // Tests almost always interact with the diaper button, so seed it on
+  // by default — tests that specifically exercise the off state can
+  // UPDATE the column themselves.
+  const info = _db
+    .prepare("INSERT INTO baby (name, birthdate, track_diaper) VALUES (?, ?, 1)")
+    .run(name, birthdate);
   return Number(info.lastInsertRowid);
 }
 

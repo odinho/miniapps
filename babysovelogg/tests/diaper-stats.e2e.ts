@@ -40,7 +40,9 @@ test("Stats page without diapers shows no diaper section", async ({ page }) => {
   );
 
   await page.goto("/stats");
-  // Should NOT show Bleie/Do section
-  await expect(page.getByRole("heading", { name: "Siste 7 dagar" })).toBeVisible({ timeout: 5000 });
+  // Wait for the page to settle on a section that's always present
+  // (the standalone "Siste 7 dagar" heading was removed in the I-dag-card
+  // refactor, so anchor on the trend table header instead).
+  await expect(page.locator(".stats-trend-header").first()).toBeVisible({ timeout: 5000 });
   await expect(page.getByRole("heading", { name: "Bleie/Do" })).not.toBeVisible();
 });

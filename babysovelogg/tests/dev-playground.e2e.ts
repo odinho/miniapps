@@ -20,5 +20,7 @@ test('dev playground: all scenario groups visible and visual snapshot', async ({
 	await expect(page.locator('.countdown-value').first()).toBeVisible();
 
 	// Visual regression snapshot — update with: bunx playwright test --update-snapshots
-	await expect(page).toHaveScreenshot('dev-playground.png', { fullPage: true });
+	// Tolerate small font/anti-alias drift between machines (~0.01 ratio is
+	// typical for sub-pixel rendering differences).
+	await expect(page).toHaveScreenshot('dev-playground.png', { fullPage: true, maxDiffPixelRatio: 0.02 });
 });

@@ -22,13 +22,17 @@ test("B11: shows overtime when predicted nap time has passed", async ({ page }) 
   // Set custom_nap_count = 1 so prediction expects exactly 1 nap
   db.prepare("UPDATE baby SET custom_nap_count = 1 WHERE id = ?").run(babyId);
 
-  // Strategy: set wake time so the predicted nap is 30 min before server's real time.
-  // 9-month-old with no history: default WW = (150+210)/2 = 180 min.
-  // We want: predicted_nap = now - 30 min, so wakeTime = now - 210 min.
-  // The 90-min skip threshold means 30 min overdue will show "Overtid" (not bedtime).
-  const now = Date.now();
-  const wakeTime = new Date(now - 210 * 60000);
-  // Insert a completed overnight night sleep so wakeup is derived from its end_time
+  // Pin the server clock so the test isn't time-of-day dependent. Use a
+  // mid-morning anchor that leaves the predicted nap 30 min in the past
+  // (overdue but below the 90-min skip threshold), with bedtime still
+  // safely in the future.
+  // Wake at 07:00, anchor "now" at 10:30 (210 min later). Default 9-mo WW
+  // 180 min → predicted nap at 10:00 → 30 min overdue at 10:30.
+  const today = new Date();
+  today.setHours(10, 30, 0, 0);
+  const nowMs = today.getTime();
+  const wakeTime = new Date(nowMs - 210 * 60_000);
+
   const nightStart = new Date(wakeTime);
   nightStart.setDate(nightStart.getDate() - 1);
   nightStart.setHours(19, 0, 0, 0);
@@ -36,9 +40,17 @@ test("B11: shows overtime when predicted nap time has passed", async ({ page }) 
     "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, 'night', ?)",
   ).run(babyId, nightStart.toISOString(), wakeTime.toISOString(), generateId());
 
-  // Force browser to daytime hour (avoids deep-night mode at 0-5 AM)
-  // getHours() is used for night mode check; Date.now() remains real time
-  // which matches the server's predictions.
+  // Pin the server's clock via the supported ?now= query parameter on
+  // /api/state. Route interception is needed for both initial fetch and
+  // periodic refreshes.
+  await page.route("**/api/state**", async (route) => {
+    const url = new URL(route.request().url());
+    if (!url.searchParams.has("now")) {
+      url.searchParams.set("now", String(nowMs));
+    }
+    await route.continue({ url: url.toString() });
+  });
+
   await forceHour(page, 10);
 
   await page.goto("/");
