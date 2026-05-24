@@ -14,19 +14,17 @@ is for tracked product/engine/test work.
 
 Source: 2026-05-22 design pass with Codex pair-review. Plan lives in
 [`pause-redesign-2026-05-22.md`](./pause-redesign-2026-05-22.md).
-Staged rollout replaces the single `Pause` button with (a) reversible
-`End` for naps and (b) first-class `night_waking` events with their
-own edit sheet, arc rendering, and history rows. `sleep_pauses` table
-and `sleep.paused`/`sleep.resumed` events go away at stage 4.
+Stages 1–4 shipped 2026-05-24: `Angre slutt` button + first-class
+`night_waking` events with edit sheet, red arc overlays, history
+rows, indexed migration of existing pauses, and nap-pause UI ripped
+out. `sleep_pauses` table kept as a frozen archive so the engine's
+`calcPauseMs` historical-net math still works.
 
-Stage 1 (Angre slutt button in WakeUpSheet/EditSleepModal) shipped
-2026-05-24 — reuses the existing `sleep.restarted` event the post-End
-undo toast already emitted. No schema change.
-
-Stages still pending: 2 (`night_waking` table + events + projections),
-3 (night-waking UI + arc red sub-bands + edit sheet + history rows),
-4 (remove pause-on-naps + drop `sleep_pauses` + simplifications), 5
-(polish).
+Stage 5 (polish) pending:
+- Arc red sub-band dark-mode contrast pass.
+- Potential follow-up: drop `sleep_pauses` table + legacy
+  `sleep.paused`/`sleep.resumed`/`sleep.pause_deleted` projections
+  once we're confident no engine-math regression is masked by them.
 
 
 ## Trend intervention-target split — stage 5+ followups
