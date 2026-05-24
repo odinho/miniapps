@@ -195,8 +195,15 @@ export interface LearnedSchedule {
 	bedtimeWakeWindowMin: number;
 	/** Expected nap count */
 	expectedNapCount: number;
-	/** Estimated sleep cycle length in minutes (from data or age default) */
+	/** Estimated sleep cycle length in minutes (from data or age default).
+	 *  Legacy scalar — new code should read `sleepCycle.minutes` plus
+	 *  `sleepCycle.source`/`confidence` so UI hedging is accurate. */
 	sleepCycleMin: number;
+	/** Full sleep-cycle estimate: minutes + source + confidence band +
+	 *  diagnostics. Drives whether UI labels claim "lærte syklus" vs
+	 *  "typisk for alder". See `estimateSleepCycleDetails` in
+	 *  `src/lib/engine/schedule.ts`. */
+	sleepCycle: import("$lib/types.js").SleepCycleEstimate;
 }
 
 export interface AppState {

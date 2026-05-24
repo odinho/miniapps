@@ -543,6 +543,7 @@ describe("timer-mode timeline", () => {
         learnedSchedule: {
           napDurationMin: 90, nightDurationMin: 720, wakeWindowMin: 240,
           bedtimeWakeWindowMin: 240, expectedNapCount: 2, sleepCycleMin: 50,
+          sleepCycle: { minutes: 50, source: "age-default", confidence: "low", sampleCount: 0, scoreMargin: 0, candidateRange: [45, 62] },
         },
       });
       return makeInput({ prediction: pred });
@@ -585,6 +586,7 @@ describe("timer-mode timeline", () => {
         learnedSchedule: {
           napDurationMin: 90, nightDurationMin: 720, wakeWindowMin: 240,
           bedtimeWakeWindowMin: 240, expectedNapCount: 1, sleepCycleMin: 45,
+          sleepCycle: { minutes: 45, source: "age-default", confidence: "low", sampleCount: 0, scoreMargin: 0, candidateRange: [40, 60] },
         },
       });
       return makeInput({
@@ -630,6 +632,7 @@ describe("timer-mode timeline", () => {
         learnedSchedule: {
           napDurationMin: 90, nightDurationMin: 720, wakeWindowMin: 240,
           bedtimeWakeWindowMin: 240, expectedNapCount: 1, sleepCycleMin: 50,
+          sleepCycle: { minutes: 50, source: "age-default", confidence: "low", sampleCount: 0, scoreMargin: 0, candidateRange: [45, 62] },
         },
       });
       return makeInput({ prediction: pred });

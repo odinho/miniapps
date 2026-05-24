@@ -701,9 +701,14 @@
 					{/if}
 				</div>
 				{#if showNapBudgetExplain}
+					{@const cyc = prediction.learnedSchedule?.sleepCycle}
+					{@const cycMin = cyc?.minutes ?? prediction.learnedSchedule?.sleepCycleMin ?? 55}
+					{@const cycLabel = cyc?.source === 'learned' && cyc.confidence !== 'low'
+						? `hennar lærte syklus (${cycMin} min)`
+						: `typisk syklus for alderen (${cycMin} min)`}
 					<div class="nap-budget-explain">
 						{#if nb.cycleNudge}
-							Vekkjingsvindauget tek omsyn til hennar lærte syklus ({prediction.learnedSchedule?.sleepCycleMin ?? '~50'} min).
+							Vekkjingsvindauget tek omsyn til {cycLabel}.
 							Vi kapper ved slutten av éin full syklus så ho vaknar i lett fase — mjukare oppvakning, mindre tilvenningsstress.
 						{:else}
 							Vi anbefaler å vakne litt før neste syklus startar så du får tid til å koma fram til henne. Trendmålet i dag er {Math.round(nb.context.blendedTrendMin / 60 * 10) / 10}t totalt søvn ({nb.context.sourceLabel}).

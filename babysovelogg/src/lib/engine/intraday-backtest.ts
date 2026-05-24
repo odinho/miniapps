@@ -72,6 +72,12 @@ export function intradayBacktest(
     for (let j = Math.max(0, i - lookback); j < i; j++) {
       recentSleeps.push(...days[j].sleeps.filter((s) => s.end_time));
     }
+    // Cycle estimator window mirrors prod's 180d window. All-prior-history
+    // is fine here — backtests stay below 180 days for most fixtures.
+    const cycleSleeps: SleepEntry[] = [];
+    for (let j = 0; j < i; j++) {
+      cycleSleeps.push(...days[j].sleeps.filter((s) => s.end_time));
+    }
 
     const ctx: BabyContext = {
       birthdate,
@@ -79,6 +85,7 @@ export function intradayBacktest(
       tz,
       customNapCount: null,
       recentSleeps,
+      cycleSleeps,
     };
 
     // Get the day's naps in order

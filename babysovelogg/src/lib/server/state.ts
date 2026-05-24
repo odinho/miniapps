@@ -122,6 +122,18 @@ export function getState(now?: number) {
     .all(baby.id, thirtyDaysAgo) as SleepLogRow[];
   const trendSleeps = strategySleeps;
 
+  // Very-long-horizon window for the sleep-cycle estimator. The strict
+  // self-wake filter needs many samples to beat the age-default prior,
+  // and the 30-day trend window is too small for 1-nap babies who
+  // self-wake rarely (Halldis has 35 self-wakes in 5 months of data).
+  // 180 days is the spec ceiling from the cycle-estimator-v2 followup.
+  const oneEightyDaysAgo = new Date(nowMs - 180 * 86400000).toISOString();
+  const cycleSleeps = db
+    .prepare(
+      "SELECT * FROM sleep_log WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time DESC",
+    )
+    .all(baby.id, oneEightyDaysAgo) as SleepLogRow[];
+
   // Night wakings — fetched in a window wide enough to cover (a) the
   // active night sleep that started yesterday and (b) all of today's
   // sleeps. 30h before midnight is the safe ceiling for a typical
@@ -170,6 +182,7 @@ export function getState(now?: number) {
     recentSleeps,
     strategySleeps,
     trendSleeps,
+    cycleSleeps,
     todayWakeUp,
     priorOvernightSleep: priorOvernightRow,
     todayNightWakings,

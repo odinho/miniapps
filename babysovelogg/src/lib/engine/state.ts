@@ -12,7 +12,7 @@ import {
   getLearnedNapDuration,
   getLearnedNightDuration,
   getLearnedBedtimeWakeWindow,
-  estimateSleepCycleFromData,
+  estimateSleepCycleDetails,
 } from "./schedule.js";
 import { RESCUE_NAP, NAP_FLOOR_BY_AGE, WAKE_WINDOWS, findByAge } from "./constants.js";
 import { getTodayStats, getSleepDayTotals } from "./stats.js";
@@ -40,6 +40,8 @@ export interface DayData {
   strategySleeps?: SleepLogRow[];
   /** Long-horizon sleeps (30-day lookback) for daily-total trend math in napBudget. Falls back to strategySleeps if absent. */
   trendSleeps?: SleepLogRow[];
+  /** Very-long-horizon sleeps (180-day lookback) for the sleep-cycle estimator. Falls back to trendSleeps/strategySleeps/recentSleeps. */
+  cycleSleeps?: SleepLogRow[];
   todayWakeUp: DayStartRow | undefined;
   /**
    * The overnight that ended *this* morning (start_time before midnight,
@@ -650,6 +652,7 @@ function buildContext(
   now: number,
   extendedSleeps?: SleepEntry[],
   trendSleeps?: SleepEntry[],
+  cycleSleeps?: SleepEntry[],
   offDays?: Set<string>,
   priorTrendTargetState?: TrendTargetState | null,
 ): BabyContext {
@@ -687,6 +690,7 @@ function buildContext(
     recentSleeps,
     extendedSleeps,
     trendSleeps,
+    cycleSleeps,
     offDays,
     trendTotalMin: trendTargets?.observedRecentMin ?? null,
     interventionTrendTargetMin: trendTargets?.interventionTargetMin ?? null,
@@ -743,8 +747,12 @@ export function assembleState(data: DayData) {
   // fall back to whatever wider data we have. The helper itself gates on
   // ≥7 days of complete data.
   const trendEntries = (data.trendSleeps ?? data.strategySleeps ?? recentSleeps).map(toSleepEntry);
+  // cycleSleeps is the 180-day window for the sleep-cycle estimator.
+  // Falls through to trendSleeps/strategySleeps/recentSleeps so existing
+  // callers (tests, backtest) keep working without supplying it.
+  const cycleEntries = (data.cycleSleeps ?? data.trendSleeps ?? data.strategySleeps ?? recentSleeps).map(toSleepEntry);
   const ctx = buildContext(
-    baby, recentEntries, now, strategyEntries, trendEntries, data.offDays,
+    baby, recentEntries, now, strategyEntries, trendEntries, cycleEntries, data.offDays,
     data.priorTrendTargetState ?? null,
   );
 
@@ -978,7 +986,8 @@ function assembleEmergingPrediction(
 
   const completedNaps = todaySleeps.filter((s) => s.type === "nap" && s.end_time);
   // Don't count cut-short naps toward the day's budget — see schedule branch.
-  const cycleMin = estimateSleepCycleFromData(ctx);
+  const sleepCycleEstimate = estimateSleepCycleDetails(ctx);
+  const cycleMin = sleepCycleEstimate.minutes;
   const shortThreshold = computeShortNapThreshold(getLearnedNapDuration(ctx), cycleMin);
   const consumedNaps = countSufficientNaps(completedNaps, shortThreshold, activeSleep?.type === "nap");
   const expectedNapCount = resolveNapCount(ctx);
@@ -1077,7 +1086,8 @@ function assembleEmergingPrediction(
       wakeWindowMin: getWakeWindow(ctx),
       bedtimeWakeWindowMin: getLearnedBedtimeWakeWindow(ctx),
       expectedNapCount,
-      sleepCycleMin: estimateSleepCycleFromData(ctx),
+      sleepCycleMin: sleepCycleEstimate.minutes,
+      sleepCycle: sleepCycleEstimate,
     },
   };
 }
@@ -1102,7 +1112,8 @@ function assembleSchedulePrediction(
   // Cut-short naps don't fulfill the day's nap budget. A 28-min car nap when
   // the learned duration is ~120 min leaves a sleep deficit, so count only
   // naps that crossed the short-nap threshold and let the engine plan another.
-  const cycleMin = estimateSleepCycleFromData(ctx);
+  const sleepCycleEstimate = estimateSleepCycleDetails(ctx);
+  const cycleMin = sleepCycleEstimate.minutes;
   const shortThreshold = computeShortNapThreshold(getLearnedNapDuration(ctx), cycleMin);
   const consumedNaps = countSufficientNaps(completedNaps, shortThreshold, activeSleep?.type === "nap");
   const expectedNapCount = resolveNapCount(ctx);
@@ -1204,7 +1215,8 @@ function assembleSchedulePrediction(
       wakeWindowMin: getWakeWindow(ctx),
       bedtimeWakeWindowMin: getLearnedBedtimeWakeWindow(ctx),
       expectedNapCount,
-      sleepCycleMin: estimateSleepCycleFromData(ctx),
+      sleepCycleMin: sleepCycleEstimate.minutes,
+      sleepCycle: sleepCycleEstimate,
     },
   };
 }

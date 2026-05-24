@@ -1,7 +1,10 @@
 import { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, RESCUE_NAP, NAP_BUDGET, findByAge } from "./constants.js";
 export { WAKE_WINDOWS, NAP_COUNTS, SLEEP_NEEDS, RESCUE_NAP, findByAge } from "./constants.js";
 export type { SleepEntry } from "$lib/types.js";
-import type { SleepEntry, BabyContext, PredictionFeatures } from "$lib/types.js";
+import type {
+  SleepEntry, BabyContext, PredictionFeatures, SleepCyclePrior, SleepCycleEstimate,
+} from "$lib/types.js";
+export type { SleepCyclePrior, SleepCycleEstimate } from "$lib/types.js";
 import { getHourInTz, setHourInTz, isoToDateInTz } from "$lib/tz.js";
 import type { SleepLogRow } from "$lib/types.js";
 import { daytimeSleepDuration } from "$lib/data/shine2021.js";
@@ -245,18 +248,14 @@ export function predictDayNaps(
     && useHabitualNapStart
     && ctx.strategy === "routine_schedule"
     && !isOffDayForWake(ctx, wakeUpTime);
-  // Use the age-research default cycle, not the data-fit estimator, as
-  // the snap unit. `estimateSleepCycleFromData` is a subharmonic finder,
-  // not a sleep-cycle estimator: when naps cluster at common multiples
-  // (110 min on Halldis), c=55, c=37, c=27.5 all fit at zero distance
-  // and the scorer biases toward smaller divisors with no prior over
-  // biological plausibility. Codex 2026-05-20 dug into all 202 prod naps
-  // and the literature (Lopp et al. 2017: NREM/REM cycles ~57.5 min at
-  // 9mo; Grigg-Damberger: 50-60 min for healthy term infants) — the
-  // current estimator overclaims what parent-logged nap durations can
-  // support. Until v2 (see followups.md → "Cycle estimator v2"), the
-  // age-default is the conservative truth. The user's "snap into next
-  // cycle" intuition maps to that, not to a clustering artifact.
+  // Late-wake re-anchor deliberately uses the age-default cycle, not
+  // the data-learned estimate. Re-anchor logic doesn't need
+  // baby-specific precision (it's snapping a wake-window blend onto the
+  // nearest cycle boundary), and using the learned value here would
+  // expose a confidence-gated decision to a code path that doesn't read
+  // `sleepCycle.confidence`. If/when we want this to track learned
+  // cycles, replace with `estimatePhaseShiftCycleMin(ctx)` that gates
+  // on medium/high confidence. See followups.md.
   const cycleMinForReAnchor = getSleepCycleMinutes(ctx.ageMonths);
   const recentWakeAnchorMin = reAnchorEligible
     ? recentWakeMedianMinute(ctx, wakeUpTime)
@@ -1434,57 +1433,333 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+// ─── Sleep cycle estimator v2 ──────────────────────────────────────────────
+//
+// Research-backed: age prior gates the search range, multi-cycle fit scores
+// candidates, multiplicity discount + prior penalty break aliases, and an
+// explicit confidence/source surface tells consumers when to trust the
+// learned number vs the age-default. See docs/followups.md →
+// "Cycle estimator v2" and the Codex design pair-review 2026-05-24.
+
+// Prior means are anchored to the pre-existing `getSleepCycleMinutes`
+// age-default ladder (50 / 50 / 55 / 60 / 60) so that the prior-mean
+// path — which `predictNapEndTime`, `predictNightEndTime`, and the
+// late-wake re-anchor all read directly — doesn't shift baseline
+// behavior. Codex 2026-05-25 final-diff review flagged: extrapolating
+// new mid-band priors (52 / 65) for 3-6mo and 24+mo was an unintended
+// algorithm change that surfaced in baby_1's 26-27mo wake MAE.
+// Ranges are the search/rejection bounds the new estimator uses; SDs
+// derive from Lopp/Jenni's ±2.4 at 9mo widened slightly so the data
+// can overwhelm the prior at typical sample counts.
+const CYCLE_PRIORS: { ageMin: number; prior: SleepCyclePrior }[] = [
+  { ageMin: 0,  prior: { meanMin: 50, sdMin: 6, rangeMin: [40, 60] } },
+  { ageMin: 3,  prior: { meanMin: 50, sdMin: 5, rangeMin: [45, 60] } },
+  { ageMin: 6,  prior: { meanMin: 55, sdMin: 4, rangeMin: [50, 65] } },
+  { ageMin: 12, prior: { meanMin: 60, sdMin: 5, rangeMin: [55, 70] } },
+  { ageMin: 24, prior: { meanMin: 60, sdMin: 6, rangeMin: [55, 70] } },
+];
+
+export function getSleepCyclePrior(ageMonths: number): SleepCyclePrior {
+  let chosen = CYCLE_PRIORS[0].prior;
+  for (const band of CYCLE_PRIORS) {
+    if (ageMonths >= band.ageMin) chosen = band.prior;
+  }
+  return chosen;
+}
+
+interface CycleNapSample {
+  durationMin: number;
+  weight: number;
+}
+
 /**
- * Estimate the baby's individual sleep cycle length from nap duration data.
- * Nap durations naturally cluster at cycle multiples (1×, 2×, 3×).
- * Returns the estimated cycle length or the age-based default.
+ * Strict self-wake nap samples from the long-horizon cycleSleeps window.
+ *
+ * Differences from `censorCutShortNaps`:
+ *   - `wokeBy === "self"` only — no cap-respect carve-out (that's a
+ *     duration-learning trick that poisons cycle estimation).
+ *   - No median floor — even short clean self-wakes are real cycle data.
+ *   - Soft regime weights (1.0 / 0.5 / 0.2) instead of a hard nap-count
+ *     filter — cycle physiology moves more slowly than nap-count regime.
+ *   - Recency weight is gentle (0.5 → 1.0 across the window) so old clean
+ *     data still contributes.
  */
-export function estimateSleepCycleFromData(ctx: BabyContext): number {
-  const cache = getCache(ctx);
-  // Same censoring story as duration learning: a 41 min cut-short isn't a
-  // cycle-boundary signal, it's a door opening. Drop those before fitting.
-  const naps = censorCutShortNaps(
-    cache.naps.filter((s) => cache.daysWithNight.has(s.localDate)),
-    ctx,
-    getExtendedSelfMedianMin(ctx),
-  );
-  if (naps.length < 5) return getSleepCycleMinutes(ctx.ageMonths);
+function collectCycleNapSamples(ctx: BabyContext): CycleNapSample[] {
+  const sleeps =
+    ctx.cycleSleeps ?? ctx.trendSleeps ?? ctx.extendedSleeps ?? ctx.recentSleeps;
+  if (!sleeps || sleeps.length === 0) return [];
 
-  const durations = naps
-    .map((s) => Math.round((s.endMs - s.startMs) / 60000))
-    .filter((d) => d >= 20 && d <= 180);
-  if (durations.length < 5) return getSleepCycleMinutes(ctx.ageMonths);
+  const targetNapCount = resolveNapCount(ctx);
+  const offDays = ctx.offDays;
+  type DayBucket = {
+    naps: { startMs: number; endMs: number; wokeBy: "self" | "woken" | null }[];
+    hasNight: boolean;
+  };
+  const byDay = new Map<string, DayBucket>();
 
-  // Test cycle lengths from 35-60 min and score each by how well
-  // durations cluster at multiples
-  let bestCycle = getSleepCycleMinutes(ctx.ageMonths);
-  let bestScore = -Infinity;
-
-  for (let c = 35; c <= 60; c++) {
-    let score = 0;
-    for (const d of durations) {
-      // Distance to nearest cycle boundary
-      const remainder = d % c;
-      const dist = Math.min(remainder, c - remainder);
-      // Gaussian-like scoring: closer to boundary = higher score
-      score += Math.exp(-(dist * dist) / (8 * 8));
+  for (const s of sleeps) {
+    if (!s.end_time) continue;
+    const day = isoToDateInTz(s.start_time, ctx.tz);
+    if (offDays?.has(day)) continue;
+    let bucket = byDay.get(day);
+    if (!bucket) {
+      bucket = { naps: [], hasNight: false };
+      byDay.set(day, bucket);
     }
-    if (score > bestScore) {
-      bestScore = score;
-      bestCycle = c;
+    if (s.type === "night") {
+      bucket.hasNight = true;
+    } else {
+      bucket.naps.push({
+        startMs: new Date(s.start_time).getTime(),
+        endMs: new Date(s.end_time).getTime(),
+        wokeBy: s.woke_by ?? null,
+      });
     }
   }
 
-  return bestCycle;
+  // First pass: collect per-day clean self-wake durations + regime weight,
+  // keeping only sample-bearing days. Second pass: apply recency weight
+  // indexed by *sample-bearing* day position, not by raw day position —
+  // otherwise adding cap-respect (woken) days to a baby's history would
+  // push the existing self-wakes "into the past", dropping effectiveN even
+  // though the cycle evidence is unchanged.
+  const dayKeys = [...byDay.keys()].toSorted();
+  type DayDraft = { regimeWeight: number; durations: number[] };
+  const drafts = new Map<string, DayDraft>();
+  for (const day of dayKeys) {
+    const bucket = byDay.get(day)!;
+    if (!bucket.hasNight) continue;
+    const dayNapCount = bucket.naps.length;
+    const regimeDelta = Math.abs(dayNapCount - targetNapCount);
+    const regimeWeight =
+      regimeDelta === 0 ? 1.0 : regimeDelta === 1 ? 0.5 : 0.2;
+    const durations: number[] = [];
+    for (const n of bucket.naps) {
+      if (n.wokeBy !== "self") continue;
+      const dur = (n.endMs - n.startMs) / 60_000;
+      if (dur < 20 || dur > 180) continue;
+      durations.push(dur);
+    }
+    if (durations.length > 0) drafts.set(day, { regimeWeight, durations });
+  }
+  if (drafts.size === 0) return [];
+  const sampleDayKeys = [...drafts.keys()].toSorted();
+  const totalSampleDays = sampleDayKeys.length;
+  const samples: CycleNapSample[] = [];
+  for (let i = 0; i < totalSampleDays; i++) {
+    const draft = drafts.get(sampleDayKeys[i])!;
+    // Recency: oldest sample-bearing day 0.5, newest 1.0. Codex review
+    // 2026-05-25 pushed back on a 0.7 floor as too weak decay over a
+    // 180-day window — stale pre-transition evidence could keep driving
+    // learned cycles long after recent behavior stopped confirming it.
+    const recencyWeight =
+      totalSampleDays <= 1 ? 1.0 : 0.5 + 0.5 * (i / (totalSampleDays - 1));
+    const weight = draft.regimeWeight * recencyWeight;
+    for (const dur of draft.durations) {
+      samples.push({ durationMin: dur, weight });
+    }
+  }
+  return samples;
+}
+
+// Scoring constants. SIGMA_DATA is the expected std of (sample - k*cycle)
+// residuals for a clean self-wake nap; 4 min is on the tight side, which
+// is right because the per-nap censoring is already strict (self-wake
+// only, in-range, complete day).
+const SIGMA_DATA_MIN = 4;
+// Mild multiplicity discount — Codex recommended a "gentle, secondary"
+// term so the age prior remains the primary alias defense.
+const MULTIPLICITY_ALPHA = 0.2;
+// Best vs prior-mean candidate must clear this per-effective-sample
+// log-score gain to be reported as "learned". Codex 2026-05-25 pushed
+// back on a 0.05 floor — at N=5 that's only 0.25 total log-units,
+// below a 2-min residual improvement per sample. 0.10 keeps weak
+// evidence hedged to "age-default" instead of overclaiming.
+const PER_N_MARGIN_THRESHOLD = 0.10;
+// Best vs second-best (≥ NEIGHBOR_GAP_MIN apart) clearance for "learned".
+const PER_N_AMBIGUITY_LOW = 0.10;
+// Stricter clearance required to reach "high" confidence.
+const PER_N_AMBIGUITY_HIGH = 0.15;
+const NEIGHBOR_GAP_MIN = 3;
+const MIN_LEARNED_EFFECTIVE_N = 5;
+const MIN_HIGH_EFFECTIVE_N = 12;
+// When the candidate is outside the prior's 1σ window, allow high
+// confidence only if residuals are very tight AND the data strongly
+// disagrees with the prior — a precision-only override (Codex flagged
+// it as too easy: parent logs can look artificially tidy via routine
+// + rounding). The margin captures evidence strength.
+const PER_N_OUTSIDE_PRIOR_OVERRIDE_MARGIN = 0.30;
+const TIGHT_RES_FACTOR = 1.25;
+const VERY_TIGHT_RES_FACTOR = 0.5;
+
+function scoreCycleCandidate(
+  c: number,
+  samples: CycleNapSample[],
+  prior: SleepCyclePrior,
+): { score: number; alignedSqResWeighted: number; weightUsed: number } {
+  let dataScore = 0;
+  let alignedSqResWeighted = 0;
+  let weightUsed = 0;
+  const RESIDUAL_CAP = 4 * SIGMA_DATA_MIN;
+  for (const s of samples) {
+    let bestK = 1;
+    let bestResid = Math.abs(s.durationMin - c);
+    for (let k = 2; k <= 3; k++) {
+      const r = Math.abs(s.durationMin - k * c);
+      if (r < bestResid) {
+        bestResid = r;
+        bestK = k;
+      }
+    }
+    // Cap residuals rather than rejecting them: a sample that doesn't
+    // fit any plausible k·c at this candidate should make the candidate
+    // look *bad*, not be silently dropped (which would let the prior
+    // penalty alone determine the score and pollute ambiguity detection
+    // at the range edges).
+    const cappedRes = Math.min(bestResid, RESIDUAL_CAP);
+    const dataLogP =
+      -(cappedRes * cappedRes) / (2 * SIGMA_DATA_MIN * SIGMA_DATA_MIN)
+      - MULTIPLICITY_ALPHA * (bestK - 1);
+    dataScore += s.weight * dataLogP;
+    alignedSqResWeighted += s.weight * bestResid * bestResid;
+    weightUsed += s.weight;
+  }
+  const priorLogP =
+    -((c - prior.meanMin) * (c - prior.meanMin))
+    / (2 * prior.sdMin * prior.sdMin);
+  return { score: dataScore + priorLogP, alignedSqResWeighted, weightUsed };
+}
+
+/**
+ * Estimate the baby's sleep cycle length with explicit
+ * confidence/source/diagnostics. Memoized on the context — safe to call
+ * from multiple call sites in the prediction pipeline.
+ *
+ * Algorithm:
+ *  1. Pick age prior. Search range = `prior.rangeMin`.
+ *  2. Build weighted self-wake-only sample list from `cycleSleeps`.
+ *  3. Score each integer candidate in the search range using a Gaussian
+ *     log-likelihood (residual to nearest k·c, k∈{1,2,3}) with a mild
+ *     multiplicity discount and a Gaussian prior penalty.
+ *  4. Compare best vs prior-mean (margin) and best vs next-best ≥3 min
+ *     away (ambiguity). Both must clear per-effective-sample thresholds.
+ *  5. Confidence: low when N<5, residuals are wide, or ambiguity is
+ *     tight. High when N≥12, residuals are tight, ambiguity is clear,
+ *     and the candidate is within ~1σ of the prior mean (or residuals
+ *     are *very* tight, overriding the within-sigma rule for clean
+ *     edge-of-range babies).
+ */
+export function estimateSleepCycleDetails(ctx: BabyContext): SleepCycleEstimate {
+  if (ctx._sleepCycleEstimate !== undefined) {
+    return ctx._sleepCycleEstimate;
+  }
+  const prior = getSleepCyclePrior(ctx.ageMonths);
+  const samples = collectCycleNapSamples(ctx);
+  const effectiveN = samples.reduce((sum, s) => sum + s.weight, 0);
+
+  const fallback = (margin: number): SleepCycleEstimate => ({
+    minutes: prior.meanMin,
+    source: "age-default",
+    confidence: "low",
+    sampleCount: effectiveN,
+    scoreMargin: margin,
+    candidateRange: prior.rangeMin,
+  });
+
+  if (samples.length === 0 || effectiveN < MIN_LEARNED_EFFECTIVE_N) {
+    const out = fallback(0);
+    ctx._sleepCycleEstimate = out;
+    return out;
+  }
+
+  let bestC = prior.meanMin;
+  let bestScore = -Infinity;
+  let bestAlignedSqRes = 0;
+  let bestWeightUsed = 0;
+  const allScores: { c: number; score: number }[] = [];
+  for (let c = prior.rangeMin[0]; c <= prior.rangeMin[1]; c++) {
+    const r = scoreCycleCandidate(c, samples, prior);
+    allScores.push({ c, score: r.score });
+    if (r.score > bestScore) {
+      bestScore = r.score;
+      bestC = c;
+      bestAlignedSqRes = r.alignedSqResWeighted;
+      bestWeightUsed = r.weightUsed;
+    }
+  }
+
+  const defaultResult = scoreCycleCandidate(prior.meanMin, samples, prior);
+  const margin = bestScore - defaultResult.score;
+  const perNMargin = margin / effectiveN;
+
+  let secondBestScore = -Infinity;
+  for (const candidate of allScores) {
+    if (Math.abs(candidate.c - bestC) < NEIGHBOR_GAP_MIN) continue;
+    if (candidate.score > secondBestScore) secondBestScore = candidate.score;
+  }
+  const ambiguity =
+    secondBestScore === -Infinity ? margin : bestScore - secondBestScore;
+  const perNAmbiguity = ambiguity / effectiveN;
+  const alignedStd =
+    bestWeightUsed > 0 ? Math.sqrt(bestAlignedSqRes / bestWeightUsed) : Infinity;
+  const tightResiduals = alignedStd <= SIGMA_DATA_MIN * TIGHT_RES_FACTOR;
+  const veryTightResiduals = alignedStd <= SIGMA_DATA_MIN * VERY_TIGHT_RES_FACTOR;
+  const withinPriorSigma = Math.abs(bestC - prior.meanMin) <= prior.sdMin;
+
+  // Margin gate: a non-default best must clear the per-sample threshold.
+  const beatsDefault = bestC === Math.round(prior.meanMin) || perNMargin >= PER_N_MARGIN_THRESHOLD;
+
+  let confidence: "low" | "medium" | "high";
+  if (
+    !tightResiduals
+    || perNAmbiguity < PER_N_AMBIGUITY_LOW
+    || !beatsDefault
+  ) {
+    confidence = "low";
+  } else if (
+    effectiveN >= MIN_HIGH_EFFECTIVE_N
+    && perNAmbiguity >= PER_N_AMBIGUITY_HIGH
+    && (
+      withinPriorSigma
+      || (veryTightResiduals && perNMargin >= PER_N_OUTSIDE_PRIOR_OVERRIDE_MARGIN)
+    )
+  ) {
+    // High requires the candidate to sit within the prior's 1σ window
+    // OR the data to overwhelmingly disagree with the prior (very-tight
+    // residuals AND a strong margin per effective sample). Codex
+    // 2026-05-25 review: combined evidence strength is the right bar,
+    // not precision alone.
+    confidence = "high";
+  } else {
+    confidence = "medium";
+  }
+
+  const source = confidence === "low" ? "age-default" : "learned";
+  const minutes = source === "age-default" ? prior.meanMin : bestC;
+  const out: SleepCycleEstimate = {
+    minutes,
+    source,
+    confidence,
+    sampleCount: effectiveN,
+    scoreMargin: margin,
+    candidateRange: prior.rangeMin,
+  };
+  ctx._sleepCycleEstimate = out;
+  return out;
+}
+
+/**
+ * Legacy scalar API. Returns the estimator's recommended minutes value;
+ * downstream consumers that just want a number (computeShortNapThreshold,
+ * napBudget cap-cycle math) keep working. New code should call
+ * `estimateSleepCycleDetails` and surface source/confidence.
+ */
+export function estimateSleepCycleFromData(ctx: BabyContext): number {
+  return estimateSleepCycleDetails(ctx).minutes;
 }
 
 function getSleepCycleMinutes(ageMonths: number): number {
-  // Research: newborn ~50 min, infant ~50-60 min, toddler ~60 min
-  // School-age 85-90 min. See docs/sleep-science-research.md
-  if (ageMonths < 3) return 50;
-  if (ageMonths < 6) return 50;
-  if (ageMonths < 12) return 55;
-  return 60;
+  return getSleepCyclePrior(ageMonths).meanMin;
 }
 
 /**

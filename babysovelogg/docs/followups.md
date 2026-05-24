@@ -162,114 +162,105 @@ None are urgent; capture for future reference.
   product additions if we want to keep the user-feedback loop
   tight.
 
-## Cycle estimator v2 — replace the subharmonic finder
+## Cycle estimator v2 — shipped 2026-05-25
 
-Source: 2026-05-20 Codex investigation (`local/codex-cycle-estimator.md`)
-prompted by the user asking why `estimateSleepCycleFromData` returned
-37 min for an 11mo. Reading the actual literature (Lopp et al. 2017:
-NREM/REM cycles ~57.5 ± 2.4 min at 9 months; Grigg-Damberger: 50-60
-min for healthy term infants) plus all 202 prod naps showed the
-current function is a subharmonic finder, not a cycle estimator:
+Replaced the subharmonic finder `estimateSleepCycleFromData` with
+`estimateSleepCycleDetails(ctx): SleepCycleEstimate` (minutes + source
++ confidence + diagnostics). Codex pair-review iterated three times
+(2026-05-24 design, 2026-05-25 final diff, 2026-05-25 deviation
+audit).
 
-- Search range 35-60 admits biologically implausible cycles. With nap
-  durations clustered at common multiples (e.g. 110 min on Halldis),
-  c=55, c=37, c=27.5 all fit at zero distance. No prior over plausible
-  c, no penalty for higher multiples, no margin requirement → smaller
-  divisors win when naps are common multiples.
-- Codex checked all 35 self-wake naps in prod since 2026-01-06: the
-  scorer picks c=40, not 55. Restricting to 50-65 picks 52-53. The
-  full-history "self-only" instinct is directionally right but the
-  math itself is broken; equal-weighted all-history is also wrong
-  because January data is a different age/regime/logging context.
-- The current function silently mislabels its output as "lært syklus"
-  in the UI (`SleepInsightsCard.svelte:74`, `+page.svelte:618`)
-  without surfacing confidence. NapBudget cap-cycle math
-  (`nap-budget.ts:153`) and rescue/short-nap thresholds
-  (`state.ts:840`, `state.ts:966`) consume it the same way.
+- Research-backed age priors in `getSleepCyclePrior(ageMonths)`,
+  centralized in `src/lib/types.ts`. Means anchored to the pre-existing
+  age-default ladder (50 / 50 / 55 / 60 / 60) so the prior-mean path —
+  which `predictNapEndTime`, `predictNightEndTime`, and the late-wake
+  re-anchor all read via `getSleepCycleMinutes(ageMonths)` — doesn't
+  shift baseline behavior. Ranges and SDs derive from Lopp/Jenni
+  (±2.4 at 9mo), widened so data can overwhelm the prior.
+- `collectCycleNapSamples` reads strict `woke_by === "self"` only from
+  the new long-horizon `ctx.cycleSleeps` (180 days, fetched in
+  `src/lib/server/state.ts`). Off-days excluded. Soft regime weight
+  (1.0/0.5/0.2 by dominant-nap-count delta) and recency weight
+  (0.5..1.0 across *sample-bearing* days, so woken cap-respect days
+  don't push self-wakes "into the past"). Backtest harnesses
+  (`backtest.ts` + `intraday-backtest.ts`) populate `cycleSleeps` too
+  so MAE numbers validate the production data flow.
+- Prior-weighted Gaussian log-likelihood scoring with multi-cycle fit
+  (k ∈ {1,2,3}), mild multiplicity discount (α=0.2), residual cap at
+  4σ (capping rather than rejecting prevents the prior penalty from
+  scoring artificially well at candidate-range edges).
+- Confidence gates: low when effective N < 5 OR aligned-std > σ × 1.25
+  OR per-sample margin < 0.10 (was 0.05; Codex pushback). High
+  requires N ≥ 12, ambiguity ≥ 0.15/sample, AND (within prior σ OR
+  very-tight residuals ≤ σ × 0.5 AND per-sample margin ≥ 0.30 over
+  prior-mean candidate). Medium otherwise. Source = "age-default" when
+  confidence is low, "learned" otherwise.
+- `Prediction.learnedSchedule.sleepCycle: SleepCycleEstimate` added
+  alongside the legacy `sleepCycleMin: number` shim. UI cycle-nudge
+  banner labels "lærte syklus" only when `source = "learned" &&
+  confidence !== "low"`, else "typisk syklus for alderen".
+- NapBudget cap-cycle math + rescue thresholds keep using the
+  numerical `.minutes` regardless of source/confidence — only the UI
+  label hedges.
+- Memoized via `ctx._sleepCycleEstimate`. Type centralized in
+  `types.ts` so no `unknown` cast needed in the engine.
+- Tests: `tests/unit/cycle-estimator.unit.ts` follows the
+  table-driven render+snapshot pattern from `docs/testing.md`: a
+  single 14-scenario inline snapshot covers spec + adversarial
+  fixtures (Halldis-shape, learned, very-tight high, 111m alias
+  guard, uniform noise, bimodal, off-day exclusion, missing-wake
+  filter, mixed regime, age boundary, long 180m, 12-24mo edge, cap-
+  respect invariance) with invariants pinned below to protect every
+  important behavior against `--update-snapshots`.
+- Backtest snapshots are UNCHANGED end-to-end — the apparent drift
+  during development came from accidentally shifting the age-default
+  cycle ladder (3-6mo 50→52, 24+mo 60→65), not from the new
+  estimator. Final priors keep the ladder identical.
 
-Concrete v2 (from Codex's memo):
+Stage-2 followups (parked, captured by Codex deviation review):
+- Drop the legacy `sleepCycleMin: number` field from
+  `Prediction.learnedSchedule` after at least two release cycles.
+  `timer-state.ts:117,143` still reads the scalar directly (with
+  `?? 45` fallback); migrate to `sleepCycle?.minutes ?? sleepCycleMin
+  ?? 45` first, then remove the scalar with a schema/cache
+  compatibility window.
+- A dedicated `estimatePhaseShiftCycleMin(ctx)` for the late-wake
+  re-anchor only if/when we want it to use medium/high learned
+  cycles instead of the conservative age-default. Today the re-anchor
+  at `schedule.ts:260` deliberately stays on age-default.
+- Optional absolute-time recency factor on top of sample-bearing-day
+  recency, to downweight stale pre-transition evidence even when no
+  newer self-wakes have logged. Would require threading `now` into
+  `collectCycleNapSamples`.
+- The `censorCutShortNaps` fallback-to-unfiltered loophole when
+  `stableMedianMin` has < 3 samples (`schedule.ts:1188`) was noted in
+  the original followup as a cycle-estimation correctness issue; the
+  new sample collector is independent so the loophole no longer
+  affects cycle math, but it still affects duration learning — worth
+  a separate followup if/when it bites.
+- Memoization-with-cloned-ctx latent risk: `state.ts` does
+  `{ ...ctx, customNapCount: remaining.length }` in the re-plan path.
+  If a future code path calls the estimator on that clone, it would
+  return the cached estimate computed against the original
+  `customNapCount`, which affects regime weighting. Currently no path
+  triggers this, but if it ever does, switch to a per-call
+  WeakMap<BabyContext, SleepCycleEstimate> instead of an on-ctx
+  field.
 
-```ts
-export interface SleepCycleEstimate {
-  minutes: number;
-  source: "age-default" | "learned";
-  confidence: "low" | "medium" | "high";
-  sampleCount: number;
-  scoreMargin: number;
-  candidateRange: [number, number];
-}
-export function estimateSleepCycleDetails(ctx: BabyContext): SleepCycleEstimate;
-```
-
-Pieces:
-1. `getSleepCyclePrior(ageMonths)` — research-backed Gaussian prior.
-   6-12mo: mean 55, range 50-65. 12-24mo: mean 60, range 55-70.
-   newborn/emerging: return age-default unless physiological data.
-2. `collectCycleNapSamples(ctx)` separate from `censorCutShortNaps` —
-   strict `woke_by === "self"` only, long-horizon (180d or all-history
-   while DB is tiny), age/regime-weighted (downweight different
-   dominant-nap-count days), exclude off-days. **Do not include
-   `woken` and do not import the cap-respect carve-out** — those
-   carve-outs are right for learned nap duration, poison for cycle
-   estimation.
-3. Add a new `ctx.cycleSleeps` long-horizon window in
-   `src/lib/server/state.ts` — separate from the 7d recent and 30d
-   trend fetches. Start at 180 days or all-since-birth.
-4. Prior-weighted scoring inside the candidate range. Score = Gaussian
-   prior penalty × multi-cycle fit. Require margin to beat
-   age-default before returning `source: "learned"`.
-5. UI: don't say "lært" if source is age-default or confidence is low.
-6. Late-wake re-anchor: continue using age-default OR a dedicated
-   `estimatePhaseShiftCycleMin(ctx)` that only accepts medium/high
-   confidence inside the age-plausible range.
-
-Also fix the censoring loophole flagged in the same investigation:
-`censorCutShortNaps` falls back to returning all naps unchanged when
-`stableMedianMin` < 3 samples (`schedule.ts:1124`). Acceptable for
-duration learning; not acceptable for cycle estimation. The v2 sample
-collector should handle the no-self-wake case explicitly with low
-confidence + age-default fallback.
-
-Tests to add:
-- Halldis-shape fixture (1-nap, 6 woken + 1 self): cycle estimate
-  should return age-default with low confidence + a margin field
-  showing learned candidates within 0.005 of each other.
-- Same baby with all 5+ self-wakes at ~110 min: should return ~55
-  with medium/high confidence.
-- 7mo fixture with all self-wakes at ~50 min: should return ~50 with
-  high confidence (the prior allows it).
-- Synthetic "all naps at 111 min" cluster: scorer must not pick c=37.
-
-Priority: after the trend intervention-target split. The cycle
-estimator's brittleness is real but its current impact is bounded
-(UI label + napBudget cap-cycle math + rescue thresholds), whereas
-the trend ratchet is the higher-visibility live user complaint.
-
-**Research citations to draw from when implementing v2** (Codex
-literature read 2026-05-20 — kept here so they survive memo cleanup):
-
+**Research citations** (Codex 2026-05-20 — kept for posterity):
 - Lopp et al. 2017, *Developmental Changes in Ultradian Sleep Cycles
   across Early Childhood* — Jenni et al. cited at mean cycle duration
-  **57.5 ± 2.4 min at 9 months**. Longitudinal nocturnal EEG +
-  survival analysis of cycle/episode duration distributions.
+  **57.5 ± 2.4 min at 9 months**.
   <https://journals.sagepub.com/doi/10.1177/0748730416685451>
 - Grigg-Damberger 2016, *The Visual Scoring of Sleep in Infants 0 to
-  2 Months of Age* — healthy term infant cycles 50–60 min, broad
-  newborn range. <https://pmc.ncbi.nlm.nih.gov/articles/PMC4773630/>
-- Akacem et al. 2015 — napping toddlers have later melatonin onset
-  and shorter night sleep; nap duration is NOT a clean multiple of
-  intrinsic cycle length, parental/environmental factors dominate.
+  2 Months of Age* — healthy term infant cycles 50–60 min.
+  <https://pmc.ncbi.nlm.nih.gov/articles/PMC4773630/>
+- Akacem et al. 2015 — nap duration is NOT a clean multiple of
+  intrinsic cycle length; parental/environmental factors dominate.
   <https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0125181>
-- Nakagawa et al. 2016 — at 1.5y, nap duration and nap timing
-  correlate with shorter/later night sleep.
-  <https://www.nature.com/articles/srep27246>
 - SHINE 2020 — parent-reported day sleep overestimated by 29-31 min
-  vs actigraphy; relevant when seeding priors from parent logs.
+  vs actigraphy.
   <https://academic.oup.com/sleep/article/44/4/zsaa217/5937496>
-
-Implication for v2: parent-logged nap durations are NOT a direct
-signal of NREM/REM cycle length. The age-prior (mean 55 ±5 for
-6-12mo) carries more weight than data fits in this estimator.
 
 ## Split `shortThreshold` into three semantically distinct thresholds
 

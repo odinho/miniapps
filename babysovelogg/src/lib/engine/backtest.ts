@@ -79,6 +79,11 @@ export function backtest(
   options?: {
     lookbackDays?: number;
     extendedLookbackDays?: number;
+    /** Very-long-horizon window for the sleep-cycle estimator. Mirrors
+     *  prod's `cycleSleeps` (180d). Defaults to 180, but the harness
+     *  capping at `i` means an early-life baby gets all-prior-history
+     *  naturally. */
+    cycleLookbackDays?: number;
     predict?: NapPredictor;
     predictBedtime?: BedtimePredictor;
     predictWakeTime?: WakeTimePredictor;
@@ -92,6 +97,7 @@ export function backtest(
   // `extendedSleeps` so the cut-short censor's self-wake median has enough
   // signal even when the 7-day window is sparse.
   const extendedLookback = options?.extendedLookbackDays ?? 21;
+  const cycleLookback = options?.cycleLookbackDays ?? 180;
   const predict = options?.predict ?? predictDayNaps;
   const bedtimePredict = options?.predictBedtime ?? recommendBedtime;
   const wakePredict = options?.predictWakeTime ?? predictNightEndTime;
@@ -113,11 +119,14 @@ export function backtest(
     const dayMs = dayMsCache[i];
     const recentCutoff = dayMs - lookback * DAY_MS;
     const extendedCutoff = dayMs - extendedLookback * DAY_MS;
+    const cycleCutoff = dayMs - cycleLookback * DAY_MS;
     const recentSleeps: SleepEntry[] = [];
     const extendedSleeps: SleepEntry[] = [];
+    const cycleSleeps: SleepEntry[] = [];
     for (let j = 0; j < i; j++) {
       const otherMs = dayMsCache[j];
       const completed = days[j].sleeps.filter((s) => s.end_time);
+      if (otherMs >= cycleCutoff) cycleSleeps.push(...completed);
       if (otherMs >= extendedCutoff) extendedSleeps.push(...completed);
       if (otherMs >= recentCutoff) recentSleeps.push(...completed);
     }
@@ -146,6 +155,7 @@ export function backtest(
       targetBedtime: day.target_bedtime ?? null,
       recentSleeps,
       extendedSleeps,
+      cycleSleeps,
       trendTotalMin,
       features,
     };

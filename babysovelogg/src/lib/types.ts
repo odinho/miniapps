@@ -154,6 +154,14 @@ export interface BabyContext {
    */
   trendSleeps?: SleepEntry[];
   /**
+   * Very-long-horizon lookback (up to 180 days) used by the sleep-cycle
+   * estimator. The cycle scorer needs many strict self-wake naps to beat
+   * the age-default prior; the 30-day trend window is too small for
+   * babies who don't self-wake often. Falls back to trendSleeps, then
+   * extendedSleeps, then recentSleeps when not provided.
+   */
+  cycleSleeps?: SleepEntry[];
+  /**
    * Local-date keys (YYYY-MM-DD in baby tz) the parent marked as off-days
    * (sick, travel, growth spurt, DST). The trend computation skips these
    * so a bad week doesn't pull the engine's recommendations sideways.
@@ -199,6 +207,38 @@ export interface BabyContext {
   _cache?: unknown;
   /** @internal Memoized self-wake median (minutes) over extendedSleeps. */
   _extendedSelfMedian?: number | null;
+  /** @internal Memoized sleep-cycle estimate. */
+  _sleepCycleEstimate?: SleepCycleEstimate;
+}
+
+export interface SleepCyclePrior {
+  /** Research-backed mean for the age band (minutes). */
+  meanMin: number;
+  /** One-sigma width of the prior — narrower for older infants where
+   *  literature is tighter (Jenni: ±2.4 at 9mo). */
+  sdMin: number;
+  /** Age-plausible candidate range — search & rejection bounds. */
+  rangeMin: [number, number];
+}
+
+export interface SleepCycleEstimate {
+  /** Recommended cycle length (minutes). Falls back to the prior mean
+   *  when confidence is low. */
+  minutes: number;
+  /** "learned" when data clears the margin + ambiguity gates;
+   *  "age-default" otherwise. UI should only label "lærte syklus"
+   *  on `learned`. */
+  source: "age-default" | "learned";
+  /** Confidence band drives UI hedging + which gates kicked in. */
+  confidence: "low" | "medium" | "high";
+  /** Weighted effective sample count after regime/recency weighting. */
+  sampleCount: number;
+  /** Log-score margin of the best candidate over the prior-mean
+   *  candidate. Positive when data disagrees with the prior; zero when
+   *  best == prior mean. */
+  scoreMargin: number;
+  /** Age-plausible search range the scorer evaluated (diagnostics). */
+  candidateRange: [number, number];
 }
 
 export interface EventRow {
