@@ -50,7 +50,9 @@ export function buildEndSleep(activeSleep: SleepLogRow): EndSleepResult {
 		},
 	];
 
-	return { events, endTime, sleepSnapshot: { ...activeSleep } };
+	// Stamp end_time onto the snapshot so downstream consumers
+	// (WakeUpSheet's undo-end gating in particular) see post-end state.
+	return { events, endTime, sleepSnapshot: { ...activeSleep, end_time: endTime } };
 }
 
 /** Build a pause event. */

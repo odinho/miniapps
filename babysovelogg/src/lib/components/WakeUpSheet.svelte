@@ -7,6 +7,7 @@
 	import { formatDuration, formatTime } from '$lib/utils.js';
 	import { toggleOffDay, localDateForOffDay } from '$lib/off-day-actions.js';
 	import { calcPauseMs } from '$lib/engine/classification.js';
+	import { isWithinEndUndoWindow } from '$lib/end-undo.js';
 	import TimeInput from './TimeInput.svelte';
 
 	interface Props {
@@ -16,6 +17,26 @@
 	}
 
 	let { sleepDomainId, sleepSnapshot, onClose }: Props = $props();
+
+	// "Angre slutt" — undo the just-recorded End for a nap, within 15 min and
+	// only if no later sleep has started. Reuses the existing `sleep.restarted`
+	// event (same one the post-end undo toast emits).
+	const canUndoEnd = $derived(
+		isWithinEndUndoWindow(sleepSnapshot, appState.state.todaySleeps),
+	);
+
+	async function undoEnd() {
+		if (busy) return;
+		busy = true;
+		try {
+			await sync.sendEvents([
+				{ type: 'sleep.restarted', payload: { sleepDomainId } },
+			]);
+			onClose?.();
+		} finally {
+			busy = false;
+		}
+	}
 
 	// Detect trailing pause (active pause = baby never went back to sleep)
 	// svelte-ignore state_referenced_locally — intentional: snapshot is immutable once passed
@@ -180,6 +201,21 @@
 					</div>
 				{/if}
 			</div>
+		{/if}
+
+		<!-- Angre slutt — undo the just-recorded End and resume the nap.
+		     Most prominent affordance when the parent realises baby is still asleep. -->
+		{#if canUndoEnd}
+			<button
+				class="btn btn-ghost"
+				style="width: 100%; background: var(--peach); color: var(--text); font-weight: 600; margin-bottom: 10px;"
+				onclick={undoEnd}
+				disabled={busy}
+				data-testid="undo-end-btn"
+				type="button"
+			>
+				↩️ Angre slutt — søv vidare
+			</button>
 		{/if}
 
 		<!-- Trailing pause notice -->

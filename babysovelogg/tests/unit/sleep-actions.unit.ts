@@ -91,10 +91,11 @@ describe('buildEndSleep', () => {
 		expect(result.endTime).toBe('2026-03-27T15:00:00.000Z');
 	});
 
-	it('returns a snapshot of the sleep', () => {
+	it('returns a snapshot of the sleep with end_time stamped', () => {
 		const sleep = makeSleep({ mood: 'normal' });
 		const result = buildEndSleep(sleep);
-		expect(result.sleepSnapshot).toEqual(sleep);
+		// Snapshot reflects post-end state — end_time is set to the just-emitted timestamp
+		expect(result.sleepSnapshot).toEqual({ ...sleep, end_time: result.endTime });
 		// Should be a copy, not the same reference
 		expect(result.sleepSnapshot).not.toBe(sleep);
 	});

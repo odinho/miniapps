@@ -10,6 +10,24 @@ multi-day testing, the unit-of-work flow — live in
 [`workflow.md`](./workflow.md). Don't put process in this file; this
 is for tracked product/engine/test work.
 
+## Pause UX redesign — see dedicated plan
+
+Source: 2026-05-22 design pass with Codex pair-review. Plan lives in
+[`pause-redesign-2026-05-22.md`](./pause-redesign-2026-05-22.md).
+Staged rollout replaces the single `Pause` button with (a) reversible
+`End` for naps and (b) first-class `night_waking` events with their
+own edit sheet, arc rendering, and history rows. `sleep_pauses` table
+and `sleep.paused`/`sleep.resumed` events go away at stage 4.
+
+Stage 1 (Angre slutt button in WakeUpSheet/EditSleepModal) shipped
+2026-05-24 — reuses the existing `sleep.restarted` event the post-End
+undo toast already emitted. No schema change.
+
+Stages still pending: 2 (`night_waking` table + events + projections),
+3 (night-waking UI + arc red sub-bands + edit sheet + history rows),
+4 (remove pause-on-naps + drop `sleep_pauses` + simplifications), 5
+(polish).
+
 
 ## Trend intervention-target split — stage 5+ followups
 

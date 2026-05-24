@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { SleepLogRow } from '$lib/types.js';
 	import { sync } from '$lib/stores/sync.svelte.js';
+	import { appState } from '$lib/stores/app.svelte.js';
 	import { MOODS, METHODS, FALL_ASLEEP_BUCKETS, WAKE_MOODS } from '$lib/constants.js';
 	import { formatTime, formatDuration } from '$lib/utils.js';
 	import {
@@ -11,6 +12,7 @@
 		isoToTimeInput,
 		dateTimeToIso,
 	} from '$lib/history-utils.js';
+	import { isWithinEndUndoWindow } from '$lib/end-undo.js';
 	import TimeInput from './TimeInput.svelte';
 	import DateInput from './DateInput.svelte';
 
@@ -115,6 +117,25 @@
 		}
 	}
 
+	// "Angre slutt" — undo End within 15 min, only when no later sleep
+	// exists. Reuses the existing `sleep.restarted` event.
+	const canUndoEnd = $derived(
+		isWithinEndUndoWindow(entry, appState.state.todaySleeps),
+	);
+
+	async function undoEnd() {
+		if (busy) return;
+		busy = true;
+		try {
+			await sync.sendEvents([
+				{ type: 'sleep.restarted', payload: { sleepDomainId: entry.domain_id } },
+			]);
+			onClose?.();
+		} finally {
+			busy = false;
+		}
+	}
+
 	let confirmPauseDelete = $state<number | null>(null);
 
 	async function deletePause(index: number) {
@@ -147,6 +168,21 @@
 <div class="modal-overlay" onclick={handleOverlayClick} data-testid="modal-overlay">
 	<div class="modal" data-testid="edit-sleep-modal">
 		<h2>Endra søvn</h2>
+
+		<!-- Angre slutt — undo the End and reopen the nap (only when within
+		     the undo window and no later sleep has been started). -->
+		{#if canUndoEnd}
+			<button
+				class="btn btn-ghost"
+				style="width: 100%; background: var(--peach); color: var(--text); font-weight: 600; margin-bottom: 12px;"
+				onclick={undoEnd}
+				disabled={busy}
+				data-testid="undo-end-btn"
+				type="button"
+			>
+				↩️ Angre slutt — søv vidare
+			</button>
+		{/if}
 
 		<!-- Type -->
 		<div class="form-group">
