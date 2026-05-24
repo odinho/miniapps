@@ -1,4 +1,4 @@
-import type { SleepLogRow, DiaperLogRow } from '$lib/types.js';
+import type { SleepLogRow, DiaperLogRow, NightWakingRow } from '$lib/types.js';
 import { toLocal, toLocalDate, formatTime, formatDuration } from '$lib/utils.js';
 import { MOOD_EMOJI, METHOD_EMOJI, FALL_ASLEEP_LABELS, WAKE_MOOD_EMOJI } from '$lib/constants.js';
 
@@ -71,19 +71,22 @@ export { POTTY_DIAPER_STATUSES as POTTY_EDIT_STATUSES } from './diaper-form-acti
 
 export type HistoryEntry =
 	| (SleepLogRow & { _kind: 'sleep'; _sortTime: string })
-	| (DiaperLogRow & { _kind: 'diaper'; _sortTime: string });
+	| (DiaperLogRow & { _kind: 'diaper'; _sortTime: string })
+	| (NightWakingRow & { _kind: 'night_waking'; _sortTime: string });
 
 // ── Data fetching ────────────────────────────────────────────────
 
 export async function fetchHistory(limit = 50): Promise<{
 	sleeps: SleepLogRow[];
 	diapers: DiaperLogRow[];
+	nightWakings: NightWakingRow[];
 }> {
-	const [sleeps, diapers] = await Promise.all([
+	const [sleeps, diapers, nightWakings] = await Promise.all([
 		fetch(`/api/sleeps?limit=${limit}`).then((r) => r.json()) as Promise<SleepLogRow[]>,
 		fetch(`/api/diapers?limit=${limit}`).then((r) => r.json()) as Promise<DiaperLogRow[]>,
+		fetch(`/api/night-wakings?limit=${limit}`).then((r) => r.json()) as Promise<NightWakingRow[]>,
 	]);
-	return { sleeps, diapers };
+	return { sleeps, diapers, nightWakings };
 }
 
 // ── Merge + sort ─────────────────────────────────────────────────
@@ -91,10 +94,12 @@ export async function fetchHistory(limit = 50): Promise<{
 export function mergeEntries(
 	sleeps: SleepLogRow[],
 	diapers: DiaperLogRow[],
+	nightWakings: NightWakingRow[] = [],
 ): HistoryEntry[] {
 	const entries: HistoryEntry[] = [
 		...sleeps.map((s) => ({ ...s, _kind: 'sleep' as const, _sortTime: s.start_time })),
 		...diapers.map((d) => ({ ...d, _kind: 'diaper' as const, _sortTime: d.time })),
+		...nightWakings.map((w) => ({ ...w, _kind: 'night_waking' as const, _sortTime: w.start_time })),
 	];
 	entries.sort((a, b) => new Date(b._sortTime).getTime() - new Date(a._sortTime).getTime());
 	return entries;
@@ -163,6 +168,12 @@ export function getSleepTypeLabel(type: string): string {
 	return type === 'night' ? 'Nattesøvn' : 'Lur';
 }
 
+/**
+ * Legacy pause summary — used only by the unit test suite to verify
+ * the legacy projection still nets historical pauses correctly. The
+ * UI no longer renders this; night wakings are a first-class entity
+ * with their own history row (see `docs/pause-redesign-2026-05-22.md`).
+ */
 export interface PauseSummary {
 	count: number;
 	totalMinutes: number;

@@ -88,6 +88,10 @@ export function applyOptimisticEvent(
 	// is sufficient because AppState is plain JSON-safe data (no Date,
 	// Map, etc).
 	const s: AppState = JSON.parse(JSON.stringify(state));
+	// Defensive default: pre-redesign cached state in localStorage may lack
+	// todayNightWakings. Without this, the night_waking.* cases below would
+	// throw on `s.todayNightWakings.map(...)` etc.
+	if (!Array.isArray(s.todayNightWakings)) s.todayNightWakings = [];
 
 	// `type` is narrowed to AppEventType inside the switch so the `never`
 	// branch at the bottom rejects adding a new event type in schemas.ts
@@ -338,6 +342,62 @@ export function applyOptimisticEvent(
 			if (s.todayWakeUp && s.todayWakeUp.date === date) {
 				s.todayWakeUp = { ...s.todayWakeUp, off_day: 0, off_day_reason: null };
 			}
+			break;
+		}
+
+		case "night_waking.started": {
+			const wakingDomainId = payload.wakingDomainId as string;
+			const babyId = (payload.babyId as number) || s.baby?.id || 0;
+			s.todayNightWakings = [
+				...s.todayNightWakings,
+				{
+					id: 0,
+					baby_id: babyId,
+					domain_id: wakingDomainId,
+					start_time: payload.startTime as string,
+					end_time: null,
+					notes: null,
+					mood: null,
+					deleted: 0,
+					created_by_event_id: null,
+					updated_by_event_id: null,
+				},
+			];
+			break;
+		}
+
+		case "night_waking.ended": {
+			const wakingDomainId = payload.wakingDomainId as string;
+			s.todayNightWakings = s.todayNightWakings.map((w) =>
+				w.domain_id === wakingDomainId ? { ...w, end_time: payload.endTime as string } : w,
+			);
+			break;
+		}
+
+		case "night_waking.edited": {
+			const wakingDomainId = payload.wakingDomainId as string;
+			s.todayNightWakings = s.todayNightWakings.map((w) => {
+				if (w.domain_id !== wakingDomainId) return w;
+				return {
+					...w,
+					start_time: (payload.startTime as string | null | undefined) ?? w.start_time,
+					end_time:
+						payload.endTime !== undefined
+							? (payload.endTime as string | null)
+							: w.end_time,
+					notes:
+						payload.notes !== undefined ? (payload.notes as string | null) : w.notes,
+					mood: payload.mood !== undefined ? (payload.mood as string | null) : w.mood,
+				};
+			});
+			break;
+		}
+
+		case "night_waking.deleted": {
+			const wakingDomainId = payload.wakingDomainId as string;
+			s.todayNightWakings = s.todayNightWakings.filter(
+				(w) => w.domain_id !== wakingDomainId,
+			);
 			break;
 		}
 

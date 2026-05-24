@@ -10,9 +10,10 @@
 	import DiaperForm from '$lib/components/DiaperForm.svelte';
 	import WakeUpSheet from '$lib/components/WakeUpSheet.svelte';
 	import EditSleepModal from '$lib/components/EditSleepModal.svelte';
+	import NightWakingEditSheet from '$lib/components/NightWakingEditSheet.svelte';
 	import { formatDuration, formatTime, formatTimeWindow } from '$lib/utils.js';
 	import { calcPauseMs } from '$lib/engine/classification.js';
-	import { buildPause, buildResume, isPaused } from '$lib/sleep-actions.js';
+	import { generateNightWakingId } from '$lib/identity.js';
 	import { buildSleepInfoRows } from '$lib/settings-utils.js';
 	import TimeInput from '$lib/components/TimeInput.svelte';
 	import DateInput from '$lib/components/DateInput.svelte';
@@ -35,6 +36,7 @@
 	let diaperFromTagSheet = $state(false);
 
 	let editingSleep = $state<SleepLogRow | null>(null);
+	let editingNightWakingId = $state<string | null>(null);
 
 	// --- undo toast ---
 	let undoToast = $state<{ message: string; undoEvents: Array<{ type: string; payload: Record<string, unknown> }> } | null>(null);
@@ -71,7 +73,14 @@
 	const pottyMode = $derived(baby?.potty_mode === 1);
 	const trackDiaper = $derived(baby?.track_diaper === 1);
 
-	const paused = $derived(isPaused(activeSleep?.pauses));
+	// Open night-waking (no end_time) inside the active night sleep — drives
+	// the Nattvaking button between "start" and "Sov att" states.
+	const todayNightWakings = $derived(s.todayNightWakings);
+	const activeNightWaking = $derived(
+		activeSleep?.type === 'night' && !activeSleep.end_time
+			? todayNightWakings.find((w) => !w.end_time) ?? null
+			: null,
+	);
 	const strategy = $derived(prediction?.strategy ?? 'routine_schedule');
 	const isNewborn = $derived(strategy === 'newborn_guidance');
 	const isEmerging = $derived(strategy === 'emerging_rhythm');
@@ -87,22 +96,40 @@
 	const showTodayCard = $derived(!showContextCard && prediction?.calibration?.trust !== 'age-default');
 	const showPopulationNorms = $derived(!showContextCard && !showTodayCard && prediction?.calibration?.trust === 'age-default');
 	const populationNormsRows = $derived(showPopulationNorms ? buildSleepInfoRows(ageMonths) : []);
-	let pauseBusy = $state(false);
 	// The bottom summary row is the default surface; tap it to reveal the
 	// detailed "I dag" rows (per-sleep windows + Leggetid hint). Per-mount
 	// state so a refresh resets to the clean default.
 	let summaryExpanded = $state(false);
 
-	async function handlePauseToggle() {
-		if (pauseBusy || !activeSleep) return;
-		pauseBusy = true;
+	let nightWakingBusy = $state(false);
+	async function handleNightWakingToggle() {
+		if (nightWakingBusy || !activeSleep || !baby) return;
+		nightWakingBusy = true;
 		try {
-			const event = paused
-				? buildResume(activeSleep.domain_id)
-				: buildPause(activeSleep.domain_id);
-			await sync.sendEvents([event]);
+			if (activeNightWaking) {
+				await sync.sendEvents([
+					{
+						type: 'night_waking.ended',
+						payload: {
+							wakingDomainId: activeNightWaking.domain_id,
+							endTime: new Date().toISOString(),
+						},
+					},
+				]);
+			} else {
+				await sync.sendEvents([
+					{
+						type: 'night_waking.started',
+						payload: {
+							babyId: baby.id,
+							startTime: new Date().toISOString(),
+							wakingDomainId: generateNightWakingId(),
+						},
+					},
+				]);
+			}
 		} finally {
-			pauseBusy = false;
+			nightWakingBusy = false;
 		}
 	}
 
@@ -178,6 +205,13 @@
 			lo: nr.startRange.lo,
 			hi: nr.startRange.hi,
 		})) ?? [],
+	);
+	const arcNightWakings = $derived(
+		todayNightWakings.map((w) => ({
+			startTime: w.start_time,
+			endTime: w.end_time,
+			domainId: w.domain_id,
+		})),
 	);
 
 	// Active-sleep progress meter: predicted wake + ±1 SD band.
@@ -363,6 +397,16 @@
 			editingSleep = sleep;
 		}
 	}
+
+	function onArcNightWakingClick(domainId: string) {
+		editingNightWakingId = domainId;
+	}
+
+	const editingNightWaking = $derived(
+		editingNightWakingId
+			? todayNightWakings.find((w) => w.domain_id === editingNightWakingId) ?? null
+			: null,
+	);
 
 	/** Arc start endpoint click: open night sleep or morning dialog */
 	function onArcStartClick() {
@@ -565,14 +609,17 @@
 				activeWakeBand={arcActiveWakeBand}
 				skippedNap={arcSkippedNap}
 				rescueWindow={arcRescueWindow}
+				nightWakings={arcNightWakings}
 				onSleepClick={onArcBubbleClick}
 				onStartClick={onArcStartClick}
+				onNightWakingClick={onArcNightWakingClick}
 			/>
 			<Timer
 				{activeSleep}
 				{prediction}
 				{todayWakeUp}
 				{todaySleeps}
+				{todayNightWakings}
 				targetBedtime={baby?.target_bedtime ?? null}
 				onEditStart={activeSleep && !activeSleep.end_time ? () => { editingSleep = activeSleep; } : undefined}
 			/>
@@ -580,14 +627,14 @@
 
 		<!-- Action buttons -->
 		<div class="arc-actions">
-			{#if activeSleep && !activeSleep.end_time}
+			{#if activeSleep && !activeSleep.end_time && activeSleep.type === 'night'}
 				<button
-					class="arc-action-btn {paused ? 'morning' : 'nap'}"
-					data-testid="pause-btn"
-					onclick={handlePauseToggle}
-					disabled={pauseBusy}
+					class="arc-action-btn {activeNightWaking ? 'morning' : 'night-waking'}"
+					data-testid="night-waking-btn"
+					onclick={handleNightWakingToggle}
+					disabled={nightWakingBusy}
 				>
-					{paused ? '▶️ Fortset' : '⏸️ Pause'}
+					{activeNightWaking ? '💤 Sov att' : '🌙 Nattvaking'}
 				</button>
 			{/if}
 			{#if trackDiaper}
@@ -784,6 +831,14 @@
 			entry={editingSleep}
 			onClose={onEditSleepClose}
 			onDeleted={onEditSleepClose}
+		/>
+	{/if}
+
+	{#if editingNightWaking}
+		<NightWakingEditSheet
+			waking={editingNightWaking}
+			onClose={() => (editingNightWakingId = null)}
+			onDeleted={() => (editingNightWakingId = null)}
 		/>
 	{/if}
 

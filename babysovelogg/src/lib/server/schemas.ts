@@ -22,12 +22,12 @@ const isoDateTime = v.pipe(
     "Invalid ISO datetime string",
   ),
 );
-// Accept both new prefixed short IDs (slp_xxx, dip_xxx) and legacy UUIDs for replay
+// Accept both new prefixed short IDs (slp_xxx, dip_xxx, nwk_xxx) and legacy UUIDs for replay
 const domainId = v.pipe(
   v.string(),
   v.check(
     (s) =>
-      /^(slp|dip|evt|cli)_[0-9a-z]+[A-Za-z0-9]+$/.test(s) ||
+      /^(slp|dip|nwk|evt|cli)_[0-9a-z]+[A-Za-z0-9]+$/.test(s) ||
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s),
     "Invalid domain ID format",
   ),
@@ -116,6 +116,27 @@ const payloadSchemas = {
   "sleep.pause_deleted": v.object({
     sleepDomainId: domainId,
     pauseIndex: v.number(),
+  }),
+  // First-class night-waking events. Replace the role pauses played for
+  // night sleeps — see docs/pause-redesign-2026-05-22.md.
+  "night_waking.started": v.object({
+    babyId: v.number(),
+    startTime: isoDateTime,
+    wakingDomainId: domainId,
+  }),
+  "night_waking.ended": v.object({
+    wakingDomainId: domainId,
+    endTime: isoDateTime,
+  }),
+  "night_waking.edited": v.object({
+    wakingDomainId: domainId,
+    startTime: v.nullish(isoDateTime),
+    endTime: v.nullish(isoDateTime),
+    notes: optStr,
+    mood: optStr,
+  }),
+  "night_waking.deleted": v.object({
+    wakingDomainId: domainId,
   }),
   "diaper.logged": v.object({
     babyId: v.number(),

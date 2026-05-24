@@ -40,6 +40,11 @@ export function generateDiaperId(): string {
   return generatePrefixedId("dip");
 }
 
+/** Generate a night-waking domain ID. */
+export function generateNightWakingId(): string {
+  return generatePrefixedId("nwk");
+}
+
 /** Generate a generic event ID (used for clientEventId). */
 export function generateId(): string {
   return generatePrefixedId("evt");

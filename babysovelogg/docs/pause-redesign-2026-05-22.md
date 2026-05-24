@@ -184,47 +184,86 @@ Order matters — keep each stage shippable on its own.
    - Tests: `tests/unit/end-undo.unit.ts` (8 cases), `tests/end-undo.e2e.ts`.
    - No pause changes yet — the existing pause button stays around.
 
-2. **Stage 2 — `night_waking` table, events, and projections.**
-   - New table, schema, four event types, projection handlers.
-   - Rebuild logic updated; no UI yet.
-   - Migration: copy existing `sleep_pauses` rows on night sleeps
-     into `night_waking`. Leave `sleep_pauses` in place for now —
-     this stage is data-prep.
-   - Tests: integration for event → projection round-trip; rebuild
-     idempotency.
+2. **Stage 2 — `night_waking` table, events, and projections.** *Shipped 2026-05-24.*
+   - New table + `nwk_` domain-id prefix in
+     [`schemas.ts`](../src/lib/server/schemas.ts).
+   - Four event types (`started`, `ended`, `edited`, `deleted`) with
+     projections in [`projections.ts`](../src/lib/server/projections.ts).
+   - Optimistic offline-queue handlers in
+     [`offline-queue.ts`](../src/lib/offline-queue.ts) for all four
+     event types.
+   - `getState` returns `todayNightWakings` (30 h pre-midnight window
+     to cover the active night sleep). `AppState.todayNightWakings`
+     non-optional with `[]` defaults in all init paths.
+   - `/api/night-wakings` GET endpoint.
+   - Integration tests in
+     [`tests/integration/night-waking.test.ts`](../tests/integration/night-waking.test.ts):
+     each event projection + rebuild idempotency.
 
-3. **Stage 3 — Night waking UI: button, arc rendering, edit sheet.**
-   - Homepage button switches based on active sleep type
-     (`nap` → `Vakna no` only; `night` → `🌙 Nattvaking` / `Sov att`
-     when a waking is open).
-   - Arc renders red sub-bands inside night sleeps.
-   - New `NightWakingEditSheet`. Wire click handlers from arc and
-     history.
-   - History indented sub-rows for night wakings.
-   - Tests: e2e for the full night-waking flow.
+3. **Stage 3 — Night-waking UI.** *Shipped 2026-05-24.*
+   - Homepage button: `🌙 Nattvaking` / `💤 Sov att` on night sleeps
+     (replaces the old `⏸️ Pause` button slot on nights). Nap-side
+     button removed (Stage 4 work folded in here since the UI
+     surface is shared).
+   - Arc red sub-band overlays for completed night_wakings inside
+     night bands (new `nightWakingOverlays` field on the scene from
+     [`arc-scene.ts`](../src/lib/arc-scene.ts)). Click → opens edit.
+   - New
+     [`NightWakingEditSheet.svelte`](../src/lib/components/NightWakingEditSheet.svelte)
+     with start/end pickers, notes, mood, delete.
+   - Timer center label: `🌙 Vakning sidan HH:MM` while an open
+     night_waking exists (in
+     [`timer-state.ts`](../src/lib/timer-state.ts)).
+   - History page: night_wakings render as their own time-sorted
+     entries (🌙 icon, time range, duration); click → edit sheet.
 
-4. **Stage 4 — Remove pause on naps; clean up.**
-   - Drop pause button code paths on naps in `+page.svelte`,
-     `arc-utils.ts`, `timer-state.ts`, `WakeUpSheet.svelte`.
-   - Migration finalization: convert any remaining nap `sleep_pauses`
-     rows (per the rules above), then `DROP TABLE sleep_pauses`.
-   - Mark `sleep.paused` / `sleep.resumed` / `sleep.pause_deleted`
-     schemas deprecated (projection becomes a no-op preserving the
-     audit trail).
-   - Delete `calcPauseMs`, `buildPause`, `buildResume`,
-     `isPaused`, and the `pauses?: SleepPauseRow[]` field on
-     `SleepLogRow` (or scope to night-derived, depending on Codex
-     simplification review).
-   - Update `import-napper.ts` to emit `night_waking.*` events.
-   - Tests: delete `tests/pause.e2e.ts`; add or extend
-     `tests/night-waking.e2e.ts`.
+4. **Stage 4 — Migration + rip-out.** *Shipped 2026-05-24.*
+   - `migrateSleepPausesToNightWaking` in
+     [`db.ts`](../src/lib/server/db.ts): for each `sleep_pauses` row,
+     if the parent is a night, `INSERT OR IGNORE INTO night_waking`
+     with deterministic `nwk_pse${pause_id}` domain-id; if the
+     parent is a nap with an open trailing pause, close the nap by
+     setting `end_time = pause_time` (tentative-end conversion).
+     Idempotent under reruns. Called both on init and after
+     `rebuildAll`.
+   - WakeUpSheet trailing-pause block removed.
+   - EditSleepModal `Pausar` list + delete UI removed.
+   - History `pauseInfo` line removed.
+   - Napper import switched to emit `night_waking.started/ended`.
+   - CLI `baby pause` / `baby resume` commands removed.
+   - `tests/pause.e2e.ts` deleted; cli nap-pause tests removed;
+     `tests/helpers/render-state.ts` now folds night_wakings into
+     its summary as `N vakning (Xm)`.
+   - `sleep_pauses` table and legacy `sleep.paused`/`sleep.resumed`
+     /`sleep.pause_deleted` projections **kept** as a frozen archive
+     for legacy nap data. The engine now reads `night_waking` (via
+     `wakingsAsPausesForSleep` in `src/lib/engine/state.ts`) for
+     night-sleep duration netting, so new night_waking events
+     correctly subtract from sleep totals. Dropping the
+     `sleep_pauses` table is deferred to a future cleanup PR.
 
-5. **Stage 5 — Polish.**
-   - History sub-row styling.
-   - Arc red sub-band styling (dark-mode contrast, accessibility).
-   - Settings: optional toggle for "track night wakings" if we want
-     to mirror the diaper-toggle pattern (not required; lean toward
-     always-on).
+   **Codex-flagged edge cases addressed in this stage:**
+   - Migration `WHERE sl.deleted = 0` so pauses from soft-deleted
+     sleeps don't reappear as standalone wakings.
+   - Open pauses on *completed* night sleeps get closed at the
+     parent's end_time during migration; open pauses on *active*
+     nights legitimately remain open.
+   - `applyOptimisticEvent` defaults `todayNightWakings` to `[]` for
+     pre-redesign cached state so the offline queue doesn't throw on
+     missing fields.
+   - `night_waking.ended/edited/deleted` projections soft-fail (log
+     warning, don't throw) when the row is missing — keeps
+     `rebuildAll` running when an edit to a migrated `nwk_pse_*`
+     row arrives in history before the end-of-replay migration has
+     populated it.
+
+5. **Stage 5 — Polish.** *Pending.*
+   - Arc red sub-band styling (dark-mode contrast).
+   - History sub-row indentation/styling if night_wakings appearing
+     between sleeps feels visually disconnected.
+   - Potential follow-up: drop the `sleep_pauses` table + legacy
+     pause projections once we're confident no engine-math regression
+     is masked by them.
 
 ## Simplification opportunities
 

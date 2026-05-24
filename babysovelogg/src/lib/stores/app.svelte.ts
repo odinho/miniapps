@@ -1,4 +1,4 @@
-import type { Baby, SleepLogRow, DayStartRow } from "$lib/types.js";
+import type { Baby, SleepLogRow, DayStartRow, NightWakingRow } from "$lib/types.js";
 import type { DayStats, SleepDayTotals } from "$lib/engine/stats.js";
 import type { PredictedNap } from "$lib/engine/schedule.js";
 import type { ConfidenceResult, PredictionRange } from "$lib/engine/confidence.js";
@@ -227,6 +227,13 @@ export interface AppState {
 	 * current state next to their per-date toggle.
 	 */
 	offDays: string[];
+	/**
+	 * Night wakings within today's sleeps (or the active night sleep).
+	 * Rendered as red intervals on the arc and as edit-able sub-rows
+	 * in history. Empty when no wakings have been logged. See
+	 * docs/pause-redesign-2026-05-22.md.
+	 */
+	todayNightWakings: NightWakingRow[];
 }
 
 const emptyState: AppState = {
@@ -242,6 +249,7 @@ const emptyState: AppState = {
 	lastDiaperTime: null,
 	todayWakeUp: null,
 	offDays: [],
+	todayNightWakings: [],
 };
 
 /** Reactive app state — the single source of truth for the UI. */

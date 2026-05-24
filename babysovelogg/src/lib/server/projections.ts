@@ -1,4 +1,4 @@
-import { db } from "./db.js";
+import { db, migrateSleepPausesToNightWaking } from "./db.js";
 import type { AppEvent } from "./events.js";
 import { rowToAppEvent } from "./events.js";
 import type { EventRow } from "$lib/types.js";
@@ -276,6 +276,80 @@ export function applyEvent(event: AppEvent): void {
       break;
     }
 
+    case "night_waking.started": {
+      db.prepare(
+        "INSERT INTO night_waking (baby_id, domain_id, start_time, created_by_event_id) VALUES (?, ?, ?, ?)",
+      ).run(payload.babyId, payload.wakingDomainId, payload.startTime, eventId);
+      break;
+    }
+
+    case "night_waking.ended": {
+      const result = db
+        .prepare(
+          "UPDATE night_waking SET end_time = ?, updated_by_event_id = ? WHERE domain_id = ? AND deleted = 0",
+        )
+        .run(payload.endTime, eventId, payload.wakingDomainId);
+      if (result.changes === 0) {
+        // Soft-fail. During `rebuildAll`, events targeting a migrated
+        // `nwk_pse_*` row arrive before the end-of-replay migration has
+        // populated it; throwing here would break the rebuild. The
+        // migration re-seeds the row from sleep_pauses with the original
+        // values; only an interactive edit on a migrated waking gets lost
+        // on rebuild — acceptable edge case.
+        console.warn(
+          `night_waking.ended: no waking found with domain_id ${payload.wakingDomainId} (skipping)`,
+        );
+      }
+      break;
+    }
+
+    case "night_waking.edited": {
+      const sets: string[] = ["updated_by_event_id = ?"];
+      const vals: unknown[] = [eventId];
+      if (payload.startTime !== undefined && payload.startTime !== null) {
+        sets.push("start_time = ?");
+        vals.push(payload.startTime);
+      }
+      if (payload.endTime !== undefined) {
+        sets.push("end_time = ?");
+        vals.push(payload.endTime);
+      }
+      if (payload.notes !== undefined) {
+        sets.push("notes = ?");
+        vals.push(payload.notes);
+      }
+      if (payload.mood !== undefined) {
+        sets.push("mood = ?");
+        vals.push(payload.mood);
+      }
+      vals.push(payload.wakingDomainId);
+      const result = db
+        .prepare(`UPDATE night_waking SET ${sets.join(", ")} WHERE domain_id = ? AND deleted = 0`)
+        .run(...vals);
+      if (result.changes === 0) {
+        // Soft-fail (see night_waking.ended).
+        console.warn(
+          `night_waking.edited: no waking found with domain_id ${payload.wakingDomainId} (skipping)`,
+        );
+      }
+      break;
+    }
+
+    case "night_waking.deleted": {
+      const result = db
+        .prepare(
+          "UPDATE night_waking SET deleted = 1, updated_by_event_id = ? WHERE domain_id = ?",
+        )
+        .run(eventId, payload.wakingDomainId);
+      if (result.changes === 0) {
+        // Soft-fail (see night_waking.ended).
+        console.warn(
+          `night_waking.deleted: no waking found with domain_id ${payload.wakingDomainId} (skipping)`,
+        );
+      }
+      break;
+    }
+
     case "diaper.logged":
       db.prepare(
         "INSERT INTO diaper_log (baby_id, time, type, amount, note, domain_id, created_by_event_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -402,8 +476,8 @@ export interface RebuildReport {
   success: boolean;
   eventsReplayed: number;
   invalidEvents: { id: number; type: string; error: string }[];
-  before: { sleeps: number; diapers: number; pauses: number };
-  after: { sleeps: number; diapers: number; pauses: number };
+  before: { sleeps: number; diapers: number; pauses: number; nightWakings: number };
+  after: { sleeps: number; diapers: number; pauses: number; nightWakings: number };
   durationMs: number;
 }
 
@@ -411,7 +485,8 @@ function countProjections() {
   const sleeps = (db.prepare("SELECT COUNT(*) as c FROM sleep_log").get() as { c: number }).c;
   const diapers = (db.prepare("SELECT COUNT(*) as c FROM diaper_log").get() as { c: number }).c;
   const pauses = (db.prepare("SELECT COUNT(*) as c FROM sleep_pauses").get() as { c: number }).c;
-  return { sleeps, diapers, pauses };
+  const nightWakings = (db.prepare("SELECT COUNT(*) as c FROM night_waking").get() as { c: number }).c;
+  return { sleeps, diapers, pauses, nightWakings };
 }
 
 export function rebuildAll(): RebuildReport {
@@ -443,6 +518,7 @@ export function rebuildAll(): RebuildReport {
   // Rebuild in transaction
   const doRebuild = db.transaction(() => {
     db.prepare("DELETE FROM sleep_pauses").run();
+    db.prepare("DELETE FROM night_waking").run();
     db.prepare("DELETE FROM diaper_log").run();
     db.prepare("DELETE FROM sleep_log").run();
     // Per-day projection rows + nap-budget state reference baby(id); clear
@@ -459,11 +535,15 @@ export function rebuildAll(): RebuildReport {
     db.prepare("DELETE FROM baby").run();
     // Reset autoincrement so replayed baby IDs match original payload references
     db.prepare(
-      "DELETE FROM sqlite_sequence WHERE name IN ('baby', 'sleep_log', 'diaper_log', 'sleep_pauses')",
+      "DELETE FROM sqlite_sequence WHERE name IN ('baby', 'sleep_log', 'diaper_log', 'sleep_pauses', 'night_waking')",
     ).run();
     for (const row of events) {
       applyEvent(rowToAppEvent(row));
     }
+    // Re-run the pause → night_waking migration on the freshly-replayed
+    // sleep_pauses rows so the UI's night_waking projections stay in sync
+    // after rebuild.
+    migrateSleepPausesToNightWaking(db);
   });
   doRebuild();
 

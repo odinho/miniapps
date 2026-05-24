@@ -25,7 +25,7 @@ import { computeStrategySignals } from "./features.js";
 import { selectStrategy } from "./strategy.js";
 import { predictNewborn } from "./newborn.js";
 import { predictEmerging } from "./emerging.js";
-import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry, BabyContext } from "$lib/types.js";
+import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry, BabyContext, NightWakingRow } from "$lib/types.js";
 import type { PredictedNap } from "./schedule.js";
 import type { Strategy, StrategyContext, StrategyOverride } from "./strategy.js";
 import type { Prediction, PostSkipPlan } from "$lib/stores/app.svelte.js";
@@ -51,6 +51,12 @@ export interface DayData {
    */
   priorOvernightSleep?: SleepLogRow | undefined;
   pausesBySleep: Map<number, SleepPauseRow[]>;
+  /**
+   * Night wakings inside the active night sleep or any of today's
+   * sleeps. Server pre-fetched (30h window from midnight) so the engine
+   * and UI don't re-query. Empty array when none exist yet.
+   */
+  todayNightWakings?: NightWakingRow[];
   diaperCount: number;
   lastDiaperTime: string | null;
   /**
@@ -677,9 +683,31 @@ function buildContext(
   };
 }
 
+/**
+ * Convert night_waking rows that fall inside a sleep into the SleepPause
+ * shape so the engine's pause-aware math (calcPauseMs, getTodayStats,
+ * getSleepDayTotals) nets night-waking duration out of night-sleep totals.
+ * Returns an empty array for non-night sleeps and when no overlap exists.
+ */
+function wakingsAsPausesForSleep(
+  sleep: { id: number; start_time: string; end_time: string | null; type: string },
+  wakings: NightWakingRow[],
+): { pause_time: string; resume_time: string | null }[] {
+  if (sleep.type !== "night" || wakings.length === 0) return [];
+  const startMs = new Date(sleep.start_time).getTime();
+  const endMs = sleep.end_time ? new Date(sleep.end_time).getTime() : Number.POSITIVE_INFINITY;
+  return wakings
+    .filter((w) => {
+      const ws = new Date(w.start_time).getTime();
+      return ws >= startMs && ws < endMs;
+    })
+    .map((w) => ({ pause_time: w.start_time, resume_time: w.end_time }));
+}
+
 /** Pure state assembly — takes fetched data, returns the API response shape. */
 export function assembleState(data: DayData) {
   const { baby, activeSleep, todaySleeps, recentSleeps, todayWakeUp, pausesBySleep } = data;
+  const nightWakings = data.todayNightWakings ?? [];
 
   // Calculate predictions even during active sleep so ghost arcs stay visible
   const now = data.now ?? Date.now();
@@ -708,9 +736,15 @@ export function assembleState(data: DayData) {
     data.priorTrendTargetState ?? null,
   );
 
+  // For night sleeps, use night_waking intervals (the post-redesign source
+  // of truth) — they include both migrated pre-redesign pauses and new
+  // first-class wakings. For naps, the legacy pausesBySleep still applies
+  // (historical data only; nap pauses are no longer created).
   const todaySleepsWithPauses = todaySleeps.map((s) => ({
     ...toSleepEntry(s),
-    pauses: pausesBySleep.get(s.id) || [],
+    pauses: s.type === "night"
+      ? wakingsAsPausesForSleep(s, nightWakings)
+      : pausesBySleep.get(s.id) || [],
   }));
   const stats = getTodayStats(todaySleepsWithPauses);
 
@@ -720,7 +754,13 @@ export function assembleState(data: DayData) {
   // i dag" — caused by the calendar-midnight cutoff in todaySleeps.
   const priorOvernight = data.priorOvernightSleep;
   const priorOvernightEntry: SleepEntry | null = priorOvernight
-    ? { ...toSleepEntry(priorOvernight), pauses: pausesBySleep.get(priorOvernight.id) || [] }
+    ? {
+        ...toSleepEntry(priorOvernight),
+        pauses:
+          priorOvernight.type === "night"
+            ? wakingsAsPausesForSleep(priorOvernight, nightWakings)
+            : pausesBySleep.get(priorOvernight.id) || [],
+      }
     : null;
   const dayTotals = getSleepDayTotals(todaySleepsWithPauses, priorOvernightEntry);
 
@@ -748,6 +788,7 @@ export function assembleState(data: DayData) {
     baby,
     activeSleep,
     todaySleeps,
+    todayNightWakings: data.todayNightWakings ?? [],
     stats,
     /**
      * Wake-to-wake totals. Same nap + today-night numbers as `stats`, plus

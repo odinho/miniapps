@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { SleepLogRow } from '$lib/types.js';
+	import type { SleepLogRow, NightWakingRow } from '$lib/types.js';
 	import type { Prediction } from '$lib/stores/app.svelte.js';
 	import { getTimerMode, getAwakeSince } from '$lib/timer-state.js';
 	import { formatDurationLong, formatDuration, formatTime } from '$lib/utils.js';
@@ -9,13 +9,14 @@
 		prediction: Prediction | null;
 		todayWakeUp: { wake_time: string | null } | null;
 		todaySleeps: SleepLogRow[];
+		todayNightWakings?: NightWakingRow[];
 		targetBedtime?: string | null;
 		/** Override internal clock (ms since epoch). Used by the dev playground. */
 		nowMs?: number;
 		onEditStart?: () => void;
 	}
 
-	let { activeSleep, prediction, todayWakeUp, todaySleeps, targetBedtime = null, nowMs, onEditStart }: Props = $props();
+	let { activeSleep, prediction, todayWakeUp, todaySleeps, todayNightWakings = [], targetBedtime = null, nowMs, onEditStart }: Props = $props();
 
 	let _now = $state(Date.now());
 	const now = $derived(nowMs !== undefined ? nowMs : _now);
@@ -30,7 +31,7 @@
 		return () => clearInterval(iv);
 	});
 
-	const input = $derived({ activeSleep, prediction, todayWakeUp, todaySleeps, now });
+	const input = $derived({ activeSleep, prediction, todayWakeUp, todaySleeps, todayNightWakings, now });
 	const mode = $derived(getTimerMode(input));
 	const awakeMs = $derived(getAwakeSince(input));
 

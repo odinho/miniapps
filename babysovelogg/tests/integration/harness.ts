@@ -215,6 +215,7 @@ export function setupHarness() {
 
   beforeEach(() => {
     db.prepare("DELETE FROM sleep_pauses").run();
+    db.prepare("DELETE FROM night_waking").run();
     db.prepare("DELETE FROM diaper_log").run();
     db.prepare("DELETE FROM sleep_log").run();
     db.prepare("DELETE FROM day_start").run();
@@ -289,6 +290,10 @@ export function generateSleepId(): string {
 
 export function generateDiaperId(): string {
   return generateId("dip");
+}
+
+export function generateNightWakingId(): string {
+  return generateId("nwk");
 }
 
 // --- Seed helpers (use shared in-memory db directly) ---

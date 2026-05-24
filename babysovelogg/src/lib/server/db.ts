@@ -112,6 +112,29 @@ function initSchema(database: SqliteDb) {
     );
   `);
 
+  // night_waking: first-class events for brief wakings inside a night
+  // sleep. Replaces what sleep_pauses did for night sleeps — see
+  // docs/pause-redesign-2026-05-22.md. Each row is its own editable
+  // entity (start/end/notes/mood), rendered as a red interval on the
+  // night arc and as an indented sub-row in history.
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS night_waking (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      baby_id INTEGER NOT NULL REFERENCES baby(id),
+      domain_id TEXT NOT NULL UNIQUE,
+      start_time TEXT NOT NULL,
+      end_time TEXT,
+      notes TEXT,
+      mood TEXT,
+      deleted INTEGER NOT NULL DEFAULT 0,
+      created_by_event_id INTEGER,
+      updated_by_event_id INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_night_waking_baby_start ON night_waking(baby_id, start_time);
+  `);
+
+  migrateSleepPausesToNightWaking(database);
+
   // Migrations: add late-added columns idempotently.
   tryAddColumn(database, "baby", "timezone", "TEXT");
   tryAddColumn(database, "baby", "target_bedtime", "TEXT");
@@ -209,6 +232,82 @@ function initSchema(database: SqliteDb) {
   // Per-row attempt counter so transient push failures retry a small
   // number of times before being abandoned (see notification-scheduler).
   tryAddColumn(database, "notification_schedule", "attempts", "INTEGER NOT NULL DEFAULT 0");
+}
+
+/**
+ * One-time migration: copy each `sleep_pauses` row whose parent sleep
+ * is a night into the new `night_waking` table; close any open trailing
+ * pause on a nap by setting the parent's `end_time` to the pause time.
+ *
+ * Idempotent: a `night_waking` row's `domain_id` is deterministically
+ * `nwk_pse${pause_id}`, so reruns find the existing row and skip.
+ *
+ * `sleep_pauses` is kept as a frozen archive — the engine still reads
+ * it for the `calcPauseMs` netting on historical sleeps, and we don't
+ * want to lose that until a follow-up cleanup PR. New events never
+ * write to it again because the UI no longer emits `sleep.paused`.
+ */
+export function migrateSleepPausesToNightWaking(database: SqliteDb) {
+  const tableExists = database
+    .prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='sleep_pauses'",
+    )
+    .get();
+  if (!tableExists) return;
+
+  const rows = database
+    .prepare(
+      `SELECT sp.id AS pause_id, sp.pause_time, sp.resume_time, sp.created_by_event_id,
+              sl.id AS sleep_id, sl.baby_id, sl.type AS sleep_type, sl.end_time AS sleep_end_time
+       FROM sleep_pauses sp
+       JOIN sleep_log sl ON sl.id = sp.sleep_id
+       WHERE sl.deleted = 0
+       ORDER BY sp.id ASC`,
+    )
+    .all() as Array<{
+    pause_id: number;
+    pause_time: string;
+    resume_time: string | null;
+    created_by_event_id: number | null;
+    sleep_id: number;
+    baby_id: number;
+    sleep_type: string;
+    sleep_end_time: string | null;
+  }>;
+
+  const insertWaking = database.prepare(
+    `INSERT OR IGNORE INTO night_waking
+       (baby_id, domain_id, start_time, end_time, created_by_event_id)
+       VALUES (?, ?, ?, ?, ?)`,
+  );
+  const closeNapByPause = database.prepare(
+    "UPDATE sleep_log SET end_time = ? WHERE id = ? AND end_time IS NULL",
+  );
+
+  for (const r of rows) {
+    if (r.sleep_type === "night") {
+      // An open pause on a *completed* night sleep is almost always a
+      // parent who forgot to resume — close the waking at the parent's
+      // end_time so the new UI doesn't perpetually show "Sov att" on a
+      // night that's already over. An open pause on an *active* night
+      // legitimately stays open; the UI surfaces that as the current
+      // waking.
+      const endTime =
+        r.resume_time ?? (r.sleep_end_time ?? null);
+      insertWaking.run(
+        r.baby_id,
+        `nwk_pse${r.pause_id}`,
+        r.pause_time,
+        endTime,
+        r.created_by_event_id,
+      );
+    } else if (r.sleep_type === "nap" && !r.resume_time && !r.sleep_end_time) {
+      // Open trailing pause on a nap with no end_time → use the pause
+      // time as the tentative end. Matches the historical WakeUpSheet
+      // behaviour that this redesign replaces.
+      closeNapByPause.run(r.pause_time, r.sleep_id);
+    }
+  }
 }
 
 /** Initialize (or re-initialize) the database. Defaults to file-based db.sqlite. */

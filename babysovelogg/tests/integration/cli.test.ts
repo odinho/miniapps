@@ -199,37 +199,6 @@ test("bed → up lifecycle logs day start", () => {
   expect(upData.loggedDayStart).toBe(true);
 });
 
-// ── Pause / Resume ──
-
-test("pause and resume during nap", () => {
-  cli(["nap"]);
-
-  const pause = cli(["pause", "--json"], { mockTime: at("+20m") });
-  expect(JSON.parse(pause.stdout).ok).toBe(true);
-
-  const resume = cli(["resume", "--json"], { mockTime: at("+25m") });
-  expect(JSON.parse(resume.stdout).ok).toBe(true);
-
-  const up = cli(["up", "--json"], { mockTime: at("+50m") });
-  const upData = JSON.parse(up.stdout);
-  expect(upData.ok).toBe(true);
-  // 50 min total - 5 min paused = 45 min sleep
-  expect(upData.endedSleep.durationMinutes).toBe(50);
-});
-
-test("pause without active sleep fails", () => {
-  const { exitCode, stderr } = cli(["pause"], { expectFail: true });
-  expect(exitCode).not.toBe(0);
-  expect(stderr).toContain("No active sleep");
-});
-
-test("resume without paused sleep fails", () => {
-  cli(["nap"]);
-  const { exitCode, stderr } = cli(["resume"], { expectFail: true, mockTime: at("+5m") });
-  expect(exitCode).not.toBe(0);
-  expect(stderr).toContain("not paused");
-});
-
 // ── Up without active sleep (manual day start) ──
 
 test("up without active sleep logs day start only", () => {

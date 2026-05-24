@@ -937,6 +937,15 @@ html, body {
   background: linear-gradient(135deg, var(--sun), var(--sun-glow));
   color: #4a3f5c;
 }
+.arc-action-btn.night-waking {
+  background: rgba(231, 110, 110, 0.85);
+  color: var(--white);
+}
+
+[data-theme="night"] .arc-action-btn.night-waking {
+  background: rgba(231, 110, 110, 0.75);
+  box-shadow: 0 0 12px rgba(231, 110, 110, 0.3);
+}
 
 [data-theme="night"] .arc-action-btn.nap {
   background: rgba(184, 169, 212, 0.25);

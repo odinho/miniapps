@@ -3,7 +3,13 @@ import { assembleState } from "$lib/engine/state.js";
 import { getPrefs } from "./notification-prefs.js";
 import { getNapBudgetState, setNapBudgetState } from "./nap-budget-state.js";
 import { getTrendTargetState, setTrendTargetState } from "./trend-target-state.js";
-import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow } from "$lib/types.js";
+import type {
+  Baby,
+  SleepLogRow,
+  SleepPauseRow,
+  DayStartRow,
+  NightWakingRow,
+} from "$lib/types.js";
 import { todayInTz } from "$lib/tz.js";
 
 export function getState(now?: number) {
@@ -13,6 +19,7 @@ export function getState(now?: number) {
       baby: null,
       activeSleep: null,
       todaySleeps: [],
+      todayNightWakings: [] as NightWakingRow[],
       stats: null,
       dayTotals: null,
       priorOvernightSleep: null,
@@ -142,6 +149,20 @@ export function getState(now?: number) {
     }
   }
 
+  // Night wakings — fetched in a window wide enough to cover (a) the
+  // active night sleep that started yesterday and (b) all of today's
+  // sleeps. 30h before midnight is the safe ceiling for a typical
+  // night plus a long morning. UI does overlap math against the parent
+  // sleep on its own.
+  const wakingsWindowIso = new Date(
+    new Date(midnightIso).getTime() - 30 * 60 * 60 * 1000,
+  ).toISOString();
+  const todayNightWakings = db
+    .prepare(
+      "SELECT * FROM night_waking WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time ASC",
+    )
+    .all(baby.id, wakingsWindowIso) as NightWakingRow[];
+
   const todayDiapers = db
     .prepare(
       "SELECT COUNT(*) as count FROM diaper_log WHERE baby_id = ? AND time >= ? AND deleted = 0",
@@ -179,6 +200,7 @@ export function getState(now?: number) {
     todayWakeUp,
     priorOvernightSleep: priorOvernightRow,
     pausesBySleep,
+    todayNightWakings,
     diaperCount: todayDiapers?.count ?? 0,
     lastDiaperTime: lastDiaper?.time ?? null,
     napBudgetOptedIn,

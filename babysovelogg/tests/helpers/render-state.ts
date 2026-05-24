@@ -1,5 +1,11 @@
 import type { SqliteDb } from "$lib/server/db.js";
-import type { SleepLogRow, DiaperLogRow, Baby, SleepPauseRow } from "$lib/types.js";
+import type {
+  SleepLogRow,
+  DiaperLogRow,
+  Baby,
+  SleepPauseRow,
+  NightWakingRow,
+} from "$lib/types.js";
 
 /** Render a compact, readable summary of a baby's current day state from the DB. */
 export function renderDayState(db: SqliteDb, babyId: number): string {
@@ -28,6 +34,14 @@ export function renderDayState(db: SqliteDb, babyId: number): string {
     pausesBySleep.get(p.sleep_id)!.push(p);
   }
 
+  // Night wakings (first-class events that replace pauses on night sleeps).
+  // Group them per parent sleep by overlap so renderSleep can fold them in.
+  const wakings = db
+    .prepare(
+      "SELECT * FROM night_waking WHERE baby_id = ? AND deleted = 0 ORDER BY start_time",
+    )
+    .all(babyId) as NightWakingRow[];
+
   const lines: string[] = [];
   lines.push(`baby: ${baby.name} (${baby.birthdate})`);
 
@@ -37,7 +51,7 @@ export function renderDayState(db: SqliteDb, babyId: number): string {
 
   const sleepLine =
     sleeps.length > 0
-      ? sleeps.map((s) => renderSleep(s, pausesBySleep.get(s.id))).join(" | ")
+      ? sleeps.map((s) => renderSleep(s, pausesBySleep.get(s.id), wakingsInSleep(wakings, s))).join(" | ")
       : "(ingen)";
   lines.push(`søvn: ${sleepLine}`);
 
@@ -64,7 +78,11 @@ export function renderCounts(db: SqliteDb): string {
     .join(", ");
 }
 
-function renderSleep(s: SleepLogRow, pauses?: SleepPauseRow[]): string {
+function renderSleep(
+  s: SleepLogRow,
+  pauses?: SleepPauseRow[],
+  wakings?: NightWakingRow[],
+): string {
   const time = s.end_time
     ? `${fmtTime(s.start_time)}–${fmtTime(s.end_time)}`
     : `${fmtTime(s.start_time)}–pågår`;
@@ -79,6 +97,16 @@ function renderSleep(s: SleepLogRow, pauses?: SleepPauseRow[]): string {
     );
     parts.push(`${pauses.length} pause (${pauseMin}m)`);
   }
+  if (wakings && wakings.length > 0) {
+    const wakingMin = Math.round(
+      wakings.reduce((sum, w) => {
+        const start = new Date(w.start_time).getTime();
+        const end = w.end_time ? new Date(w.end_time).getTime() : Date.now();
+        return sum + (end - start);
+      }, 0) / 60000,
+    );
+    parts.push(`${wakings.length} vakning (${wakingMin}m)`);
+  }
   if (s.mood) parts.push(s.mood);
   if (s.method) parts.push(s.method);
   if (s.fall_asleep_time) parts.push(`innsov:${s.fall_asleep_time}`);
@@ -86,6 +114,15 @@ function renderSleep(s: SleepLogRow, pauses?: SleepPauseRow[]): string {
   if (s.notes) parts.push(`"${s.notes}"`);
   if (s.wake_notes) parts.push(`vaknenotat:"${s.wake_notes}"`);
   return parts.join(" ");
+}
+
+function wakingsInSleep(all: NightWakingRow[], s: SleepLogRow): NightWakingRow[] {
+  const startMs = new Date(s.start_time).getTime();
+  const endMs = s.end_time ? new Date(s.end_time).getTime() : Date.now();
+  return all.filter((w) => {
+    const ws = new Date(w.start_time).getTime();
+    return ws >= startMs && ws < endMs;
+  });
 }
 
 function renderDiaper(d: DiaperLogRow): string {

@@ -196,7 +196,7 @@ describe("mapNapperToEvents", () => {
     expect(events[1].payload.sleepDomainId).toBe(events[0].payload.sleepDomainId);
   });
 
-  it("maps NIGHT_WAKINGs as pause/resume pairs on night sleep", () => {
+  it("maps NIGHT_WAKINGs as night_waking.started/ended pairs", () => {
     const events = map(
       bedTime("2026-01-07T18:05"),
       nightWaking("2026-01-07T20:34", "2026-01-07T20:50"),
@@ -204,18 +204,17 @@ describe("mapNapperToEvents", () => {
     );
     expect(events.map((e) => e.type)).toEqual([
       "sleep.manual",
-      "sleep.paused",
-      "sleep.resumed",
+      "night_waking.started",
+      "night_waking.ended",
     ]);
-    const sleepId = events[0].payload.sleepDomainId;
     expect(events[1].payload).toMatchObject({
-      sleepDomainId: sleepId,
-      pauseTime: "2026-01-07T19:34:00.000Z",
+      startTime: "2026-01-07T19:34:00.000Z",
     });
     expect(events[2].payload).toMatchObject({
-      sleepDomainId: sleepId,
-      resumeTime: "2026-01-07T19:50:00.000Z",
+      endTime: "2026-01-07T19:50:00.000Z",
     });
+    // started/ended share the wakingDomainId
+    expect(events[1].payload.wakingDomainId).toBe(events[2].payload.wakingDomainId);
   });
 
   it("handles multiple NIGHT_WAKINGs in one night", () => {
@@ -229,18 +228,19 @@ describe("mapNapperToEvents", () => {
     const typeList = events.map((e) => e.type);
     expect(typeList).toEqual([
       "sleep.manual",
-      "sleep.paused",
-      "sleep.resumed",
-      "sleep.paused",
-      "sleep.resumed",
-      "sleep.paused",
-      "sleep.resumed",
+      "night_waking.started",
+      "night_waking.ended",
+      "night_waking.started",
+      "night_waking.ended",
+      "night_waking.started",
+      "night_waking.ended",
     ]);
-    // All pause/resume reference same sleep
-    const sleepId = events[0].payload.sleepDomainId;
-    for (const e of events.slice(1)) {
-      expect(e.payload.sleepDomainId).toBe(sleepId);
-    }
+    // Each started/ended pair shares its wakingDomainId
+    expect(events[1].payload.wakingDomainId).toBe(events[2].payload.wakingDomainId);
+    expect(events[3].payload.wakingDomainId).toBe(events[4].payload.wakingDomainId);
+    expect(events[5].payload.wakingDomainId).toBe(events[6].payload.wakingDomainId);
+    // The three wakings are distinct events
+    expect(events[1].payload.wakingDomainId).not.toBe(events[3].payload.wakingDomainId);
   });
 
   it("skips SOLIDS and MEDICINE", () => {

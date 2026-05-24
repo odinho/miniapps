@@ -67,6 +67,7 @@ export function mapNapperToEvents(
   let eventCounter = 0;
   const makeEventId = () => `evt_import_${batchHash}_${++eventCounter}`;
   const makeSleepId = () => `slp_import_${batchHash}_${++eventCounter}`;
+  const makeNightWakingId = () => `nwk_import_${batchHash}_${++eventCounter}`;
 
   const sorted = [...rows].toSorted(
     (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
@@ -125,15 +126,20 @@ export function mapNapperToEvents(
       emit("sleep.tagged", { sleepDomainId, notes, mood });
     }
 
-    // Emit pause/resume for each NIGHT_WAKING
+    // Emit a first-class night_waking event pair for each NIGHT_WAKING.
+    // Replaces the legacy pause/resume emission so wakings get the new
+    // edit sheet + red-arc-interval treatment instead of being hidden
+    // as sleep_pauses rows. See docs/pause-redesign-2026-05-22.md.
     for (const nw of nightCtx.nightWakings) {
-      emit("sleep.paused", {
-        sleepDomainId,
-        pauseTime: toUtc(nw.start),
+      const wakingDomainId = makeNightWakingId();
+      emit("night_waking.started", {
+        babyId,
+        startTime: toUtc(nw.start),
+        wakingDomainId,
       });
-      emit("sleep.resumed", {
-        sleepDomainId,
-        resumeTime: toUtc(nw.end),
+      emit("night_waking.ended", {
+        wakingDomainId,
+        endTime: toUtc(nw.end),
       });
     }
 

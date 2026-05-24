@@ -51,10 +51,16 @@
 		nightEnd?: string | null;
 		/** Override internal clock (ms since epoch). Used by the dev playground. */
 		nowMs?: number;
+		/**
+		 * Night wakings to overlay as red intervals on the night band. Click
+		 * → opens the NightWakingEditSheet via `onNightWakingClick`.
+		 */
+		nightWakings?: Array<{ startTime: string; endTime: string | null; domainId: string }>;
 		onStartClick?: () => void;
 		onEndClick?: () => void;
 		onSleepClick?: (index: number) => void;
 		onPredictedNapClick?: (index: number) => void;
+		onNightWakingClick?: (domainId: string) => void;
 	}
 
 	let {
@@ -73,10 +79,12 @@
 		bedtime = null,
 		nightEnd = null,
 		nowMs,
+		nightWakings = [],
 		onStartClick,
 		onEndClick,
 		onSleepClick,
 		onPredictedNapClick,
+		onNightWakingClick,
 	}: Props = $props();
 
 	const G = DEFAULT_ARC_GEOMETRY;
@@ -109,6 +117,7 @@
 			rescueWindow,
 			bedtime,
 			nightEnd,
+			nightWakings,
 			geometry: G,
 		}),
 	);
@@ -271,6 +280,33 @@
 				>
 			{/if}
 		</g>
+	{/each}
+
+	<!-- Night-waking overlays: red sub-bands inside the night band.
+		 Drawn AFTER bubbles so they paint on top of the moon-coloured
+		 night band, with a wider transparent tap target underneath. -->
+	{#each scene.nightWakingOverlays as overlay (overlay.domainId)}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		{#if onNightWakingClick}
+			<path
+				d={overlay.tapD}
+				fill="none"
+				stroke="transparent"
+				stroke-width={G.trackWidth + 16}
+				style="cursor:pointer"
+				onclick={() => onNightWakingClick?.(overlay.domainId)}
+			/>
+		{/if}
+		<path
+			d={overlay.d}
+			fill="none"
+			stroke="rgba(231, 110, 110, 0.9)"
+			stroke-width={G.trackWidth - 2}
+			stroke-linecap="round"
+			opacity={overlay.active ? 1 : 0.85}
+			class:arc-active-pulse={overlay.active}
+		/>
 	{/each}
 
 	<!-- Skipped-nap blob: faded dashed peach arc + line-through time label -->

@@ -70,6 +70,13 @@ export interface ComposeArcInput {
   bedtime?: string | null;
   /** Night-mode end anchor (ISO): expectedNightEnd. Falls through to 06:00. */
   nightEnd?: string | null;
+  /**
+   * Night wakings to overlay as red sub-bands on top of the night band.
+   * Open (end_time = null) wakings render as an active red interval ending
+   * at `now`. Click → opens the night-waking edit sheet (handler wired in
+   * Arc.svelte).
+   */
+  nightWakings?: Array<{ startTime: string; endTime: string | null; domainId: string }>;
   geometry?: ArcGeometry;
 }
 
@@ -157,6 +164,17 @@ interface SceneRescueBlob {
   d: string;
 }
 
+interface SceneNightWaking {
+  /** Path d for the red sub-band drawn on top of the night band. */
+  d: string;
+  /** Hit-test path (often same as d). */
+  tapD: string;
+  /** True when this waking has no end_time (still active). */
+  active: boolean;
+  /** Domain ID propagated for click → edit-sheet routing. */
+  domainId: string;
+}
+
 interface ArcScene {
   config: ArcConfig;
   geometry: ArcGeometry;
@@ -175,6 +193,8 @@ interface ArcScene {
   plannedTrack: ScenePlannedTrack;
   skippedBlob: SceneSkippedBlob | null;
   rescueBlob: SceneRescueBlob | null;
+  /** Night-waking red sub-bands (rendered on top of the night band). */
+  nightWakingOverlays: SceneNightWaking[];
 }
 
 /**
@@ -234,6 +254,7 @@ export function composeArc(input: ComposeArcInput): ArcScene {
     rescueWindow = null,
     bedtime = null,
     nightEnd = null,
+    nightWakings = [],
     geometry = DEFAULT_ARC_GEOMETRY,
   } = input;
 
@@ -490,6 +511,25 @@ export function composeArc(input: ComposeArcInput): ArcScene {
     }
   }
 
+  // Night-waking overlays: red sub-bands inside the night band. Each waking
+  // is rendered separately so it has its own click target → edit sheet.
+  // Open wakings end at `now` so the band grows visibly during a live event.
+  const nightWakingOverlays: SceneNightWaking[] = [];
+  for (const waking of nightWakings) {
+    const startD = new Date(waking.startTime);
+    const endD = waking.endTime ? new Date(waking.endTime) : now;
+    const startFrac = timeToArcFraction(startD, config);
+    const endFrac = timeToArcFraction(endD, config);
+    if (endFrac - startFrac < 0.003) continue;
+    const d = describeArc(cx, cy, r, startFrac, endFrac);
+    nightWakingOverlays.push({
+      d,
+      tapD: d,
+      active: !waking.endTime,
+      domainId: waking.domainId,
+    });
+  }
+
   return {
     config,
     geometry,
@@ -516,5 +556,6 @@ export function composeArc(input: ComposeArcInput): ArcScene {
     plannedTrack,
     skippedBlob,
     rescueBlob,
+    nightWakingOverlays,
   };
 }

@@ -357,7 +357,6 @@ function cmdDefault() {
   console.log();
   if (active) {
     console.log(`  baby up                     Baby woke up`);
-    console.log(`  baby pause                  Pause sleep`);
     console.log(`  baby ${pottyExample.padEnd(21)} Log ${pottyCmd}`);
   } else {
     console.log(`  baby nap                    Start a nap`);
@@ -694,50 +693,6 @@ function cmdUp() {
   }
 }
 
-function cmdPause() {
-  const baby = getBaby();
-  const active = getActiveSleep(baby.id);
-  if (!active) {
-    console.error("No active sleep to pause.");
-    process.exit(1);
-  }
-  const isPaused = active.pauses.length > 0 && !active.pauses[active.pauses.length - 1].resume_time;
-  if (isPaused) {
-    console.error("Sleep is already paused.");
-    process.exit(1);
-  }
-  const pauseTime = parseTime(flags.at);
-  postEvent("sleep.paused", { sleepDomainId: active.domain_id, pauseTime });
-
-  if (jsonOut) {
-    console.log(JSON.stringify({ ok: true, pauseTime }));
-  } else {
-    console.log(`Paused at ${fmtTime(pauseTime)}.`);
-  }
-}
-
-function cmdResume() {
-  const baby = getBaby();
-  const active = getActiveSleep(baby.id);
-  if (!active) {
-    console.error("No active sleep to resume.");
-    process.exit(1);
-  }
-  const isPaused = active.pauses.length > 0 && !active.pauses[active.pauses.length - 1].resume_time;
-  if (!isPaused) {
-    console.error("Sleep is not paused.");
-    process.exit(1);
-  }
-  const resumeTime = parseTime(flags.at);
-  postEvent("sleep.resumed", { sleepDomainId: active.domain_id, resumeTime });
-
-  if (jsonOut) {
-    console.log(JSON.stringify({ ok: true, resumeTime }));
-  } else {
-    console.log(`Resumed at ${fmtTime(resumeTime)}.`);
-  }
-}
-
 function cmdPotty() {
   const baby = getBaby();
   const isPottyMode = !!baby.potty_mode;
@@ -961,37 +916,6 @@ EXAMPLES
   baby up --mood happy --method self    Woke up happy, fell asleep on own
   baby up --at -5m --notes "Short nap"  Woke 5 min ago, short nap`,
 
-  pause: `baby pause — Pause the current sleep
-
-USAGE
-  baby pause [options]
-
-OPTIONS
-  --at <time>     When the pause started (default: now)
-                  Formats: 14:30, 2026-03-23T14:30, -10m, -1h
-  --json          Output as JSON
-
-Use when baby wakes briefly mid-nap. Resume with "baby resume".
-Paused time is subtracted from total sleep duration.
-
-EXAMPLES
-  baby pause                Pause now
-  baby pause --at 14:45     Paused at 14:45`,
-
-  resume: `baby resume — Resume a paused sleep
-
-USAGE
-  baby resume [options]
-
-OPTIONS
-  --at <time>     When sleep resumed (default: now)
-                  Formats: 14:30, 2026-03-23T14:30, -10m, -1h
-  --json          Output as JSON
-
-EXAMPLES
-  baby resume               Resume now
-  baby resume --at 14:55    Resumed at 14:55`,
-
   potty: `baby potty — Log a potty visit
 
 USAGE
@@ -1077,8 +1001,6 @@ const commands: Record<string, () => void> = {
   nap: cmdNap,
   bed: cmdBed,
   up: cmdUp,
-  pause: cmdPause,
-  resume: cmdResume,
   potty: cmdPotty,
   diaper: cmdPotty,
   query: cmdQuery,

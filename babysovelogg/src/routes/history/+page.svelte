@@ -1,9 +1,10 @@
 <script lang="ts">
-	import type { SleepLogRow, DiaperLogRow } from '$lib/types.js';
-	import { formatTime } from '$lib/utils.js';
+	import type { SleepLogRow, DiaperLogRow, NightWakingRow } from '$lib/types.js';
+	import { formatTime, formatDuration } from '$lib/utils.js';
 	import EditSleepModal from '$lib/components/EditSleepModal.svelte';
 	import EditDiaperModal from '$lib/components/EditDiaperModal.svelte';
 	import ManualSleepModal from '$lib/components/ManualSleepModal.svelte';
+	import NightWakingEditSheet from '$lib/components/NightWakingEditSheet.svelte';
 	import { appState } from '$lib/stores/app.svelte.js';
 	import { sync } from '$lib/stores/sync.svelte.js';
 	import { toggleOffDay } from '$lib/off-day-actions.js';
@@ -17,7 +18,6 @@
 		formatSleepTimes,
 		getSleepIcon,
 		getSleepTypeLabel,
-		getPauseSummary,
 		getSleepBadges,
 		getFallAsleepLabel,
 		getWokeByLabel,
@@ -33,6 +33,7 @@
 
 	let editingSleep = $state<SleepLogRow | null>(null);
 	let editingDiaper = $state<DiaperLogRow | null>(null);
+	let editingNightWaking = $state<NightWakingRow | null>(null);
 	let showManualSleep = $state(false);
 
 	const baby = $derived(appState.state.baby);
@@ -55,7 +56,7 @@
 		loading = true;
 		try {
 			const data = await fetchHistory();
-			entries = mergeEntries(data.sleeps, data.diapers);
+			entries = mergeEntries(data.sleeps, data.diapers, data.nightWakings);
 		} finally {
 			loading = false;
 		}
@@ -69,6 +70,10 @@
 		editingDiaper = entry;
 	}
 
+	function openNightWakingEdit(entry: NightWakingRow & { _kind: 'night_waking'; _sortTime: string }) {
+		editingNightWaking = entry;
+	}
+
 	function closeSleepEdit() {
 		editingSleep = null;
 		load();
@@ -76,6 +81,11 @@
 
 	function closeDiaperEdit() {
 		editingDiaper = null;
+		load();
+	}
+
+	function closeNightWakingEdit() {
+		editingNightWaking = null;
 		load();
 	}
 
@@ -139,7 +149,6 @@
 
 				{#each dayEntries as entry}
 					{#if entry._kind === 'sleep'}
-						{@const pauseInfo = getPauseSummary(entry)}
 						{@const badges = getSleepBadges(entry)}
 						{@const fallAsleep = getFallAsleepLabel(entry.fall_asleep_time)}
 						{@const wokeBy = getWokeByLabel(entry.woke_by)}
@@ -152,9 +161,6 @@
 								<div class="log-times">{formatSleepTimes(entry)}</div>
 								<div class="log-meta">
 									{getSleepTypeLabel(entry.type)}
-									{#if pauseInfo}
-										 · {pauseInfo.count} {pauseInfo.count > 1 ? 'pausar' : 'pause'} ({pauseInfo.totalMinutes}m)
-									{/if}
 									{#if badges.length > 0}
 										<span class="tag-badges">
 											{#each badges as badge}
@@ -198,6 +204,31 @@
 							</div>
 							<span class="log-duration">{getDiaperCategoryLabel(entry.type)}</span>
 						</div>
+					{:else if entry._kind === 'night_waking'}
+						<!-- svelte-ignore a11y_click_events_have_key_events -->
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<div class="sleep-log-item night-waking-log-item" onclick={() => openNightWakingEdit(entry)} data-testid="night-waking-row">
+							<span class="log-icon">🌙</span>
+							<div class="log-info">
+								<div class="log-times">
+									{formatTime(entry.start_time)}{entry.end_time ? `–${formatTime(entry.end_time)}` : ' (pågår)'}
+								</div>
+								<div class="log-meta">
+									Nattvaking
+									{#if entry.mood}
+										· {entry.mood}
+									{/if}
+								</div>
+								{#if entry.notes}
+									<div class="log-meta" style="font-style: italic;">{entry.notes}</div>
+								{/if}
+							</div>
+							<span class="log-duration">
+								{#if entry.end_time}
+									{formatDuration(new Date(entry.end_time).getTime() - new Date(entry.start_time).getTime())}
+								{/if}
+							</span>
+						</div>
 					{/if}
 				{/each}
 			{/each}
@@ -219,6 +250,14 @@
 		entry={editingDiaper}
 		onClose={closeDiaperEdit}
 		onDeleted={closeDiaperEdit}
+	/>
+{/if}
+
+{#if editingNightWaking}
+	<NightWakingEditSheet
+		waking={editingNightWaking}
+		onClose={closeNightWakingEdit}
+		onDeleted={closeNightWakingEdit}
 	/>
 {/if}
 

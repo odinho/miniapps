@@ -43,6 +43,25 @@ export interface SleepPauseRow {
   created_by_event_id: number | null;
 }
 
+/**
+ * First-class brief waking inside a night sleep. Editable as a
+ * standalone entity (start/end/notes/mood) — replaces the role
+ * `sleep_pauses` played for night sleeps. See
+ * `docs/pause-redesign-2026-05-22.md`.
+ */
+export interface NightWakingRow {
+  id: number;
+  baby_id: number;
+  domain_id: string;
+  start_time: string;
+  end_time: string | null;
+  notes: string | null;
+  mood: string | null;
+  deleted: number;
+  created_by_event_id: number | null;
+  updated_by_event_id: number | null;
+}
+
 export interface DiaperLogRow {
   id: number;
   baby_id: number;

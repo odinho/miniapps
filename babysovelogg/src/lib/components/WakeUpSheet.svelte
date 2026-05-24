@@ -4,9 +4,8 @@
 	import { appState } from '$lib/stores/app.svelte.js';
 	import { WOKE_OPTIONS, buildWakeUpEvent, getBedtimeSummary } from '$lib/wake-sheet-actions.js';
 	import { WAKE_MOODS } from '$lib/constants.js';
-	import { formatDuration, formatTime } from '$lib/utils.js';
+	import { formatDuration } from '$lib/utils.js';
 	import { toggleOffDay, localDateForOffDay } from '$lib/off-day-actions.js';
-	import { calcPauseMs } from '$lib/engine/classification.js';
 	import { isWithinEndUndoWindow } from '$lib/end-undo.js';
 	import TimeInput from './TimeInput.svelte';
 
@@ -38,16 +37,8 @@
 		}
 	}
 
-	// Detect trailing pause (active pause = baby never went back to sleep)
 	// svelte-ignore state_referenced_locally — intentional: snapshot is immutable once passed
-	const trailingPause = sleepSnapshot.pauses?.findLast(p => !p.resume_time) ?? null;
-	// svelte-ignore state_referenced_locally
-	const trailingPauseIdx = sleepSnapshot.pauses?.findLastIndex(p => !p.resume_time) ?? -1;
-
-	// svelte-ignore state_referenced_locally — intentional: snapshot is immutable once passed
-	const defaultWakeTime = trailingPause
-		? new Date(trailingPause.pause_time)
-		: sleepSnapshot.end_time ? new Date(sleepSnapshot.end_time) : new Date();
+	const defaultWakeTime = sleepSnapshot.end_time ? new Date(sleepSnapshot.end_time) : new Date();
 	let wakeTime = $state(defaultWakeTime.toTimeString().slice(0, 5));
 	let wakeDate = $state(`${defaultWakeTime.getFullYear()}-${String(defaultWakeTime.getMonth() + 1).padStart(2, '0')}-${String(defaultWakeTime.getDate()).padStart(2, '0')}`);
 
@@ -58,14 +49,10 @@
 
 	const summary = $derived(getBedtimeSummary(sleepSnapshot));
 
-	// Reactive sleep duration. Subtract any completed pauses so the "1t 12m"
-	// label matches what the rest of the app reports (the engine's totals
-	// already net out pauses; this used to show raw end-start).
 	const sleepDurationMs = $derived.by(() => {
 		const start = new Date(sleepSnapshot.start_time).getTime();
 		const end = new Date(`${wakeDate}T${wakeTime}:00`).getTime();
-		const pauseMs = calcPauseMs(sleepSnapshot.pauses ?? [], end);
-		return Math.max(0, end - start - pauseMs);
+		return Math.max(0, end - start);
 	});
 
 	const MAX_NAP_HOURS = 4;
@@ -114,25 +101,13 @@
 		try {
 			const endTimeIso = wakeTimeChanged
 				? new Date(`${wakeDate}T${wakeTime}:00`).toISOString()
-				: trailingPause
-					? new Date(trailingPause.pause_time).toISOString()
-					: null;
+				: null;
 			const event = buildWakeUpEvent(sleepDomainId, wokeBy, notes, endTimeIso, wakeMood);
-			const events: Array<{ type: string; payload: Record<string, unknown> }> = [];
-			// Delete trailing pause (it wasn't real sleep time)
-			if (trailingPause && trailingPauseIdx >= 0) {
-				events.push({
-					type: 'sleep.pause_deleted',
-					payload: { sleepDomainId, pauseIndex: trailingPauseIdx },
-				});
-			}
-			if (event) events.push(event);
-
-			if (events.length > 0) {
-				const result = await sync.sendEvents(events);
+			if (event) {
+				const result = await sync.sendEvents([event]);
 				if (result == null) {
-					// Server rejected (4xx/5xx). Keep the sheet open so the parent can
-					// retry rather than silently losing the wake event.
+					// Server rejected (4xx/5xx). Keep the sheet open so the parent
+					// can retry rather than silently losing the wake event.
 					return;
 				}
 			}
@@ -216,13 +191,6 @@
 			>
 				↩️ Angre slutt — søv vidare
 			</button>
-		{/if}
-
-		<!-- Trailing pause notice -->
-		{#if trailingPause}
-			<div style="background: var(--lavender); padding: 10px 12px; border-radius: var(--radius-sm); margin-bottom: 8px; font-size: 0.8rem; color: var(--text);">
-				⏸️ Pausen frå {formatTime(trailingPause.pause_time)} vert fjerna og vaknetida sett dit.
-			</div>
 		{/if}
 
 		<!-- Sleep duration -->

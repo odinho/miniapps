@@ -1,4 +1,4 @@
-import type { SleepLogRow, SleepPauseRow } from '$lib/types.js';
+import type { SleepLogRow, SleepPauseRow, NightWakingRow } from '$lib/types.js';
 import type { Prediction, PostSkipPlan } from '$lib/stores/app.svelte.js';
 import { calcPauseMs } from '$lib/engine/classification.js';
 
@@ -61,7 +61,15 @@ export interface TimerInput {
 	prediction: Prediction | null;
 	todayWakeUp: { wake_time: string | null } | null;
 	todaySleeps: SleepLogRow[];
+	/** Today's night wakings — used to surface an "open" waking in the timer label. */
+	todayNightWakings?: NightWakingRow[];
 	now: number;
+}
+
+function formatHM(d: Date): string {
+	const h = d.getHours().toString().padStart(2, '0');
+	const m = d.getMinutes().toString().padStart(2, '0');
+	return `${h}:${m}`;
 }
 
 /** Pure function: determine what the arc center timer should display. */
@@ -76,8 +84,18 @@ export function getTimerMode(input: TimerInput): TimerMode {
 		const start = new Date(activeSleep.start_time).getTime();
 		const elapsed = Math.max(0, now - start - calcPauseMs(pauses, now));
 
+		// Open night-waking on the active night sleep — shown as a distinct
+		// label so the parent can see "she's awake right now inside the night
+		// sleep" rather than the regular sleeping label.
+		const openNightWaking =
+			activeSleep.type === 'night'
+				? (input.todayNightWakings ?? []).find((w) => !w.end_time) ?? null
+				: null;
+
 		let label: string;
-		if (isPaused) label = '⏸️ Pause';
+		if (openNightWaking) {
+			label = `🌙 Vakning sidan ${formatHM(new Date(openNightWaking.start_time))}`;
+		} else if (isPaused) label = '⏸️ Pause';
 		else if (activeSleep.type === 'night') label = '💤 Søv';
 		else label = '😴 Lurar';
 

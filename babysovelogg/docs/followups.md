@@ -17,14 +17,21 @@ Source: 2026-05-22 design pass with Codex pair-review. Plan lives in
 Stages 1–4 shipped 2026-05-24: `Angre slutt` button + first-class
 `night_waking` events with edit sheet, red arc overlays, history
 rows, indexed migration of existing pauses, and nap-pause UI ripped
-out. `sleep_pauses` table kept as a frozen archive so the engine's
-`calcPauseMs` historical-net math still works.
+out. Engine now reads `night_waking` for night-sleep duration
+netting; `sleep_pauses` stays as a frozen archive for legacy nap
+data.
 
 Stage 5 (polish) pending:
 - Arc red sub-band dark-mode contrast pass.
+- Edits to migrated wakings (`nwk_pse_*` IDs) are lost on `rebuildAll`
+  — the migration re-seeds the row from sleep_pauses with original
+  values, so any later `night_waking.edited` event whose target
+  doesn't yet exist soft-fails. Acceptable edge case (admin-only
+  flow), but a cleaner fix would mirror-write to night_waking from
+  the legacy `sleep.paused` projection.
 - Potential follow-up: drop `sleep_pauses` table + legacy
   `sleep.paused`/`sleep.resumed`/`sleep.pause_deleted` projections
-  once we're confident no engine-math regression is masked by them.
+  once we've confirmed no engine-math regression is masked by them.
 
 
 ## Trend intervention-target split — stage 5+ followups

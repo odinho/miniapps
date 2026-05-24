@@ -38,6 +38,7 @@ function normalizeState(raw: AppStateResponse): AppState {
 		lastDiaperTime: raw.lastDiaperTime ?? null,
 		todayWakeUp: raw.todayWakeUp ?? null,
 		offDays: raw.offDays ?? [],
+		todayNightWakings: raw.todayNightWakings ?? [],
 	};
 }
 
