@@ -14,7 +14,7 @@ import {
   getLearnedBedtimeWakeWindow,
   estimateSleepCycleFromData,
 } from "./schedule.js";
-import { RESCUE_NAP, NAP_FLOOR_BY_AGE, findByAge } from "./constants.js";
+import { RESCUE_NAP, NAP_FLOOR_BY_AGE, WAKE_WINDOWS, findByAge } from "./constants.js";
 import { getTodayStats, getSleepDayTotals } from "./stats.js";
 import { computeConfidence, computeWakeRange } from "./confidence.js";
 import { computeNapBudget, isDayOnTrend } from "./nap-budget.js";
@@ -471,12 +471,25 @@ function derivePostPlanFields(input: PostPlanInput): PostPlanOutput {
   } = input;
 
   const bedtimeMs = new Date(bedtime).getTime();
-  const bedtimeNapBufferMs = 60 * 60_000;
+  // 60 min for the predicted-nap visibility filter (legacy, unchanged: "is
+  // this so close to bedtime it's effectively bedtime"). For the fallback
+  // comeback-nap gate, use half the age-band minimum wake window — that
+  // catches doomed late catnaps in a sleep-science-grounded way without
+  // over-suppressing real comebacks on younger 2-nap babies. Empirically
+  // chosen from a sweep over Halldis prod history (n=33 cut-short days)
+  // and baby_1 fixture (n=60); both showed 0 % false-positive rate vs
+  // the parent's actual choice. See `local/sweep-comeback-thresholds*.ts`.
+  const visibleNapBufferMs = 60 * 60_000;
+  const fallbackBufferMin = 0.5 * findByAge(WAKE_WINDOWS, ctx.ageMonths).minMinutes;
+  const fallbackBufferMs = fallbackBufferMin * 60_000;
   const learnedNapDurMin = getLearnedNapDuration(ctx);
 
-  const clearsBedtimeBuffer = (startMs: number, endMs: number): boolean =>
-    startMs < bedtimeMs - bedtimeNapBufferMs
-    && endMs < bedtimeMs - bedtimeNapBufferMs;
+  const clearsVisibleBuffer = (startMs: number, endMs: number): boolean =>
+    startMs < bedtimeMs - visibleNapBufferMs
+    && endMs < bedtimeMs - visibleNapBufferMs;
+  const clearsFallbackBuffer = (startMs: number, endMs: number): boolean =>
+    startMs < bedtimeMs - fallbackBufferMs
+    && endMs < bedtimeMs - fallbackBufferMs;
 
   // Drop naps within 60 min of bedtime and naps whose start time is
   // >60 min in the past (stale — parent didn't act on them, no point
@@ -484,7 +497,7 @@ function derivePostPlanFields(input: PostPlanInput): PostPlanOutput {
   let predictedNaps: PredictedNap[] | null = remaining.filter((n) => {
     const startMs = new Date(n.startTime).getTime();
     const endMs = new Date(n.endTime).getTime();
-    return clearsBedtimeBuffer(startMs, endMs)
+    return clearsVisibleBuffer(startMs, endMs)
       && startMs > now - 60 * 60_000;
   });
   if (predictedNaps.length === 0) predictedNaps = null;
@@ -504,7 +517,7 @@ function derivePostPlanFields(input: PostPlanInput): PostPlanOutput {
     && fallbackNapOverdueMs > 60 * 60_000
     && fallbackNapOverdueMs < 18 * 60 * 60_000;
   const fallbackClearsBedtime = fallbackNextNapMs
-    ? clearsBedtimeBuffer(fallbackNextNapMs, fallbackNapEndMs)
+    ? clearsFallbackBuffer(fallbackNextNapMs, fallbackNapEndMs)
     : false;
   const fallbackRejectedByBedtime = Boolean(
     !firstVisibleNap
@@ -531,7 +544,7 @@ function derivePostPlanFields(input: PostPlanInput): PostPlanOutput {
       : nextNapMs + learnedNapDurMin * 60_000
     : 0;
   const collapsedToBedtime = fallbackRejectedByBedtime
-    || (nextNapMs > 0 && !napSkipped && !clearsBedtimeBuffer(nextNapMs, nextNapEndMs));
+    || (nextNapMs > 0 && !napSkipped && !clearsVisibleBuffer(nextNapMs, nextNapEndMs));
   // An active night ends the day's nap budget regardless of count.
   const napsAllDone = consumedNaps >= expectedNapCount
     || napSkipped

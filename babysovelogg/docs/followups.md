@@ -276,7 +276,9 @@ signal of NREM/REM cycle length. The age-prior (mean 55 ±5 for
 Source: 2026-05-24 Codex pair-review on the Halldis "second nap at 17:02"
 bug. The bedtime-feasibility gate now stops doomed comeback naps from
 surfacing (`derivePostPlanFields` rejects fallbackNextNap that can't fit
-before bedtime − 60 min). But `computeShortNapThreshold(L, C) = L − 0.5*C`
+before `bedtime − 0.5 × age-band min WW`, age-aware; chosen after a
+two-fixture empirical sweep — see `local/sweep-comeback-thresholds*.ts`
+for the methodology). But `computeShortNapThreshold(L, C) = L − 0.5*C`
 is doing three jobs in one number:
 
 1. **Cut-short / continuation flag** — "this nap was so short the parent
