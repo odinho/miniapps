@@ -160,8 +160,21 @@ test("migration converts night sleep_pauses → night_waking and closes nap trai
     db.prepare("SELECT id FROM sleep_log WHERE domain_id = ?").get(nightId) as { id: number }
   ).id;
 
-  // Two pauses on the night (one closed, one closed) and one open trailing
-  // pause on the nap (the tentative-end pattern).
+  // initDb drops sleep_pauses after migration; re-create the legacy
+  // schema here so we can simulate a pre-deploy database and verify the
+  // migration still converts it cleanly.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sleep_pauses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sleep_id INTEGER NOT NULL REFERENCES sleep_log(id),
+      pause_time TEXT NOT NULL,
+      resume_time TEXT,
+      created_by_event_id INTEGER
+    );
+  `);
+
+  // Two closed pauses on the night and one open trailing pause on the
+  // nap (the tentative-end pattern).
   db.prepare(
     "INSERT INTO sleep_pauses (sleep_id, pause_time, resume_time) VALUES (?, ?, ?)",
   ).run(nightInternalId, "2026-03-27T03:00:00.000Z", "2026-03-27T03:15:00.000Z");
@@ -174,6 +187,7 @@ test("migration converts night sleep_pauses → night_waking and closes nap trai
 
   const { migrateSleepPausesToNightWaking } = await import("$lib/server/db.js");
   migrateSleepPausesToNightWaking(db);
+  db.exec("DROP TABLE IF EXISTS sleep_pauses");
 
   // Night pauses are now first-class night_wakings.
   const wakings = db

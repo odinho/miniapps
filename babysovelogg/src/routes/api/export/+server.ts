@@ -1,7 +1,7 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types.js";
 import { db, getCurrentBaby } from "$lib/server/db.js";
-import type { SleepLogRow, SleepPauseRow } from "$lib/types.js";
+import type { SleepLogRow, NightWakingRow } from "$lib/types.js";
 
 function csvField(value: string): string {
   if (value.includes(",") || value.includes('"') || value.includes("\n")) {
@@ -19,26 +19,13 @@ export const GET: RequestHandler = ({ url }) => {
     .prepare("SELECT * FROM sleep_log WHERE baby_id = ? AND deleted = 0 ORDER BY start_time DESC")
     .all(baby.id) as SleepLogRow[];
 
-  // Batch-fetch pauses
-  const sIds = sleeps.map((s) => s.id);
-  if (sIds.length > 0) {
-    const pAll = db
-      .prepare(
-        `SELECT * FROM sleep_pauses WHERE sleep_id IN (${sIds.map(() => "?").join(",")}) ORDER BY pause_time ASC`,
-      )
-      .all(...sIds) as SleepPauseRow[];
-    const pMap = new Map<number, SleepPauseRow[]>();
-    for (const p of pAll) {
-      if (!pMap.has(p.sleep_id)) pMap.set(p.sleep_id, []);
-      pMap.get(p.sleep_id)!.push(p);
-    }
-    for (const s of sleeps) s.pauses = pMap.get(s.id) || [];
-  }
-
   const diapers = db
     .prepare("SELECT * FROM diaper_log WHERE baby_id = ? AND deleted = 0 ORDER BY time DESC")
     .all(baby.id);
 
+  const nightWakings = db
+    .prepare("SELECT * FROM night_waking WHERE baby_id = ? AND deleted = 0 ORDER BY start_time DESC")
+    .all(baby.id) as NightWakingRow[];
 
   if (format === "csv") {
     const lines = ["type,start,end,sleep_type,mood,method,notes"];
@@ -52,6 +39,19 @@ export const GET: RequestHandler = ({ url }) => {
           s.mood || "",
           s.method || "",
           csvField(s.notes || ""),
+        ].join(","),
+      );
+    }
+    for (const w of nightWakings) {
+      lines.push(
+        [
+          "night_waking",
+          w.start_time,
+          w.end_time || "",
+          "",
+          w.mood || "",
+          "",
+          csvField(w.notes || ""),
         ].join(","),
       );
     }
@@ -73,5 +73,5 @@ export const GET: RequestHandler = ({ url }) => {
     });
   }
 
-  return json({ baby, sleeps, diapers });
+  return json({ baby, sleeps, diapers, nightWakings });
 };

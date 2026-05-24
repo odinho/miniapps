@@ -16,7 +16,7 @@ import {
   predictDayNaps,
 } from "../src/lib/engine/schedule.js";
 import { getTodayStats, getWeekStats, getAverageWakeWindow } from "../src/lib/engine/stats.js";
-import type { Baby, SleepLogRow, SleepPauseRow, SleepEntry, BabyContext } from "../src/lib/types.js";
+import type { Baby, SleepLogRow, SleepEntry, BabyContext } from "../src/lib/types.js";
 
 process.on("exit", closeDb);
 db.exec("PRAGMA busy_timeout = 3000");
@@ -139,15 +139,7 @@ function fmtAgo(iso: string): string {
 
 function calcSleepDuration(s: SleepLogRow): number {
   const endMs = s.end_time ? new Date(s.end_time).getTime() : now();
-  const total = (endMs - new Date(s.start_time).getTime()) / 60000;
-  if (!s.pauses) return total;
-  let pauseMs = 0;
-  for (const p of s.pauses) {
-    const ps = new Date(p.pause_time).getTime();
-    const pe = p.resume_time ? new Date(p.resume_time).getTime() : endMs;
-    pauseMs += pe - ps;
-  }
-  return total - pauseMs / 60000;
+  return (endMs - new Date(s.start_time).getTime()) / 60000;
 }
 
 function toSleepEntry(s: SleepLogRow): SleepEntry {
@@ -156,7 +148,6 @@ function toSleepEntry(s: SleepLogRow): SleepEntry {
     start_time: s.start_time,
     end_time: s.end_time,
     type: s.type as "nap" | "night",
-    pauses: s.pauses?.map((p) => ({ pause_time: p.pause_time, resume_time: p.resume_time })),
     woke_by: wokeBy,
   };
 }
@@ -207,44 +198,31 @@ function getBaby(): Baby {
   return baby;
 }
 
-function getActiveSleep(babyId: number): (SleepLogRow & { pauses: SleepPauseRow[] }) | null {
+function getActiveSleep(babyId: number): SleepLogRow | null {
   const sleep = db
     .prepare(
       "SELECT * FROM sleep_log WHERE baby_id = ? AND end_time IS NULL AND deleted = 0 ORDER BY id DESC LIMIT 1",
     )
     .get(babyId) as SleepLogRow | undefined;
-  if (!sleep) return null;
-  const pauses = db
-    .prepare("SELECT * FROM sleep_pauses WHERE sleep_id = ? ORDER BY pause_time ASC")
-    .all(sleep.id) as SleepPauseRow[];
-  return { ...sleep, pauses };
+  return sleep ?? null;
 }
 
 function getSleeps(babyId: number, days: number, limit: number): SleepLogRow[] {
   const from = new Date(now() - days * 86400000).toISOString();
-  const sleeps = db
+  return db
     .prepare(
       "SELECT * FROM sleep_log WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time DESC LIMIT ?",
     )
     .all(babyId, from, limit) as SleepLogRow[];
-  attachPauses(sleeps);
-  return sleeps;
 }
 
-function attachPauses(sleeps: SleepLogRow[]) {
-  const ids = sleeps.map((s) => s.id);
-  if (ids.length === 0) return;
-  const allPauses = db
+function hasOpenNightWaking(babyId: number): boolean {
+  const row = db
     .prepare(
-      `SELECT * FROM sleep_pauses WHERE sleep_id IN (${ids.map(() => "?").join(",")}) ORDER BY pause_time ASC`,
+      "SELECT 1 FROM night_waking WHERE baby_id = ? AND end_time IS NULL AND deleted = 0 LIMIT 1",
     )
-    .all(...ids) as SleepPauseRow[];
-  const grouped = new Map<number, SleepPauseRow[]>();
-  for (const p of allPauses) {
-    if (!grouped.has(p.sleep_id)) grouped.set(p.sleep_id, []);
-    grouped.get(p.sleep_id)!.push(p);
-  }
-  for (const s of sleeps) s.pauses = grouped.get(s.id) || [];
+    .get(babyId);
+  return !!row;
 }
 
 function getTodayWakeUp(babyId: number): { baby_id: number; date: string; wake_time: string } | undefined {
@@ -293,7 +271,6 @@ function cmdDefault() {
       "SELECT * FROM sleep_log WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time ASC",
     )
     .all(baby.id, todayStart.toISOString()) as SleepLogRow[];
-  attachPauses(todaySleeps);
 
   const wakeUp = getTodayWakeUp(baby.id);
   const stats = getTodayStats(todaySleeps.map(toSleepEntry));
@@ -311,9 +288,10 @@ function cmdDefault() {
   if (active) {
     const typeLabel = active.type === "night" ? "Night sleep" : "Napping";
     const dur = fmtDuration(calcSleepDuration(active));
-    const isPaused =
-      active.pauses.length > 0 && !active.pauses[active.pauses.length - 1].resume_time;
-    stateStr = `${typeLabel} since ${fmtTime(active.start_time)} (${dur})${isPaused ? " [PAUSED]" : ""}`;
+    const wakingNote = active.type === "night" && hasOpenNightWaking(baby.id)
+      ? " [WAKING]"
+      : "";
+    stateStr = `${typeLabel} since ${fmtTime(active.start_time)} (${dur})${wakingNote}`;
   } else {
     const lastSleep = todaySleeps.toReversed().find((s) => s.end_time);
     const wakeTime = lastSleep?.end_time || wakeUp?.wake_time;
@@ -343,7 +321,6 @@ function cmdDefault() {
           "SELECT * FROM sleep_log WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time DESC",
         )
         .all(baby.id, weekAgo) as SleepLogRow[];
-      attachPauses(recentSleeps);
       const ctx = buildCtx(baby, recentSleeps.map(toSleepEntry));
       const nextNap = predictNextNap(wakeTime, ctx);
       parts.push(`Next nap: ~${fmtTime(nextNap)}`);
@@ -379,7 +356,6 @@ function cmdStatus() {
       "SELECT * FROM sleep_log WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time ASC",
     )
     .all(baby.id, todayStart.toISOString()) as SleepLogRow[];
-  attachPauses(todaySleeps);
 
   const wakeUp = getTodayWakeUp(baby.id);
   const stats = getTodayStats(todaySleeps.map(toSleepEntry));
@@ -397,7 +373,6 @@ function cmdStatus() {
           "SELECT * FROM sleep_log WHERE baby_id = ? AND start_time >= ? AND deleted = 0 ORDER BY start_time DESC",
         )
         .all(baby.id, weekAgo) as SleepLogRow[];
-      attachPauses(recentSleeps);
       const ctx = buildCtx(baby, recentSleeps.map(toSleepEntry));
       prediction = {
         nextNap: predictNextNap(wakeTime, ctx),
@@ -448,10 +423,10 @@ function cmdStatus() {
   if (active) {
     const typeLabel = active.type === "night" ? "Night sleep" : "Napping";
     const dur = fmtDuration(calcSleepDuration(active));
-    const isPaused =
-      active.pauses.length > 0 && !active.pauses[active.pauses.length - 1].resume_time;
-    const pauseNote = isPaused ? " [PAUSED]" : "";
-    console.log(`Status:  ${typeLabel} since ${fmtTime(active.start_time)} (${dur})${pauseNote}`);
+    const wakingNote = active.type === "night" && hasOpenNightWaking(baby.id)
+      ? " [WAKING]"
+      : "";
+    console.log(`Status:  ${typeLabel} since ${fmtTime(active.start_time)} (${dur})${wakingNote}`);
   } else {
     const lastSleep = todaySleeps.toReversed().find((s) => s.end_time);
     if (lastSleep) {
@@ -804,7 +779,7 @@ EXAMPLES
 TABLES (for query command)
   baby          Baby profile (name, birthdate, potty_mode)
   sleep_log     Sleep sessions (start_time, end_time, type, mood, method, notes, ...)
-  sleep_pauses  Pause/resume records within a sleep
+  night_waking  Brief wakings inside a night sleep (start_time, end_time, notes, mood)
   diaper_log    Diaper/potty log (time, type, amount, note)
   day_start     Daily wake-up times (date, wake_time)
   events        Raw event log (type, payload JSON, timestamp)
@@ -966,7 +941,7 @@ TABLES
   baby          id, name, birthdate, created_at, custom_nap_count, potty_mode
   sleep_log     id, baby_id, start_time, end_time, type, notes, mood, method,
                 fall_asleep_time, woke_by, wake_notes, deleted, domain_id
-  sleep_pauses  id, sleep_id, pause_time, resume_time
+  night_waking  id, baby_id, domain_id, start_time, end_time, notes, mood, deleted
   diaper_log    id, baby_id, time, type, amount, note, deleted, domain_id
   day_start     id, baby_id, date, wake_time, created_at
   events        id, type, payload, client_id, client_event_id, timestamp,

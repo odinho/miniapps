@@ -25,7 +25,7 @@ import { computeStrategySignals } from "./features.js";
 import { selectStrategy } from "./strategy.js";
 import { predictNewborn } from "./newborn.js";
 import { predictEmerging } from "./emerging.js";
-import type { Baby, SleepLogRow, SleepPauseRow, DayStartRow, SleepEntry, BabyContext, NightWakingRow } from "$lib/types.js";
+import type { Baby, SleepLogRow, DayStartRow, SleepEntry, BabyContext, NightWakingRow } from "$lib/types.js";
 import type { PredictedNap } from "./schedule.js";
 import type { Strategy, StrategyContext, StrategyOverride } from "./strategy.js";
 import type { Prediction, PostSkipPlan } from "$lib/stores/app.svelte.js";
@@ -50,7 +50,6 @@ export interface DayData {
    * overnight exists (still in progress, or none logged).
    */
   priorOvernightSleep?: SleepLogRow | undefined;
-  pausesBySleep: Map<number, SleepPauseRow[]>;
   /**
    * Night wakings inside the active night sleep or any of today's
    * sleeps. Server pre-fetched (30h window from midnight) so the engine
@@ -706,7 +705,7 @@ function wakingsAsPausesForSleep(
 
 /** Pure state assembly — takes fetched data, returns the API response shape. */
 export function assembleState(data: DayData) {
-  const { baby, activeSleep, todaySleeps, recentSleeps, todayWakeUp, pausesBySleep } = data;
+  const { baby, activeSleep, todaySleeps, recentSleeps, todayWakeUp } = data;
   const nightWakings = data.todayNightWakings ?? [];
 
   // Calculate predictions even during active sleep so ghost arcs stay visible
@@ -736,15 +735,16 @@ export function assembleState(data: DayData) {
     data.priorTrendTargetState ?? null,
   );
 
-  // For night sleeps, use night_waking intervals (the post-redesign source
-  // of truth) — they include both migrated pre-redesign pauses and new
-  // first-class wakings. For naps, the legacy pausesBySleep still applies
-  // (historical data only; nap pauses are no longer created).
+  // For night sleeps, attach overlapping night_waking intervals as the
+  // engine's SleepEntry.pauses so calcPauseMs nets them out of duration
+  // math. Naps no longer have pauses under the redesign — the legacy
+  // sleep_pauses table has been dropped (see
+  // docs/pause-redesign-2026-05-22.md).
   const todaySleepsWithPauses = todaySleeps.map((s) => ({
     ...toSleepEntry(s),
     pauses: s.type === "night"
       ? wakingsAsPausesForSleep(s, nightWakings)
-      : pausesBySleep.get(s.id) || [],
+      : [],
   }));
   const stats = getTodayStats(todaySleepsWithPauses);
 
@@ -759,7 +759,7 @@ export function assembleState(data: DayData) {
         pauses:
           priorOvernight.type === "night"
             ? wakingsAsPausesForSleep(priorOvernight, nightWakings)
-            : pausesBySleep.get(priorOvernight.id) || [],
+            : [],
       }
     : null;
   const dayTotals = getSleepDayTotals(todaySleepsWithPauses, priorOvernightEntry);

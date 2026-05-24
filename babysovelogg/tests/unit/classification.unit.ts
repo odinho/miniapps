@@ -5,7 +5,7 @@ import {
   calcPauseMs,
   shouldReclassifyAsNight,
 } from "$lib/engine/classification.js";
-import type { SleepLogRow, SleepPauseRow } from "$lib/types.js";
+import type { SleepLogRow, SleepPause } from "$lib/types.js";
 
 function sleepRow(overrides: Partial<SleepLogRow> = {}): SleepLogRow {
   return {
@@ -135,33 +135,24 @@ describe("calcPauseMs", () => {
   });
 
   it("single completed pause", () => {
-    const pauses: SleepPauseRow[] = [
+    const pauses: SleepPause[] = [
       {
-        id: 1,
-        sleep_id: 1,
         pause_time: "2026-03-26T09:20:00.000Z",
         resume_time: "2026-03-26T09:30:00.000Z",
-        created_by_event_id: null,
       },
     ];
     expect(calcPauseMs(pauses)).toBe(10 * 60 * 1000);
   });
 
   it("multiple pauses sum up", () => {
-    const pauses: SleepPauseRow[] = [
+    const pauses: SleepPause[] = [
       {
-        id: 1,
-        sleep_id: 1,
         pause_time: "2026-03-26T09:20:00.000Z",
         resume_time: "2026-03-26T09:30:00.000Z",
-        created_by_event_id: null,
       },
       {
-        id: 2,
-        sleep_id: 1,
         pause_time: "2026-03-26T09:40:00.000Z",
         resume_time: "2026-03-26T09:55:00.000Z",
-        created_by_event_id: null,
       },
     ];
     expect(calcPauseMs(pauses)).toBe(25 * 60 * 1000);

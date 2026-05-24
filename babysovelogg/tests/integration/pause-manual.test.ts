@@ -10,50 +10,11 @@ import {
 setupHarness();
 import { renderDayState, renderCounts } from "../helpers/render-state.js";
 
-test("sleep.pause_deleted removes a pause by index", async () => {
-  const babyId = createBaby("Testa");
-  const did = generateSleepId();
-
-  await postEvents([
-    makeEvent("sleep.started", {
-      babyId,
-      startTime: "2026-03-26T09:00:00.000Z",
-      type: "nap",
-      sleepDomainId: did,
-    }),
-  ]);
-
-  // Add two pauses
-  await postEvents([
-    makeEvent("sleep.paused", { sleepDomainId: did, pauseTime: "2026-03-26T09:15:00.000Z" }),
-  ]);
-  await postEvents([
-    makeEvent("sleep.resumed", { sleepDomainId: did, resumeTime: "2026-03-26T09:20:00.000Z" }),
-  ]);
-  await postEvents([
-    makeEvent("sleep.paused", { sleepDomainId: did, pauseTime: "2026-03-26T09:30:00.000Z" }),
-  ]);
-  await postEvents([
-    makeEvent("sleep.resumed", { sleepDomainId: did, resumeTime: "2026-03-26T09:35:00.000Z" }),
-  ]);
-
-  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
-    "baby: Testa (2025-06-12)
-    søvn: 09:00–pågår lur 2 pause (10m)
-    bleier: (ingen)"
-  `);
-
-  // Delete the first pause (index 0)
-  await postEvents([
-    makeEvent("sleep.pause_deleted", { sleepDomainId: did, pauseIndex: 0 }),
-  ]);
-
-  expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
-    "baby: Testa (2025-06-12)
-    søvn: 09:00–pågår lur 1 pause (5m)
-    bleier: (ingen)"
-  `);
-});
+// Legacy pause projection tests have been removed — the sleep_pauses
+// table is gone (docs/pause-redesign-2026-05-22.md). Coverage for the
+// no-op projections lives in tests/integration/domain-ids.test.ts.
+// sleep.manual is exercised here because it still uses the same
+// surface area.
 
 test("sleep.manual creates a complete sleep entry in one event", async () => {
   const babyId = createBaby("Testa");
@@ -75,27 +36,28 @@ test("sleep.manual creates a complete sleep entry in one event", async () => {
     bleier: (ingen)"
   `);
   expect(renderCounts(db)).toMatchInlineSnapshot(
-    `"events: 2, sleeps: 1, diapers: 0, pauses: 0"`,
+    `"events: 2, sleeps: 1, diapers: 0, nightWakings: 0"`,
   );
 });
 
 test("sleep.manual with night type", async () => {
   const babyId = createBaby("Testa");
+  const did = generateSleepId();
 
   await postEvents([
     makeEvent("sleep.manual", {
       babyId,
-      startTime: "2026-03-25T19:30:00.000Z",
-      endTime: "2026-03-26T06:15:00.000Z",
+      startTime: "2026-03-25T20:00:00.000Z",
+      endTime: "2026-03-26T06:30:00.000Z",
       type: "night",
-      sleepDomainId: generateSleepId(),
+      sleepDomainId: did,
     }),
   ]);
 
   expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
     "baby: Testa (2025-06-12)
-    vekketid: 06:15
-    søvn: 19:30–06:15 natt
+    vekketid: 06:30
+    søvn: 20:00–06:30 natt
     bleier: (ingen)"
   `);
 });

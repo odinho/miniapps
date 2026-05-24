@@ -102,16 +102,6 @@ function initSchema(database: SqliteDb) {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_diaper_log_domain_id ON diaper_log(domain_id);
   `);
 
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS sleep_pauses (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      sleep_id INTEGER NOT NULL REFERENCES sleep_log(id),
-      pause_time TEXT NOT NULL,
-      resume_time TEXT,
-      created_by_event_id INTEGER
-    );
-  `);
-
   // night_waking: first-class events for brief wakings inside a night
   // sleep. Replaces what sleep_pauses did for night sleeps — see
   // docs/pause-redesign-2026-05-22.md. Each row is its own editable
@@ -133,7 +123,13 @@ function initSchema(database: SqliteDb) {
     CREATE INDEX IF NOT EXISTS idx_night_waking_baby_start ON night_waking(baby_id, start_time);
   `);
 
+  // One-time migration of legacy sleep_pauses → night_waking. Idempotent
+  // and a no-op once the table has been dropped (return-early guard
+  // inside the function). After migration, DROP the table so we stop
+  // carrying dead schema forward. The migration function itself is
+  // retained as a guard for pre-deploy databases.
   migrateSleepPausesToNightWaking(database);
+  database.exec("DROP TABLE IF EXISTS sleep_pauses");
 
   // Migrations: add late-added columns idempotently.
   tryAddColumn(database, "baby", "timezone", "TEXT");

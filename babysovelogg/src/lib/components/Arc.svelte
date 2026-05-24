@@ -6,8 +6,6 @@
 		activeSleep: {
 			start_time: string;
 			type: 'nap' | 'night';
-			isPaused?: boolean;
-			pauseTime?: string;
 		} | null;
 		prediction: {
 			nextNap: string;

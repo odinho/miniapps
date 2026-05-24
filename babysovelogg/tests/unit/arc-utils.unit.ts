@@ -208,16 +208,16 @@ describe("collectBubbles", () => {
     expect(bubbles[0].status).toBe("active");
   });
 
-  it("collects active sleep with paused time", () => {
+  it("active sleep has no endTime (renders to `now` in the scene layer)", () => {
     const bubbles = collectBubbles(
       [],
-      { start_time: "2026-03-27T09:00:00", type: "nap", isPaused: true, pauseTime: "2026-03-27T09:30:00" },
+      { start_time: "2026-03-27T09:00:00", type: "nap" },
       null,
       NOW,
     );
     expect(bubbles).toHaveLength(1);
     expect(bubbles[0].status).toBe("active");
-    expect(bubbles[0].endTime).toEqual(new Date("2026-03-27T09:30:00"));
+    expect(bubbles[0].endTime).toBeNull();
   });
 
   it("collects predicted naps when no active sleep", () => {

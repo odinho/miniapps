@@ -214,7 +214,9 @@ export function setupHarness() {
   });
 
   beforeEach(() => {
-    db.prepare("DELETE FROM sleep_pauses").run();
+    // The night-waking migration test re-creates sleep_pauses inline;
+    // drop it here defensively so leftovers don't bleed across tests.
+    db.exec("DROP TABLE IF EXISTS sleep_pauses");
     db.prepare("DELETE FROM night_waking").run();
     db.prepare("DELETE FROM diaper_log").run();
     db.prepare("DELETE FROM sleep_log").run();

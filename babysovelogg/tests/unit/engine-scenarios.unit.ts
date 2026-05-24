@@ -459,7 +459,6 @@ function buildScenario(arch: Archetype, input: ScenarioInput): BuiltScenario {
       recentSleeps: arch.recentSleeps,
       strategySleeps: arch.strategySleeps,
       todayWakeUp,
-      pausesBySleep: new Map(),
       diaperCount: 0,
       lastDiaperTime: null,
       now: nowMs,
@@ -2528,8 +2527,7 @@ describe("paired-baseline invariants", () => {
         recentSleeps,
         strategySleeps,
         todayWakeUp: wake,
-        pausesBySleep: new Map(),
-        diaperCount: 0,
+          diaperCount: 0,
         lastDiaperTime: null,
         now: new Date(osloIso(today, "06:30")).getTime(),
       };

@@ -2,7 +2,7 @@
 	import Arc from '$lib/components/Arc.svelte';
 	import Timer from '$lib/components/Timer.svelte';
 	import type { Prediction } from '$lib/stores/app.svelte.js';
-	import type { SleepLogRow, SleepPauseRow } from '$lib/types.js';
+	import type { SleepLogRow } from '$lib/types.js';
 	import type { ConfidenceResult, NapPredictionWithRange } from '$lib/engine/confidence.js';
 	import type { CalibrationReport } from '$lib/engine/calibration.js';
 	import { formatTime } from '$lib/utils.js';
@@ -32,7 +32,7 @@
 
 	// --- Type aliases ---
 	type ArcSleep = { start_time: string; end_time: string | null; type: 'nap' | 'night' };
-	type ArcActive = { start_time: string; type: 'nap' | 'night'; isPaused?: boolean; pauseTime?: string } | null;
+	type ArcActive = { start_time: string; type: 'nap' | 'night' } | null;
 	type ArcPred = { nextNap: string; bedtime?: string; predictedNaps?: Array<{ startTime: string; endTime: string }> } | null;
 
 	interface ScenarioCard {
@@ -270,28 +270,9 @@
 				// can see they're outside the expected window.
 				arcActiveWakeBand: wakeBand(-20, 15),
 			},
-			{
-				label: 'Lur på pause',
-				group: 'Søver',
-				modeKind: 'sleeping',
-				nowMs: n,
-				activeSleep: makeSleep({
-					start_time: o(-60), type: 'nap',
-					pauses: [{ id: 1, sleep_id: 1, pause_time: o(-10), resume_time: null, created_by_event_id: null } satisfies SleepPauseRow],
-				}),
-				prediction: makePrediction({ expectedNapEnd: o(+30), nextNap: o(+90), bedtime: o(+480) }),
-				todayWakeUp: { wake_time: o(-180) },
-				todaySleeps: [makeSleep({ start_time: o(-60), type: 'nap' })],
-				arcSleeps: [],
-				arcActive: { start_time: o(-60), type: 'nap', isPaused: true, pauseTime: o(-10) },
-				arcPred: null,
-				arcIsNight: false,
-				arcStartLabel: hm(o(-180)),
-				arcEndLabel: hm(o(+480)),
-				arcBands: [],
-				arcActiveWakeAt: o(+30),
-				arcActiveWakeBand: wakeBand(+30, 20),
-			},
+			// Scenario "Lur på pause" was removed when nap-pause UI got ripped
+			// out (docs/pause-redesign-2026-05-22.md). Night wakings render
+			// via the "Natt med vakning" scenario instead.
 			{
 				label: 'Nattesøvn – 6 timar',
 				group: 'Søver',

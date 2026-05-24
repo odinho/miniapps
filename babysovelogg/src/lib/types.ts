@@ -32,21 +32,12 @@ export interface SleepLogRow {
   domain_id: string;
   created_by_event_id: number | null;
   updated_by_event_id: number | null;
-  pauses?: SleepPauseRow[];
-}
-
-export interface SleepPauseRow {
-  id: number;
-  sleep_id: number;
-  pause_time: string;
-  resume_time: string | null;
-  created_by_event_id: number | null;
 }
 
 /**
  * First-class brief waking inside a night sleep. Editable as a
- * standalone entity (start/end/notes/mood) — replaces the role
- * `sleep_pauses` played for night sleeps. See
+ * standalone entity (start/end/notes/mood) — replaces the role the
+ * dropped `sleep_pauses` table played for night sleeps. See
  * `docs/pause-redesign-2026-05-22.md`.
  */
 export interface NightWakingRow {

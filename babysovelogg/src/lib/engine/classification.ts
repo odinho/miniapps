@@ -1,5 +1,5 @@
 import { getExpectedNapCount } from "./schedule.js";
-import type { SleepLogRow, SleepPauseRow } from "$lib/types.js";
+import type { SleepLogRow } from "$lib/types.js";
 
 /** Simple hour-based classification fallback. */
 export function classifySleepTypeByHour(hour?: number): "nap" | "night" {
@@ -48,8 +48,16 @@ export function shouldReclassifyAsNight(startTime: string, endTime: string): boo
   return durationHours > 6 && startHour >= 17;
 }
 
-/** Total pause duration in milliseconds. */
-export function calcPauseMs(pauses: SleepPauseRow[], nowMs?: number): number {
+/**
+ * Total pause duration in milliseconds. Accepts the engine's `SleepPause`
+ * shape ({ pause_time, resume_time }) — used to net `night_waking`
+ * intervals out of night-sleep duration math via
+ * `wakingsAsPausesForSleep` in `src/lib/engine/state.ts`.
+ */
+export function calcPauseMs(
+  pauses: { pause_time: string; resume_time: string | null }[],
+  nowMs?: number,
+): number {
   const resolvedNow = nowMs ?? Date.now();
   let total = 0;
   for (const p of pauses) {

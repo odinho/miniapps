@@ -12,7 +12,6 @@
 	import EditSleepModal from '$lib/components/EditSleepModal.svelte';
 	import NightWakingEditSheet from '$lib/components/NightWakingEditSheet.svelte';
 	import { formatDuration, formatTime, formatTimeWindow } from '$lib/utils.js';
-	import { calcPauseMs } from '$lib/engine/classification.js';
 	import { generateNightWakingId } from '$lib/identity.js';
 	import { buildSleepInfoRows } from '$lib/settings-utils.js';
 	import TimeInput from '$lib/components/TimeInput.svelte';
@@ -186,8 +185,6 @@
 			? {
 					start_time: activeSleep.start_time,
 					type: activeSleep.type as 'nap' | 'night',
-					isPaused: activeSleep.pauses?.some((p) => !p.resume_time) ?? false,
-					pauseTime: activeSleep.pauses?.find((p) => !p.resume_time)?.pause_time,
 				}
 			: null,
 	);
@@ -319,11 +316,27 @@
 	const liveNapMs = $derived.by(() => {
 		const base = (stats?.totalNapMinutes ?? 0) * 60_000;
 		if (activeSleep?.type === 'nap' && !activeSleep.end_time) {
-			const elapsed = now - new Date(activeSleep.start_time).getTime() - calcPauseMs(activeSleep.pauses ?? []);
+			const elapsed = now - new Date(activeSleep.start_time).getTime();
 			return base + Math.max(0, elapsed);
 		}
 		return base;
 	});
+
+	// Subtract any night_waking intervals that fall inside an active night sleep
+	// (open wakings net out time-since-start; closed ones net out their span).
+	// Returns 0 for naps (which have no wakings under the new design).
+	function activeNightWakingMs(): number {
+		if (!activeSleep || activeSleep.end_time || activeSleep.type !== 'night') return 0;
+		const startMs = new Date(activeSleep.start_time).getTime();
+		let ms = 0;
+		for (const w of todayNightWakings) {
+			const ws = new Date(w.start_time).getTime();
+			if (ws < startMs) continue;
+			const we = w.end_time ? new Date(w.end_time).getTime() : now;
+			ms += Math.max(0, we - ws);
+		}
+		return ms;
+	}
 
 	const liveTotalMs = $derived.by(() => {
 		// Wake-to-wake totals include the morning overnight that started
@@ -337,7 +350,7 @@
 		const priorNightBase = (dt?.priorNightMinutes ?? 0) * 60_000;
 		let activeMs = 0;
 		if (activeSleep && !activeSleep.end_time) {
-			activeMs = Math.max(0, now - new Date(activeSleep.start_time).getTime() - calcPauseMs(activeSleep.pauses ?? []));
+			activeMs = Math.max(0, now - new Date(activeSleep.start_time).getTime() - activeNightWakingMs());
 		}
 		return napBase + todayNightBase + priorNightBase + activeMs;
 	});

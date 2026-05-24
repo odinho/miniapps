@@ -134,18 +134,7 @@ export function getDateLabel(dateStr: string): string {
 
 export function calcSleepDurationMs(entry: SleepLogRow): number {
 	if (!entry.end_time) return 0;
-	let ms = new Date(entry.end_time).getTime() - new Date(entry.start_time).getTime();
-	if (entry.pauses?.length) {
-		for (const p of entry.pauses) {
-			const ps = new Date(p.pause_time).getTime();
-			const pe = p.resume_time
-				? new Date(p.resume_time).getTime()
-				: entry.end_time
-					? new Date(entry.end_time).getTime()
-					: Date.now();
-			ms -= pe - ps;
-		}
-	}
+	const ms = new Date(entry.end_time).getTime() - new Date(entry.start_time).getTime();
 	return Math.max(0, ms);
 }
 
@@ -166,33 +155,6 @@ export function getSleepIcon(type: string): string {
 
 export function getSleepTypeLabel(type: string): string {
 	return type === 'night' ? 'Nattesøvn' : 'Lur';
-}
-
-/**
- * Legacy pause summary — used only by the unit test suite to verify
- * the legacy projection still nets historical pauses correctly. The
- * UI no longer renders this; night wakings are a first-class entity
- * with their own history row (see `docs/pause-redesign-2026-05-22.md`).
- */
-export interface PauseSummary {
-	count: number;
-	totalMinutes: number;
-}
-
-export function getPauseSummary(entry: SleepLogRow): PauseSummary | null {
-	const pauses = entry.pauses;
-	if (!pauses || pauses.length === 0) return null;
-	let totalMs = 0;
-	for (const p of pauses) {
-		const ps = new Date(p.pause_time).getTime();
-		const pe = p.resume_time
-			? new Date(p.resume_time).getTime()
-			: entry.end_time
-				? new Date(entry.end_time).getTime()
-				: Date.now();
-		totalMs += pe - ps;
-	}
-	return { count: pauses.length, totalMinutes: Math.floor(totalMs / 60000) };
 }
 
 export interface TagBadge {

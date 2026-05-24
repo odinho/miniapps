@@ -1,4 +1,4 @@
-import type { SleepLogRow, SleepPauseRow } from '$lib/types.js';
+import type { SleepLogRow } from '$lib/types.js';
 import { classifySleepType } from '$lib/engine/classification.js';
 import { generateSleepId } from '$lib/identity.js';
 
@@ -55,24 +55,3 @@ export function buildEndSleep(activeSleep: SleepLogRow): EndSleepResult {
 	return { events, endTime, sleepSnapshot: { ...activeSleep, end_time: endTime } };
 }
 
-/** Build a pause event. */
-export function buildPause(domainId: string) {
-	return {
-		type: 'sleep.paused' as const,
-		payload: { sleepDomainId: domainId, pauseTime: new Date().toISOString() },
-	};
-}
-
-/** Build a resume event. */
-export function buildResume(domainId: string) {
-	return {
-		type: 'sleep.resumed' as const,
-		payload: { sleepDomainId: domainId, resumeTime: new Date().toISOString() },
-	};
-}
-
-/** Check if a sleep's pauses indicate it's currently paused. */
-export function isPaused(pauses: SleepPauseRow[] | undefined): boolean {
-	if (!pauses || pauses.length === 0) return false;
-	return !pauses[pauses.length - 1].resume_time;
-}

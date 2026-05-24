@@ -84,7 +84,7 @@ function dayData(overrides: Partial<DayData> = {}): DayData {
   return {
     baby: baseBaby, activeSleep: undefined, todaySleeps: [],
     recentSleeps: scheduleRecentSleeps(), todayWakeUp: undefined,
-    pausesBySleep: new Map(), diaperCount: 0, lastDiaperTime: null,
+    diaperCount: 0, lastDiaperTime: null,
     ...overrides,
   };
 }

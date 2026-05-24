@@ -69,7 +69,6 @@ function dayData(overrides: Partial<DayData> = {}): DayData {
     todaySleeps: [],
     recentSleeps: scheduleRecentSleeps(),
     todayWakeUp: undefined,
-    pausesBySleep: new Map(),
     diaperCount: 0,
     lastDiaperTime: null,
     ...overrides,
@@ -223,29 +222,33 @@ describe("assembleState", () => {
     expect(result.lastDiaperTime).toBe("2026-03-26T11:00:00.000Z");
   });
 
-  it("subtracts pauses from stats", () => {
-    const sleep = sleepRow({ id: 42 });
-    const pausesBySleep = new Map([
-      [
-        42,
-        [
-          {
-            id: 1,
-            sleep_id: 42,
-            pause_time: "2026-03-26T09:20:00.000Z",
-            resume_time: "2026-03-26T09:30:00.000Z",
-            created_by_event_id: null,
-          },
-        ],
-      ],
-    ]);
+  it("subtracts night_waking intervals from night-sleep duration", () => {
+    const night = sleepRow({
+      id: 42,
+      start_time: "2026-03-25T20:00:00.000Z",
+      end_time: "2026-03-26T06:00:00.000Z",
+      type: "night",
+    });
+    const waking = {
+      id: 1,
+      baby_id: 1,
+      domain_id: "nwk_1",
+      start_time: "2026-03-26T03:00:00.000Z",
+      end_time: "2026-03-26T03:10:00.000Z",
+      notes: null,
+      mood: null,
+      deleted: 0,
+      created_by_event_id: null,
+      updated_by_event_id: null,
+    };
     const result = assembleState(
       dayData({
-        todaySleeps: [sleep],
-        pausesBySleep,
+        todaySleeps: [night],
+        todayNightWakings: [waking],
       }),
     );
-    expect(result.stats.totalNapMinutes).toBe(50); // 60 - 10
+    // 10h night − 10 min waking = 9h50m (590 min)
+    expect(result.stats.totalNightMinutes).toBe(590);
   });
 
   it("B2: nextNap derived from day schedule respects custom nap count", () => {
@@ -1297,7 +1300,6 @@ describe("assembleState", () => {
           created_at: "",
           created_by_event_id: null,
         },
-        pausesBySleep: new Map(),
         diaperCount: 0,
         lastDiaperTime: null,
         napBudgetOptedIn,

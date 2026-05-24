@@ -117,7 +117,6 @@ export function applyOptimisticEvent(
 				domain_id: payload.sleepDomainId as string,
 				created_by_event_id: null,
 				updated_by_event_id: null,
-				pauses: [],
 			};
 			break;
 		}
@@ -128,16 +127,8 @@ export function applyOptimisticEvent(
 				s.todaySleeps = [...s.todaySleeps, ended];
 				s.activeSleep = null;
 				if (s.stats) {
-					let pauseMs = 0;
-					if (ended.pauses?.length) {
-						for (const p of ended.pauses) {
-							const ps = new Date(p.pause_time).getTime();
-							const pe = p.resume_time ? new Date(p.resume_time).getTime() : new Date(ended.end_time!).getTime();
-							pauseMs += pe - ps;
-						}
-					}
 					const durationMs =
-						new Date(ended.end_time!).getTime() - new Date(ended.start_time).getTime() - pauseMs;
+						new Date(ended.end_time!).getTime() - new Date(ended.start_time).getTime();
 					const durationMin = Math.max(0, durationMs / 60000);
 					if (ended.type === "nap") {
 						s.stats.napCount += 1;
@@ -150,45 +141,13 @@ export function applyOptimisticEvent(
 			break;
 		}
 
-		case "sleep.paused": {
-			if (s.activeSleep && s.activeSleep.domain_id === payload.sleepDomainId) {
-				const pauses = [...(s.activeSleep.pauses || [])];
-				pauses.push({
-					id: 0,
-					sleep_id: s.activeSleep.id,
-					pause_time: payload.pauseTime as string,
-					resume_time: null,
-					created_by_event_id: null,
-				});
-				s.activeSleep = { ...s.activeSleep, pauses };
-			}
+		// Legacy pause events — see the matching no-op projections in
+		// src/lib/server/projections.ts. The sleep_pauses table is gone;
+		// new code only emits night_waking.* events.
+		case "sleep.paused":
+		case "sleep.resumed":
+		case "sleep.pause_deleted":
 			break;
-		}
-
-		case "sleep.resumed": {
-			if (s.activeSleep && s.activeSleep.domain_id === payload.sleepDomainId) {
-				const pauses = [...(s.activeSleep.pauses || [])];
-				const last = pauses[pauses.length - 1];
-				if (last && !last.resume_time) {
-					pauses[pauses.length - 1] = { ...last, resume_time: payload.resumeTime as string };
-					s.activeSleep = { ...s.activeSleep, pauses };
-				}
-			}
-			break;
-		}
-
-		case "sleep.pause_deleted": {
-			const pauseTarget = findSleep(s, payload.sleepDomainId as string);
-			if (pauseTarget && pauseTarget.pauses) {
-				const idx = payload.pauseIndex as number;
-				if (idx >= 0 && idx < pauseTarget.pauses.length) {
-					const pauses = [...pauseTarget.pauses];
-					pauses.splice(idx, 1);
-					pauseTarget.pauses = pauses;
-				}
-			}
-			break;
-		}
 
 		case "sleep.tagged": {
 			const target = findSleep(s, payload.sleepDomainId as string);
@@ -248,7 +207,6 @@ export function applyOptimisticEvent(
 				domain_id: (payload.sleepDomainId as string) || `slp_optimistic_${Date.now()}`,
 				created_by_event_id: null,
 				updated_by_event_id: null,
-				pauses: [],
 			};
 			s.todaySleeps = [...s.todaySleeps, manual];
 			if (s.stats && manual.end_time) {

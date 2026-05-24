@@ -4,11 +4,8 @@ afterAll(() => setSystemTime());
 import {
 	buildStartSleep,
 	buildEndSleep,
-	buildPause,
-	buildResume,
-	isPaused,
 } from '$lib/sleep-actions.js';
-import type { SleepLogRow, SleepPauseRow } from '$lib/types.js';
+import type { SleepLogRow } from '$lib/types.js';
 
 function makeSleep(overrides: Partial<SleepLogRow> = {}): SleepLogRow {
 	return {
@@ -108,106 +105,6 @@ describe('buildEndSleep', () => {
 	});
 });
 
-describe('buildPause', () => {
-	beforeEach(() => {
-		setSystemTime(new Date('2026-03-27T10:30:00.000Z'));
-	});
-	afterEach(() => setSystemTime());
-
-	it('creates a sleep.paused event', () => {
-		const event = buildPause('slp_test1');
-		expect(event.type).toBe('sleep.paused');
-		expect(event.payload.sleepDomainId).toBe('slp_test1');
-		expect(event.payload.pauseTime).toBe('2026-03-27T10:30:00.000Z');
-	});
-});
-
-describe('buildResume', () => {
-	beforeEach(() => {
-		setSystemTime(new Date('2026-03-27T10:45:00.000Z'));
-	});
-	afterEach(() => setSystemTime());
-
-	it('creates a sleep.resumed event', () => {
-		const event = buildResume('slp_test1');
-		expect(event.type).toBe('sleep.resumed');
-		expect(event.payload.sleepDomainId).toBe('slp_test1');
-		expect(event.payload.resumeTime).toBe('2026-03-27T10:45:00.000Z');
-	});
-});
-
-describe('isPaused', () => {
-	it('returns false for undefined pauses', () => {
-		expect(isPaused(undefined)).toBe(false);
-	});
-
-	it('returns false for empty pauses', () => {
-		expect(isPaused([])).toBe(false);
-	});
-
-	it('returns false when last pause is resumed', () => {
-		const pauses: SleepPauseRow[] = [
-			{
-				id: 1,
-				sleep_id: 1,
-				pause_time: '2026-03-27T10:30:00.000Z',
-				resume_time: '2026-03-27T10:45:00.000Z',
-				created_by_event_id: null,
-			},
-		];
-		expect(isPaused(pauses)).toBe(false);
-	});
-
-	it('returns true when last pause has no resume_time', () => {
-		const pauses: SleepPauseRow[] = [
-			{
-				id: 1,
-				sleep_id: 1,
-				pause_time: '2026-03-27T10:30:00.000Z',
-				resume_time: null,
-				created_by_event_id: null,
-			},
-		];
-		expect(isPaused(pauses)).toBe(true);
-	});
-
-	it('returns true when most recent of multiple pauses is open', () => {
-		const pauses: SleepPauseRow[] = [
-			{
-				id: 1,
-				sleep_id: 1,
-				pause_time: '2026-03-27T10:30:00.000Z',
-				resume_time: '2026-03-27T10:35:00.000Z',
-				created_by_event_id: null,
-			},
-			{
-				id: 2,
-				sleep_id: 1,
-				pause_time: '2026-03-27T10:45:00.000Z',
-				resume_time: null,
-				created_by_event_id: null,
-			},
-		];
-		expect(isPaused(pauses)).toBe(true);
-	});
-
-	it('returns false when all pauses are resumed', () => {
-		const pauses: SleepPauseRow[] = [
-			{
-				id: 1,
-				sleep_id: 1,
-				pause_time: '2026-03-27T10:30:00.000Z',
-				resume_time: '2026-03-27T10:35:00.000Z',
-				created_by_event_id: null,
-			},
-			{
-				id: 2,
-				sleep_id: 1,
-				pause_time: '2026-03-27T10:45:00.000Z',
-				resume_time: '2026-03-27T10:50:00.000Z',
-				created_by_event_id: null,
-			},
-		];
-		expect(isPaused(pauses)).toBe(false);
-	});
-});
+// buildPause / buildResume / isPaused removed with the pause UX redesign —
+// night wakings now use night_waking.{started,ended} events; nap pause no
+// longer exists. See docs/pause-redesign-2026-05-22.md.

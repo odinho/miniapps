@@ -53,7 +53,6 @@ function makeSleep(overrides: Partial<SleepLogRow> = {}): SleepLogRow {
 		domain_id: 'slp_test1',
 		created_by_event_id: null,
 		updated_by_event_id: null,
-		pauses: [],
 		...overrides,
 	};
 }
@@ -193,29 +192,24 @@ describe('applyOptimisticEvent', () => {
 		expect(result.activeSleep).not.toBeNull();
 	});
 
-	it('sleep.paused adds a pause to activeSleep', () => {
-		const active = makeSleep({ domain_id: 'slp_p', pauses: [] });
+	it('sleep.paused is a no-op (legacy event; sleep_pauses table is gone)', () => {
+		const active = makeSleep({ domain_id: 'slp_p' });
 		const state = makeState({ activeSleep: active });
 		const result = applyOptimisticEvent(state, 'sleep.paused', {
 			sleepDomainId: 'slp_p',
 			pauseTime: '2026-03-27T12:15:00.000Z',
 		});
-		expect(result.activeSleep!.pauses).toHaveLength(1);
-		expect(result.activeSleep!.pauses![0].pause_time).toBe('2026-03-27T12:15:00.000Z');
-		expect(result.activeSleep!.pauses![0].resume_time).toBeNull();
+		expect(result.activeSleep).toEqual(active);
 	});
 
-	it('sleep.resumed sets resume_time on last pause', () => {
-		const active = makeSleep({
-			domain_id: 'slp_r',
-			pauses: [{ id: 0, sleep_id: 1, pause_time: '2026-03-27T12:15:00.000Z', resume_time: null, created_by_event_id: null }],
-		});
+	it('sleep.resumed is a no-op (legacy event)', () => {
+		const active = makeSleep({ domain_id: 'slp_r' });
 		const state = makeState({ activeSleep: active });
 		const result = applyOptimisticEvent(state, 'sleep.resumed', {
 			sleepDomainId: 'slp_r',
 			resumeTime: '2026-03-27T12:20:00.000Z',
 		});
-		expect(result.activeSleep!.pauses![0].resume_time).toBe('2026-03-27T12:20:00.000Z');
+		expect(result.activeSleep).toEqual(active);
 	});
 
 	it('sleep.tagged updates mood and method on activeSleep', () => {

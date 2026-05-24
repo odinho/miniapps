@@ -16,7 +16,6 @@ import {
 	formatSleepTimes,
 	getSleepIcon,
 	getSleepTypeLabel,
-	getPauseSummary,
 	getSleepBadges,
 	getFallAsleepLabel,
 	getWokeByLabel,
@@ -55,7 +54,6 @@ function makeSleep(overrides: Partial<SleepLogRow> = {}): SleepLogRow {
 		domain_id: 'sleep-001',
 		created_by_event_id: null,
 		updated_by_event_id: null,
-		pauses: [],
 		...overrides,
 	};
 }
@@ -225,65 +223,10 @@ describe('calcSleepDurationMs', () => {
 		expect(calcSleepDurationMs(entry)).toBe(0);
 	});
 
-	test('subtracts pause time', () => {
-		const entry = makeSleep({
-			start_time: '2026-03-27T08:00:00.000Z',
-			end_time: '2026-03-27T09:30:00.000Z',
-			pauses: [
-				{
-					id: 1,
-					sleep_id: 1,
-					pause_time: '2026-03-27T08:30:00.000Z',
-					resume_time: '2026-03-27T08:45:00.000Z',
-					created_by_event_id: null,
-				},
-			],
-		});
-		// 90 min - 15 min pause = 75 min
-		expect(calcSleepDurationMs(entry)).toBe(75 * 60 * 1000);
-	});
-
-	test('handles multiple pauses', () => {
-		const entry = makeSleep({
-			start_time: '2026-03-27T08:00:00.000Z',
-			end_time: '2026-03-27T10:00:00.000Z',
-			pauses: [
-				{
-					id: 1,
-					sleep_id: 1,
-					pause_time: '2026-03-27T08:30:00.000Z',
-					resume_time: '2026-03-27T08:40:00.000Z',
-					created_by_event_id: null,
-				},
-				{
-					id: 2,
-					sleep_id: 1,
-					pause_time: '2026-03-27T09:00:00.000Z',
-					resume_time: '2026-03-27T09:10:00.000Z',
-					created_by_event_id: null,
-				},
-			],
-		});
-		// 120 min - 10 min - 10 min = 100 min
-		expect(calcSleepDurationMs(entry)).toBe(100 * 60 * 1000);
-	});
-
-	test('never returns negative', () => {
-		const entry = makeSleep({
-			start_time: '2026-03-27T08:00:00.000Z',
-			end_time: '2026-03-27T08:05:00.000Z',
-			pauses: [
-				{
-					id: 1,
-					sleep_id: 1,
-					pause_time: '2026-03-27T08:00:00.000Z',
-					resume_time: '2026-03-27T08:10:00.000Z',
-					created_by_event_id: null,
-				},
-			],
-		});
-		expect(calcSleepDurationMs(entry)).toBe(0);
-	});
+	// Pause-subtraction tests removed — the legacy pauses field on
+	// SleepLogRow is gone (docs/pause-redesign-2026-05-22.md). Night
+	// wakings net out in engine math via wakingsAsPausesForSleep
+	// (engine/state.ts), not through this UI-facing helper.
 });
 
 describe('formatSleepDuration', () => {
@@ -336,32 +279,6 @@ describe('getSleepTypeLabel', () => {
 
 	test('returns Lur for nap', () => {
 		expect(getSleepTypeLabel('nap')).toBe('Lur');
-	});
-});
-
-describe('getPauseSummary', () => {
-	test('returns null for no pauses', () => {
-		expect(getPauseSummary(makeSleep())).toBeNull();
-	});
-
-	test('returns null for empty pauses array', () => {
-		expect(getPauseSummary(makeSleep({ pauses: [] }))).toBeNull();
-	});
-
-	test('returns count and total minutes', () => {
-		const entry = makeSleep({
-			pauses: [
-				{
-					id: 1,
-					sleep_id: 1,
-					pause_time: '2026-03-27T08:30:00.000Z',
-					resume_time: '2026-03-27T08:45:00.000Z',
-					created_by_event_id: null,
-				},
-			],
-		});
-		const result = getPauseSummary(entry);
-		expect(result).toEqual({ count: 1, totalMinutes: 15 });
 	});
 });
 

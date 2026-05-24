@@ -1,4 +1,4 @@
-import { db, migrateSleepPausesToNightWaking } from "./db.js";
+import { db } from "./db.js";
 import type { AppEvent } from "./events.js";
 import { rowToAppEvent } from "./events.js";
 import type { EventRow } from "$lib/types.js";
@@ -223,58 +223,15 @@ export function applyEvent(event: AppEvent): void {
       break;
     }
 
-    case "sleep.paused": {
-      const sleep = db
-        .prepare("SELECT id FROM sleep_log WHERE domain_id = ?")
-        .get(payload.sleepDomainId) as { id: number } | undefined;
-      if (!sleep) {
-        throw new Error(`sleep.paused: no sleep found with domain_id ${payload.sleepDomainId}`);
-      }
-      db.prepare(
-        "INSERT INTO sleep_pauses (sleep_id, pause_time, created_by_event_id) VALUES (?, ?, ?)",
-      ).run(sleep.id, payload.pauseTime, eventId);
+    // Legacy pause projections — kept as no-ops so historical events
+    // still parse and replay cleanly. The `sleep_pauses` table is gone
+    // (dropped in db.ts after the one-time migration to night_waking).
+    // New events never emit these types; they only appear in pre-redesign
+    // history. See docs/pause-redesign-2026-05-22.md.
+    case "sleep.paused":
+    case "sleep.resumed":
+    case "sleep.pause_deleted":
       break;
-    }
-
-    case "sleep.resumed": {
-      const sleep = db
-        .prepare("SELECT id FROM sleep_log WHERE domain_id = ?")
-        .get(payload.sleepDomainId) as { id: number } | undefined;
-      if (!sleep) {
-        throw new Error(`sleep.resumed: no sleep found with domain_id ${payload.sleepDomainId}`);
-      }
-      const result = db
-        .prepare(
-          "UPDATE sleep_pauses SET resume_time = ? WHERE sleep_id = ? AND resume_time IS NULL",
-        )
-        .run(payload.resumeTime, sleep.id);
-      if (result.changes === 0) {
-        throw new Error(
-          `sleep.resumed: no open pause found for domain_id ${payload.sleepDomainId}`,
-        );
-      }
-      break;
-    }
-
-    case "sleep.pause_deleted": {
-      const sleep = db
-        .prepare("SELECT id FROM sleep_log WHERE domain_id = ?")
-        .get(payload.sleepDomainId) as { id: number } | undefined;
-      if (!sleep) {
-        throw new Error(`sleep.pause_deleted: no sleep found with domain_id ${payload.sleepDomainId}`);
-      }
-      const pauses = db
-        .prepare("SELECT id FROM sleep_pauses WHERE sleep_id = ? ORDER BY pause_time ASC")
-        .all(sleep.id) as { id: number }[];
-      const idx = payload.pauseIndex as number;
-      if (idx < 0 || idx >= pauses.length) {
-        throw new Error(
-          `sleep.pause_deleted: pauseIndex ${idx} out of range (sleep has ${pauses.length} pauses)`,
-        );
-      }
-      db.prepare("DELETE FROM sleep_pauses WHERE id = ?").run(pauses[idx].id);
-      break;
-    }
 
     case "night_waking.started": {
       db.prepare(
@@ -476,17 +433,16 @@ export interface RebuildReport {
   success: boolean;
   eventsReplayed: number;
   invalidEvents: { id: number; type: string; error: string }[];
-  before: { sleeps: number; diapers: number; pauses: number; nightWakings: number };
-  after: { sleeps: number; diapers: number; pauses: number; nightWakings: number };
+  before: { sleeps: number; diapers: number; nightWakings: number };
+  after: { sleeps: number; diapers: number; nightWakings: number };
   durationMs: number;
 }
 
 function countProjections() {
   const sleeps = (db.prepare("SELECT COUNT(*) as c FROM sleep_log").get() as { c: number }).c;
   const diapers = (db.prepare("SELECT COUNT(*) as c FROM diaper_log").get() as { c: number }).c;
-  const pauses = (db.prepare("SELECT COUNT(*) as c FROM sleep_pauses").get() as { c: number }).c;
   const nightWakings = (db.prepare("SELECT COUNT(*) as c FROM night_waking").get() as { c: number }).c;
-  return { sleeps, diapers, pauses, nightWakings };
+  return { sleeps, diapers, nightWakings };
 }
 
 export function rebuildAll(): RebuildReport {
@@ -517,7 +473,6 @@ export function rebuildAll(): RebuildReport {
 
   // Rebuild in transaction
   const doRebuild = db.transaction(() => {
-    db.prepare("DELETE FROM sleep_pauses").run();
     db.prepare("DELETE FROM night_waking").run();
     db.prepare("DELETE FROM diaper_log").run();
     db.prepare("DELETE FROM sleep_log").run();
@@ -535,15 +490,11 @@ export function rebuildAll(): RebuildReport {
     db.prepare("DELETE FROM baby").run();
     // Reset autoincrement so replayed baby IDs match original payload references
     db.prepare(
-      "DELETE FROM sqlite_sequence WHERE name IN ('baby', 'sleep_log', 'diaper_log', 'sleep_pauses', 'night_waking')",
+      "DELETE FROM sqlite_sequence WHERE name IN ('baby', 'sleep_log', 'diaper_log', 'night_waking')",
     ).run();
     for (const row of events) {
       applyEvent(rowToAppEvent(row));
     }
-    // Re-run the pause → night_waking migration on the freshly-replayed
-    // sleep_pauses rows so the UI's night_waking projections stay in sync
-    // after rebuild.
-    migrateSleepPausesToNightWaking(db);
   });
   doRebuild();
 

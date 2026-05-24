@@ -978,7 +978,6 @@ export function computeAllStats(
 		start_time: s.start_time,
 		end_time: s.end_time,
 		type: s.type,
-		pauses: s.pauses,
 	}));
 
 	const sevenDaysAgo = new Date();

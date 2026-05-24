@@ -3,7 +3,6 @@ import type {
   SleepLogRow,
   DiaperLogRow,
   Baby,
-  SleepPauseRow,
   NightWakingRow,
 } from "$lib/types.js";
 
@@ -25,17 +24,9 @@ export function renderDayState(db: SqliteDb, babyId: number): string {
     .prepare("SELECT end_time FROM sleep_log WHERE baby_id = ? AND type = 'night' AND end_time IS NOT NULL AND deleted = 0 ORDER BY end_time DESC LIMIT 1")
     .get(babyId) as { end_time: string } | undefined;
 
-  const pauses = db
-    .prepare("SELECT * FROM sleep_pauses ORDER BY pause_time")
-    .all() as SleepPauseRow[];
-  const pausesBySleep = new Map<number, SleepPauseRow[]>();
-  for (const p of pauses) {
-    if (!pausesBySleep.has(p.sleep_id)) pausesBySleep.set(p.sleep_id, []);
-    pausesBySleep.get(p.sleep_id)!.push(p);
-  }
-
-  // Night wakings (first-class events that replace pauses on night sleeps).
-  // Group them per parent sleep by overlap so renderSleep can fold them in.
+  // Night wakings (first-class events that replaced the legacy
+  // sleep_pauses table). Group them per parent sleep by overlap so
+  // renderSleep can fold them in.
   const wakings = db
     .prepare(
       "SELECT * FROM night_waking WHERE baby_id = ? AND deleted = 0 ORDER BY start_time",
@@ -51,7 +42,7 @@ export function renderDayState(db: SqliteDb, babyId: number): string {
 
   const sleepLine =
     sleeps.length > 0
-      ? sleeps.map((s) => renderSleep(s, pausesBySleep.get(s.id), wakingsInSleep(wakings, s))).join(" | ")
+      ? sleeps.map((s) => renderSleep(s, wakingsInSleep(wakings, s))).join(" | ")
       : "(ingen)";
   lines.push(`søvn: ${sleepLine}`);
 
@@ -71,7 +62,9 @@ export function renderCounts(db: SqliteDb): string {
     diapers: (
       db.prepare("SELECT COUNT(*) as c FROM diaper_log WHERE deleted = 0").get() as { c: number }
     ).c,
-    pauses: (db.prepare("SELECT COUNT(*) as c FROM sleep_pauses").get() as { c: number }).c,
+    nightWakings: (
+      db.prepare("SELECT COUNT(*) as c FROM night_waking WHERE deleted = 0").get() as { c: number }
+    ).c,
   };
   return Object.entries(counts)
     .map(([k, v]) => `${k}: ${v}`)
@@ -80,23 +73,12 @@ export function renderCounts(db: SqliteDb): string {
 
 function renderSleep(
   s: SleepLogRow,
-  pauses?: SleepPauseRow[],
   wakings?: NightWakingRow[],
 ): string {
   const time = s.end_time
     ? `${fmtTime(s.start_time)}–${fmtTime(s.end_time)}`
     : `${fmtTime(s.start_time)}–pågår`;
   const parts = [time, s.type === "night" ? "natt" : "lur"];
-  if (pauses && pauses.length > 0) {
-    const pauseMin = Math.round(
-      pauses.reduce((sum, p) => {
-        const start = new Date(p.pause_time).getTime();
-        const end = p.resume_time ? new Date(p.resume_time).getTime() : Date.now();
-        return sum + (end - start);
-      }, 0) / 60000,
-    );
-    parts.push(`${pauses.length} pause (${pauseMin}m)`);
-  }
   if (wakings && wakings.length > 0) {
     const wakingMin = Math.round(
       wakings.reduce((sum, w) => {

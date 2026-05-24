@@ -167,8 +167,6 @@ export function collectBubbles(
   activeSleep: {
     start_time: string;
     type: "nap" | "night";
-    isPaused?: boolean;
-    pauseTime?: string;
   } | null,
   prediction: {
     nextNap: string;
@@ -193,13 +191,9 @@ export function collectBubbles(
   }
 
   if (activeSleep) {
-    const activeEndTime =
-      activeSleep.isPaused && activeSleep.pauseTime
-        ? new Date(activeSleep.pauseTime)
-        : null;
     bubbles.push({
       startTime: new Date(activeSleep.start_time),
-      endTime: activeEndTime,
+      endTime: null,
       type: activeSleep.type,
       status: "active",
     });
@@ -208,11 +202,7 @@ export function collectBubbles(
   // Show predicted nap ghosts (skip any that overlap with the active sleep)
   const hasPredictedNaps = prediction?.predictedNaps && prediction.predictedNaps.length > 0;
   if (hasPredictedNaps) {
-    const activeEndMs = activeSleep
-      ? (activeSleep.isPaused && activeSleep.pauseTime
-          ? new Date(activeSleep.pauseTime).getTime()
-          : now.getTime())
-      : 0;
+    const activeEndMs = activeSleep ? now.getTime() : 0;
     prediction!.predictedNaps!.forEach((pred, idx) => {
       // Skip predictions that overlap with the active sleep
       if (activeSleep && new Date(pred.startTime).getTime() < activeEndMs) return;

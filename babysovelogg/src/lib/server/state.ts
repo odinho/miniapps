@@ -6,7 +6,6 @@ import { getTrendTargetState, setTrendTargetState } from "./trend-target-state.j
 import type {
   Baby,
   SleepLogRow,
-  SleepPauseRow,
   DayStartRow,
   NightWakingRow,
 } from "$lib/types.js";
@@ -26,18 +25,11 @@ export function getState(now?: number) {
       prediction: null,
     };
 
-  let activeSleep = db
+  const activeSleep = db
     .prepare(
       "SELECT * FROM sleep_log WHERE baby_id = ? AND end_time IS NULL AND deleted = 0 ORDER BY id DESC LIMIT 1",
     )
     .get(baby.id) as SleepLogRow | undefined;
-
-  if (activeSleep) {
-    const pauses = db
-      .prepare("SELECT * FROM sleep_pauses WHERE sleep_id = ? ORDER BY pause_time ASC")
-      .all(activeSleep.id) as SleepPauseRow[];
-    activeSleep = { ...activeSleep, pauses };
-  }
 
   // Backfill timezone from server locale if not set (single-tenant: server TZ = baby TZ)
   if (!baby.timezone) {
@@ -130,25 +122,6 @@ export function getState(now?: number) {
     .all(baby.id, thirtyDaysAgo) as SleepLogRow[];
   const trendSleeps = strategySleeps;
 
-  // Batch-fetch pauses for today's sleeps + the prior overnight (avoids
-  // N+1). The overnight's pauses matter for accurate sleep-day totals: a
-  // 15-min mid-night wake should subtract from "Søvn i dag", not stay
-  // counted as sleep.
-  const sleepIdsToHydrate = todaySleeps.map((s) => s.id);
-  if (priorOvernightRow) sleepIdsToHydrate.push(priorOvernightRow.id);
-  const pausesBySleep = new Map<number, SleepPauseRow[]>();
-  if (sleepIdsToHydrate.length > 0) {
-    const allPauses = db
-      .prepare(
-        `SELECT * FROM sleep_pauses WHERE sleep_id IN (${sleepIdsToHydrate.map(() => "?").join(",")}) ORDER BY pause_time ASC`,
-      )
-      .all(...sleepIdsToHydrate) as SleepPauseRow[];
-    for (const p of allPauses) {
-      if (!pausesBySleep.has(p.sleep_id)) pausesBySleep.set(p.sleep_id, []);
-      pausesBySleep.get(p.sleep_id)!.push(p);
-    }
-  }
-
   // Night wakings — fetched in a window wide enough to cover (a) the
   // active night sleep that started yesterday and (b) all of today's
   // sleeps. 30h before midnight is the safe ceiling for a typical
@@ -199,7 +172,6 @@ export function getState(now?: number) {
     trendSleeps,
     todayWakeUp,
     priorOvernightSleep: priorOvernightRow,
-    pausesBySleep,
     todayNightWakings,
     diaperCount: todayDiapers?.count ?? 0,
     lastDiaperTime: lastDiaper?.time ?? null,

@@ -122,7 +122,7 @@ function resetDb() {
   _db.prepare("DELETE FROM notification_schedule").run();
   _db.prepare("DELETE FROM notification_subscriptions").run();
   _db.prepare("DELETE FROM notification_preferences").run();
-  _db.prepare("DELETE FROM sleep_pauses").run();
+  _db.prepare("DELETE FROM night_waking").run();
   _db.prepare("DELETE FROM diaper_log").run();
   _db.prepare("DELETE FROM sleep_log").run();
   _db.prepare("DELETE FROM day_start").run();

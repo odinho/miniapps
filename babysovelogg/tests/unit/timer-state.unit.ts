@@ -100,40 +100,61 @@ describe("getTimerMode", () => {
       }
     });
 
-    it("returns Pause when sleep is paused", () => {
+    it("shows Vakning label when a night sleep has an open night_waking", () => {
+      // `now` defaults to 12:00 UTC in makeInput.
       const input = makeInput({
         activeSleep: makeSleep({
-          start_time: "2026-03-27T11:00:00.000Z",
-          pauses: [
-            { id: 1, sleep_id: 1, pause_time: "2026-03-27T11:30:00.000Z", resume_time: null, created_by_event_id: null },
-          ],
+          start_time: "2026-03-27T08:00:00.000Z",
+          type: "night",
         }),
+        todayNightWakings: [
+          {
+            id: 1,
+            baby_id: 1,
+            domain_id: "nwk_1",
+            start_time: "2026-03-27T11:30:00.000Z",
+            end_time: null,
+            notes: null,
+            mood: null,
+            deleted: 0,
+            created_by_event_id: null,
+            updated_by_event_id: null,
+          },
+        ],
       });
       const mode = getTimerMode(input);
       expect(mode.kind).toBe("sleeping");
       if (mode.kind === "sleeping") {
-        expect(mode.label).toBe("⏸️ Pause");
+        expect(mode.label).toMatch(/^🌙 Vakning sidan/);
       }
     });
 
-    it("subtracts resumed pause from elapsed", () => {
+    it("subtracts closed night_waking interval from elapsed", () => {
       const input = makeInput({
         activeSleep: makeSleep({
           start_time: "2026-03-27T11:00:00.000Z",
-          pauses: [
-            {
-              id: 1, sleep_id: 1,
-              pause_time: "2026-03-27T11:10:00.000Z",
-              resume_time: "2026-03-27T11:20:00.000Z",
-              created_by_event_id: null,
-            },
-          ],
+          type: "night",
         }),
+        todayNightWakings: [
+          {
+            id: 1,
+            baby_id: 1,
+            domain_id: "nwk_1",
+            start_time: "2026-03-27T11:10:00.000Z",
+            end_time: "2026-03-27T11:20:00.000Z",
+            notes: null,
+            mood: null,
+            deleted: 0,
+            created_by_event_id: null,
+            updated_by_event_id: null,
+          },
+        ],
       });
       const mode = getTimerMode(input);
       expect(mode.kind).toBe("sleeping");
       if (mode.kind === "sleeping") {
-        // 60 min total - 10 min pause = 50 min
+        // start=11:00, now=12:00 → 60 min total. Waking 11:10–11:20 = 10 min.
+        // 60 − 10 = 50 min elapsed.
         expect(mode.elapsed).toBeCloseTo(50 * 60 * 1000, -2);
       }
     });

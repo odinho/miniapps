@@ -54,26 +54,26 @@ test("Stats page renders bar chart", async ({ page }) => {
   await expect(bars.first()).toBeVisible();
 });
 
-test("Stats subtracts pause time from sleep durations", async ({ page }) => {
+test("Stats subtracts night_waking duration from night sleep totals", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
   const now = Date.now();
   const db = getDb();
 
-  // Add a 60-min nap with a 10-min pause (should show ~50 min)
-  const startTime = new Date(now - 3600000).toISOString();
-  const endTime = new Date(now).toISOString();
+  // Add a completed night sleep with one 10-min waking inside it.
+  const startTime = new Date(now - 10 * 3600000).toISOString();
+  const endTime = new Date(now - 60000).toISOString();
   const domainId = generateId();
   db.prepare(
-    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, 'nap', ?)",
+    "INSERT INTO sleep_log (baby_id, start_time, end_time, type, domain_id) VALUES (?, ?, ?, 'night', ?)",
   ).run(babyId, startTime, endTime, domainId);
-  const sleepId = (
-    db.prepare("SELECT id FROM sleep_log ORDER BY id DESC LIMIT 1").get() as { id: number }
-  ).id;
-  db.prepare("INSERT INTO sleep_pauses (sleep_id, pause_time, resume_time) VALUES (?, ?, ?)").run(
-    sleepId,
-    new Date(now - 50 * 60000).toISOString(),
-    new Date(now - 40 * 60000).toISOString(),
+  db.prepare(
+    "INSERT INTO night_waking (baby_id, domain_id, start_time, end_time) VALUES (?, ?, ?, ?)",
+  ).run(
+    babyId,
+    generateId().replace(/^evt_/, "nwk_"),
+    new Date(now - 5 * 3600000).toISOString(),
+    new Date(now - 5 * 3600000 + 10 * 60000).toISOString(),
   );
 
   await page.goto("/stats");

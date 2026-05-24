@@ -63,7 +63,7 @@ test("Rebuild after manual DB corruption restores data", async () => {
   // Corrupt: delete a projection row
   db.prepare("DELETE FROM sleep_log WHERE domain_id = ?").run(did);
   expect(renderCounts(db)).toMatchInlineSnapshot(
-    `"events: 4, sleeps: 0, diapers: 1, pauses: 0"`,
+    `"events: 4, sleeps: 0, diapers: 1, nightWakings: 0"`,
   );
 
   // Rebuild should restore

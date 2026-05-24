@@ -68,7 +68,10 @@ test("sleep.tagged with sleepDomainId updates the correct row", async () => {
   `);
 });
 
-test("sleep.paused / sleep.resumed with sleepDomainId works", async () => {
+test("legacy sleep.paused / sleep.resumed events parse and replay as no-ops", async () => {
+  // The sleep_pauses table is gone (docs/pause-redesign-2026-05-22.md).
+  // We keep the validators registered so historical events still parse on
+  // replay, but the projections do nothing. This test pins that contract.
   const babyId = createBaby("Testa");
   const did = generateSleepId();
 
@@ -87,7 +90,7 @@ test("sleep.paused / sleep.resumed with sleepDomainId works", async () => {
 
   expect(renderDayState(db, babyId)).toMatchInlineSnapshot(`
     "baby: Testa (2025-06-12)
-    søvn: 09:00–pågår lur 1 pause (5m)
+    søvn: 09:00–pågår lur
     bleier: (ingen)"
   `);
 });

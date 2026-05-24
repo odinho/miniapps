@@ -68,11 +68,15 @@ function seedDb() {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_diaper_log_domain_id ON diaper_log(domain_id);
 
-    CREATE TABLE IF NOT EXISTS sleep_pauses (
+    CREATE TABLE IF NOT EXISTS night_waking (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      sleep_id INTEGER NOT NULL REFERENCES sleep_log(id),
-      pause_time TEXT NOT NULL, resume_time TEXT,
-      created_by_event_id INTEGER
+      baby_id INTEGER NOT NULL REFERENCES baby(id),
+      domain_id TEXT NOT NULL UNIQUE,
+      start_time TEXT NOT NULL,
+      end_time TEXT,
+      notes TEXT, mood TEXT,
+      deleted INTEGER NOT NULL DEFAULT 0,
+      created_by_event_id INTEGER, updated_by_event_id INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS day_start (

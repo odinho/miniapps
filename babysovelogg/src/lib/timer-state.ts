@@ -1,6 +1,5 @@
-import type { SleepLogRow, SleepPauseRow, NightWakingRow } from '$lib/types.js';
+import type { SleepLogRow, NightWakingRow } from '$lib/types.js';
 import type { Prediction, PostSkipPlan } from '$lib/stores/app.svelte.js';
-import { calcPauseMs } from '$lib/engine/classification.js';
 
 export interface CyclePhase {
 	/** Current cycle number (1-based) */
@@ -79,24 +78,31 @@ export function getTimerMode(input: TimerInput): TimerMode {
 	const isSleeping = !!activeSleep && !activeSleep.end_time;
 
 	if (isSleeping && activeSleep) {
-		const pauses: SleepPauseRow[] = (activeSleep.pauses as SleepPauseRow[]) ?? [];
-		const isPaused = pauses.length > 0 && !pauses[pauses.length - 1].resume_time;
 		const start = new Date(activeSleep.start_time).getTime();
-		const elapsed = Math.max(0, now - start - calcPauseMs(pauses, now));
 
 		// Open night-waking on the active night sleep — shown as a distinct
 		// label so the parent can see "she's awake right now inside the night
-		// sleep" rather than the regular sleeping label.
-		const openNightWaking =
-			activeSleep.type === 'night'
-				? (input.todayNightWakings ?? []).find((w) => !w.end_time) ?? null
-				: null;
+		// sleep" rather than the regular sleeping label. Net the closed
+		// wakings (and the ongoing one) out of `elapsed` so the timer reflects
+		// actual sleep time, matching the engine's wakingsAsPausesForSleep
+		// netting in src/lib/engine/state.ts.
+		const todayNightWakings = input.todayNightWakings ?? [];
+		const wakingsOnThisSleep = activeSleep.type === 'night'
+			? todayNightWakings.filter((w) => new Date(w.start_time).getTime() >= start)
+			: [];
+		const openNightWaking = wakingsOnThisSleep.find((w) => !w.end_time) ?? null;
+		let nightWakingMs = 0;
+		for (const w of wakingsOnThisSleep) {
+			const ws = new Date(w.start_time).getTime();
+			const we = w.end_time ? new Date(w.end_time).getTime() : now;
+			nightWakingMs += Math.max(0, we - ws);
+		}
+		const elapsed = Math.max(0, now - start - nightWakingMs);
 
 		let label: string;
 		if (openNightWaking) {
 			label = `🌙 Vakning sidan ${formatHM(new Date(openNightWaking.start_time))}`;
-		} else if (isPaused) label = '⏸️ Pause';
-		else if (activeSleep.type === 'night') label = '💤 Søv';
+		} else if (activeSleep.type === 'night') label = '💤 Søv';
 		else label = '😴 Lurar';
 
 		// Expected wake time for naps (negative = overtime)
@@ -109,7 +115,7 @@ export function getTimerMode(input: TimerInput): TimerMode {
 
 		// Sleep cycle phase (only for naps — night cycles are different)
 		const cycleMin = prediction?.learnedSchedule?.sleepCycleMin ?? 45;
-		const cyclePhase = activeSleep.type === 'nap' && !isPaused ? computeCyclePhase(elapsed, cycleMin) : null;
+		const cyclePhase = activeSleep.type === 'nap' ? computeCyclePhase(elapsed, cycleMin) : null;
 
 		return { kind: 'sleeping', label, elapsed, startTime: activeSleep.start_time, expectedWake, expectedWakeCountdown, cyclePhase };
 	}
