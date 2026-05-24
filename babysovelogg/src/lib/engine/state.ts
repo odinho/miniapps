@@ -466,6 +466,12 @@ function derivePostPlanFields(input: PostPlanInput): PostPlanOutput {
   } = input;
 
   const bedtimeMs = new Date(bedtime).getTime();
+  const bedtimeNapBufferMs = 60 * 60_000;
+  const learnedNapDurMin = getLearnedNapDuration(ctx);
+
+  const clearsBedtimeBuffer = (startMs: number, endMs: number): boolean =>
+    startMs < bedtimeMs - bedtimeNapBufferMs
+    && endMs < bedtimeMs - bedtimeNapBufferMs;
 
   // Drop naps within 60 min of bedtime and naps whose start time is
   // >60 min in the past (stale — parent didn't act on them, no point
@@ -473,11 +479,11 @@ function derivePostPlanFields(input: PostPlanInput): PostPlanOutput {
   let predictedNaps: PredictedNap[] | null = remaining.filter((n) => {
     const startMs = new Date(n.startTime).getTime();
     const endMs = new Date(n.endTime).getTime();
-    return startMs < bedtimeMs - 60 * 60_000
-      && endMs < bedtimeMs - 60 * 60_000
+    return clearsBedtimeBuffer(startMs, endMs)
       && startMs > now - 60 * 60_000;
   });
   if (predictedNaps.length === 0) predictedNaps = null;
+  const firstVisibleNap = predictedNaps?.[0] ?? null;
 
   // `fallbackNextNap` is a naive wake-window projection from the last
   // wake/sleep-end. Use it only when the planner returned no remaining
@@ -486,9 +492,25 @@ function derivePostPlanFields(input: PostPlanInput): PostPlanOutput {
   // phantom past-time fallback nap would trip napSkipped and surface a
   // misleading "Hoppa over lur" centre label.
   const quotaMet = consumedNaps >= expectedNapCount && activeSleep?.type !== "nap";
-  let nextNap: string | null = predictedNaps && predictedNaps.length > 0
-    ? predictedNaps[0].startTime
-    : (quotaMet ? null : fallbackNextNap);
+  const fallbackNextNapMs = fallbackNextNap ? new Date(fallbackNextNap).getTime() : 0;
+  const fallbackNapEndMs = fallbackNextNapMs + learnedNapDurMin * 60_000;
+  const fallbackNapOverdueMs = fallbackNextNapMs ? now - fallbackNextNapMs : 0;
+  const fallbackNapSkipped = !activeSleep
+    && fallbackNapOverdueMs > 60 * 60_000
+    && fallbackNapOverdueMs < 18 * 60 * 60_000;
+  const fallbackClearsBedtime = fallbackNextNapMs
+    ? clearsBedtimeBuffer(fallbackNextNapMs, fallbackNapEndMs)
+    : false;
+  const fallbackRejectedByBedtime = Boolean(
+    !firstVisibleNap
+      && fallbackNextNap
+      && !quotaMet
+      && !fallbackNapSkipped
+      && !fallbackClearsBedtime,
+  );
+  let nextNap: string | null = firstVisibleNap
+    ? firstVisibleNap.startTime
+    : (quotaMet || fallbackRejectedByBedtime ? null : fallbackNextNap);
 
   // Skip detection. 60-min overdue threshold; wider thresholds let
   // stale past-time naps survive the visibility filter.
@@ -498,7 +520,13 @@ function derivePostPlanFields(input: PostPlanInput): PostPlanOutput {
   // When the next predicted nap lands within 60 min of bedtime, treat
   // the day's naps as effectively done — otherwise the Timer would show
   // "next nap" with bedtime as the target time.
-  const collapsedToBedtime = nextNapMs >= bedtimeMs - 60 * 60_000;
+  const nextNapEndMs = nextNapMs
+    ? firstVisibleNap
+      ? new Date(firstVisibleNap.endTime).getTime()
+      : nextNapMs + learnedNapDurMin * 60_000
+    : 0;
+  const collapsedToBedtime = fallbackRejectedByBedtime
+    || (nextNapMs > 0 && !napSkipped && !clearsBedtimeBuffer(nextNapMs, nextNapEndMs));
   // An active night ends the day's nap budget regardless of count.
   const napsAllDone = consumedNaps >= expectedNapCount
     || napSkipped
@@ -549,7 +577,6 @@ function derivePostPlanFields(input: PostPlanInput): PostPlanOutput {
   }
 
   // ── continuationWindow gate (shared logic in shouldSuppressContinuation) ──
-  const learnedNapDurMin = getLearnedNapDuration(ctx);
   const suppressContinuation = lastCutShort
     ? shouldSuppressContinuation(
         lastCutShort, ctx, todaySleepEntries,

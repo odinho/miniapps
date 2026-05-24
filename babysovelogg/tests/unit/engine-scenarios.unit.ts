@@ -1619,10 +1619,10 @@ describe("Oskar OneNap (1-nap routine_schedule, cut-short matrix)", () => {
         now: 12:30
         inputs: wake=06:00 done=[11:30-12:25!] target=19:30
         strategy: routine_schedule
-        nextNap: 17:25 (+4h 55m)
+        nextNap: 19:30 (+7h 00m)
         bedtime: 19:30 (+7h 00m)
         predictedNaps: none
-        napsAllDone: false (1 expected)
+        napsAllDone: true (1 expected)
         expectedNapEnd: none
         expectedNightEnd: none
         rescueNap: none
@@ -1634,10 +1634,10 @@ describe("Oskar OneNap (1-nap routine_schedule, cut-short matrix)", () => {
         now: 16:25
         inputs: wake=06:00 done=[11:30-12:25!] target=19:30
         strategy: routine_schedule
-        nextNap: 17:25 (+1h 00m)
+        nextNap: 19:30 (+3h 05m)
         bedtime: 19:30 (+3h 05m)
         predictedNaps: none
-        napsAllDone: false (1 expected)
+        napsAllDone: true (1 expected)
         expectedNapEnd: none
         expectedNightEnd: none
         rescueNap: none

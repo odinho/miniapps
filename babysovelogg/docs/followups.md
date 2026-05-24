@@ -264,6 +264,34 @@ Implication for v2: parent-logged nap durations are NOT a direct
 signal of NREM/REM cycle length. The age-prior (mean 55 ±5 for
 6-12mo) carries more weight than data fits in this estimator.
 
+## Split `shortThreshold` into three semantically distinct thresholds
+
+Source: 2026-05-24 Codex pair-review on the Halldis "second nap at 17:02"
+bug. The bedtime-feasibility gate now stops doomed comeback naps from
+surfacing (`derivePostPlanFields` rejects fallbackNextNap that can't fit
+before bedtime − 60 min). But `computeShortNapThreshold(L, C) = L − 0.5*C`
+is doing three jobs in one number:
+
+1. **Cut-short / continuation flag** — "this nap was so short the parent
+   may want to extend it now." Real threshold: roughly ≤ 1 cycle.
+2. **Quota sufficiency** — "did this nap fulfill the day's nap budget?"
+   Today's 84 min vs 115 min learned reads as "no" even though it's a
+   normal-shaped 1-nap day. Should be looser, age- and history-aware
+   (e.g. ≥ 60 % of learned AND ≥ age-band floor).
+3. **Recovery-plan trigger** — "should the engine plan a comeback?" Now
+   gated by bedtime feasibility downstream, but the underlying signal is
+   still "was this short?" rather than "is a recovery feasible AND
+   pedagogically right?".
+
+The cleanest refactor splits these into three thresholds (or a small
+`napAdequacy(s, ctx)` helper returning `{ cutShort, fulfilledQuota,
+recoveryWarranted }`). Today the same number drives all three call
+sites: `countSufficientNaps`, `mostRecentCutShort`, `detectRescueNap`.
+
+Land this when the next nap-budget v2 / cycle estimator v2 work touches
+the same code — tying it to one of those refactors avoids a third
+in-flight thread.
+
 ## Open items from the 2026-05-20 Codex critique (arc / trend / wake-rec)
 
 Codex (`local/codex-arc-trend-critique.md`) flagged a batch of bugs and

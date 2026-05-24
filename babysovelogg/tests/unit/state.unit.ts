@@ -306,6 +306,34 @@ describe("assembleState", () => {
     return recent;
   }
 
+  function halldisLikeOneNapHistory(): SleepLogRow[] {
+    const recent: SleepLogRow[] = [];
+    let id = 20_000;
+    for (let d = 1; d <= 23; d++) {
+      const date = `2026-05-${String(d).padStart(2, "0")}`;
+      const nextDate = `2026-05-${String(d + 1).padStart(2, "0")}`;
+      recent.push(
+        sleepRow({
+          id: id++,
+          start_time: `${date}T09:53:00.000Z`,
+          end_time: `${date}T11:48:00.000Z`,
+          type: "nap",
+          woke_by: "self",
+          domain_id: `slp_h_like_${d}_nap`,
+        }),
+        sleepRow({
+          id: id++,
+          start_time: `${date}T16:38:00.000Z`,
+          end_time: `${nextDate}T04:45:00.000Z`,
+          type: "night",
+          woke_by: "self",
+          domain_id: `slp_h_like_${d}_night`,
+        }),
+      );
+    }
+    return recent;
+  }
+
   it("cut-short nap: engine predicts a comeback nap when the day's nap budget isn't met", () => {
     // 10mo, 1-nap regime, predicted nap ~120 min. A 28-min car nap (woken)
     // doesn't fulfill the day's sleep need, so the engine should plan another
@@ -904,6 +932,46 @@ describe("assembleState", () => {
     // With 1 custom nap and 1 completed, napsAllDone should be true
     expect(result.prediction!.napsAllDone).toBe(true);
     // nextNap should be bedtime, not a new nap
+    expect(result.prediction!.nextNap).toBe(result.prediction!.bedtime);
+  });
+
+  it("does not surface a doomed comeback nap after a soft-short single nap", () => {
+    const baby11mo: Baby = {
+      ...baseBaby,
+      birthdate: "2025-06-21",
+      timezone: "Europe/Oslo",
+      custom_nap_count: null,
+    };
+    const wakeUp: DayStartRow = {
+      id: 1,
+      baby_id: 1,
+      date: "2026-05-24",
+      wake_time: "2026-05-24T04:45:00.000Z",
+      created_at: "2026-05-24T04:45:00.000Z",
+      created_by_event_id: null,
+    };
+    const softShortNap = sleepRow({
+      start_time: "2026-05-24T08:30:00.000Z",
+      end_time: "2026-05-24T09:54:00.000Z", // 84 min vs learned ~115 min: short, but no room for a second nap
+      type: "nap",
+      woke_by: "self",
+    });
+
+    const result = assembleState(
+      dayData({
+        baby: baby11mo,
+        recentSleeps: halldisLikeOneNapHistory(),
+        todaySleeps: [softShortNap],
+        todayWakeUp: wakeUp,
+        now: new Date("2026-05-24T10:39:00.000Z").getTime(),
+      }),
+    );
+
+    expect(result.prediction!.strategy).toBe("routine_schedule");
+    expect(result.prediction!.expectedNapCount).toBe(1);
+    expect(result.prediction!.predictedNaps).toBeNull();
+    expect(result.prediction!.skippedNap).toBeNull();
+    expect(result.prediction!.napsAllDone).toBe(true);
     expect(result.prediction!.nextNap).toBe(result.prediction!.bedtime);
   });
 
