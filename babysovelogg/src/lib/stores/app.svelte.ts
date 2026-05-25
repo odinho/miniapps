@@ -155,10 +155,14 @@ export interface NapBudget {
 		sourceLabel: string;
 	};
 	/**
-	 * If the cap was nudged to a cycle boundary for a softer wake, capture
-	 * that. Null when the raw budget cap was used unchanged. The nudge never
-	 * extends past the cap — see sleep-science-research.md §12 for why
-	 * "wake at cycle boundary" is a soft preference, not a hard rule.
+	 * Set when the engine aligned the cap to a cycle boundary for a softer
+	 * wake. `boundaryAtMin` is the final cap (= recommendedDurationMin);
+	 * `nudgedFromMin` is the raw `napBudgetMin` before alignment. In
+	 * first-contact mode this can extend *past* the raw budget — when even
+	 * one cycle wouldn't fit under the budget, the engine still recommends
+	 * one cycle (gentle easing trumps strict trend math). Null in
+	 * established mode and when the bedtime guard re-tightened the cap.
+	 * See sleep-science-research.md §12.
 	 */
 	cycleNudge: { boundaryAtMin: number; nudgedFromMin: number } | null;
 }

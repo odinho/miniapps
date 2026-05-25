@@ -313,16 +313,6 @@ describe("computeNapBudget — emits a cap when over trend", () => {
     expect(out!.urgency).toBe("advisory");
   });
 
-  it("wakeBy = activeNap.start + recommendedDurationMin", () => {
-    const s = halldisScenario();
-    const out = computeNapBudget({ ...s, isLastNapOfDay: true, optedIn: true });
-    expect(out).not.toBeNull();
-    const napStartMs = new Date(s.activeNap.start_time).getTime();
-    const wakeByMs = new Date(out!.wakeBy).getTime();
-    const diffMin = (wakeByMs - napStartMs) / 60_000;
-    expect(diffMin).toBeCloseTo(out!.recommendedDurationMin, 0);
-  });
-
   it("context exposes the source label and the blended trend in minutes", () => {
     const s = halldisScenario();
     const out = computeNapBudget({ ...s, isLastNapOfDay: true, optedIn: true });
@@ -667,10 +657,10 @@ describe("computeNapBudget — cap dimensional invariant", () => {
 
 /**
  * Time-series anti-regression. Runs a typical 11mo across 5 days, with
- * the engine called at four points during each nap (t+20, t+35, t+50,
- * t+65). For each day, captures one trail line plus the wakeBy span
- * across the four evaluations. The "parent" caps at the first emitted
- * wakeBy and the actual nap is appended to history for the next day.
+ * the engine called at three points during each nap (t+20, t+35, t+50).
+ * For each day, captures one trail line plus the wakeBy span across the
+ * three evaluations. The "parent" caps at the first emitted wakeBy and
+ * the actual nap is appended to history for the next day.
  *
  * This is the canonical test for the bug class the 2026-05-25 dimensional
  * issue belonged to — anything that makes the cap evolve during the nap
@@ -717,28 +707,25 @@ describe("computeNapBudget — multi-day simulation", () => {
         ctx: ctx({ trendSleeps }),
       };
 
-      const wakeBys: number[] = [];
-      let firstOut: ReturnType<typeof computeNapBudget> = null;
-      // Three evaluation points all under the typical cap (~55 min). Once
-      // elapsed passes the cap, the engine clamps wakeBy to `now + 1`
+      // Three evaluation points all under the typical cap (~55-60 min).
+      // Once elapsed passes the cap, the engine clamps wakeBy to `now + 1`
       // (safety: wakeBy can't be in the past). That's correct behavior,
       // not a dimensional bug, so the invariance trail stops at t+50.
+      // Each evaluation must emit — this scenario is firmly over-trend
+      // every day, so a `null` at any point would be the real regression.
+      const wakeBys: number[] = [];
+      let firstOut: NonNullable<ReturnType<typeof computeNapBudget>> | null = null;
       for (const elapsedMin of [20, 35, 50]) {
         const out = computeNapBudget({
           ...args,
           now: napStartMs + elapsedMin * 60_000,
         });
-        if (out) {
-          wakeBys.push(new Date(out.wakeBy).getTime());
-          if (!firstOut) firstOut = out;
-        }
+        expect(out, `day ${day} t+${elapsedMin} should emit a cap`).not.toBeNull();
+        wakeBys.push(new Date(out!.wakeBy).getTime());
+        if (!firstOut) firstOut = out;
       }
 
-      expect(firstOut, `day ${day} should emit a cap`).not.toBeNull();
-      const span =
-        wakeBys.length > 1
-          ? (Math.max(...wakeBys) - Math.min(...wakeBys)) / 60_000
-          : 0;
+      const span = (Math.max(...wakeBys) - Math.min(...wakeBys)) / 60_000;
       wakeBySpans.push(span);
 
       const actualNapMin = Math.round((new Date(firstOut!.wakeBy).getTime() - napStartMs) / 60_000);
@@ -763,7 +750,7 @@ describe("computeNapBudget — multi-day simulation", () => {
       day 4: night=732m wakeBy=09:28Z cap=58m mode=first-contact urgency=firm trend=779"
     `);
 
-    // Dimensional invariant: across all 5 days × 4 evaluations per day,
+    // Dimensional invariant: across all 5 days × 3 evaluations per day,
     // wakeBy never moves more than 1 min within a single nap.
     for (let i = 0; i < wakeBySpans.length; i++) {
       expect(wakeBySpans[i], `day ${i} wakeBy span ≤ 1 min`).toBeLessThanOrEqual(1);
@@ -831,6 +818,41 @@ describe("computeNapBudget — real Halldis data (regression net)", () => {
     // Context: blended trend ~13h, banked = 746 night + 25 elapsed = 771.
     expect(out!.context.blendedTrendMin).toBe(784);
     expect(out!.context.bankedMin).toBe(771);
+  });
+
+  it("wakeBy is invariant across mid-nap evaluations on the real fixture", () => {
+    // Same scenario as the concrete-pin test but probing the dimensional
+    // invariant on production data, not synthesised trends. wakeBy must
+    // stay at 09:25Z across t+20 / t+30 / t+45 evaluations of the same
+    // nap. context.bankedMin rises 1:1 with elapsed (proves it includes
+    // the active nap's elapsed minutes correctly); recommendedDurationMin
+    // stays constant (proves cap math uses bankedPreNap, not bankedMin).
+    // Starts at t+20 — MIN_ELAPSED_BEFORE_CAP_MIN gate suppresses before.
+    const napStartIso = "2026-05-13T08:30:00.000Z";
+    const napStartMs = new Date(napStartIso).getTime();
+    const base = {
+      activeNap: { start_time: napStartIso },
+      todaySleeps: [] as SleepEntry[],
+      trendSleeps: real,
+      bedtime: "2026-05-13T17:00:00.000Z",
+      isLastNapOfDay: true,
+      optedIn: true,
+      ctx: ctx({ trendSleeps: real }),
+    };
+    const t20 = computeNapBudget({ ...base, now: napStartMs + 20 * 60_000 });
+    const t30 = computeNapBudget({ ...base, now: napStartMs + 30 * 60_000 });
+    const t45 = computeNapBudget({ ...base, now: napStartMs + 45 * 60_000 });
+    expect(t20).not.toBeNull();
+    expect(t30).not.toBeNull();
+    expect(t45).not.toBeNull();
+    expect(t20!.wakeBy).toBe("2026-05-13T09:25:00.000Z");
+    expect(t30!.wakeBy).toBe("2026-05-13T09:25:00.000Z");
+    expect(t45!.wakeBy).toBe("2026-05-13T09:25:00.000Z");
+    expect(t20!.recommendedDurationMin).toBe(55);
+    expect(t45!.recommendedDurationMin).toBe(55);
+    // bankedMin rises with elapsed; the cap doesn't.
+    expect(t30!.context.bankedMin - t20!.context.bankedMin).toBe(10);
+    expect(t45!.context.bankedMin - t20!.context.bankedMin).toBe(25);
   });
 
   it("never produces NaN/Infinity for any plausible point in the dataset", () => {
