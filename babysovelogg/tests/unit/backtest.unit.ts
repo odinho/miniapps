@@ -28,8 +28,11 @@ describe("backtest", () => {
   it("accepts a custom predictor", () => {
     const result = backtest(days, BIRTHDATE, { predict: () => [], tz: TZ });
 
-    expect(result.napCountAccuracy).toBe(0);
-    // Empty predictor now gets 60 min penalty per unmatched actual nap
+    // Empty predictor matches actual count only on rare 0-nap days
+    // (sick/travel) — keep this loose so refreshing the fixture doesn't
+    // need a manual count update.
+    expect(result.napCountAccuracy).toBeLessThan(0.05);
+    // Empty predictor gets 60 min penalty per unmatched actual nap
     expect(result.napStartMAE).toBe(60);
   });
 
@@ -72,7 +75,8 @@ describe("baseline", () => {
       7mo: 31 days, count 77% (24/31), nap MAE 50.4, dur MAE 26.8, bed MAE 22.3, wake MAE 29.1, nap bias -12.7, count bias +0.16
       8mo: 28 days, count 89% (25/28), nap MAE 27, dur MAE 18.9, bed MAE 15.8, wake MAE 21.8, nap bias -4.8, count bias +0.11
       9mo: 31 days, count 87% (27/31), nap MAE 47.1, dur MAE 26.2, bed MAE 25.2, wake MAE 26.3, nap bias +3.3, count bias 0
-      10mo: 17 days, count 94% (16/17), nap MAE 29.3, dur MAE 26.8, bed MAE 19.4, wake MAE 23, nap bias +4.7, count bias -0.06"
+      10mo: 30 days, count 90% (27/30), nap MAE 24.7, dur MAE 34, bed MAE 22.8, wake MAE 23.5, nap bias +8.7, count bias -0.1
+      11mo: 13 days, count 92% (12/13), nap MAE 41.2, dur MAE 14.5, bed MAE 21.1, wake MAE 38.6, nap bias -15.2, count bias +0.08"
     `);
   });
 
@@ -98,12 +102,13 @@ describe("baseline", () => {
       7mo manual=2: 31 days, count 84% (26/31), nap MAE 48.2, dur MAE 27.3, bed MAE 20, wake MAE 29, nap bias -12.2, count bias +0.1
       8mo manual=2: 28 days, count 89% (25/28), nap MAE 27, dur MAE 18.9, bed MAE 15.8, wake MAE 21.8, nap bias -4.8, count bias +0.11
       9mo manual=1: 31 days, count 90% (28/31), nap MAE 46.8, dur MAE 26.3, bed MAE 23.1, wake MAE 26, nap bias +3.1, count bias -0.1
-      10mo manual=1: 17 days, count 94% (16/17), nap MAE 29.3, dur MAE 26.8, bed MAE 19.4, wake MAE 23, nap bias +4.7, count bias -0.06"
+      10mo manual=1: 30 days, count 90% (27/30), nap MAE 24.7, dur MAE 34, bed MAE 22.8, wake MAE 23.5, nap bias +8.7, count bias -0.1
+      11mo manual=1: 13 days, count 92% (12/13), nap MAE 41.2, dur MAE 14.5, bed MAE 21.1, wake MAE 38.6, nap bias -15.2, count bias +0.08"
     `);
   });
 
   it("combined summary", () => {
-    expect(renderSummary(auto, "all")).toMatchInlineSnapshot(`"all: 112 days, count 85% (95/112), nap MAE 41.3, dur MAE 24.3, bed MAE 21.4, wake MAE 25.2, nap bias -3.8, count bias +0.04"`);
+    expect(renderSummary(auto, "all")).toMatchInlineSnapshot(`"all: 138 days, count 86% (118/138), nap MAE 39.7, dur MAE 25, bed MAE 22, wake MAE 26.3, nap bias -3.3, count bias +0.03"`);
   });
 
   it("warm-up curve", () => {
@@ -113,7 +118,7 @@ describe("baseline", () => {
       "day 1-3: 3 days, count 33% (1/3), nap MAE 71.3, dur MAE 28.4, bed MAE 36.3, wake MAE 17.9, nap bias +46.8, count bias -0.67
       day 4-7: 4 days, count 50% (2/4), nap MAE 54.7, dur MAE 36.6, bed MAE 39.2, wake MAE 35.8, nap bias -26.4, count bias +0.5
       day 8-14: 7 days, count 86% (6/7), nap MAE 66.5, dur MAE 20.8, bed MAE 13.5, wake MAE 23.7, nap bias -40.4, count bias +0.14
-      day 15+: 98 days, count 88% (86/98), nap MAE 36.4, dur MAE 23.6, bed MAE 20.8, wake MAE 25.1, nap bias -1.3, count bias +0.04"
+      day 15+: 124 days, count 88% (109/124), nap MAE 35.3, dur MAE 24.5, bed MAE 21.5, wake MAE 26.3, nap bias -1.1, count bias +0.02"
     `);
   });
 

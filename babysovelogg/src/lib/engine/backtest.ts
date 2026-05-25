@@ -16,6 +16,10 @@ export interface DayRecord {
   wakeTime: string; // ISO — when baby woke up for the day
   sleeps: SleepEntry[]; // actual sleeps this day (naps + night)
   target_bedtime?: string | null; // HH:MM local — family's bedtime target on this day (if tracked)
+  /** Parent flagged this day as off (sick / travel / spurt / DST). The engine
+   *  excludes off-days from trend computation; the backtest mirrors that. */
+  off_day?: 0 | 1;
+  off_day_reason?: string | null;
 }
 
 /** Per-day comparison result. */
@@ -142,9 +146,15 @@ export function backtest(
     // prod's 30d trend window; the trend gate (MIN_TREND_DAYS) still
     // applies and the source label is "lite data" but the math is the same.
     const ctxAgeMonths = calculateAgeMonths(birthdate, new Date(day.date + "T12:00:00Z"));
+    // Carry parent off-day flags forward so trend math + cap-respect carve-out
+    // skip sick/travel/spurt/DST days, mirroring prod behaviour.
+    const offDays = new Set<string>();
+    for (let j = 0; j <= i; j++) {
+      if (days[j].off_day === 1) offDays.add(days[j].date);
+    }
     const trendTotalMin = computeTrendTotalMin(
       extendedSleeps,
-      { birthdate, ageMonths: ctxAgeMonths, tz, customNapCount, recentSleeps },
+      { birthdate, ageMonths: ctxAgeMonths, tz, customNapCount, recentSleeps, offDays },
       dayMs,
     );
     const ctx: BabyContext = {
@@ -156,6 +166,7 @@ export function backtest(
       recentSleeps,
       extendedSleeps,
       cycleSleeps,
+      offDays,
       trendTotalMin,
       features,
     };
