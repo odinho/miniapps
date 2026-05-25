@@ -21,6 +21,47 @@ const baseBaby: Baby = {
   updated_by_event_id: null,
 };
 
+/**
+ * Generate `days` worth of nap+night SleepLogRow entries anchored at
+ * `startDate`. ±10 min jitter keeps stdev/mean below the napBudget noise
+ * gate (0.12). Shared between the opt-out wire-up test and the
+ * anti-ratchet closed-loop test below.
+ */
+function synthSleepRows(startDate: string, days: number, avgTotalMin: number): SleepLogRow[] {
+  const rows: SleepLogRow[] = [];
+  let id = 1000;
+  for (let i = 0; i < days; i++) {
+    const dayMs = new Date(`${startDate}T00:00:00Z`).getTime() + i * 86400_000;
+    const jitter = i % 2 === 0 ? 10 : -10;
+    const total = avgTotalMin + jitter;
+    const nightMin = total * 0.85;
+    const napMin = total - nightMin;
+    const napStart = new Date(dayMs + 9 * 3600_000);
+    rows.push(
+      sleepRow({
+        id: id++,
+        start_time: napStart.toISOString(),
+        end_time: new Date(napStart.getTime() + napMin * 60_000).toISOString(),
+        type: "nap",
+        domain_id: `slp_synth_${i}n`,
+        woke_by: "self",
+      }),
+    );
+    const nightStart = new Date(dayMs + 19 * 3600_000);
+    rows.push(
+      sleepRow({
+        id: id++,
+        start_time: nightStart.toISOString(),
+        end_time: new Date(nightStart.getTime() + nightMin * 60_000).toISOString(),
+        type: "night",
+        domain_id: `slp_synth_${i}N`,
+        woke_by: "self",
+      }),
+    );
+  }
+  return rows;
+}
+
 function sleepRow(overrides: Partial<SleepLogRow> = {}): SleepLogRow {
   return {
     id: 1,
@@ -1220,46 +1261,6 @@ describe("assembleState", () => {
   // Coherent day plan and target bedtime tests → plan-scoring.unit.ts
 
   describe("napBudget opt-out wire-up", () => {
-    // Build 25 days of low-variance synthetic data as SleepLogRow so the
-    // trend gate inside computeNapBudget reliably fires. Each day has a
-    // nap and a night entry on the same start-anchored local day, matching
-    // the getWeekStats grouping convention.
-    function synthSleepRows(startDate: string, days: number, avgTotalMin: number): SleepLogRow[] {
-      const rows: SleepLogRow[] = [];
-      let id = 1000;
-      for (let i = 0; i < days; i++) {
-        const dayMs = new Date(`${startDate}T00:00:00Z`).getTime() + i * 86400_000;
-        const jitter = i % 2 === 0 ? 10 : -10; // tiny stable variance
-        const total = avgTotalMin + jitter;
-        const nightMin = total * 0.85;
-        const napMin = total - nightMin;
-
-        const napStart = new Date(dayMs + 9 * 3600_000);
-        rows.push(
-          sleepRow({
-            id: id++,
-            start_time: napStart.toISOString(),
-            end_time: new Date(napStart.getTime() + napMin * 60_000).toISOString(),
-            type: "nap",
-            domain_id: `slp_synth_${i}n`,
-            woke_by: "self",
-          }),
-        );
-        const nightStart = new Date(dayMs + 19 * 3600_000);
-        rows.push(
-          sleepRow({
-            id: id++,
-            start_time: nightStart.toISOString(),
-            end_time: new Date(nightStart.getTime() + nightMin * 60_000).toISOString(),
-            type: "night",
-            domain_id: `slp_synth_${i}N`,
-            woke_by: "self",
-          }),
-        );
-      }
-      return rows;
-    }
-
     function napBudgetScenario(napBudgetOptedIn?: boolean): DayData {
       // Today: an active last nap that, projected, would exceed the trend.
       // Yesterday's night is included so the rolling-24h banked calc has
@@ -1310,19 +1311,139 @@ describe("assembleState", () => {
     it("opt-in (or default) lets napBudget surface; opt-out suppresses it", () => {
       const optedIn = assembleState(napBudgetScenario(true));
       const optedOut = assembleState(napBudgetScenario(false));
-      // Sanity: if the opted-in case didn't produce a napBudget at all,
-      // the test gives no signal — skip rather than passing silently.
-      if (!optedIn.prediction?.napBudget) {
-        return;
-      }
+      // The scenario fixture is constructed to clearly over-trend, so the
+      // opted-in case must emit a napBudget. A regression that suppresses
+      // both calls (e.g. broken Gate 3) used to be invisible behind a
+      // `return` early — codex audit 2026-05-25 flagged that no-op.
+      expect(optedIn.prediction?.napBudget).not.toBeNull();
       expect(optedOut.prediction?.napBudget ?? null).toBeNull();
     });
 
     it("undefined napBudgetOptedIn defaults to true (back-compat for callers)", () => {
       const defaulted = assembleState(napBudgetScenario(undefined));
       const explicit = assembleState(napBudgetScenario(true));
-      // Both should match — undefined defaults to opted-in.
+      expect(defaulted.prediction?.napBudget).not.toBeNull();
       expect(!!defaulted.prediction?.napBudget).toBe(!!explicit.prediction?.napBudget);
+    });
+  });
+
+  // ── State-level closed-loop ─────────────────────────────────────────
+
+  /**
+   * Stage 4 of the trend-target split (commits b9b0161 → 5012f0a) made
+   * `napBudget.context.blendedTrendMin` read the *held intervention*
+   * target, not the rolling observed mean. The point: when a parent
+   * follows the cap day after day, the observed mean drops, but the
+   * cap target itself shouldn't ratchet down — otherwise the cap chases
+   * its own tail (target -5 → cap -5 → next-day total -5 → target -5
+   * again …) and pulls the baby below their actual sleep need.
+   *
+   * This test simulates that loop end-to-end through `assembleState`,
+   * not just `computeNapBudget` directly. It captures the wiring that
+   * the dimensional-bug fix sat on top of: trend split → intervention
+   * target → context.blendedTrendMin → UI.
+   */
+  describe("napBudget anti-ratchet (state-level closed loop)", () => {
+    it("intervention target holds across 6 days of cap-follow", () => {
+      const startDay = "2026-05-13";
+      const napStartLocalHour = 8.5; // 08:30Z = 10:30 Oslo
+
+      // Seed history: 24 days at 13h to set a stable trend.
+      let history: SleepLogRow[] = synthSleepRows("2026-04-18", 24, 13 * 60);
+      let priorState: import("$lib/engine/trend.js").TrendTargetState | null = null;
+
+      const trail: string[] = [];
+
+      for (let day = 0; day < 6; day++) {
+        const today = new Date(`${startDay}T00:00:00Z`).getTime() + day * 86400_000;
+        const nightStart = today - 5 * 3600_000;
+        // 12.2h nights every day — over-trend territory.
+        const yesterdayNight = sleepRow({
+          id: 8000 + day,
+          start_time: new Date(nightStart).toISOString(),
+          end_time: new Date(nightStart + 732 * 60_000).toISOString(),
+          type: "night",
+          domain_id: `slp_yest_night_${day}`,
+          woke_by: "self",
+        });
+        const napStartMs = today + napStartLocalHour * 3600_000;
+        const activeNap = sleepRow({
+          id: 9000 + day,
+          start_time: new Date(napStartMs).toISOString(),
+          end_time: null,
+          type: "nap",
+          domain_id: `slp_active_${day}`,
+          woke_by: null,
+        });
+        const trendSleeps = [...history, yesterdayNight];
+        const data: DayData = {
+          baby: baseBaby,
+          activeSleep: activeNap,
+          todaySleeps: [activeNap],
+          recentSleeps: trendSleeps,
+          strategySleeps: trendSleeps,
+          trendSleeps,
+          todayWakeUp: {
+            id: 1,
+            baby_id: 1,
+            date: new Date(today).toISOString().slice(0, 10),
+            wake_time: new Date(nightStart + 732 * 60_000).toISOString(),
+            created_at: "",
+            created_by_event_id: null,
+          },
+          diaperCount: 0,
+          lastDiaperTime: null,
+          now: napStartMs + 25 * 60_000, // 25 min into the nap
+          priorTrendTargetState: priorState,
+        };
+
+        const result = assembleState(data);
+        const nb = result.prediction?.napBudget;
+        expect(nb, `day ${day} napBudget should emit`).not.toBeNull();
+        const observed = result.prediction?.trendTargets?.observedRecentMin ?? null;
+        expect(observed, `day ${day} observed should not be null`).not.toBeNull();
+
+        trail.push(
+          `day ${day}: intervention=${nb!.context.blendedTrendMin} observed=${observed} cap=${nb!.recommendedDurationMin} mode=${nb!.mode}`,
+        );
+
+        // "Parent" caps the nap at the engine's wakeBy.
+        const napEndMs = new Date(nb!.wakeBy).getTime();
+        history.push(yesterdayNight, {
+          ...activeNap,
+          end_time: new Date(napEndMs).toISOString(),
+          woke_by: "woken",
+        });
+        // Carry forward the next state — what the server would persist.
+        priorState = result.prediction?.trendTargets?.state ?? null;
+      }
+
+      expect(trail.join("\n")).toMatchInlineSnapshot(`
+        "day 0: intervention=778 observed=776 cap=58 mode=first-contact
+        day 1: intervention=778 observed=776 cap=58 mode=first-contact
+        day 2: intervention=778 observed=778 cap=58 mode=first-contact
+        day 3: intervention=778 observed=778 cap=58 mode=first-contact
+        day 4: intervention=778 observed=780 cap=58 mode=first-contact
+        day 5: intervention=778 observed=780 cap=58 mode=first-contact"
+      `);
+
+      const interventions = trail.map((line) => Number(line.match(/intervention=(\d+)/)![1]));
+      const observeds = trail.map((line) => Number(line.match(/observed=(\d+)/)![1]));
+
+      // Anti-ratchet pin: intervention target stays within ±10 min over
+      // 6 days of cap-follow. A regression that wires the cap target
+      // back to the observed mean would show a monotonic decline here.
+      const interventionDrift = Math.max(...interventions) - Math.min(...interventions);
+      expect(interventionDrift).toBeLessThanOrEqual(10);
+
+      // Separation invariant: the intervention target must be reported
+      // by the engine independently from the observed mean. Observed can
+      // wander day-to-day with new data; intervention is the held cap
+      // target. In this scenario both happen to be close (long-night
+      // protection) but the engine still exposes them as separate fields.
+      for (let i = 0; i < interventions.length; i++) {
+        expect(Math.abs(observeds[i] - interventions[i])).toBeLessThanOrEqual(10);
+      }
     });
   });
 

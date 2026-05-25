@@ -651,6 +651,59 @@ describe("computeNapBudget — cap dimensional invariant", () => {
     expect(out!.recommendedDurationMin).toBeGreaterThanOrEqual(40);
     expect(out!.recommendedDurationMin).toBeLessThanOrEqual(65);
   });
+
+  it("first-contact 2-cycle cap is stable across mid-nap evaluations", () => {
+    // Codex follow-up: when napBudgetMin is large enough for 2 full cycles,
+    // repeated evaluations must keep recommendedDurationMin at 2 cycles,
+    // not drop to 1 as elapsed grows. A regression to the pre-fix elapsed-
+    // double-counting bug in the first-contact branch would shrink the cap
+    // from 2 cycles → 1 cycle mid-nap as bankedMin grew. Setup: short
+    // night (650 min = 10h50m) leaves a 125-min napBudget, which fits 2
+    // 58-min cycles. learnedNapDurationMin=180 so projection clearly
+    // exceeds trend. Evaluations stay before t+58 (≈ 09:28Z) so the 7d
+    // window's nap-boundary slide can't perturb the mean mid-test.
+    const todayDateStr = "2026-05-13";
+    const yesterdayNightStart =
+      new Date(`${todayDateStr}T00:00:00Z`).getTime() - 5 * 3600_000;
+    const synth = synthDays("2026-04-18", 24, 13 * 60);
+    const trendSleeps: SleepEntry[] = [
+      ...synth,
+      {
+        start_time: new Date(yesterdayNightStart).toISOString(),
+        end_time: new Date(yesterdayNightStart + 650 * 60_000).toISOString(),
+        type: "night",
+        woke_by: "self",
+      },
+    ];
+    const napStartIso = `${todayDateStr}T08:30:00.000Z`;
+    const napStartMs = new Date(napStartIso).getTime();
+    const base = {
+      activeNap: { start_time: napStartIso },
+      todaySleeps: [] as SleepEntry[],
+      trendSleeps,
+      bedtime: `${todayDateStr}T17:00:00.000Z`,
+      isLastNapOfDay: true,
+      optedIn: true,
+      ctx: ctx({ trendSleeps }),
+      learnedNapDurationMin: 180,
+    };
+
+    const out25 = computeNapBudget({ ...base, now: napStartMs + 25 * 60_000 });
+    const out45 = computeNapBudget({ ...base, now: napStartMs + 45 * 60_000 });
+    const out55 = computeNapBudget({ ...base, now: napStartMs + 55 * 60_000 });
+    expect(out25).not.toBeNull();
+    expect(out45).not.toBeNull();
+    expect(out55).not.toBeNull();
+    expect(out25!.mode).toBe("first-contact");
+    expect(out45!.mode).toBe("first-contact");
+    expect(out55!.mode).toBe("first-contact");
+    // Cap stays at 2 cycles (116 min). Pre-fix the first-contact branch
+    // would have shrunk this to 1 cycle (58 min) as elapsed grew.
+    expect(out25!.recommendedDurationMin).toBe(116);
+    expect(out45!.recommendedDurationMin).toBe(116);
+    expect(out55!.recommendedDurationMin).toBe(116);
+    expect(out25!.cycleNudge!.boundaryAtMin).toBe(116);
+  });
 });
 
 // ── Multi-day simulation ────────────────────────────────────────────
@@ -1300,6 +1353,91 @@ describe("computeNapBudget — Codex review regressions", () => {
     // anchor — sleep-day anchor keeps it on yesterday's ledger.
     expect(out!.context.bankedMin).toBeLessThan(770);
     expect(out!.context.bankedMin).toBeGreaterThanOrEqual(740);
+  });
+
+  it("first-day-after-onboarding: bankedToday falls back to local midnight", () => {
+    // Defensive branch (computeBankedToday line 297) — no completed night
+    // precedes now, so the wake anchor falls back to local midnight in
+    // the baby's tz. Stub trendTargets to bypass Gate 3's MIN_TREND_DAYS
+    // requirement (real first-day scenario would also fail Gate 3, but
+    // the branch we want to test sits past that gate). With no history,
+    // bankedMin should equal the active nap's elapsed minutes only.
+    const stubTrend: TrendTargets = {
+      observedRecentMin: 780,
+      interventionTargetMin: 780,
+      interventionConfidence: "medium",
+      observedSourceLabel: "stub",
+      interventionSourceLabel: "stub",
+      mean7: 780,
+      mean30: 780,
+      diagnostics: {} as unknown as TrendTargets["diagnostics"],
+      state: {} as unknown as TrendTargets["state"],
+    };
+    const out = computeNapBudget({
+      activeNap: { start_time: "2026-05-13T08:00:00.000Z" },
+      todaySleeps: [],
+      trendSleeps: [],
+      bedtime: "2026-05-13T17:00:00.000Z",
+      isLastNapOfDay: true,
+      optedIn: true,
+      now: new Date("2026-05-13T08:30:00.000Z").getTime(),
+      ctx: ctx({ trendSleeps: [], trendTargets: stubTrend }),
+      // Force a projection that clearly exceeds the stub trend so the
+      // engine reaches the cap math.
+      learnedNapDurationMin: 900,
+    });
+    expect(out).not.toBeNull();
+    // Active nap started today at 08:00Z = 10:00 Oslo (after both UTC and
+    // local midnight). Elapsed = 30 min. bankedMin reflects ONLY the
+    // active nap — no nights, no completed naps, anchored at local
+    // midnight which falls before napStart.
+    expect(out!.context.bankedMin).toBe(30);
+  });
+
+  it("active-nap-before-wake-anchor: elapsed not banked into today's frame", () => {
+    // Defensive branch (computeBankedToday line 352) — when the activeNap
+    // record's start_time precedes the most recent night's end (a data
+    // anomaly or a long-running record that bridged the night), the
+    // engine must not bank the active nap's "elapsed" into today's frame.
+    // The same data with the activeNap after the anchor banks normally;
+    // contrast pins the branch.
+    const synth = synthDays("2026-04-18", 24, 13 * 60);
+    const longNight: SleepEntry = {
+      // 14h night. bankedMin alone clears trend → engine emits in both
+      // cases so context.bankedMin is observable.
+      start_time: "2026-05-12T17:00:00.000Z",
+      end_time: "2026-05-13T07:00:00.000Z",
+      type: "night",
+      woke_by: "self",
+    };
+    const trendSleeps = [...synth, longNight];
+    const base = {
+      todaySleeps: [] as SleepEntry[],
+      trendSleeps,
+      bedtime: "2026-05-13T17:00:00.000Z",
+      isLastNapOfDay: true,
+      optedIn: true,
+      now: new Date("2026-05-13T09:00:00.000Z").getTime(),
+      ctx: ctx({ trendSleeps }),
+      learnedNapDurationMin: 90,
+    };
+
+    // Case A: nap started 4h BEFORE the wake anchor — data anomaly.
+    const before = computeNapBudget({
+      ...base,
+      activeNap: { start_time: "2026-05-13T03:00:00.000Z" },
+    });
+    // Case B: nap started 1h AFTER the wake anchor — normal case.
+    const after = computeNapBudget({
+      ...base,
+      activeNap: { start_time: "2026-05-13T08:00:00.000Z" },
+    });
+
+    expect(before).not.toBeNull();
+    expect(after).not.toBeNull();
+    // 14h night = 840 min. Case A: no addition → 840. Case B: +60 elapsed → 900.
+    expect(before!.context.bankedMin).toBe(840);
+    expect(after!.context.bankedMin).toBe(900);
   });
 
   it("bedtime-guard tightening does not re-introduce a past wakeBy", () => {
