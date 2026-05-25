@@ -234,39 +234,36 @@ describe("cycle estimator v2: scenario table", () => {
     expect(halldis12.source).toBe("learned");
     expect(halldis12.minutes).toBe(55);
 
-    // Subharmonic guard: the 111m cluster must NEVER drop the estimate
-    // into an alias below the age-plausible range. This was the live
-    // bug that motivated the rewrite.
+    // Subharmonic guard: the 111m cluster must pick c=55 (the fundamental
+    // cycle, with 111 ≈ 2×55), not an alias like c=37 (111/3) that would
+    // fit the residual just as well. This was the live bug that motivated
+    // the v2 rewrite. Pinning the exact value here AND keeping the range
+    // bound above forces deliberate updates if the alias detector changes.
     const cluster111 = estimateSleepCycleDetails(ctxOf({
       ageMonths: 11, customNapCount: 1, naps: selfRun(10, 111),
     }));
-    expect(cluster111.minutes).toBeGreaterThanOrEqual(50);
-    expect(cluster111.minutes).toBeLessThanOrEqual(65);
+    expect(cluster111.minutes).toBe(55);
 
-    // Toddler edge: same 110m cluster at 14mo. 110/2=55 sits below the
-    // [55, 70] range. The scorer must stay within range — not pick
-    // 64-ish at the edge nor a sub-55 alias. Codex 2026-05-25 final
-    // review flagged this as a missing fixture.
+    // Toddler edge: 14mo + 110m cluster. The 11mo prior is ~55; the 14mo
+    // prior is ~62. The estimator must still land on 55 (the actual
+    // fundamental for this baby's data) rather than drift toward the
+    // age-prior or pick an edge candidate like 64. Codex 2026-05-25 final
+    // review flagged this as a missing exact-value pin.
     const toddler110 = estimateSleepCycleDetails(ctxOf({
       ageMonths: 14, customNapCount: 1, naps: selfRun(12, 110),
     }));
-    expect(toddler110.minutes).toBeGreaterThanOrEqual(55);
-    expect(toddler110.minutes).toBeLessThanOrEqual(70);
+    expect(toddler110.minutes).toBe(55);
 
     // Subharmonic-trap regression pin: 110m + 165m clusters would have
     // tied c=37 (110/3 ≈ 36.7, 165/4 ≈ 41.25 — both inside the OLD
     // [35, 60] search) under residual-only scoring. The new estimator
-    // must reject c=37 because it's outside the 11mo plausible range,
-    // landing somewhere in [50, 65] instead.
+    // must pick c=55 (110≈2c, 165≈3c) — the only c that explains both
+    // clusters with low residuals AND sits in the age-plausible range.
     const aliasTrap = estimateSleepCycleDetails(ctxOf({
       ageMonths: 11, customNapCount: 1,
       naps: [...selfRun(12, 110, 1), ...selfRun(8, 165, 15)],
     }));
-    expect(aliasTrap.minutes).toBeGreaterThanOrEqual(50);
-    expect(aliasTrap.minutes).toBeLessThanOrEqual(65);
-    expect(aliasTrap.minutes).not.toBe(37);
-    expect(aliasTrap.minutes).not.toBe(40);
-    expect(aliasTrap.minutes).not.toBe(41);
+    expect(aliasTrap.minutes).toBe(55);
 
     // Strict self-wake filter: woken-only data must be ignored entirely.
     const wokenOnly = estimateSleepCycleDetails(ctxOf({

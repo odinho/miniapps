@@ -8,6 +8,7 @@ import { describe, it, expect } from "bun:test";
 import { computeNapBudget, isDayOnTrend } from "$lib/engine/nap-budget.js";
 import type { SleepEntry, BabyContext } from "$lib/types.js";
 import { NAP_BUDGET, NAP_FLOOR_BY_AGE, findByAge } from "$lib/engine/constants.js";
+import type { TrendTargets } from "$lib/engine/trend.js";
 import halldisRealData from "../fixtures/halldis-real-2026-05-13.json";
 
 // ── Fixtures ────────────────────────────────────────────────────────
@@ -164,6 +165,53 @@ describe("computeNapBudget — gates", () => {
       optedIn: true,
     });
     expect(out).toBeNull();
+  });
+
+  it("suppresses at exactly the trend boundary (projection == trend → null)", () => {
+    // Gate 4 reads `projectedIfRunsFull <= trend.blendedTrendMin` — the
+    // boundary is a *suppression* not an emit. Set up a stubbed trend
+    // target = 780 and a projection that lands exactly there: night =
+    // 720, learnedNapDurationMin = 60 → projection = 780. Then bump
+    // projection by 1 min and verify the engine emits.
+    const todayDateStr = "2026-05-13";
+    const yesterdayNightStart = new Date(`${todayDateStr}T00:00:00Z`).getTime() - 5 * 3600_000;
+    const synth = synthDays("2026-04-18", 24, 13 * 60);
+    const trendSleeps: SleepEntry[] = [
+      ...synth,
+      {
+        start_time: new Date(yesterdayNightStart).toISOString(),
+        end_time: new Date(yesterdayNightStart + 720 * 60_000).toISOString(),
+        type: "night",
+        woke_by: "self",
+      },
+    ];
+    const stubTrend = {
+      observedRecentMin: 780,
+      interventionTargetMin: 780,
+      interventionConfidence: "medium" as const,
+      observedSourceLabel: "stub",
+      interventionSourceLabel: "stub",
+      mean7: 780,
+      mean30: 780,
+      diagnostics: {} as unknown as TrendTargets["diagnostics"],
+      state: {} as unknown as TrendTargets["state"],
+    };
+    const base = {
+      activeNap: { start_time: `${todayDateStr}T08:30:00.000Z` },
+      todaySleeps: [],
+      trendSleeps,
+      bedtime: `${todayDateStr}T17:00:00.000Z`,
+      isLastNapOfDay: true,
+      optedIn: true,
+      now: new Date(`${todayDateStr}T08:55:00.000Z`).getTime(),
+      ctx: ctx({ trendSleeps, trendTargets: stubTrend }),
+    };
+
+    const atBoundary = computeNapBudget({ ...base, learnedNapDurationMin: 60 });
+    expect(atBoundary).toBeNull();
+
+    const justOver = computeNapBudget({ ...base, learnedNapDurationMin: 61 });
+    expect(justOver).not.toBeNull();
   });
 
   it("returns null when today's projection is already under trend + tolerance", () => {
@@ -612,6 +660,124 @@ describe("computeNapBudget — cap dimensional invariant", () => {
     // onto a sub-cycle floor or onto elapsed+1.
     expect(out!.recommendedDurationMin).toBeGreaterThanOrEqual(40);
     expect(out!.recommendedDurationMin).toBeLessThanOrEqual(65);
+  });
+});
+
+// ── Multi-day simulation ────────────────────────────────────────────
+
+/**
+ * Time-series anti-regression. Runs a typical 11mo across 5 days, with
+ * the engine called at four points during each nap (t+20, t+35, t+50,
+ * t+65). For each day, captures one trail line plus the wakeBy span
+ * across the four evaluations. The "parent" caps at the first emitted
+ * wakeBy and the actual nap is appended to history for the next day.
+ *
+ * This is the canonical test for the bug class the 2026-05-25 dimensional
+ * issue belonged to — anything that makes the cap evolve during the nap
+ * (or anything that makes the trend ratchet down over days of cap-
+ * following) will show up either in the trail snapshot or in the
+ * pinned invariants. testing.md's "render full state then assert"
+ * pattern applied to a multi-evaluation timeline.
+ */
+describe("computeNapBudget — multi-day simulation", () => {
+  it("typical 11mo, 5 days of capped naps with 4 mid-nap snapshots/day", () => {
+    const baselineSynth = synthDays("2026-04-18", 24, 13 * 60);
+    let history: SleepEntry[] = [...baselineSynth];
+
+    // 12.2h nights each day, 1 nap starting 10:30 local (08:30Z), bedtime
+    // 19:00 local (17:00Z). Day N's night ends at 06:30 local (04:30Z) of day N.
+    const NIGHT_MIN = 732;
+    const NAP_START_OFFSET_H = 8.5;
+    const BEDTIME_OFFSET_H = 17;
+    const startDay = "2026-05-13";
+
+    const trail: string[] = [];
+    const wakeBySpans: number[] = [];
+
+    for (let day = 0; day < 5; day++) {
+      const today = new Date(`${startDay}T00:00:00Z`).getTime() + day * 86400_000;
+      const yesterdayNightStart = today - 5 * 3600_000;
+      const yesterdayNight: SleepEntry = {
+        start_time: new Date(yesterdayNightStart).toISOString(),
+        end_time: new Date(yesterdayNightStart + NIGHT_MIN * 60_000).toISOString(),
+        type: "night",
+        woke_by: "self",
+      };
+      const trendSleeps = [...history, yesterdayNight];
+      const napStartMs = today + NAP_START_OFFSET_H * 3600_000;
+      const napStartIso = new Date(napStartMs).toISOString();
+      const bedtimeIso = new Date(today + BEDTIME_OFFSET_H * 3600_000).toISOString();
+      const args = {
+        activeNap: { start_time: napStartIso },
+        todaySleeps: [] as SleepEntry[],
+        trendSleeps,
+        bedtime: bedtimeIso,
+        isLastNapOfDay: true,
+        optedIn: true,
+        ctx: ctx({ trendSleeps }),
+      };
+
+      const wakeBys: number[] = [];
+      let firstOut: ReturnType<typeof computeNapBudget> = null;
+      // Three evaluation points all under the typical cap (~55 min). Once
+      // elapsed passes the cap, the engine clamps wakeBy to `now + 1`
+      // (safety: wakeBy can't be in the past). That's correct behavior,
+      // not a dimensional bug, so the invariance trail stops at t+50.
+      for (const elapsedMin of [20, 35, 50]) {
+        const out = computeNapBudget({
+          ...args,
+          now: napStartMs + elapsedMin * 60_000,
+        });
+        if (out) {
+          wakeBys.push(new Date(out.wakeBy).getTime());
+          if (!firstOut) firstOut = out;
+        }
+      }
+
+      expect(firstOut, `day ${day} should emit a cap`).not.toBeNull();
+      const span =
+        wakeBys.length > 1
+          ? (Math.max(...wakeBys) - Math.min(...wakeBys)) / 60_000
+          : 0;
+      wakeBySpans.push(span);
+
+      const actualNapMin = Math.round((new Date(firstOut!.wakeBy).getTime() - napStartMs) / 60_000);
+      const wakeHM = new Date(firstOut!.wakeBy).toISOString().slice(11, 16);
+      trail.push(
+        `day ${day}: night=${NIGHT_MIN}m wakeBy=${wakeHM}Z cap=${actualNapMin}m mode=${firstOut!.mode} urgency=${firstOut!.urgency} trend=${firstOut!.context.blendedTrendMin}`,
+      );
+
+      history.push(yesterdayNight, {
+        start_time: napStartIso,
+        end_time: new Date(napStartMs + actualNapMin * 60_000).toISOString(),
+        type: "nap",
+        woke_by: "woken",
+      });
+    }
+
+    expect(trail.join("\n")).toMatchInlineSnapshot(`
+      "day 0: night=732m wakeBy=09:28Z cap=58m mode=first-contact urgency=firm trend=778
+      day 1: night=732m wakeBy=09:28Z cap=58m mode=first-contact urgency=firm trend=778
+      day 2: night=732m wakeBy=09:28Z cap=58m mode=first-contact urgency=firm trend=778
+      day 3: night=732m wakeBy=09:28Z cap=58m mode=first-contact urgency=firm trend=778
+      day 4: night=732m wakeBy=09:28Z cap=58m mode=first-contact urgency=firm trend=779"
+    `);
+
+    // Dimensional invariant: across all 5 days × 4 evaluations per day,
+    // wakeBy never moves more than 1 min within a single nap.
+    for (let i = 0; i < wakeBySpans.length; i++) {
+      expect(wakeBySpans[i], `day ${i} wakeBy span ≤ 1 min`).toBeLessThanOrEqual(1);
+    }
+
+    // Anti-ratchet invariant: the held intervention target must not drop
+    // materially as the parent follows the cap. Stage 4 of the trend
+    // split (intervention vs observed) is what protects this — a
+    // regression that wires the cap back to the observed mean would
+    // show up as a slow trend drift in the snapshot above.
+    const trends = trail.map((line) => Number(line.match(/trend=(\d+)/)![1]));
+    const trendDrift = trends[0] - trends[trends.length - 1];
+    expect(trendDrift, "intervention target should drift ≤ 10 min over 5 days of cap-follow")
+      .toBeLessThanOrEqual(10);
   });
 });
 
