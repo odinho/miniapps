@@ -204,14 +204,23 @@ describe("computeNapBudget — emits a cap when over trend", () => {
     const out = computeNapBudget({ ...s, isLastNapOfDay: true, optedIn: true });
     expect(out).not.toBeNull();
     expect(out!.reason).toBe("over_trend");
-    expect(out!.wakeBy).toBeTruthy();
-    expect(out!.recommendedDurationMin).toBeGreaterThan(0);
+    expect(out!.mode).toBe("first-contact");
+    // Sanity bounds; the synth fixture is parameterised on trend math
+    // that may legitimately drift — exact value lives in the prod-fixture
+    // test below and in the cap-dimensional-invariant block.
+    expect(out!.recommendedDurationMin).toBeGreaterThan(20);
+    expect(out!.recommendedDurationMin).toBeLessThanOrEqual(90);
   });
 
   it("recommendedDurationMin honors the age-band floor", () => {
+    // Floor invariant: regardless of the trend math, the engine never
+    // recommends a cap below the literature-backed minimum useful nap
+    // for the baby's age band. Sanity check that the floor is being
+    // applied at all — i.e. that NAP_FLOOR_BY_AGE is wired up.
     const s = halldisScenario();
     const floorMin = findByAge(NAP_FLOOR_BY_AGE, 11).floorMin;
     const out = computeNapBudget({ ...s, isLastNapOfDay: true, optedIn: true });
+    expect(out).not.toBeNull();
     expect(out!.recommendedDurationMin).toBeGreaterThanOrEqual(floorMin);
   });
 
@@ -310,12 +319,14 @@ describe("computeNapBudget — bedtime guard", () => {
       now,
       ctx: ctx({ trendSleeps }),
     });
-    if (out) {
-      const wakeByMs = new Date(out.wakeBy).getTime();
-      const bedtimeMs = new Date(`${todayDateStr}T17:00:00.000Z`).getTime();
-      const preBedtimeGapMin = (bedtimeMs - wakeByMs) / 60_000;
-      expect(preBedtimeGapMin).toBeGreaterThanOrEqual(90 - 0.5);
-    }
+    // Scenario is over-trend (12h night + ~90 min uncapped nap projects past
+    // 13h) and within the pre-bedtime guard's reach — engine must emit and
+    // tighten so wakeBy lands no later than bedtime − 90 min.
+    expect(out).not.toBeNull();
+    const wakeByMs = new Date(out!.wakeBy).getTime();
+    const bedtimeMs = new Date(`${todayDateStr}T17:00:00.000Z`).getTime();
+    const preBedtimeGapMin = (bedtimeMs - wakeByMs) / 60_000;
+    expect(preBedtimeGapMin).toBeGreaterThanOrEqual(90 - 0.5);
   });
 
   it("suppresses entirely when no useful nap fits before bedtime gap", () => {
@@ -402,11 +413,10 @@ describe("computeNapBudget — works across ages with literature-backed floors",
       now: new Date(`${todayDateStr}T08:55:00.000Z`).getTime(),
       ctx: ctx({ trendSleeps }),
     });
-    if (out) {
-      expect(out.mode).toBe("established");
-      // Established mode shouldn't snap to cycle boundary.
-      expect(out.cycleNudge).toBeNull();
-    }
+    expect(out).not.toBeNull();
+    expect(out!.mode).toBe("established");
+    // Established mode shouldn't snap to cycle boundary.
+    expect(out!.cycleNudge).toBeNull();
   });
 
   it("established mode applies EARLY_WAKE_LEAD_MIN buffer", () => {
@@ -449,6 +459,10 @@ describe("computeNapBudget — works across ages with literature-backed floors",
   });
 
   it("emits a budget for an 18mo toddler with the older floor", () => {
+    // Same Halldis-tonight setup, age switched to 18mo. SLEEP_NEEDS for
+    // 12-18mo is 12-14h (range narrower, target lower). The synth at 13h
+    // still over-trends a 12.44h night + 90 min uncapped nap. Floor at this
+    // age is 28 min. Engine must emit and respect that floor.
     const s = halldisScenario();
     const out = computeNapBudget({
       ...s,
@@ -456,9 +470,8 @@ describe("computeNapBudget — works across ages with literature-backed floors",
       isLastNapOfDay: true,
       optedIn: true,
     });
-    if (out) {
-      expect(out.recommendedDurationMin).toBeGreaterThanOrEqual(28);
-    }
+    expect(out).not.toBeNull();
+    expect(out!.recommendedDurationMin).toBeGreaterThanOrEqual(28);
   });
 });
 
@@ -615,9 +628,16 @@ describe("computeNapBudget — real Halldis data (regression net)", () => {
   // Type the fixture so the rest of the test reads cleanly.
   const real = halldisRealData as SleepEntry[];
 
-  it("emits a sensible cap for the actual 2026-05-13 morning scenario", () => {
+  it("emits a concrete cap for the actual 2026-05-13 morning scenario", () => {
     // Halldis tonight: night 16:08-yesterday → 04:35 today (12h27).
-    // Active nap supposedly starting around 10:30 local (08:30Z).
+    // Active nap supposedly starting around 10:30 local (08:30Z),
+    // engine called 25 min into the nap.
+    //
+    // This is the canonical real-baby pin. If anything in the engine
+    // changes — trend math, cycle estimator, intervention target, banked
+    // calculation — the values below WILL change, and that should be
+    // a deliberate update with a reason. Concrete values force someone
+    // to look at the recommendation a real parent would see.
     const now = new Date("2026-05-13T08:55:00.000Z").getTime();
     const out = computeNapBudget({
       activeNap: { start_time: "2026-05-13T08:30:00.000Z" },
@@ -630,24 +650,21 @@ describe("computeNapBudget — real Halldis data (regression net)", () => {
       ctx: ctx({ trendSleeps: real }),
     });
 
-    // The engine may legitimately suppress here (real data has high
-    // variance — last 10 days swing from 12.10h to 15.10h, stdev/mean
-    // likely > MAX_STDEV_FRACTION). That's the *correct* conservative
-    // behavior, not a bug.
-    if (out === null) {
-      // Suppressed — verify the suppression reason makes sense by recomputing
-      // stdev/mean to confirm the gate fired correctly.
-      return;
-    }
-
-    // If it does emit, the values must be sane:
-    expect(out.recommendedDurationMin).toBeGreaterThanOrEqual(
-      findByAge(NAP_FLOOR_BY_AGE, 11).floorMin,
-    );
-    expect(out.recommendedDurationMin).toBeLessThanOrEqual(120);
-    expect(out.context.blendedTrendMin).toBeGreaterThan(11 * 60);
-    expect(out.context.blendedTrendMin).toBeLessThan(15 * 60);
-    expect(["first-contact", "established"]).toContain(out.mode);
+    expect(out).not.toBeNull();
+    // wakeBy: napStart (08:30Z) + 55 min = 09:25Z = 11:25 local — one
+    // full sleep cycle, the gentle first-contact cap.
+    expect(out!.wakeBy).toBe("2026-05-13T09:25:00.000Z");
+    expect(out!.recommendedDurationMin).toBe(55);
+    expect(out!.mode).toBe("first-contact");
+    expect(out!.reason).toBe("over_trend");
+    // Urgency is firm because the uncapped projection (banked + 90 min
+    // typical-full-nap remaining) overshoots trend by > TOLERANCE_MIN.
+    expect(out!.urgency).toBe("firm");
+    expect(out!.cycleNudge).not.toBeNull();
+    expect(out!.cycleNudge!.boundaryAtMin).toBe(55);
+    // Context: blended trend ~13h, banked = 746 night + 25 elapsed = 771.
+    expect(out!.context.blendedTrendMin).toBe(784);
+    expect(out!.context.bankedMin).toBe(771);
   });
 
   it("never produces NaN/Infinity for any plausible point in the dataset", () => {
@@ -810,10 +827,9 @@ describe("computeNapBudget — Codex review regressions", () => {
       isLastNapOfDay: true,
       optedIn: true,
     });
-    if (out) {
-      const wakeByMs = new Date(out.wakeBy).getTime();
-      expect(wakeByMs).toBeGreaterThan(lateNow);
-    }
+    expect(out).not.toBeNull();
+    const wakeByMs = new Date(out!.wakeBy).getTime();
+    expect(wakeByMs).toBeGreaterThan(lateNow);
   });
 
   it("trend gate ignores nap-only days that have no night", () => {
@@ -912,13 +928,13 @@ describe("computeNapBudget — Codex review regressions", () => {
       priorState: { mode: "established", enteredAt: "2026-04-13T00:00:00.000Z" },
     });
 
-    // Either both null (engine had its own reason to suppress) or both emit;
-    // when both emit, the sticky one must be established and the fresh one
-    // first-contact (the actual hysteresis behaviour).
-    if (fresh && sticky) {
-      expect(fresh.mode).toBe("first-contact");
-      expect(sticky.mode).toBe("established");
-    }
+    // Both calls hit the same over-trend gate; the only difference is the
+    // priorState. Both must emit, and the sticky one must be established
+    // while the fresh one falls back to first-contact (mean30 ≈ mean7).
+    expect(fresh).not.toBeNull();
+    expect(sticky).not.toBeNull();
+    expect(fresh!.mode).toBe("first-contact");
+    expect(sticky!.mode).toBe("established");
   });
 
   it("hysteresis: established mode exits when 7d climbs back above 30d", () => {
@@ -950,28 +966,34 @@ describe("computeNapBudget — Codex review regressions", () => {
       ctx: ctx({ trendSleeps }),
     });
 
-    // If the engine emits at all, hysteresis must have released — mode is
-    // no longer established.
-    if (out) {
-      expect(out.mode).toBe("first-contact");
-    }
+    // Scenario projects clearly over trend (800 min night + nap = ~14h+).
+    // Engine must emit, and hysteresis must have released — mode no longer
+    // established because the parent has clearly stopped capping.
+    expect(out).not.toBeNull();
+    expect(out!.mode).toBe("first-contact");
   });
 
   it("off-day filter excludes flagged dates from trend computation", () => {
-    // Baseline: 7 days of 12h totals (low) + 17 days of 13.5h totals (high).
-    // With all 24 days in: mean is somewhere in between. With the 7 low
-    // days marked off-day: mean rises to ~13.5h. Trend math reflects this.
+    // 18 days of 13.5h totals followed by 6 days of 12h totals (a recent
+    // "off week"), plus a separate yesterdayNight as the 25th day.
+    // Without the filter the recent 7d window pulls the blended trend
+    // down. Marking the 6 low days off-day restores it. The 12h–13.5h
+    // split keeps stdev/mean below the noise gate so both calls emit;
+    // an earlier version of this test silently no-op'd because the
+    // variance was too high (see codex audit 2026-05-25). lowDays runs
+    // up to 2026-05-11 so it doesn't collide with yesterdayNight on
+    // 2026-05-12 (which would double-count and blow up the stdev).
     const todayDateStr = "2026-05-13";
     const yesterdayNightStart = new Date(`${todayDateStr}T00:00:00Z`).getTime() - 5 * 3600_000;
-    const lowDays = synthDays("2026-04-18", 7, 12 * 60); // first 7 days low
-    const highDays = synthDays("2026-04-25", 18, 13.5 * 60); // then 18 high
+    const highDays = synthDays("2026-04-18", 18, 13.5 * 60);
+    const lowDays = synthDays("2026-05-06", 6, 12 * 60);
     const yesterdayNight: SleepEntry = {
       start_time: new Date(yesterdayNightStart).toISOString(),
       end_time: new Date(yesterdayNightStart + 800 * 60_000).toISOString(),
       type: "night",
       woke_by: "self",
     };
-    const trendSleeps = [...lowDays, ...highDays, yesterdayNight];
+    const trendSleeps = [...highDays, ...lowDays, yesterdayNight];
 
     const input = {
       activeNap: { start_time: `${todayDateStr}T08:30:00.000Z` },
@@ -985,58 +1007,50 @@ describe("computeNapBudget — Codex review regressions", () => {
 
     const withAllDays = computeNapBudget({ ...input, ctx: ctx({ trendSleeps }) });
 
-    // Mark the 7 low days as off-days. The trend should now reflect only
-    // the high days.
     const offDays = new Set<string>();
-    for (let i = 0; i < 7; i++) {
-      const dayMs = new Date("2026-04-18T00:00:00Z").getTime() + i * 86400_000;
-      // Use the same start-anchored local date that getWeekStats uses.
+    for (let i = 0; i < 6; i++) {
+      const dayMs = new Date("2026-05-06T00:00:00Z").getTime() + i * 86400_000;
       const d = new Date(dayMs);
-      const yyyy = d.getUTCFullYear();
-      const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-      const dd = String(d.getUTCDate()).padStart(2, "0");
-      offDays.add(`${yyyy}-${mm}-${dd}`);
+      offDays.add(
+        `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`,
+      );
     }
     const withFilter = computeNapBudget({
       ...input,
       ctx: ctx({ trendSleeps, offDays }),
     });
 
-    // When both emit, the filtered trend target must be >= the unfiltered
-    // one (dropping the low days raises the mean). When the filter pushes
-    // suppression on either side the test gives no signal — skip.
-    if (withAllDays && withFilter) {
-      expect(withFilter.context.blendedTrendMin).toBeGreaterThanOrEqual(
-        withAllDays.context.blendedTrendMin,
-      );
-    }
+    expect(withAllDays).not.toBeNull();
+    expect(withFilter).not.toBeNull();
+    expect(withFilter!.context.blendedTrendMin).toBeGreaterThan(
+      withAllDays!.context.blendedTrendMin,
+    );
   });
 
   it("split-night fragments both count toward banked", () => {
     // Parent logged the night as TWO entries (a mid-night feeding session
-    // split out): 19:00-22:00 yesterday and 22:30-06:00 today. Old code's
-    // `break` after the first night-ended-today bailed out before
-    // including the earlier fragment — banked under-counted by 3h.
-    // Sleep-day anchor at 06:00 today picks up both because both end
-    // within the 12h overnight window.
+    // split out): 17:00-21:00 yesterday (4h) and 21:30-05:30 today (8h).
+    // Old code's `break` after the first night-ended-today bailed out
+    // before including the earlier fragment — banked under-counted by 4h.
+    // Sleep-day anchor at 05:30 today picks up both because both end
+    // within the 12h overnight window. 12h banked + 25 min nap + 65 min
+    // remaining projects over trend → engine must emit, and bankedMin
+    // must reflect both fragments.
     const todayDateStr = "2026-05-13";
     const todayStart = new Date(`${todayDateStr}T00:00:00Z`).getTime();
     const trendSleeps: SleepEntry[] = [
       {
-        // First night fragment: 17:00Z yesterday → 20:00Z yesterday (3h).
         start_time: new Date(todayStart - 7 * 3600_000).toISOString(),
-        end_time: new Date(todayStart - 4 * 3600_000).toISOString(),
+        end_time: new Date(todayStart - 3 * 3600_000).toISOString(),
         type: "night",
         woke_by: "self",
       },
       {
-        // Second fragment: 20:30Z yesterday → 04:00Z today (7.5h).
-        start_time: new Date(todayStart - 3.5 * 3600_000).toISOString(),
-        end_time: new Date(todayStart + 4 * 3600_000).toISOString(),
+        start_time: new Date(todayStart - 2.5 * 3600_000).toISOString(),
+        end_time: new Date(todayStart + 5.5 * 3600_000).toISOString(),
         type: "night",
         woke_by: "self",
       },
-      // Padding history for trend gate.
       ...synthDays("2026-04-18", 24, 13 * 60),
     ];
     const out = computeNapBudget({
@@ -1049,12 +1063,10 @@ describe("computeNapBudget — Codex review regressions", () => {
       now: new Date(`${todayDateStr}T08:55:00.000Z`).getTime(),
       ctx: ctx({ trendSleeps }),
     });
-    if (out) {
-      // bankedMin should be ~10.5h (night) + 25 min (active) ≈ 655 min.
-      // The exact threshold for emit/suppress depends on trend math, but
-      // bankedMin being captured in context proves both fragments counted.
-      expect(out.context.bankedMin).toBeGreaterThanOrEqual(10 * 60);
-    }
+    expect(out).not.toBeNull();
+    // 4h + 8h = 720 min night + 25 min active nap = 745 min banked.
+    expect(out!.context.bankedMin).toBeGreaterThanOrEqual(740);
+    expect(out!.context.bankedMin).toBeLessThanOrEqual(755);
   });
 
   it("midnight-crossing nap stays attributed to its sleep-day (not double-counted)", () => {
@@ -1094,13 +1106,12 @@ describe("computeNapBudget — Codex review regressions", () => {
       now,
       ctx: ctx({ trendSleeps }),
     });
-    if (out) {
-      // Banked = 12h night + 25 min active = 745 min. The midnight-crossing
-      // nap (50 min) is NOT included because it started before the wake
-      // anchor — sleep-day anchor keeps it on yesterday's ledger.
-      expect(out.context.bankedMin).toBeLessThan(770);
-      expect(out.context.bankedMin).toBeGreaterThanOrEqual(740);
-    }
+    expect(out).not.toBeNull();
+    // Banked = 12h night + 25 min active = 745 min. The midnight-crossing
+    // nap (50 min) is NOT included because it started before the wake
+    // anchor — sleep-day anchor keeps it on yesterday's ledger.
+    expect(out!.context.bankedMin).toBeLessThan(770);
+    expect(out!.context.bankedMin).toBeGreaterThanOrEqual(740);
   });
 
   it("bedtime-guard tightening does not re-introduce a past wakeBy", () => {

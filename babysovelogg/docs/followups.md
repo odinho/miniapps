@@ -268,6 +268,97 @@ Stage-2 followups (parked, captured by Codex deviation review):
   vs actigraphy.
   <https://academic.oup.com/sleep/article/44/4/zsaa217/5937496>
 
+## Test-suite tightening — 2026-05-25 codex audit
+
+Source: 2026-05-25, after the nap-budget cap-collapsing bug (commit
+`f1d8783`). The bug was a dimensional confusion in `computeNapBudget`
+that the existing unit suite failed to catch despite "passing" 39/41
+tests on the area. Codex audited the engine test files with critical
+eyes; the findings below are the highest-leverage ones.
+
+Read this with [`docs/testing.md`](./testing.md) — the goal is not
+more assertions, it is testing patterns that catch regressions while
+keeping tests readable as behavior documentation (renderer + snapshot
++ pinned invariants).
+
+### Patterns that masked real bugs
+
+- **`if (out)` guards**: many tests in `nap-budget.unit.ts` wrap their
+  assertions in `if (out) { ... }`. If the engine starts suppressing
+  the scenario, the test silently becomes a no-op. Decide per test:
+  this scenario should always emit (assert non-null then bounds) or
+  always suppress (assert null with the documented reason). Lines:
+  `nap-budget.unit.ts` :288, :378, :412, :446, :656, :703, :870, :915.
+- **Halldis real fixture allowed `null`**: `nap-budget.unit.ts:473`
+  uses `tests/fixtures/halldis-real-2026-05-13.json` as the canonical
+  real-baby regression net, but the assertion explicitly permits
+  `null` output and otherwise only checks broad ranges. The canonical
+  baby deserves concrete pins on what the engine actually recommends.
+- **Aggregate snapshots hide per-day regressions**: `backtest.unit.ts`
+  :72/:93/:111/:141 and `baselines.unit.ts` :62/:73 freeze multi-day
+  MAE / accuracy totals. A user-visible "wake at 30 instead of 60"
+  regression disappears inside 138-day aggregates. Pair the aggregate
+  snapshots with at least one per-day expected behavior for the
+  canonical scenarios that have repeatedly broken.
+
+### Loose / tautological assertions worth tightening
+
+- `nap-budget.unit.ts:259` — `wakeBy = napStart + recommendedDurationMin`
+  is a tautology of the impl: the recent bug preserved this exact
+  relationship while producing the wrong cap.
+- `cycle-estimator.unit.ts:240/:250/:261` — bounds `[50, 65]` allow
+  regressions from the spec value `55` to e.g. `64`. Pin the exact
+  alias-detection outputs where the spec is exact; keep ranges where
+  the spec is genuinely a range.
+- `schedule.unit.ts:159/:176/:182/:638` — direction-only assertions
+  ("after wake", "before bedtime") and "learnedDurationMin > 95"
+  miss off-by-30-min regressions on the user-visible nap end.
+- `state.unit.ts:1310/:1321` — opt-in/opt-out test returns early if
+  the path doesn't emit; an "always suppress" regression is invisible.
+
+### Engine branches with no direct test
+
+- `nap-budget.ts` Gate 4 (`projectedIfRunsFull <= trend`) — no
+  boundary test at trend, trend+1, trend+tolerance, trend+tolerance+1.
+- `nap-budget.ts` `computeBankedToday` fallback to `localMidnightMs`
+  when no completed night precedes `now` (first-day-after-onboarding).
+- `nap-budget.ts` active-nap-before-wake-anchor branch
+  (midnight-crossing active nap), counter to the typical case.
+- Cycle estimator filters: `woke_by === "self"` and duration
+  `20..180` — boundary values (19, 20, 181) untested.
+- Cycle estimator source precedence: `cycleSleeps → trendSleeps →
+  extendedSleeps → recentSleeps` is fall-through, but no test asserts
+  the precedence order.
+
+### High-value tests to add (not just tighten)
+
+- **Time-invariance trail for nap-budget**: evaluate the engine at
+  multiple points during a single nap on a typical baby and snapshot
+  the trail; pin that `wakeBy` is invariant across the trail. The
+  canonical anti-regression for the dimensional bug class — both for
+  nap-budget itself and as a template for other time-evolving
+  recommendations (continuation window, rescue caps, post-skip plan).
+- **Multi-day nap-budget simulation** on a typical baby (Mina-style
+  3-nap or Halldis-style 2-nap), feeding capped naps back into
+  history. Pins the "cap-follow doesn't ratchet target down" contract
+  from `trend-targets.unit.ts` but on real recommendations rather
+  than the trend math alone.
+- **Halldis real-fixture concrete pin**: assert the exact
+  recommended cap, mode, and urgency that the canonical scenario
+  produces today. Force someone to deliberately update it.
+
+### Process notes
+
+- Don't pin every value exactly. Pin invariants (monotonicity,
+  bounds-of-reason, no-overshoot, mode-once-set) and let the
+  snapshot/trail catch the rest. Update the snapshot when behavior
+  changes intentionally.
+- Renderer-first: when a test asserts more than two fields, consider
+  a trail/renderer + `toMatchInlineSnapshot`. The diff communicates
+  the change more honestly than five separate `expect()`s.
+- `if (out)` is almost always a smell. Decide which side of the gate
+  the scenario lives on.
+
 ## Split `shortThreshold` into three semantically distinct thresholds
 
 Source: 2026-05-24 Codex pair-review on the Halldis "second nap at 17:02"
