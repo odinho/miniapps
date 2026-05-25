@@ -416,24 +416,197 @@ describe("computeTrendTargets (stage 1: API only)", () => {
     expect(t.observedRecentMin).toBeLessThan(780);
   });
 
-  it("epoch gate: same-day re-evaluation does NOT advance the streak or move the target", () => {
-    // assembleState runs on every state fetch. Without the gate, hitting
-    // /api/state ten times today would advance the natural-support
-    // streak ten times and step the target every other call. Pin that
-    // same-day calls are a no-op against prior state.
+  it("evidence-frame gate: identical evidence on repeated calls is a no-op", () => {
+    // assembleState runs on every state fetch. Without an evidence-frame
+    // gate, repeated calls with identical classifiedDays + observed mean
+    // would re-advance the streak / re-step the target on each call. Pin
+    // that the engine's own output (with its persisted evidence
+    // fingerprint) is idempotent against repeat invocation.
     const sleeps = halldisLikeTrend();
     const now = new Date(day(9, 5, 25)).getTime();
-    const prior: TrendTargetState = {
+    const seed: TrendTargetState = {
       targetMin: 780,
       baselineMin: 780,
       source: "observed-initial",
       confidence: "medium",
       naturalSupportStreak: 1,
-      updatedAt: new Date(now).toISOString(), // same UTC date as now
+      updatedAt: new Date(now - 86400_000).toISOString(),
     };
-    const t = computeTrendTargets(sleeps, ctx11(sleeps), now, prior)!;
-    expect(t.state.targetMin).toBe(780);
-    expect(t.state.naturalSupportStreak).toBe(1); // unchanged
+    // First call seeds the fingerprint.
+    const r0 = computeTrendTargets(sleeps, ctx11(sleeps), now, seed)!;
+    expect(r0.state.evidenceFingerprint).toBeTruthy();
+    // Same data, same now, prior = r0.state — must hold.
+    const r1 = computeTrendTargets(sleeps, ctx11(sleeps), now, r0.state)!;
+    expect(r1.state.targetMin).toBe(r0.state.targetMin);
+    expect(r1.state.naturalSupportStreak).toBe(r0.state.naturalSupportStreak);
+    expect(r1.state.evidenceFingerprint).toBe(r0.state.evidenceFingerprint);
+  });
+
+  // ─── Data-based evidence-frame gate (Codex 2026-05-25 design B) ─────────
+  //
+  // The earlier same-UTC-date gate had a hole: a parent backfilling
+  // yesterday's nap data still re-triggers drift today (same date but new
+  // evidence). And — equally bad — the upward path mutates targetMin in
+  // place, so repeated calls with identical high-need evidence would
+  // ratchet up. The fingerprint covers both directions.
+
+  it("upward signal: repeated calls with identical evidence raise target at most once", () => {
+    // 14 natural-self-woke days at 820 min (40 above 780 target). Without
+    // the gate, two calls with the same data would both fire the upward
+    // path and stack the steps.
+    const history: SleepEntry[] = [];
+    for (let d = 0; d < 14; d++) {
+      history.push(...naturalDayAt(isoOffset("2026-04-01", d), 820, "self"));
+    }
+    const now = noonUtc(isoOffset("2026-04-01", 15));
+    const recent = last30(history, now);
+    const ctx = ctxForCtxBase(recent);
+    const seed: TrendTargetState = {
+      targetMin: 780,
+      baselineMin: 780,
+      source: "observed-initial",
+      confidence: "medium",
+      naturalSupportStreak: 0,
+      updatedAt: new Date(now - 86400_000).toISOString(),
+    };
+    const r1 = computeTrendTargets(recent, ctx, now, seed)!;
+    expect(r1.interventionTargetMin).toBeGreaterThan(780);
+    const r2 = computeTrendTargets(recent, ctx, now + 1000, r1.state)!;
+    expect(r2.interventionTargetMin).toBe(r1.interventionTargetMin);
+  });
+
+  it("downward signal: repeated calls with identical evidence don't double-advance the streak", () => {
+    // 14 self-woke days at 740 (40 below target). First call advances
+    // streak to 1. A second call with IDENTICAL data must NOT advance
+    // streak to 2 and step the target — that's the same-evidence-frame
+    // ratchet the gate is designed to prevent.
+    const history: SleepEntry[] = [];
+    for (let d = 0; d < 14; d++) {
+      history.push(...naturalDayAt(isoOffset("2026-04-01", d), 740, "self"));
+    }
+    const now = noonUtc(isoOffset("2026-04-01", 15));
+    const recent = last30(history, now);
+    const ctx = ctxForCtxBase(recent);
+    const seed: TrendTargetState = {
+      targetMin: 780,
+      baselineMin: 780,
+      source: "observed-initial",
+      confidence: "medium",
+      naturalSupportStreak: 0,
+      updatedAt: new Date(now - 86400_000).toISOString(),
+    };
+    const r1 = computeTrendTargets(recent, ctx, now, seed)!;
+    expect(r1.state.naturalSupportStreak).toBe(1);
+    const r2 = computeTrendTargets(recent, ctx, now + 1000, r1.state)!;
+    expect(r2.state.naturalSupportStreak).toBe(1); // unchanged
+    expect(r2.interventionTargetMin).toBe(780); // no step-down
+  });
+
+  it("evidence backfill: same UTC date but a prior day's kind flipped → re-evaluates", () => {
+    // Setup: 13 self-woke days at 740, then yesterday is untagged (woke_by
+    // null on the nap) at 740. First eval builds streak=0 (untagged doesn't
+    // support downward). Then the parent backfills yesterday's nap as
+    // self-woke. Same date, but classifiedDays for yesterday changes from
+    // natural-untagged → natural-self-woke. The gate must open so the
+    // streak advances on the corrected evidence.
+    const baseHistory: SleepEntry[] = [];
+    for (let d = 0; d < 13; d++) {
+      baseHistory.push(...naturalDayAt(isoOffset("2026-04-01", d), 740, "self"));
+    }
+    const yesterday = isoOffset("2026-04-01", 13);
+    const untaggedNaps: SleepEntry[] = [
+      { start_time: `${yesterday}T08:20:00.000Z`, end_time: `${yesterday}T09:50:00.000Z`, type: "nap", woke_by: null },
+      { start_time: `${yesterday}T18:00:00.000Z`, end_time: `${isoNextDate(yesterday)}T05:00:00.000Z`, type: "night", woke_by: "self" },
+    ];
+    const untaggedHistory = [...baseHistory, ...untaggedNaps];
+    const now = noonUtc(isoOffset("2026-04-01", 14));
+    const recent1 = last30(untaggedHistory, now);
+
+    const seed: TrendTargetState = {
+      targetMin: 780,
+      baselineMin: 780,
+      source: "observed-initial",
+      confidence: "medium",
+      naturalSupportStreak: 0,
+      updatedAt: new Date(now - 86400_000).toISOString(),
+    };
+    const r1 = computeTrendTargets(recent1, ctxForCtxBase(recent1), now, seed)!;
+    // r1 advances streak to 1 (13 self-woke days, well-below target) but
+    // doesn't step yet (streak < 2). target holds at 780.
+    expect(r1.state.naturalSupportStreak).toBe(1);
+    expect(r1.interventionTargetMin).toBe(780);
+
+    // Parent edits yesterday's nap to self-woke.
+    const fixedNaps: SleepEntry[] = [
+      { ...untaggedNaps[0], woke_by: "self" },
+      untaggedNaps[1],
+    ];
+    const updatedHistory = [...baseHistory, ...fixedNaps];
+    const recent2 = last30(updatedHistory, now);
+    const r2 = computeTrendTargets(recent2, ctxForCtxBase(recent2), now, r1.state)!;
+    // Fingerprint differs (yesterday's kind flipped) → gate opens.
+    expect(r2.state.evidenceFingerprint).not.toBe(r1.state.evidenceFingerprint);
+    // With the gate open, the streak completes (1 → 2) and the downward
+    // step fires; target drops below 780 (the actual "re-evaluation
+    // happened" signal). naturalSupportStreak then resets to 0 per the
+    // existing reset-after-step rule.
+    expect(r2.interventionTargetMin).toBeLessThan(r1.interventionTargetMin);
+  });
+
+  it("legacy migration: same-UTC-day fetch on a pre-fingerprint row holds (old date-gate carry-over)", () => {
+    // Production rows persisted under the old date-based gate already
+    // saw today's evidence. A first post-deploy fetch on the same UTC
+    // day must not re-fire drift on identical evidence, and must stamp
+    // the fingerprint so subsequent calls use the new data-based gate.
+    const history: SleepEntry[] = [];
+    for (let d = 0; d < 14; d++) {
+      history.push(...naturalDayAt(isoOffset("2026-04-01", d), 740, "self"));
+    }
+    const now = noonUtc(isoOffset("2026-04-01", 15));
+    const recent = last30(history, now);
+    const ctx = ctxForCtxBase(recent);
+    const legacyToday: TrendTargetState = {
+      targetMin: 780,
+      baselineMin: 780,
+      source: "observed-initial",
+      confidence: "medium",
+      naturalSupportStreak: 1, // pretend old code already advanced today
+      updatedAt: new Date(now).toISOString(),
+      // no evidenceFingerprint — pre-deploy row
+    };
+    const r = computeTrendTargets(recent, ctx, now, legacyToday)!;
+    // Held — streak unchanged, target unchanged. Same-day double-advance
+    // prevented per the migration safety belt.
+    expect(r.state.naturalSupportStreak).toBe(1);
+    expect(r.interventionTargetMin).toBe(780);
+    // But the fingerprint is stamped so future calls use the data gate.
+    expect(r.state.evidenceFingerprint).toBeTruthy();
+  });
+
+  it("legacy migration: missing evidenceFingerprint on prior allows one evaluation, then persists", () => {
+    // Existing production rows in `trend_target_state` predate the
+    // fingerprint column. Treat `undefined/null` as "no prior marker —
+    // allow this call to evaluate normally" and persist the new
+    // fingerprint on the returned state.
+    const history: SleepEntry[] = [];
+    for (let d = 0; d < 14; d++) {
+      history.push(...naturalDayAt(isoOffset("2026-04-01", d), 820, "self"));
+    }
+    const now = noonUtc(isoOffset("2026-04-01", 15));
+    const recent = last30(history, now);
+    const ctx = ctxForCtxBase(recent);
+    const legacy: TrendTargetState = {
+      targetMin: 780,
+      baselineMin: 780,
+      source: "observed-initial",
+      confidence: "medium",
+      naturalSupportStreak: 0,
+      updatedAt: new Date(now - 86400_000).toISOString(),
+      // no evidenceFingerprint — production row pre-migration
+    };
+    const r = computeTrendTargets(recent, ctx, now, legacy)!;
+    expect(r.interventionTargetMin).toBeGreaterThan(780);
+    expect(r.state.evidenceFingerprint).toBeTruthy();
   });
 
   it("downward drift requires explicit self-woke evidence (untagged days don't count)", () => {

@@ -222,8 +222,24 @@ export function getState(now?: number) {
 }
 
 function sameTrendTargetState(
-  a: { targetMin: number; baselineMin: number; source: string; confidence: string; naturalSupportStreak: number } | null,
-  b: { targetMin: number; baselineMin: number; source: string; confidence: string; naturalSupportStreak: number },
+  a:
+    | {
+        targetMin: number;
+        baselineMin: number;
+        source: string;
+        confidence: string;
+        naturalSupportStreak: number;
+        evidenceFingerprint?: string;
+      }
+    | null,
+  b: {
+    targetMin: number;
+    baselineMin: number;
+    source: string;
+    confidence: string;
+    naturalSupportStreak: number;
+    evidenceFingerprint?: string;
+  },
 ): boolean {
   if (!a) return false;
   return (
@@ -231,6 +247,7 @@ function sameTrendTargetState(
     a.baselineMin === b.baselineMin &&
     a.source === b.source &&
     a.confidence === b.confidence &&
-    a.naturalSupportStreak === b.naturalSupportStreak
+    a.naturalSupportStreak === b.naturalSupportStreak &&
+    (a.evidenceFingerprint ?? null) === (b.evidenceFingerprint ?? null)
   );
 }

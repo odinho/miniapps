@@ -156,6 +156,16 @@ export interface TrendTargetState {
    *  to 0 whenever upward/flat support arrives. */
   naturalSupportStreak: number;
   updatedAt: string;
+  /**
+   * Fingerprint of the evidence (classified completed days + observed
+   * recent mean) used by the last drift evaluation. The drift function
+   * no-ops when this matches the current evidence — repeat state-fetches
+   * within the same evidence frame don't ratchet target/streak even if a
+   * backfill keeps the UTC date the same. `undefined` on legacy rows; the
+   * next call freely evaluates and persists the marker.
+   * Codex 2026-05-25 review.
+   */
+  evidenceFingerprint?: string;
 }
 
 /**
@@ -352,15 +362,34 @@ function evaluateTrendTargetDrift(input: DriftInputs): TrendTargetState {
   const { prior, observedRecentMin, classifiedDays, ageFloorMin, now } = input;
   const updatedAt = new Date(now).toISOString();
 
-  // Epoch gate (Codex stage-3 review §"drift can advance multiple times
-  // on the same input"). `assembleState` runs on every state fetch, so
-  // without a per-day gate the streak/step would accumulate across
-  // multiple same-day evaluations. Compare against the *date* of the
-  // prior `updatedAt`, not the wall-clock minute — same local day → hold.
-  const priorDate = prior.updatedAt.slice(0, 10);
-  const nowDate = new Date(now).toISOString().slice(0, 10);
-  if (priorDate === nowDate) {
+  // Evidence-frame gate (Codex 2026-05-25 review, replacing the original
+  // UTC-date gate). `assembleState` runs on every state fetch, so without
+  // a per-evidence gate the streak/step would accumulate across multiple
+  // same-frame evaluations — and the upward path mutates targetMin in
+  // place, so even a single re-fire ratchets up. A fingerprint over
+  // evidence-bearing classified days + the observed mean catches both:
+  //   - repeated calls within the same evaluation frame (hold),
+  //   - same-UTC-date calls where a parent backfilled yesterday's data
+  //     (advance — the old date-based gate would have missed this).
+  // Legacy rows with `evidenceFingerprint === undefined` (pre-migration)
+  // skip the gate and evaluate once; the new marker persists on the
+  // returned state.
+  const fingerprint = computeEvidenceFingerprint(classifiedDays, observedRecentMin);
+  if (prior.evidenceFingerprint !== undefined && prior.evidenceFingerprint === fingerprint) {
     return { ...prior, updatedAt };
+  }
+  // Legacy migration safety: pre-deploy rows have no fingerprint. If
+  // the prior was updated today (UTC), the old date-based gate would
+  // have held — keep that behavior so a first post-deploy fetch on the
+  // same day can't advance a streak the old code already saw. Stamp
+  // the fingerprint so subsequent calls use the data-based gate. Codex
+  // 2026-05-25 review noted this as a non-blocking transition risk.
+  if (prior.evidenceFingerprint === undefined) {
+    const priorDate = prior.updatedAt.slice(0, 10);
+    const nowDate = new Date(now).toISOString().slice(0, 10);
+    if (priorDate === nowDate) {
+      return { ...prior, updatedAt, evidenceFingerprint: fingerprint };
+    }
   }
 
   // Downward-drift evidence is *self-woke only*. Untagged-complete days
@@ -407,6 +436,7 @@ function evaluateTrendTargetDrift(input: DriftInputs): TrendTargetState {
       confidence: naturalAnyMean !== null ? "medium" : "low",
       source: prior.source,
       updatedAt,
+      evidenceFingerprint: fingerprint,
     };
   }
 
@@ -425,12 +455,14 @@ function evaluateTrendTargetDrift(input: DriftInputs): TrendTargetState {
         confidence: "medium",
         source: "natural-days",
         updatedAt,
+        evidenceFingerprint: fingerprint,
       };
     }
     return {
       ...prior,
       naturalSupportStreak: newStreak,
       updatedAt,
+      evidenceFingerprint: fingerprint,
     };
   }
 
@@ -442,7 +474,33 @@ function evaluateTrendTargetDrift(input: DriftInputs): TrendTargetState {
       ? "medium"
       : prior.confidence,
     updatedAt,
+    evidenceFingerprint: fingerprint,
   };
+}
+
+/**
+ * Fingerprint of the evidence the drift function would consume: evidence-
+ * bearing classified days (excluding off-day / incomplete / noisy) plus
+ * the observed recent mean. Cheap string comparison gates re-fire of the
+ * mutation paths on the same evaluation frame. Codex 2026-05-25 review
+ * §"3. Extra test scenarios" — must NOT depend on `incomplete` days so
+ * a midnight tick doesn't reset/advance the streak.
+ */
+function computeEvidenceFingerprint(
+  classifiedDays: TrendDay[],
+  observedRecentMin: number,
+): string {
+  const evidence = classifiedDays
+    .filter(
+      (d) =>
+        d.kind === "natural-self-woke"
+        || d.kind === "natural-untagged"
+        || d.kind === "policy-affected",
+    )
+    .toSorted((a, b) => a.date.localeCompare(b.date))
+    .map((d) => `${d.date}:${d.kind}:${Math.round(d.totalMin)}`)
+    .join("|");
+  return `${evidence}#obs=${Math.round(observedRecentMin)}`;
 }
 
 /**
@@ -547,6 +605,7 @@ export function computeTrendTargets(
       confidence: "low",
       naturalSupportStreak: 0,
       updatedAt,
+      evidenceFingerprint: computeEvidenceFingerprint(classifiedDays, observed.blendedTrendMin),
     };
   }
 

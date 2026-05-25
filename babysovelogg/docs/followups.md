@@ -49,12 +49,18 @@ natural-day mean of last 30)` and persists it. No manual migration.
 
 Remaining items, in priority order:
 
-- **Drift epoch gate is time-based, not data-based.** Currently
-  same UTC date as `prior.updatedAt` → no-op. A data-based gate
-  (`evaluatedThroughDate` / fingerprint of the latest classified
-  completed day) would also catch "same date but parent logged a
-  self-wake nap that satisfied the streak". `src/lib/engine/trend.ts`
-  `evaluateTrendTargetDrift` epoch check.
+- ~~**Drift epoch gate is time-based, not data-based.**~~ Shipped
+  2026-05-25. Replaced the UTC-date gate with an evidence fingerprint
+  (sorted `${date}:${kind}:${totalMin}` over evidence-bearing days +
+  observed mean) so backfills on the same date re-fire drift, and
+  repeated calls within the same evidence frame don't ratchet
+  target/streak even when the upward path would normally mutate
+  targetMin in place. New `evidenceFingerprint` column on
+  `trend_target_state`; legacy rows migrate idempotently with a
+  same-UTC-day safety belt so pre-deploy rows can't double-advance
+  on their first new-code fetch. Codex pair-review picked design B
+  (full 30-day fingerprint over evidence-bearing days) and approved
+  the diff.
 
 - **Policy classifier uses observed as the near-target reference.**
   Held target and observed diverge once cap-following begins; the

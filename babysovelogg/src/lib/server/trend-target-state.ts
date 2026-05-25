@@ -11,7 +11,7 @@ export function getTrendTargetState(babyId: number): TrendTargetState | null {
   const row = db
     .prepare(
       `SELECT target_min, baseline_min, source, confidence,
-              natural_support_streak, updated_at
+              natural_support_streak, updated_at, evidence_fingerprint
        FROM trend_target_state WHERE baby_id = ?`,
     )
     .get(babyId) as
@@ -22,6 +22,7 @@ export function getTrendTargetState(babyId: number): TrendTargetState | null {
           confidence: string;
           natural_support_streak: number;
           updated_at: string;
+          evidence_fingerprint: string | null;
         }
       | undefined;
   if (!row) return null;
@@ -38,21 +39,24 @@ export function getTrendTargetState(babyId: number): TrendTargetState | null {
     confidence: row.confidence,
     naturalSupportStreak: row.natural_support_streak,
     updatedAt: row.updated_at,
+    evidenceFingerprint: row.evidence_fingerprint ?? undefined,
   };
 }
 
 export function setTrendTargetState(babyId: number, state: TrendTargetState): void {
   db.prepare(
     `INSERT INTO trend_target_state
-       (baby_id, target_min, baseline_min, source, confidence, natural_support_streak, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+       (baby_id, target_min, baseline_min, source, confidence,
+        natural_support_streak, updated_at, evidence_fingerprint)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(baby_id) DO UPDATE SET
        target_min = excluded.target_min,
        baseline_min = excluded.baseline_min,
        source = excluded.source,
        confidence = excluded.confidence,
        natural_support_streak = excluded.natural_support_streak,
-       updated_at = excluded.updated_at`,
+       updated_at = excluded.updated_at,
+       evidence_fingerprint = excluded.evidence_fingerprint`,
   ).run(
     babyId,
     state.targetMin,
@@ -61,6 +65,7 @@ export function setTrendTargetState(babyId: number, state: TrendTargetState): vo
     state.confidence,
     state.naturalSupportStreak,
     state.updatedAt,
+    state.evidenceFingerprint ?? null,
   );
 }
 

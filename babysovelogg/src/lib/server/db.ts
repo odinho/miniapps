@@ -228,6 +228,13 @@ function initSchema(database: SqliteDb) {
   // Per-row attempt counter so transient push failures retry a small
   // number of times before being abandoned (see notification-scheduler).
   tryAddColumn(database, "notification_schedule", "attempts", "INTEGER NOT NULL DEFAULT 0");
+
+  // Evidence-frame marker for the trend drift gate. Set on the prior
+  // state and compared against the freshly-computed fingerprint so
+  // repeated state-fetches on the same evidence don't ratchet target /
+  // streak. NULL on legacy rows; the next call evaluates once and
+  // persists the marker. Codex 2026-05-25 review.
+  tryAddColumn(database, "trend_target_state", "evidence_fingerprint", "TEXT");
 }
 
 /**
