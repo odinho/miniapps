@@ -1,10 +1,13 @@
-import type { SleepEntry, BabyContext, PredictionFeatures } from "$lib/types.js";
+import type { SleepEntry, BabyContext, PredictionFeatures, SleepCycleEstimate } from "$lib/types.js";
 import type { PredictedNap } from "./schedule.js";
 import {
   predictDayNaps,
   predictNightEndTime,
   recommendBedtime,
   calculateAgeMonths,
+  estimateSleepCycleDetails,
+  getLearnedNapDuration,
+  computeShortNapThreshold,
 } from "./schedule.js";
 import { computeStrategySignals, computeSleepWindow, extractWakeWindows } from "./features.js";
 import { selectStrategy, type Strategy } from "./strategy.js";
@@ -40,6 +43,23 @@ export interface DayResult {
   wakeTimeError: number | null; // minutes, predicted morning wake vs actual (positive = predicted later)
   /** Newborn: was the actual sleep start within the predicted window? (null for schedule days) */
   sleepWindowHit: boolean | null;
+  /** Sleep-cycle estimate the engine would have read this day — surfaces
+   *  source/confidence/minutes so per-period summaries can roll up cycle
+   *  confidence distribution. Null on newborn days (cycle is age-default
+   *  and the schedule engine doesn't run). */
+  sleepCycle: SleepCycleEstimate | null;
+  /** Day contained at least one parent-woken nap shorter than the
+   *  cycle-aware short threshold (`computeShortNapThreshold(learnedNap,
+   *  cycle.minutes)`). Surfaces the cut-short *signal* that drives the
+   *  rescue path in production — but this is a context metric only, NOT
+   *  a faithful rescue replay: the production rescue trigger
+   *  (`mostRecentCutShort` + `derivePostPlanFields`) flags any short
+   *  completed nap regardless of `woke_by`, and applies continuation /
+   *  bedtime-feasibility / active-nap gates the backtest doesn't
+   *  evaluate. Keeping the proxy narrow to woken naps because
+   *  Halldis's data labels them — the heuristic intentionally won't
+   *  fire on unlabeled or self-woken cut-shorts. */
+  rescueLikely: boolean;
 }
 
 /** Aggregate metrics across all backtested days. */
@@ -58,6 +78,17 @@ export interface BacktestResult {
   strategyCounts: Record<Strategy, number>;
   /** Fraction of newborn/emerging days where actual sleep started within predicted window */
   sleepWindowHitRate: number | null;
+  /** Average predicted naps per day (decimal). */
+  avgPredictedNapsPerDay: number;
+  /** Average actual naps per day (decimal). */
+  avgActualNapsPerDay: number;
+  /** Days where the rescueLikely heuristic fired. */
+  rescueLikelyDays: number;
+  /** Cycle confidence distribution across schedule/emerging days. */
+  cycleConfidence: { low: number; medium: number; high: number };
+  /** Fraction of schedule/emerging days where the cycle estimator
+   *  returned `source: "learned"` (vs `age-default`). */
+  cycleLearnedShare: number;
 }
 
 /** Predictor function signature — takes wake time and baby context. */
@@ -212,6 +243,8 @@ export function backtest(
         bedtimeError: null,
         wakeTimeError: null,
         sleepWindowHit,
+        sleepCycle: null,
+        rescueLikely: false,
       });
       continue;
     }
@@ -268,6 +301,24 @@ export function backtest(
       wakeTimeError = (predictedWakeMs - actualWakeMs) / 60000;
     }
 
+    // Surface the cycle estimate the engine read for this day — drives
+    // per-period rollups of confidence and powers the rescueLikely
+    // heuristic below. Memoized on ctx; cheap.
+    const sleepCycle = estimateSleepCycleDetails(ctx);
+    // Cut-short-woken-nap heuristic. Same `computeShortNapThreshold`
+    // production uses, retrospectively applied to actual naps. Narrower
+    // than production's `mostRecentCutShort` (which flags any short nap
+    // regardless of `woke_by`) and ignores continuation/bedtime gates,
+    // so this is a *signal* not a replay — see `DayResult.rescueLikely`
+    // docstring for the caveats.
+    const learnedNap = getLearnedNapDuration(ctx);
+    const shortThreshold = computeShortNapThreshold(learnedNap, sleepCycle.minutes);
+    const rescueLikely = actualNaps.some((n) => {
+      if (n.woke_by !== "woken" || !n.end_time) return false;
+      const durMin = (new Date(n.end_time).getTime() - new Date(n.start_time).getTime()) / 60000;
+      return durMin < shortThreshold;
+    });
+
     results.push({
       date: day.date,
       dayIndex: i,
@@ -283,6 +334,8 @@ export function backtest(
       bedtimeError,
       wakeTimeError,
       sleepWindowHit,
+      sleepCycle,
+      rescueLikely,
     });
   }
 
@@ -305,6 +358,11 @@ function summarize(days: DayResult[]): BacktestResult {
       wakeTimeMAE: 0,
       strategyCounts: { newborn_guidance: 0, emerging_rhythm: 0, routine_schedule: 0 },
       sleepWindowHitRate: null,
+      avgPredictedNapsPerDay: 0,
+      avgActualNapsPerDay: 0,
+      rescueLikelyDays: 0,
+      cycleConfidence: { low: 0, medium: 0, high: 0 },
+      cycleLearnedShare: 0,
     };
   }
 
@@ -372,6 +430,29 @@ function summarize(days: DayResult[]): BacktestResult {
     ? Math.round(windowDays.filter((d) => d.sleepWindowHit).length / windowDays.length * 100) / 100
     : null;
 
+  // Per-day-count averages over schedule days (newborn predictions are
+  // empty by construction). Rounded to one decimal so a 1.8-vs-2.0 split
+  // is visible in snapshots without exposing floating-point noise.
+  const avgPredictedNapsPerDay = scheduleDayCount > 0
+    ? Math.round(scheduleDays.reduce((sum, d) => sum + d.predictedNaps.length, 0) / scheduleDayCount * 10) / 10
+    : 0;
+  const avgActualNapsPerDay = scheduleDayCount > 0
+    ? Math.round(scheduleDays.reduce((sum, d) => sum + d.actualNaps.length, 0) / scheduleDayCount * 10) / 10
+    : 0;
+
+  // Rescue/cycle rollups — schedule/emerging days only.
+  const rescueLikelyDays = scheduleDays.filter((d) => d.rescueLikely).length;
+  const cycleDays = scheduleDays.filter((d): d is DayResult & { sleepCycle: SleepCycleEstimate } => d.sleepCycle !== null);
+  const cycleConfidence = { low: 0, medium: 0, high: 0 };
+  let learnedCount = 0;
+  for (const d of cycleDays) {
+    cycleConfidence[d.sleepCycle.confidence]++;
+    if (d.sleepCycle.source === "learned") learnedCount++;
+  }
+  const cycleLearnedShare = cycleDays.length > 0
+    ? Math.round(learnedCount / cycleDays.length * 100) / 100
+    : 0;
+
   return {
     days,
     totalDays,
@@ -385,6 +466,11 @@ function summarize(days: DayResult[]): BacktestResult {
     wakeTimeMAE: Math.round(wakeTimeMAE * 10) / 10,
     strategyCounts,
     sleepWindowHitRate,
+    avgPredictedNapsPerDay,
+    avgActualNapsPerDay,
+    rescueLikelyDays,
+    cycleConfidence,
+    cycleLearnedShare,
   };
 }
 
@@ -413,6 +499,31 @@ export function bucketResultsByAge(
 }
 
 /**
+ * Split results into ISO-week buckets (Monday-Sunday). Finer-grained
+ * than per-month bucketing — useful for timeline tests that need to see
+ * how cycle confidence + rescue activity move week-to-week. Each bucket
+ * label is the week's start date (YYYY-MM-DD on Monday).
+ */
+export function bucketResultsByWeek(
+  result: BacktestResult,
+): { label: string; result: BacktestResult }[] {
+  const byWeek = new Map<string, DayResult[]>();
+  for (const day of result.days) {
+    // Use UTC noon to avoid DST shift on week-start computation. ISO
+    // week: Monday = day 1. JS Date.getUTCDay() returns 0 for Sunday.
+    const dt = new Date(day.date + "T12:00:00Z");
+    const dayOfWeek = (dt.getUTCDay() + 6) % 7; // 0 = Monday
+    dt.setUTCDate(dt.getUTCDate() - dayOfWeek);
+    const weekStart = dt.toISOString().slice(0, 10);
+    if (!byWeek.has(weekStart)) byWeek.set(weekStart, []);
+    byWeek.get(weekStart)!.push(day);
+  }
+  return [...byWeek.entries()]
+    .toSorted(([a], [b]) => a.localeCompare(b))
+    .map(([start, days]) => ({ label: `wk ${start}`, result: summarize(days) }));
+}
+
+/**
  * Split results by how many prior days of data were available.
  * Shows cold-start penalty and how quickly predictions stabilize.
  */
@@ -431,21 +542,36 @@ export function bucketByWarmup(
     .filter((b) => b.result.totalDays > 0);
 }
 
-/** Compact one-line summary for snapshot assertions. */
+/** Compact one-line summary for snapshot assertions. Stays terse so it
+ *  fits in inline snapshots across many tests; per-day detail belongs
+ *  in separate dedicated timeline tests.
+ *
+ *  Note: `cycle` and `cut-short` are CONTEXT metrics derived from
+ *  actual history, not predictor outputs — they're identical across
+ *  baseline strategies in `baseline comparison` tests. Repetition is
+ *  intentional: it documents the data shape each strategy operates on.
+ */
 export function renderSummary(result: BacktestResult, label: string): string {
   const scheduleDays = result.days.filter((d) => d.strategy !== "newborn_guidance");
   const correct = scheduleDays.filter((d) => d.napCountError === 0).length;
   const pct = scheduleDays.length > 0 ? Math.round(correct / scheduleDays.length * 100) : 0;
+  const cc = result.cycleConfidence;
   return [
     `${label}:`,
     `${result.totalDays} days,`,
     `count ${pct}% (${correct}/${scheduleDays.length}),`,
+    `naps ${result.avgPredictedNapsPerDay.toFixed(1)}p/${result.avgActualNapsPerDay.toFixed(1)}a,`,
     `nap MAE ${result.napStartMAE},`,
     `dur MAE ${result.napDurationMAE},`,
     `bed MAE ${result.bedtimeMAE},`,
     `wake MAE ${result.wakeTimeMAE},`,
     `nap bias ${result.napStartBias > 0 ? "+" : ""}${result.napStartBias},`,
-    `count bias ${result.napCountBias > 0 ? "+" : ""}${result.napCountBias}`,
+    `count bias ${result.napCountBias > 0 ? "+" : ""}${result.napCountBias},`,
+    `cycle ${cc.low}/${cc.medium}/${cc.high} (l/m/h),`,
+    // "cut-short" rather than "rescue" — this is the cut-short woken
+    // signal, not a faithful rescue-trigger replay. See
+    // `DayResult.rescueLikely` docstring.
+    `cut-short ${result.rescueLikelyDays}`,
   ].join(" ");
 }
 

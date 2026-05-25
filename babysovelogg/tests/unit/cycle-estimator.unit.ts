@@ -181,6 +181,16 @@ describe("cycle estimator v2: scenario table", () => {
         ageMonths: 11, customNapCount: 1,
         naps: [...selfRun(8, 110, 1), ...selfRun(20, 55, 10, "woken")],
       })),
+      // Subharmonic-trap reproduction. Old `estimateSleepCycleFromData`
+      // (search range 35-60, no prior, zero-distance scoring) would have
+      // picked c=37 here: 110/3 ≈ 36.7 and 165/4 = 41.25 both score
+      // perfectly under a residual-only scorer. The new estimator's
+      // age-plausible range [50, 65] for 11mo excludes c=37 entirely,
+      // so the result must stay in-range — pinning the alias-defense.
+      render("11mo, 12@110m + 8@165m (alias trap)",   ctxOf({
+        ageMonths: 11, customNapCount: 1,
+        naps: [...selfRun(12, 110, 1), ...selfRun(8, 165, 15)],
+      })),
     ];
 
     expect(lines.join("\n")).toMatchInlineSnapshot(`
@@ -197,7 +207,8 @@ describe("cycle estimator v2: scenario table", () => {
       12.1mo, 12 self-wakes @ 55m                    c=55m  src=learned      conf=medium  N=  9.0  margin=+ 6.53  range=[55,70]
       14mo, 10 self-wakes @ 180m                     c=60m  src=learned      conf=medium  N=  7.5  margin=+ 0.00  range=[55,70]
       14mo, 12 self-wakes @ 110m                     c=55m  src=learned      conf=medium  N=  9.0  margin=+27.63  range=[55,70]
-      11mo, 8 self@110 + 20 woken@55                 c=55m  src=learned      conf=medium  N=  6.0  margin=+ 0.00  range=[50,65]"
+      11mo, 8 self@110 + 20 woken@55                 c=55m  src=learned      conf=medium  N=  6.0  margin=+ 0.00  range=[50,65]
+      11mo, 12@110m + 8@165m (alias trap)            c=55m  src=learned      conf=high    N= 15.0  margin=+ 0.00  range=[50,65]"
     `);
 
     // ── Invariants pinned below the snapshot ─────────────────────────────
@@ -241,6 +252,21 @@ describe("cycle estimator v2: scenario table", () => {
     }));
     expect(toddler110.minutes).toBeGreaterThanOrEqual(55);
     expect(toddler110.minutes).toBeLessThanOrEqual(70);
+
+    // Subharmonic-trap regression pin: 110m + 165m clusters would have
+    // tied c=37 (110/3 ≈ 36.7, 165/4 ≈ 41.25 — both inside the OLD
+    // [35, 60] search) under residual-only scoring. The new estimator
+    // must reject c=37 because it's outside the 11mo plausible range,
+    // landing somewhere in [50, 65] instead.
+    const aliasTrap = estimateSleepCycleDetails(ctxOf({
+      ageMonths: 11, customNapCount: 1,
+      naps: [...selfRun(12, 110, 1), ...selfRun(8, 165, 15)],
+    }));
+    expect(aliasTrap.minutes).toBeGreaterThanOrEqual(50);
+    expect(aliasTrap.minutes).toBeLessThanOrEqual(65);
+    expect(aliasTrap.minutes).not.toBe(37);
+    expect(aliasTrap.minutes).not.toBe(40);
+    expect(aliasTrap.minutes).not.toBe(41);
 
     // Strict self-wake filter: woken-only data must be ignored entirely.
     const wokenOnly = estimateSleepCycleDetails(ctxOf({
