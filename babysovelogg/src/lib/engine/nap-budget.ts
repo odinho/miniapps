@@ -159,7 +159,16 @@ export function computeNapBudget(input: ComputeNapBudgetInput): NapBudget | null
     ? delta >= 0
     : delta >= NAP_BUDGET.ESTABLISHED_TRACK_DELTA_MIN;
 
-  const remainingBudgetMin = Math.max(0, trend.blendedTrendMin - bankedMin);
+  // Cap math operates in "duration from nap start", so the budget must be
+  // the trend minus what was banked *before* this nap began. `bankedMin`
+  // above includes the active nap's elapsed minutes (correct for the
+  // projection gate). Using it here too would double-count elapsed time —
+  // every minute the parent waits would shrink the cap by an extra minute,
+  // collapsing it onto `elapsedMin + 1` and recommending "wake now" 30 min
+  // into a nap that the parent's data says will run 110 min (observed on
+  // Halldis, 2026-05-25). Recompute banked without the active nap instead.
+  const bankedPreNapMin = computeBankedToday(trendSleeps, todaySleeps, null, ctx.tz, now);
+  const napBudgetMin = Math.max(0, trend.blendedTrendMin - bankedPreNapMin);
   const cycleMin = estimateSleepCycleFromData(ctx);
   const floorMin = findByAge(NAP_FLOOR_BY_AGE, ctx.ageMonths).floorMin;
 
@@ -171,7 +180,7 @@ export function computeNapBudget(input: ComputeNapBudgetInput): NapBudget | null
   //    light-phase boundary (Trotti 2017: easy wake). See sleep-science
   //    §12.
   //
-  //  Mode B — established: trust the trend math. cap = remainingBudget,
+  //  Mode B — established: trust the trend math. cap = napBudget,
   //    minus a lead-time buffer so the parent has a minute to get to the
   //    baby before the next cycle starts. May land mid-cycle; the parent
   //    has practiced waking and accepts the trade.
@@ -179,9 +188,9 @@ export function computeNapBudget(input: ComputeNapBudgetInput): NapBudget | null
   let cyclesCompleted: number;
   if (establishedMode) {
     cyclesCompleted = 0;
-    cappedDurationMin = remainingBudgetMin - NAP_BUDGET.EARLY_WAKE_LEAD_MIN;
+    cappedDurationMin = napBudgetMin - NAP_BUDGET.EARLY_WAKE_LEAD_MIN;
   } else {
-    const cyclesUnderBudget = Math.floor(remainingBudgetMin / cycleMin);
+    const cyclesUnderBudget = Math.floor(napBudgetMin / cycleMin);
     if (cyclesUnderBudget >= 1) {
       cyclesCompleted = cyclesUnderBudget;
       cappedDurationMin = cyclesCompleted * cycleMin;
@@ -245,7 +254,7 @@ export function computeNapBudget(input: ComputeNapBudgetInput): NapBudget | null
           boundaryAtMin: Math.round(cappedDurationMin),
           // For backwards-compat with the existing field; the conceptual
           // "nudged from" is the raw cap before cycle alignment.
-          nudgedFromMin: Math.round(remainingBudgetMin),
+          nudgedFromMin: Math.round(napBudgetMin),
         }
       : null,
   };

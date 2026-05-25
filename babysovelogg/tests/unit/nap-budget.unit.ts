@@ -410,18 +410,21 @@ describe("computeNapBudget — works across ages with literature-backed floors",
   });
 
   it("established mode applies EARLY_WAKE_LEAD_MIN buffer", () => {
-    // Same fixture as above; check that the recommended duration is
-    // shorter than what a naive cycle-boundary cap would give.
+    // Trend ~773 min (13h synth, clamped at the upper edge of the blend),
+    // yesterday night 725 min → bankedPreNap 725, napBudget ≈ 48, established
+    // cap = 48 − EARLY_WAKE_LEAD_MIN (5) ≈ 43. Asserts the cap reflects the
+    // lead-time offset rather than collapsing onto the age-band floor —
+    // which is what a regression to the pre-2026-05-25 dimensional bug would
+    // produce. Even synthetic days so the blend is not pulled down by a 7d
+    // dip; priorState pins established mode regardless of delta.
     const todayDateStr = "2026-05-13";
     const yesterdayNightStart = new Date(`${todayDateStr}T00:00:00Z`).getTime() - 5 * 3600_000;
-    const longHistory = synthDays("2026-04-18", 17, 13 * 60);
-    const recentCapped = synthDays("2026-05-05", 7, 12.4 * 60);
-    const synth = [...longHistory, ...recentCapped];
+    const synth = synthDays("2026-04-18", 24, 13 * 60);
     const trendSleeps: SleepEntry[] = [
       ...synth,
       {
         start_time: new Date(yesterdayNightStart).toISOString(),
-        end_time: new Date(yesterdayNightStart + 740 * 60_000).toISOString(),
+        end_time: new Date(yesterdayNightStart + 725 * 60_000).toISOString(),
         type: "night",
         woke_by: "self",
       },
@@ -435,12 +438,14 @@ describe("computeNapBudget — works across ages with literature-backed floors",
       optedIn: true,
       now: new Date(`${todayDateStr}T08:55:00.000Z`).getTime(),
       ctx: ctx({ trendSleeps }),
+      priorState: { mode: "established", enteredAt: "2026-04-13T00:00:00.000Z" },
     });
-    if (out && out.mode === "established") {
-      // Floor is 22 for 11mo. With banked ~740 + 25 elapsed = 765 and a
-      // ~755 trend (clamped), remaining is small → cap floors at 22-25 min.
-      expect(out.recommendedDurationMin).toBeLessThan(50);
-    }
+    expect(out).not.toBeNull();
+    expect(out!.mode).toBe("established");
+    expect(out!.cycleNudge).toBeNull();
+    // Pre-fix this would have collapsed to ~26 (floor 22 + elapsed+1 clamp).
+    expect(out!.recommendedDurationMin).toBeGreaterThanOrEqual(38);
+    expect(out!.recommendedDurationMin).toBeLessThanOrEqual(55);
   });
 
   it("emits a budget for an 18mo toddler with the older floor", () => {
@@ -454,6 +459,146 @@ describe("computeNapBudget — works across ages with literature-backed floors",
     if (out) {
       expect(out.recommendedDurationMin).toBeGreaterThanOrEqual(28);
     }
+  });
+});
+
+// ── Cap dimensional invariant ───────────────────────────────────────
+
+/**
+ * Anti-regression for the 2026-05-25 production bug.
+ *
+ * Observed on Halldis: an 11mo with a 11h56m night, 30 min into her nap,
+ * the engine recommended waking at napStart + 30 min (i.e. "wake now")
+ * while the same engine's cycle predictor was projecting a natural wake
+ * 80 min later. Root cause: the cap math used `bankedMin` (which includes
+ * the active nap's elapsed minutes) as the available nap budget. The
+ * resulting `cappedDurationMin` is meant to be "duration from nap start"
+ * but was effectively "minutes remaining from now". As elapsed grew, the
+ * cap shrank in lockstep, collapsing onto the `elapsedMin + 1` floor.
+ *
+ * The dimensional invariant: holding the fixture constant, evaluating
+ * the engine at multiple points during the same nap must produce the
+ * same absolute wakeBy (modulo the elapsed+1 safety floor once the cap
+ * has truly been passed). Previously, wakeBy moved forward roughly
+ * 1 min per minute of waiting — a tell-tale signature of the bug.
+ */
+describe("computeNapBudget — cap dimensional invariant", () => {
+  it("wakeBy is invariant under repeated evaluation during the same nap", () => {
+    // Halldis-screenshot replica: 11h56m night (716 min), 11mo, 13h trend.
+    // bankedPreNap = 716, napBudget = 64. Evaluate at elapsed = 25 / 35 / 45
+    // min. wakeBy must stay near a single absolute time across all three.
+    const todayDateStr = "2026-05-13";
+    const yesterdayNightStart =
+      new Date(`${todayDateStr}T00:00:00Z`).getTime() - 5 * 3600_000;
+    const synth = synthDays("2026-04-18", 24, 13 * 60);
+    const trendSleeps: SleepEntry[] = [
+      ...synth,
+      {
+        start_time: new Date(yesterdayNightStart).toISOString(),
+        end_time: new Date(yesterdayNightStart + 716 * 60_000).toISOString(),
+        type: "night",
+        woke_by: "self",
+      },
+    ];
+    const napStartIso = `${todayDateStr}T08:30:00.000Z`;
+    const napStartMs = new Date(napStartIso).getTime();
+    const args = {
+      activeNap: { start_time: napStartIso },
+      todaySleeps: [] as SleepEntry[],
+      trendSleeps,
+      bedtime: `${todayDateStr}T17:00:00.000Z`,
+      isLastNapOfDay: true,
+      optedIn: true,
+      ctx: ctx({ trendSleeps }),
+    };
+
+    const wakeBys: number[] = [];
+    for (const elapsedMin of [25, 35, 45]) {
+      const out = computeNapBudget({
+        ...args,
+        now: napStartMs + elapsedMin * 60_000,
+      });
+      expect(out).not.toBeNull();
+      wakeBys.push(new Date(out!.wakeBy).getTime());
+    }
+    // All three wakeBys must be within ±1 min of each other. Pre-fix this
+    // span would be ~20 min (cap shrinking with elapsed).
+    const span = (Math.max(...wakeBys) - Math.min(...wakeBys)) / 60_000;
+    expect(span).toBeLessThanOrEqual(1);
+  });
+
+  it("established cap = napBudget − lead, computed from bankedPreNap, not bankedMin", () => {
+    // Screenshot replica with established priorState. Even 13h synth so the
+    // blend lands near 773; night 716 → bankedPreNap 716, napBudget ≈ 57,
+    // established cap ≈ 52-58. Pre-fix this returned ~30 (the elapsed+1
+    // safety floor, after the dimensional double-count collapsed the math).
+    const todayDateStr = "2026-05-13";
+    const yesterdayNightStart =
+      new Date(`${todayDateStr}T00:00:00Z`).getTime() - 5 * 3600_000;
+    const synth = synthDays("2026-04-18", 24, 13 * 60);
+    const trendSleeps: SleepEntry[] = [
+      ...synth,
+      {
+        start_time: new Date(yesterdayNightStart).toISOString(),
+        end_time: new Date(yesterdayNightStart + 716 * 60_000).toISOString(),
+        type: "night",
+        woke_by: "self",
+      },
+    ];
+    const napStartIso = `${todayDateStr}T08:30:00.000Z`;
+    const out = computeNapBudget({
+      activeNap: { start_time: napStartIso },
+      todaySleeps: [],
+      trendSleeps,
+      bedtime: `${todayDateStr}T17:00:00.000Z`,
+      isLastNapOfDay: true,
+      optedIn: true,
+      now: new Date(napStartIso).getTime() + 30 * 60_000,
+      ctx: ctx({ trendSleeps }),
+      priorState: { mode: "established", enteredAt: "2026-04-13T00:00:00.000Z" },
+    });
+    expect(out).not.toBeNull();
+    expect(out!.mode).toBe("established");
+    // Tight window. Pre-fix: ~30 (elapsed+1 floor). Post-fix: ~50-60.
+    expect(out!.recommendedDurationMin).toBeGreaterThanOrEqual(50);
+    expect(out!.recommendedDurationMin).toBeLessThanOrEqual(65);
+  });
+
+  it("first-contact cap fits a full cycle into napBudget from nap start", () => {
+    // Same replica, first-contact (no priorState). napBudget = 64. Cycle for
+    // an 11mo with no nap data falls in the 45–55 min range. The cap should
+    // accommodate one full cycle (≥ 40 min), not collapse to floor.
+    const todayDateStr = "2026-05-13";
+    const yesterdayNightStart =
+      new Date(`${todayDateStr}T00:00:00Z`).getTime() - 5 * 3600_000;
+    const synth = synthDays("2026-04-18", 24, 13 * 60);
+    const trendSleeps: SleepEntry[] = [
+      ...synth,
+      {
+        start_time: new Date(yesterdayNightStart).toISOString(),
+        end_time: new Date(yesterdayNightStart + 716 * 60_000).toISOString(),
+        type: "night",
+        woke_by: "self",
+      },
+    ];
+    const napStartIso = `${todayDateStr}T08:30:00.000Z`;
+    const out = computeNapBudget({
+      activeNap: { start_time: napStartIso },
+      todaySleeps: [],
+      trendSleeps,
+      bedtime: `${todayDateStr}T17:00:00.000Z`,
+      isLastNapOfDay: true,
+      optedIn: true,
+      now: new Date(napStartIso).getTime() + 30 * 60_000,
+      ctx: ctx({ trendSleeps }),
+    });
+    expect(out).not.toBeNull();
+    expect(out!.mode).toBe("first-contact");
+    expect(out!.cycleNudge).not.toBeNull();
+    // One full cycle ≈ 45-55 min. Pre-fix the bug would have collapsed this
+    // onto a sub-cycle floor or onto elapsed+1.
+    expect(out!.recommendedDurationMin).toBeGreaterThanOrEqual(40);
+    expect(out!.recommendedDurationMin).toBeLessThanOrEqual(65);
   });
 });
 
