@@ -428,11 +428,17 @@ deliberately deferred:
   `dayBudgetProjection` field that runs the day forward from now and
   surfaces the same cap target as a soft window.
 
-- **Active nap-budget ignores pauses.** `computeNapBudget` only takes
-  `{ start_time }` and computes `elapsed = now - start`
-  (`src/lib/engine/nap-budget.ts:113`, `:331`). A 20-min pause is
-  counted as sleep, so banked totals and wakeBy run too aggressive.
-  Thread `activeSleep.pauseTime` / `calcPauseMs` through.
+- **Active nap-budget ignores pauses.** _(IN ACTIVE WORK 2026-05-26 —
+  branch `worktree-napbudget-pauses`. Don't pick up in parallel.)_
+  After the pause-redesign migration the active-nap side of this is
+  moot (naps no longer pause), but the overnight side of
+  `computeBankedToday` (`src/lib/engine/nap-budget.ts:325-333`) still
+  counts night `(end - start)` without netting `night_waking`
+  intervals, so banked overnight is inflated by every minute the baby
+  was awake mid-night. Halldis fixture refresh added pauses so the
+  bug is now testable end-to-end. Fix: attach `wakingsAsPausesForSleep`
+  to trend/today entries that flow into napBudget, then use
+  `calcPauseMs` inside `computeBankedToday`'s night branch.
 
 - **Capped naps shouldn't drift learned-typical down.** The cap-respect
   carve-out in `censorCutShortNaps` keeps app-capped naps in the
