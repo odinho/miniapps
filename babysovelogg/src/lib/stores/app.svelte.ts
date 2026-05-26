@@ -162,7 +162,12 @@ export interface NapBudget {
 	 * one cycle wouldn't fit under the budget, the engine still recommends
 	 * one cycle (gentle easing trumps strict trend math). Null in
 	 * established mode and when the bedtime guard re-tightened the cap.
-	 * See sleep-science-research.md §12.
+	 *
+	 * Caveat: the post-bedtime-guard `elapsed + 1` safety clamp can push
+	 * the final cap past the original cycle boundary without clearing
+	 * `cycleNudge`. When that happens `boundaryAtMin` reflects the
+	 * clamped value, not a cycle-aligned wake. Treat the nudge as a hint
+	 * rather than a guarantee. See sleep-science-research.md §12.
 	 */
 	cycleNudge: { boundaryAtMin: number; nudgedFromMin: number } | null;
 }

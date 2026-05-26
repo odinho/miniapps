@@ -1344,24 +1344,34 @@ describe("assembleState", () => {
    * target → context.blendedTrendMin → UI.
    */
   describe("napBudget anti-ratchet (state-level closed loop)", () => {
-    it("intervention target holds across 6 days of cap-follow", () => {
+    it("intervention target holds while observed drops under sustained cap-follow", () => {
+      // Codex re-review 2026-05-26: the prior version of this test had
+      // intervention and observed both ~778 throughout — a regression
+      // that re-wired the cap to observed wouldn't have been caught.
+      // Redesigned per Codex's suggestion: seed a HIGH baseline (24 days
+      // at 14h), then simulate 10 LOW days (12h night + 55-min capped
+      // nap = ~12.9h total) and assert observable divergence between
+      // the held intervention target and the falling observed mean.
       const startDay = "2026-05-13";
-      const napStartLocalHour = 8.5; // 08:30Z = 10:30 Oslo
+      const napStartLocalHour = 8.5;
+      const SEED_DAYS = 24;
+      const SIM_DAYS = 10;
+      const SEED_TOTAL_MIN = 14 * 60; // 840
+      const SIM_NIGHT_MIN = 720; // 12h
+      const SIM_NAP_MIN = 55; // one cycle; parent caps at the engine's wakeBy
 
-      // Seed history: 24 days at 13h to set a stable trend.
-      let history: SleepLogRow[] = synthSleepRows("2026-04-18", 24, 13 * 60);
+      let history: SleepLogRow[] = synthSleepRows("2026-04-18", SEED_DAYS, SEED_TOTAL_MIN);
       let priorState: import("$lib/engine/trend.js").TrendTargetState | null = null;
 
       const trail: string[] = [];
 
-      for (let day = 0; day < 6; day++) {
+      for (let day = 0; day < SIM_DAYS; day++) {
         const today = new Date(`${startDay}T00:00:00Z`).getTime() + day * 86400_000;
         const nightStart = today - 5 * 3600_000;
-        // 12.2h nights every day — over-trend territory.
         const yesterdayNight = sleepRow({
           id: 8000 + day,
           start_time: new Date(nightStart).toISOString(),
-          end_time: new Date(nightStart + 732 * 60_000).toISOString(),
+          end_time: new Date(nightStart + SIM_NIGHT_MIN * 60_000).toISOString(),
           type: "night",
           domain_id: `slp_yest_night_${day}`,
           woke_by: "self",
@@ -1387,63 +1397,68 @@ describe("assembleState", () => {
             id: 1,
             baby_id: 1,
             date: new Date(today).toISOString().slice(0, 10),
-            wake_time: new Date(nightStart + 732 * 60_000).toISOString(),
+            wake_time: new Date(nightStart + SIM_NIGHT_MIN * 60_000).toISOString(),
             created_at: "",
             created_by_event_id: null,
           },
           diaperCount: 0,
           lastDiaperTime: null,
-          now: napStartMs + 25 * 60_000, // 25 min into the nap
+          now: napStartMs + 25 * 60_000,
           priorTrendTargetState: priorState,
         };
 
         const result = assembleState(data);
-        const nb = result.prediction?.napBudget;
-        expect(nb, `day ${day} napBudget should emit`).not.toBeNull();
-        const observed = result.prediction?.trendTargets?.observedRecentMin ?? null;
-        expect(observed, `day ${day} observed should not be null`).not.toBeNull();
-
+        const tt = result.prediction?.trendTargets;
+        expect(tt, `day ${day} trendTargets should be computed`).not.toBeNull();
         trail.push(
-          `day ${day}: intervention=${nb!.context.blendedTrendMin} observed=${observed} cap=${nb!.recommendedDurationMin} mode=${nb!.mode}`,
+          `day ${day}: intervention=${tt!.interventionTargetMin} observed=${tt!.observedRecentMin}`,
         );
 
-        // "Parent" caps the nap at the engine's wakeBy.
-        const napEndMs = new Date(nb!.wakeBy).getTime();
+        // Parent caps the nap at 55 min (one cycle) regardless of whether
+        // the engine emits a recommendation — the contract under test is
+        // the trend-split wiring, not the cap decision.
         history.push(yesterdayNight, {
           ...activeNap,
-          end_time: new Date(napEndMs).toISOString(),
+          end_time: new Date(napStartMs + SIM_NAP_MIN * 60_000).toISOString(),
           woke_by: "woken",
         });
-        // Carry forward the next state — what the server would persist.
-        priorState = result.prediction?.trendTargets?.state ?? null;
+        priorState = result.prediction?.trendTargets?.state ?? priorState;
       }
 
       expect(trail.join("\n")).toMatchInlineSnapshot(`
-        "day 0: intervention=778 observed=776 cap=58 mode=first-contact
-        day 1: intervention=778 observed=776 cap=58 mode=first-contact
-        day 2: intervention=778 observed=778 cap=58 mode=first-contact
-        day 3: intervention=778 observed=778 cap=58 mode=first-contact
-        day 4: intervention=778 observed=780 cap=58 mode=first-contact
-        day 5: intervention=778 observed=780 cap=58 mode=first-contact"
+        "day 0: intervention=835 observed=829
+        day 1: intervention=835 observed=821
+        day 2: intervention=835 observed=816
+        day 3: intervention=835 observed=808
+        day 4: intervention=835 observed=803
+        day 5: intervention=835 observed=795
+        day 6: intervention=835 observed=790
+        day 7: intervention=835 observed=789
+        day 8: intervention=835 observed=788
+        day 9: intervention=835 observed=787"
       `);
 
       const interventions = trail.map((line) => Number(line.match(/intervention=(\d+)/)![1]));
       const observeds = trail.map((line) => Number(line.match(/observed=(\d+)/)![1]));
 
-      // Anti-ratchet pin: intervention target stays within ±10 min over
-      // 6 days of cap-follow. A regression that wires the cap target
-      // back to the observed mean would show a monotonic decline here.
+      // Anti-ratchet pin: intervention drifts ≤ 10 min across 10 days.
       const interventionDrift = Math.max(...interventions) - Math.min(...interventions);
-      expect(interventionDrift).toBeLessThanOrEqual(10);
+      expect(interventionDrift, "intervention must not ratchet down").toBeLessThanOrEqual(10);
 
-      // Separation invariant: the intervention target must be reported
-      // by the engine independently from the observed mean. Observed can
-      // wander day-to-day with new data; intervention is the held cap
-      // target. In this scenario both happen to be close (long-night
-      // protection) but the engine still exposes them as separate fields.
-      for (let i = 0; i < interventions.length; i++) {
-        expect(Math.abs(observeds[i] - interventions[i])).toBeLessThanOrEqual(10);
-      }
+      // Observed must actually fall under sustained cap-follow — proves
+      // the test scenario is doing what it claims.
+      expect(
+        observeds[0] - observeds[observeds.length - 1],
+        "observed should fall as low-total days accumulate",
+      ).toBeGreaterThan(20);
+
+      // Divergence pin: by the end of 10 days the held intervention
+      // target should sit at least 30 min above observed. A regression
+      // that wired the cap target back to the observed mean would collapse
+      // this divergence to ~0 — the exact death spiral the trend split
+      // was designed to prevent.
+      const finalDivergence = interventions[interventions.length - 1] - observeds[observeds.length - 1];
+      expect(finalDivergence, "intervention should sit ≥ 30 min above observed by day 10").toBeGreaterThanOrEqual(30);
     });
   });
 
