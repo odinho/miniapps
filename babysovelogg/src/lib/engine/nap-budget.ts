@@ -27,6 +27,7 @@ import {
 import { isoToDateInTz } from "$lib/tz.js";
 import { estimateSleepCycleFromData } from "./schedule.js";
 import { computeBlendedTrend, computeTrendTargets } from "./trend.js";
+import { calcPauseMs } from "./classification.js";
 
 interface ComputeNapBudgetInput {
   /** Active nap. Must be type === 'nap'. */
@@ -320,8 +321,14 @@ function computeBankedToday(
   let banked = 0;
 
   // (1) Overnight sleep — primary night plus any fragments inside the
-  //     12h window. Each contributes its own duration; no double-count
-  //     because intervals are disjoint by construction (log invariant).
+  //     12h window. Each contributes its own duration minus any
+  //     `night_waking` intervals (threaded through as SleepEntry.pauses
+  //     by state.ts). Without this netting a 12h night with 65 min of
+  //     parent-attended wakings counts as 720 min when the baby only
+  //     slept 655 — bankedMin overshoots and the cap fires too
+  //     aggressively. No double-count: log invariant keeps disjoint
+  //     intervals between fragments, and pauses are nested inside a
+  //     single fragment.
   for (const s of allSleeps) {
     if (s.type !== "night" || !s.end_time) continue;
     if (seen.has(s.start_time)) continue;
@@ -329,7 +336,8 @@ function computeBankedToday(
     const endMs = new Date(s.end_time).getTime();
     if (endMs > wakeAnchorMs || endMs < overnightStartMs) continue;
     const startMs = new Date(s.start_time).getTime();
-    banked += (endMs - startMs) / 60_000;
+    const pauseMs = s.pauses && s.pauses.length > 0 ? calcPauseMs(s.pauses) : 0;
+    banked += Math.max(0, endMs - startMs - pauseMs) / 60_000;
   }
 
   // (2) Completed naps in the [wakeAnchorMs, now] interval. start_time

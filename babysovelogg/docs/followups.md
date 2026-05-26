@@ -29,9 +29,9 @@ Stage 5 (polish) pending:
   doesn't yet exist soft-fails. Acceptable edge case (admin-only
   flow), but a cleaner fix would mirror-write to night_waking from
   the legacy `sleep.paused` projection.
-- Potential follow-up: drop `sleep_pauses` table + legacy
-  `sleep.paused`/`sleep.resumed`/`sleep.pause_deleted` projections
-  once we've confirmed no engine-math regression is masked by them.
+- ~~Drop `sleep_pauses` table + legacy `sleep.paused`/`sleep.resumed`/
+  `sleep.pause_deleted` projections.~~ Shipped 2026-05-25 (commit
+  `2b55d9d`).
 
 
 ## Trend intervention-target split — stage 5+ followups
@@ -268,7 +268,7 @@ Stage-2 followups (parked, captured by Codex deviation review):
   vs actigraphy.
   <https://academic.oup.com/sleep/article/44/4/zsaa217/5937496>
 
-## Test-suite tightening — 2026-05-25 codex audit
+## Test-suite tightening — 2026-05-25 codex audit (mostly shipped)
 
 Source: 2026-05-25, after the nap-budget cap-collapsing bug (commit
 `f1d8783`). The bug was a dimensional confusion in `computeNapBudget`
@@ -281,73 +281,35 @@ more assertions, it is testing patterns that catch regressions while
 keeping tests readable as behavior documentation (renderer + snapshot
 + pinned invariants).
 
-### Patterns that masked real bugs
+**Shipped 2026-05-25 → 2026-05-26** (commits `9145681`, `0de9a94`,
+`0966070`, `d0d2cb8`, `e79de0b`, and the napbudget-pauses pass):
+`if (out)` guards stripped from `nap-budget.unit.ts`; Halldis real
+fixture pinned with concrete cap/mode/urgency; cycle-estimator alias
+exact-pins; nap-budget Gate 4 boundary; `computeBankedToday` local-
+midnight fallback; active-nap-before-wake-anchor branch; two-cycle
+first-contact invariance trail; multi-day capped-naps simulation;
+state-level anti-ratchet closed loop; opt-in/opt-out wire-up
+strengthened. One more `if (out)` no-op fixed in the off-day-bucket
+expansion test (2026-05-26 napbudget-pauses pass).
 
-- **`if (out)` guards**: many tests in `nap-budget.unit.ts` wrap their
-  assertions in `if (out) { ... }`. If the engine starts suppressing
-  the scenario, the test silently becomes a no-op. Decide per test:
-  this scenario should always emit (assert non-null then bounds) or
-  always suppress (assert null with the documented reason). Lines:
-  `nap-budget.unit.ts` :288, :378, :412, :446, :656, :703, :870, :915.
-- **Halldis real fixture allowed `null`**: `nap-budget.unit.ts:473`
-  uses `tests/fixtures/halldis-real-2026-05-13.json` as the canonical
-  real-baby regression net, but the assertion explicitly permits
-  `null` output and otherwise only checks broad ranges. The canonical
-  baby deserves concrete pins on what the engine actually recommends.
+### Still open
+
 - **Aggregate snapshots hide per-day regressions**: `backtest.unit.ts`
   :72/:93/:111/:141 and `baselines.unit.ts` :62/:73 freeze multi-day
   MAE / accuracy totals. A user-visible "wake at 30 instead of 60"
   regression disappears inside 138-day aggregates. Pair the aggregate
   snapshots with at least one per-day expected behavior for the
   canonical scenarios that have repeatedly broken.
-
-### Loose / tautological assertions worth tightening
-
-- `nap-budget.unit.ts:259` — `wakeBy = napStart + recommendedDurationMin`
-  is a tautology of the impl: the recent bug preserved this exact
-  relationship while producing the wrong cap.
-- `cycle-estimator.unit.ts:240/:250/:261` — bounds `[50, 65]` allow
-  regressions from the spec value `55` to e.g. `64`. Pin the exact
-  alias-detection outputs where the spec is exact; keep ranges where
-  the spec is genuinely a range.
 - `schedule.unit.ts:159/:176/:182/:638` — direction-only assertions
   ("after wake", "before bedtime") and "learnedDurationMin > 95"
   miss off-by-30-min regressions on the user-visible nap end.
-- `state.unit.ts:1310/:1321` — opt-in/opt-out test returns early if
-  the path doesn't emit; an "always suppress" regression is invisible.
-
-### Engine branches with no direct test
-
-- `nap-budget.ts` Gate 4 (`projectedIfRunsFull <= trend`) — no
-  boundary test at trend, trend+1, trend+tolerance, trend+tolerance+1.
-- `nap-budget.ts` `computeBankedToday` fallback to `localMidnightMs`
-  when no completed night precedes `now` (first-day-after-onboarding).
-- `nap-budget.ts` active-nap-before-wake-anchor branch
-  (midnight-crossing active nap), counter to the typical case.
 - Cycle estimator filters: `woke_by === "self"` and duration
   `20..180` — boundary values (19, 20, 181) untested.
 - Cycle estimator source precedence: `cycleSleeps → trendSleeps →
   extendedSleeps → recentSleeps` is fall-through, but no test asserts
   the precedence order.
 
-### High-value tests to add (not just tighten)
-
-- **Time-invariance trail for nap-budget**: evaluate the engine at
-  multiple points during a single nap on a typical baby and snapshot
-  the trail; pin that `wakeBy` is invariant across the trail. The
-  canonical anti-regression for the dimensional bug class — both for
-  nap-budget itself and as a template for other time-evolving
-  recommendations (continuation window, rescue caps, post-skip plan).
-- **Multi-day nap-budget simulation** on a typical baby (Mina-style
-  3-nap or Halldis-style 2-nap), feeding capped naps back into
-  history. Pins the "cap-follow doesn't ratchet target down" contract
-  from `trend-targets.unit.ts` but on real recommendations rather
-  than the trend math alone.
-- **Halldis real-fixture concrete pin**: assert the exact
-  recommended cap, mode, and urgency that the canonical scenario
-  produces today. Force someone to deliberately update it.
-
-### Process notes
+### Process notes (durable)
 
 - Don't pin every value exactly. Pin invariants (monotonicity,
   bounds-of-reason, no-overshoot, mode-once-set) and let the
@@ -428,17 +390,34 @@ deliberately deferred:
   `dayBudgetProjection` field that runs the day forward from now and
   surfaces the same cap target as a soft window.
 
-- **Active nap-budget ignores pauses.** _(IN ACTIVE WORK 2026-05-26 —
-  branch `worktree-napbudget-pauses`. Don't pick up in parallel.)_
-  After the pause-redesign migration the active-nap side of this is
-  moot (naps no longer pause), but the overnight side of
-  `computeBankedToday` (`src/lib/engine/nap-budget.ts:325-333`) still
-  counts night `(end - start)` without netting `night_waking`
-  intervals, so banked overnight is inflated by every minute the baby
-  was awake mid-night. Halldis fixture refresh added pauses so the
-  bug is now testable end-to-end. Fix: attach `wakingsAsPausesForSleep`
-  to trend/today entries that flow into napBudget, then use
-  `calcPauseMs` inside `computeBankedToday`'s night branch.
+- ~~**Active nap-budget ignores pauses.**~~ Shipped 2026-05-26.
+  Active-nap side is moot after the pause-redesign (naps no longer
+  pause). Overnight side fixed: `computeBankedToday` now subtracts
+  `calcPauseMs(s.pauses)` from each night contribution, and
+  `assembleState` attaches `wakingsAsPausesForSleep` to all engine
+  entry windows (recent/strategy/trend/cycle, not only today). Codex
+  pair-review caught a malformed-waking blocker — `wakingsAsPauses-
+  ForSleep` now clips waking intervals to the containing sleep so an
+  open waking on a closed night caps at sleep.end_time instead of
+  reaching `Date.now()`. Bonus: fixed an `if (out)` no-op in the
+  off-day-bucket-expansion test that masked a synth-night /
+  yesterdayNight start_time collision.
+
+- **Trend classification still uses gross-duration on nights with
+  pauses.** Codex 2026-05-26 follow-up to the pauses fix above.
+  `computeBlendedTrend` is already pause-aware via `getWeekStats` →
+  `durationMinutes` (`src/lib/engine/stats.ts:30-33`). But
+  `classifyTrendDay` in `src/lib/engine/trend.ts:259-260` and `:285`
+  uses a local `durationOf` (`:314-317`) that ignores `s.pauses`. A
+  night with 60 min of wakings counts at full duration for
+  classification — `nearTarget = totalMin >= reference - tolerance`
+  may flip `policy-affected` ↔ `natural` because of waking time
+  rather than actual sleep. After the bankedMin fix the cap-firing
+  comparison is now pause-aware on both sides, so this is a
+  classification consistency issue rather than a load-bearing engine
+  bug. Cleanest fix: have `durationOf` net pauses (or delete it and
+  call into the shared `durationMinutes`). Snapshot churn risk for
+  trend-target diagnostics — pin the new totals deliberately.
 
 - **Capped naps shouldn't drift learned-typical down.** The cap-respect
   carve-out in `censorCutShortNaps` keeps app-capped naps in the

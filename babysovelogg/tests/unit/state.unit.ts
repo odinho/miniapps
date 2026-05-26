@@ -3,6 +3,7 @@ import {
   assembleState,
   arbitrateRescueAgainstNapBudget,
   shouldSuppressContinuation,
+  wakingsAsPausesForSleep,
   type DayData,
 } from "$lib/engine/state.js";
 import { computeConfidence } from "$lib/engine/confidence.js";
@@ -115,6 +116,18 @@ function dayData(overrides: Partial<DayData> = {}): DayData {
     ...overrides,
   };
 }
+
+const nightSleep = (start: string, end: string | null) => ({
+  id: 1, type: "night", start_time: start, end_time: end,
+});
+const napSleep = (start: string, end: string | null) => ({
+  id: 1, type: "nap", start_time: start, end_time: end,
+});
+const wakingRow = (id: number, start: string, end: string | null) => ({
+  id, baby_id: 1, domain_id: `nwk_${id}`, start_time: start, end_time: end,
+  notes: null, mood: null, deleted: 0,
+  created_by_event_id: null, updated_by_event_id: null,
+});
 
 describe("assembleState", () => {
   it("computes ageMonths from baby birthdate", () => {
@@ -1662,6 +1675,70 @@ describe("assembleState", () => {
         }),
       );
       expect(result.prediction?.continuationWindow).not.toBeNull();
+    });
+  });
+
+  describe("wakingsAsPausesForSleep", () => {
+    // Codex 2026-05-26 pair-review flagged malformed waking shapes that the
+    // helper previously passed through verbatim. The pause-aware bankedMin
+    // fix in nap-budget.ts blew the cap up arbitrarily because `calcPauseMs`
+    // would either reach into `Date.now()` (open waking on closed night) or
+    // count post-sleep wake-time (waking that extended past sleep.end).
+    it("clips waking that overruns sleep.end to sleep.end", () => {
+      const out = wakingsAsPausesForSleep(
+        nightSleep("2026-05-12T19:00:00.000Z", "2026-05-13T05:00:00.000Z"),
+        [wakingRow(1, "2026-05-13T04:50:00.000Z", "2026-05-13T05:30:00.000Z")],
+      );
+      expect(out).toEqual([
+        { pause_time: "2026-05-13T04:50:00.000Z", resume_time: "2026-05-13T05:00:00.000Z" },
+      ]);
+    });
+
+    it("clips open waking on closed night to sleep.end (not Date.now())", () => {
+      const out = wakingsAsPausesForSleep(
+        nightSleep("2026-05-12T19:00:00.000Z", "2026-05-13T05:00:00.000Z"),
+        [wakingRow(1, "2026-05-13T03:00:00.000Z", null)],
+      );
+      expect(out).toEqual([
+        { pause_time: "2026-05-13T03:00:00.000Z", resume_time: "2026-05-13T05:00:00.000Z" },
+      ]);
+    });
+
+    it("leaves null resume_time alone for an active sleep", () => {
+      const out = wakingsAsPausesForSleep(
+        nightSleep("2026-05-12T19:00:00.000Z", null),
+        [wakingRow(1, "2026-05-12T22:00:00.000Z", null)],
+      );
+      expect(out).toEqual([
+        { pause_time: "2026-05-12T22:00:00.000Z", resume_time: null },
+      ]);
+    });
+
+    it("drops wakings that start at/after sleep.end", () => {
+      const out = wakingsAsPausesForSleep(
+        nightSleep("2026-05-12T19:00:00.000Z", "2026-05-13T05:00:00.000Z"),
+        [
+          wakingRow(1, "2026-05-13T05:00:00.000Z", "2026-05-13T05:30:00.000Z"),
+          wakingRow(2, "2026-05-13T05:30:00.000Z", "2026-05-13T05:35:00.000Z"),
+        ],
+      );
+      expect(out).toEqual([]);
+    });
+
+    it("drops wakings that start before sleep.start", () => {
+      const out = wakingsAsPausesForSleep(
+        nightSleep("2026-05-12T19:00:00.000Z", "2026-05-13T05:00:00.000Z"),
+        [wakingRow(1, "2026-05-12T18:30:00.000Z", "2026-05-12T19:30:00.000Z")],
+      );
+      expect(out).toEqual([]);
+    });
+
+    it("returns [] for naps", () => {
+      const out = wakingsAsPausesForSleep(
+        napSleep("2026-05-13T10:00:00.000Z", "2026-05-13T11:00:00.000Z"),
+        [wakingRow(1, "2026-05-13T10:30:00.000Z", "2026-05-13T10:45:00.000Z")],
+      );
+      expect(out).toEqual([]);
     });
   });
 });

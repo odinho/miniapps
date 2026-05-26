@@ -704,20 +704,44 @@ function buildContext(
  * shape so the engine's pause-aware math (calcPauseMs, getTodayStats,
  * getSleepDayTotals) nets night-waking duration out of night-sleep totals.
  * Returns an empty array for non-night sleeps and when no overlap exists.
+ *
+ * Waking intervals are clipped to the containing sleep's [start, end].
+ * Without the clip a waking that extends past sleep.end (or an open
+ * waking on a closed sleep, where `calcPauseMs` would otherwise fall
+ * back to `Date.now()`) inflates the netted duration arbitrarily.
+ * Codex 2026-05-26 pair-review flagged this as the blocker for the
+ * napBudget pauses fix.
  */
-function wakingsAsPausesForSleep(
+export function wakingsAsPausesForSleep(
   sleep: { id: number; start_time: string; end_time: string | null; type: string },
   wakings: NightWakingRow[],
 ): { pause_time: string; resume_time: string | null }[] {
   if (sleep.type !== "night" || wakings.length === 0) return [];
   const startMs = new Date(sleep.start_time).getTime();
-  const endMs = sleep.end_time ? new Date(sleep.end_time).getTime() : Number.POSITIVE_INFINITY;
-  return wakings
-    .filter((w) => {
-      const ws = new Date(w.start_time).getTime();
-      return ws >= startMs && ws < endMs;
-    })
-    .map((w) => ({ pause_time: w.start_time, resume_time: w.end_time }));
+  const sleepEndMs = sleep.end_time ? new Date(sleep.end_time).getTime() : null;
+  const endMs = sleepEndMs ?? Number.POSITIVE_INFINITY;
+  const out: { pause_time: string; resume_time: string | null }[] = [];
+  for (const w of wakings) {
+    const ws = new Date(w.start_time).getTime();
+    if (ws < startMs || ws >= endMs) continue;
+    // Clip waking end to sleep end. An open waking (resume_time === null)
+    // on a closed sleep gets capped at sleep.end_time instead of
+    // `Date.now()`. A waking that overruns the sleep is similarly
+    // clipped to sleep.end_time.
+    if (sleepEndMs === null) {
+      // Active sleep — leave waking as-is; calcPauseMs uses `now` for null
+      // resumes, which is the right behaviour while the sleep is ongoing.
+      out.push({ pause_time: w.start_time, resume_time: w.end_time });
+      continue;
+    }
+    const weMs = w.end_time ? new Date(w.end_time).getTime() : sleepEndMs;
+    const clippedEndMs = Math.min(weMs, sleepEndMs);
+    out.push({
+      pause_time: w.start_time,
+      resume_time: new Date(clippedEndMs).toISOString(),
+    });
+  }
+  return out;
 }
 
 /** Pure state assembly — takes fetched data, returns the API response shape. */
@@ -728,7 +752,20 @@ export function assembleState(data: DayData) {
   // Calculate predictions even during active sleep so ghost arcs stay visible
   const now = data.now ?? Date.now();
 
-  const recentEntries = recentSleeps.map(toSleepEntry);
+  // Attach overlapping night_waking intervals to night sleeps so the
+  // engine's pause-aware math (calcPauseMs, computeBankedToday) nets
+  // waking-time out of duration. The `nightWakings` fetch covers the
+  // 30h window before midnight, which fully contains the wake-anchor
+  // overnight that `computeBankedToday` looks up — older trend nights
+  // get an empty pauses array (no-op for duration math, which is
+  // already correct for those rows since their wakings aren't fetched
+  // and aren't load-bearing for the day's banked total).
+  const toSleepEntryWithPauses = (s: SleepLogRow): SleepEntry => ({
+    ...toSleepEntry(s),
+    pauses: s.type === "night" ? wakingsAsPausesForSleep(s, nightWakings) : [],
+  });
+
+  const recentEntries = recentSleeps.map(toSleepEntryWithPauses);
   // Determine strategy (use extended lookback for hysteresis when available).
   // The same extended window also feeds the cut-short censor's self-wake
   // median so it can fire even when the 7-day window has < 3 self-wakes.
@@ -742,15 +779,15 @@ export function assembleState(data: DayData) {
   const rawStrategySleeps = data.strategySleeps ?? recentSleeps;
   const strategyEntries = rawStrategySleeps
     .filter((s) => new Date(s.start_time).getTime() >= strategyCutoffMs)
-    .map(toSleepEntry);
+    .map(toSleepEntryWithPauses);
   // Trend window for napBudget — prefer the 30-day fetch when present, then
   // fall back to whatever wider data we have. The helper itself gates on
   // ≥7 days of complete data.
-  const trendEntries = (data.trendSleeps ?? data.strategySleeps ?? recentSleeps).map(toSleepEntry);
+  const trendEntries = (data.trendSleeps ?? data.strategySleeps ?? recentSleeps).map(toSleepEntryWithPauses);
   // cycleSleeps is the 180-day window for the sleep-cycle estimator.
   // Falls through to trendSleeps/strategySleeps/recentSleeps so existing
   // callers (tests, backtest) keep working without supplying it.
-  const cycleEntries = (data.cycleSleeps ?? data.trendSleeps ?? data.strategySleeps ?? recentSleeps).map(toSleepEntry);
+  const cycleEntries = (data.cycleSleeps ?? data.trendSleeps ?? data.strategySleeps ?? recentSleeps).map(toSleepEntryWithPauses);
   const ctx = buildContext(
     baby, recentEntries, now, strategyEntries, trendEntries, cycleEntries, data.offDays,
     data.priorTrendTargetState ?? null,

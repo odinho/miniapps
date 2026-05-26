@@ -1459,6 +1459,106 @@ describe("computeNapBudget — Codex review regressions", () => {
     expect(after!.context.bankedMin).toBe(900);
   });
 
+  it("overnight wakings net out of bankedMin (real Halldis pattern)", () => {
+    // Halldis pattern: 12h overnight with two parent-attended wakings
+    // (e.g. 15 min + 50 min = 65 min total). Actual sleep is 11h, not 12.
+    // The bug counts wake-time as sleep → bankedMin off by every minute
+    // the baby was awake mid-night. That alone can flip a near-trend day
+    // into "above trend" and fire a cap that shouldn't fire.
+    //
+    // Synth at 11h so the trend (≈660 min) is well below both cases'
+    // projection — the cap fires in both, and bankedMin is observable.
+    //   A. night has no pauses → bankedMin = 720 (12h night) + 60 (active) = 780.
+    //   B. night has 65 min pauses → bankedMin = 720 + 60 − 65 = 715.
+    // The 65-min delta IS the bug — pre-fix, both cases bank 780.
+    const synth = synthDays("2026-04-18", 24, 11 * 60);
+    const nightStart = "2026-05-12T17:00:00.000Z";
+    const nightEnd = "2026-05-13T05:00:00.000Z"; // 12h
+    const baseNight: SleepEntry = {
+      start_time: nightStart,
+      end_time: nightEnd,
+      type: "night",
+      woke_by: "self",
+    };
+    const trendNoPauses = [...synth, baseNight];
+    const nightWithPauses: SleepEntry = {
+      ...baseNight,
+      pauses: [
+        { pause_time: "2026-05-12T20:00:00.000Z", resume_time: "2026-05-12T20:15:00.000Z" }, // 15 min
+        { pause_time: "2026-05-13T02:30:00.000Z", resume_time: "2026-05-13T03:20:00.000Z" }, //  50 min
+      ],
+    };
+    const trendWithPauses = [...synth, nightWithPauses];
+    const base = {
+      activeNap: { start_time: "2026-05-13T08:00:00.000Z" },
+      todaySleeps: [] as SleepEntry[],
+      bedtime: "2026-05-13T17:00:00.000Z",
+      isLastNapOfDay: true,
+      optedIn: true,
+      now: new Date("2026-05-13T09:00:00.000Z").getTime(),
+      learnedNapDurationMin: 90,
+    };
+
+    const without = computeNapBudget({
+      ...base,
+      trendSleeps: trendNoPauses,
+      ctx: ctx({ trendSleeps: trendNoPauses }),
+    });
+    const with_ = computeNapBudget({
+      ...base,
+      trendSleeps: trendWithPauses,
+      ctx: ctx({ trendSleeps: trendWithPauses }),
+    });
+
+    expect(without).not.toBeNull();
+    expect(with_).not.toBeNull();
+    // 12h night + 60 min active elapsed = 780, then -65 min wakings on case B.
+    expect(without!.context.bankedMin).toBe(780);
+    expect(with_!.context.bankedMin).toBe(715);
+  });
+
+  it("isDayOnTrend nets overnight wakings out of banked24h", () => {
+    // Mirror of the above for the rescue suppression gate. A day with
+    // observed-trend ≈ 13h and an overnight of 13.0h *with* 65 min of
+    // wakings has actual sleep 11.92h — below trend tolerance. Without
+    // the netting the engine thinks the day is on trend and suppresses
+    // the continuation/rescue path that the parent actually needs.
+    const synth = synthDays("2026-04-18", 24, 13 * 60);
+    const yesterdayStart = "2026-05-12T16:00:00.000Z";
+    const yesterdayEnd = "2026-05-13T05:00:00.000Z"; // 13h
+    const baseNight: SleepEntry = {
+      start_time: yesterdayStart,
+      end_time: yesterdayEnd,
+      type: "night",
+      woke_by: "self",
+    };
+    const nightWithPauses: SleepEntry = {
+      ...baseNight,
+      pauses: [
+        { pause_time: "2026-05-12T19:30:00.000Z", resume_time: "2026-05-12T19:45:00.000Z" }, // 15 min
+        { pause_time: "2026-05-13T01:00:00.000Z", resume_time: "2026-05-13T01:50:00.000Z" }, // 50 min
+      ],
+    };
+    const now = new Date("2026-05-13T07:00:00.000Z").getTime();
+
+    expect(
+      isDayOnTrend(
+        [...synth, baseNight],
+        [],
+        ctx({ trendSleeps: [...synth, baseNight] }),
+        now,
+      ),
+    ).toBe(true);
+    expect(
+      isDayOnTrend(
+        [...synth, nightWithPauses],
+        [],
+        ctx({ trendSleeps: [...synth, nightWithPauses] }),
+        now,
+      ),
+    ).toBe(false);
+  });
+
   it("bedtime-guard tightening does not re-introduce a past wakeBy", () => {
     // Parent has napped past bedtime - 90 min. The bedtime guard would
     // tighten cap to (bedtime - 90 min - napStart), which lands in the
@@ -1513,10 +1613,10 @@ describe("computeNapBudget — Codex review regressions", () => {
     // the bad night still pulls the mean down.
     const todayDateStr = "2026-05-13";
     const yesterdayNightStart = new Date(`${todayDateStr}T00:00:00Z`).getTime() - 5 * 3600_000;
-    // 23 normal days, then one anomalously-short overnight (8h) for the
-    // night anchored to 2026-05-11 (= sick night going into 2026-05-12).
-    const normal = synthDays("2026-04-19", 24, 13 * 60);
-    // Replace the 2026-05-11 night with a much shorter one.
+    // 23 normal days (2026-04-19 → 2026-05-11), then a separate yesterday
+    // overnight (2026-05-12 → 2026-05-13). The 2026-05-11 night is the
+    // short overnight (8h) that we want off-day expansion to also drop.
+    const normal = synthDays("2026-04-19", 23, 13 * 60);
     const shortNightStart = new Date("2026-05-11T19:00:00Z");
     const shortNightEnd = new Date(shortNightStart.getTime() + 8 * 3600_000);
     const fixed = normal.map((s) =>
@@ -1547,10 +1647,10 @@ describe("computeNapBudget — Codex review regressions", () => {
     // is also excluded → mean rises.
     const offDays = new Set<string>(["2026-05-12"]);
     const withFilter = computeNapBudget({ ...baseInput, ctx: ctx({ trendSleeps, offDays }) });
-    if (withoutFilter && withFilter) {
-      expect(withFilter.context.blendedTrendMin).toBeGreaterThan(
-        withoutFilter.context.blendedTrendMin,
-      );
-    }
+    expect(withoutFilter).not.toBeNull();
+    expect(withFilter).not.toBeNull();
+    expect(withFilter!.context.blendedTrendMin).toBeGreaterThan(
+      withoutFilter!.context.blendedTrendMin,
+    );
   });
 });
