@@ -16,12 +16,6 @@ import {
 // the dashboard should show "Overtid" (overtime), not silently jump to bedtime.
 
 test("B11: shows overtime when predicted nap time has passed", async ({ page }) => {
-  const babyId = createBaby("Testa"); // birthdate 2025-06-12 → ~9 months old
-  const db = getDb();
-
-  // Set custom_nap_count = 1 so prediction expects exactly 1 nap
-  db.prepare("UPDATE baby SET custom_nap_count = 1 WHERE id = ?").run(babyId);
-
   // Pin the server clock so the test isn't time-of-day dependent. Use a
   // mid-morning anchor that leaves the predicted nap 30 min in the past
   // (overdue but below the 90-min skip threshold), with bedtime still
@@ -32,6 +26,18 @@ test("B11: shows overtime when predicted nap time has passed", async ({ page }) 
   today.setHours(10, 30, 0, 0);
   const nowMs = today.getTime();
   const wakeTime = new Date(nowMs - 210 * 60_000);
+
+  // Anchor the birthdate ~9 months before `now` rather than a fixed date —
+  // a hard-coded birthdate drifts the baby older as real time passes, which
+  // lengthens the wake window and pushes the predicted nap into the future
+  // (the test had rotted to ~12 mo → "Neste lur" instead of "Overtid").
+  const birthdate = new Date(nowMs);
+  birthdate.setMonth(birthdate.getMonth() - 9);
+  const babyId = createBaby("Testa", birthdate.toISOString().slice(0, 10));
+  const db = getDb();
+
+  // Set custom_nap_count = 1 so prediction expects exactly 1 nap
+  db.prepare("UPDATE baby SET custom_nap_count = 1 WHERE id = ?").run(babyId);
 
   const nightStart = new Date(wakeTime);
   nightStart.setDate(nightStart.getDate() - 1);
