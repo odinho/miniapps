@@ -691,10 +691,64 @@ the engine logic is unit-tested; this is a display assertion.
 `DayRecord` now has `target_bedtime?: string | null` and the backtest threads
 it into `ctx.targetBedtime` (2026-05-09). But `tests/fixtures/halldis-sleep.json`
 has no `target_bedtime` data (the feature didn't exist when the fixture was
-exported). To actually measure whether the 60-min cap helps, re-export a fresh
-Halldis fixture from prod that includes current target_bedtime settings, or
-back-fill the field for known date ranges (e.g. target was ~19:30 from
-approximately Halldis's 3-month mark).
+exported). To actually measure whether the 60-min cap helps, the fixture needs
+real target_bedtime periods.
+
+**2026-06-11 prod-pull findings** (fresh openclaw Halldis db, 1464 events,
+2026-03-22 → 06-10, saved to `local/imports/halldis-openclaw.db.sqlite`):
+- `target_bedtime` is a **baby-global** setting (column on `baby`), NOT
+  per-day. From the `baby.updated` event log it was **`18:00` from 2026-04-05
+  to ~2026-05-03/04**, then cleared (currently `null`). So a faithful fixture
+  must **walk `baby.updated` events** and stamp `target_bedtime` per-day across
+  that window — `db-to-fixture.ts`'s "current value applied uniformly" path
+  yields nothing now that it's null (the script's own comment flags this).
+- **Blocked by tooling bugs below** — the export path crashes on the current
+  (migrated) schema before we can even regenerate. Fix those first, then add
+  event-walking, then re-run `backtest:report` to measure the cap over the
+  Apr–May 18:00 window.
+
+## Fixture-export tooling broken on the post-migration schema — 2026-06-11
+
+Surfaced while pulling fresh Halldis prod data to refresh the backtest
+fixture. Both export paths predate the `sleep_pauses → night_waking`
+migration (which DROPs `sleep_pauses`), so they break on any current DB:
+
+- **`scripts/db-to-fixture.ts` crashes** — `SQLiteError: no such table:
+  sleep_pauses` (`db-to-fixture.ts:69`). It must tolerate the dropped table
+  and read pause/waking intervals from `night_waking` instead (nets night
+  duration via `calcPauseMs`). This is the hard blocker on refreshing
+  `tests/fixtures/halldis-sleep.json`.
+- **`scripts/backtest-report.ts --db` is unreliable** — `loadFromDb`
+  (`:129-182`) doesn't crash (separate inline loader) but produces ~20h
+  nap-start/wake MAE on the fresh Halldis db (nap MAE 1181, wake MAE 1279)
+  while the committed merged fixture gives sane numbers (nap MAE 39.7, wake
+  26.3). It reads neither `night_waking` (so night durations aren't
+  pause-netted) nor `off_day` (so sick/travel days poison stats). Don't
+  trust `--db` numbers until this loader matches `db-to-fixture` semantics —
+  ideally collapse the two loaders into one shared helper.
+
+Canonical fixture still backtests fine (it was generated pre-migration via
+the merge pipeline), so nothing shipped is affected — this only blocks
+*refreshing* the fixture from current prod.
+
+## Newborn stage: drop night/morning framing, treat as naps + wakings?
+
+Source: 2026-06-11 — Umi parent on the pre-night_waking build logged an
+evening re-sleep ("wake at 22, then sleep again") that the old version
+rendered confusingly. Open question: in the newborn/emerging strategy, should
+the engine stop imposing a hard "night" / "morning" / day-boundary at all and
+just model naps + wakings, since newborn sleep is polyphasic and the wall-clock
+day/night split doesn't apply yet?
+
+Leaning: **the immediate confusion is already resolved by `night_waking`**
+(now deployed everywhere — Umi updated 06-11), so a full "naps-only newborn
+mode" is probably not worth the downside (parents still want night totals /
+longest-stretch even for newborns). The narrower real bug, if it recurs, is
+the **wall-clock day-boundary logic** (`getHours()` deep-night/evening gates,
+see the "Wall-clock assumptions" followup) mislabeling a late-evening re-sleep
+as a new day/morning instead of a continued fragmented night. Fix that
+specific path rather than removing night handling. Revisit if a newer-build
+parent still reports the confusion.
 
 
 ### Engine: sleepWindow during active sleep shows "now" window, not post-wakeup window
