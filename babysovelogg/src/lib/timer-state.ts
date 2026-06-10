@@ -105,9 +105,17 @@ export function getTimerMode(input: TimerInput): TimerMode {
 		} else if (activeSleep.type === 'night') label = '💤 Søv';
 		else label = '😴 Lurar';
 
-		// Expected wake time for naps (negative = overtime)
-		const expectedWake = activeSleep.type === 'nap' && prediction?.expectedNapEnd
-			? prediction.expectedNapEnd
+		// Expected wake time for naps (negative = overtime). When the engine
+		// has emitted an actionable cap (napBudget for over-trend days,
+		// rescueNap for short-prior/extra naps) point the countdown at *that*
+		// deadline — otherwise the centre text says "Vaknar ~15:11" while the
+		// nap-budget banner and arc marker say "vekk 14:00–14:10" (2026-05-27
+		// report). Falls back to the natural expected nap-end when no cap.
+		const napCapWake = activeSleep.type === 'nap'
+			? (prediction?.napBudget?.wakeBy ?? prediction?.rescueNap?.recommendedWakeTime ?? null)
+			: null;
+		const expectedWake = activeSleep.type === 'nap'
+			? (napCapWake ?? prediction?.expectedNapEnd ?? null)
 			: null;
 		const expectedWakeCountdown = expectedWake
 			? new Date(expectedWake).getTime() - now
@@ -161,7 +169,12 @@ export function getTimerMode(input: TimerInput): TimerMode {
 	// When the engine flagged a missed nap (no active sleep, >60 min overdue),
 	// surface that to the parent with the post-skip recommendation instead of
 	// the misleading "Leggetid om 8t" the regular bedtime branch would show.
-	if (prediction?.skippedNap) {
+	//
+	// But once the planned bedtime has passed, the skip is moot — the parent is
+	// putting the baby to bed now, not weighing a rescue nap. Yield to the
+	// bedtime / after-bedtime branches so we don't keep showing "Hoppa over lur"
+	// and a stale earlier-bedtime tip past bedtime (2026-05-30 report).
+	if (prediction?.skippedNap && (bedtimeMs == null || bedtimeMs > now)) {
 		const plannedMs = new Date(prediction.skippedNap.plannedAt).getTime();
 		return {
 			kind: 'skipped-nap',

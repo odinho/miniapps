@@ -664,6 +664,7 @@
 				{ageMonths}
 				{baby}
 				napsAllDone={prediction?.napsAllDone && prediction?.postSkipPlan?.kind !== 'rescue'}
+				wakeCapActive={!!(activeSleep && !activeSleep.end_time && activeSleep.type === 'nap' && (prediction?.napBudget || prediction?.rescueNap))}
 				{onSleepStarted}
 				{onSleepEnded}
 			/>
@@ -775,7 +776,7 @@
 							Vekkjingsvindauget tek omsyn til {cycLabel}.
 							Vi kapper ved slutten av éin full syklus så ho vaknar i lett fase — mjukare oppvakning, mindre tilvenningsstress.
 						{:else}
-							Vi anbefaler å vakne litt før neste syklus startar så du får tid til å koma fram til henne. Trendmålet i dag er {Math.round(nb.context.blendedTrendMin / 60 * 10) / 10}t totalt søvn ({nb.context.sourceLabel}).
+							Vi anbefaler å vakne litt før neste syklus startar så du får tid til å koma fram til henne. Trendmålet i dag er {Math.round(nb.context.blendedTrendMin / 60 * 10) / 10}t totalt søvn.
 						{/if}
 						<button class="nap-budget-explain-close" onclick={() => (showNapBudgetExplain = false)}>Lukk</button>
 					</div>

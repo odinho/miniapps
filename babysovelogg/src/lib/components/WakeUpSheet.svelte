@@ -54,7 +54,10 @@
 	let wakeTime = $state(defaultWakeTime.toTimeString().slice(0, 5));
 	let wakeDate = $state(`${defaultWakeTime.getFullYear()}-${String(defaultWakeTime.getMonth() + 1).padStart(2, '0')}-${String(defaultWakeTime.getDate()).padStart(2, '0')}`);
 
-	let wokeBy = $state<string | null>(null);
+	// Pre-select the wake reason already recorded (e.g. a cap-respect wake the
+	// sleep button tagged 'woken'); the parent can still change it.
+	// svelte-ignore state_referenced_locally — intentional: snapshot is immutable
+	let wokeBy = $state<string | null>(sleepSnapshot.woke_by ?? null);
 	let wakeMood = $state<string | null>(null);
 	let notes = $state('');
 	let busy = $state(false);

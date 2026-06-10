@@ -82,7 +82,12 @@
 				<div class="arc-sub-label" style="opacity: 0.8; color: var(--peach-dark);">+{formatDuration(Math.abs(mode.expectedWakeCountdown))} over forventa</div>
 			{/if}
 		{/if}
-		{#if mode.cyclePhase}
+		{#if mode.cyclePhase && !(prediction?.napBudget || prediction?.rescueNap)}
+			<!-- Hide the "~Xm til neste lette fase" cycle hint when a wake cap is
+			     active: the cap (esp. established/"presis modus") may recommend a
+			     mid-cycle wake, and showing "16 min til lette fase" alongside
+			     "vekk no" reads as contradictory (2026-05-29 report). The
+			     nap-budget banner is the authoritative guidance in that case. -->
 			<div class="arc-sub-label" style="opacity: 0.7; font-size: 0.7rem; margin-top: 2px;">
 				{#if mode.cyclePhase.isLightPhase}
 					<span style="color: var(--lavender-dark);">💡 Truleg lett fase no</span>
@@ -115,8 +120,11 @@
 		{#if confidenceLabel}
 			<div class="arc-sub-label confidence-range" data-testid="confidence-range">{confidenceLabel}</div>
 		{/if}
-		{#if prediction?.feasible === false}
-			<div class="arc-sub-label" style="color: var(--peach-dark); font-size: 0.7rem;">Målet ditt{targetBedtime ? ` (${targetBedtime})` : ''} er ikkje nåeleg i dag</div>
+		{#if prediction?.feasible === false && targetBedtime}
+			<!-- Only call it "ditt mål" when the parent actually set a manual
+			     target bedtime. With auto bedtime the infeasibility is about an
+			     internal target, not a parent goal (2026-06-06 report). -->
+			<div class="arc-sub-label" style="color: var(--peach-dark); font-size: 0.7rem;">Målet ditt ({targetBedtime}) er ikkje nåeleg i dag</div>
 		{/if}
 	{:else if mode.kind === 'after-bedtime'}
 		<div class="arc-center-label">Etter leggetid</div>
@@ -139,7 +147,7 @@
 				💡 Vurder ein kort ekstralur ca. kl. {formatTime(mode.postSkipPlan.recommendedStart)}
 				<span style="opacity: 0.75; white-space: nowrap;">— vekk innan {formatTime(mode.postSkipPlan.wakeBy)}</span>
 			</div>
-		{:else if mode.postSkipPlan?.kind === 'earlier-bedtime'}
+		{:else if mode.postSkipPlan?.kind === 'earlier-bedtime' && mode.postSkipPlan.minutesEarlier > 0}
 			<div class="arc-sub-label rescue-tip" data-testid="post-skip-tip">
 				💡 Vurder tidlegare leggetid kl. {formatTime(mode.postSkipPlan.suggestedBedtime)}
 				<span style="opacity: 0.7;">({mode.postSkipPlan.minutesEarlier}m før normalt)</span>

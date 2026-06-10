@@ -10,11 +10,14 @@
 		ageMonths: number;
 		baby: Baby;
 		napsAllDone?: boolean;
+		/** True when the engine is showing a wake-by cap (napBudget / rescue)
+		 *  for the active nap — ending then is a cap-respect wake. */
+		wakeCapActive?: boolean;
 		onSleepStarted?: (sleepDomainId: string, startTime: string) => void;
 		onSleepEnded?: (domainId: string, sleepSnapshot: SleepLogRow, endTime: string) => void;
 	}
 
-	let { activeSleep, todaySleeps, ageMonths, baby, napsAllDone, onSleepStarted, onSleepEnded }: Props =
+	let { activeSleep, todaySleeps, ageMonths, baby, napsAllDone, wakeCapActive, onSleepStarted, onSleepEnded }: Props =
 		$props();
 
 	const isSleeping = $derived(!!activeSleep && !activeSleep.end_time);
@@ -27,7 +30,7 @@
 		try {
 			if (isSleeping && activeSleep) {
 				const domainId = activeSleep.domain_id;
-				const result = buildEndSleep(activeSleep);
+				const result = buildEndSleep(activeSleep, wakeCapActive && activeSleep.type === 'nap');
 				await sync.sendEvents(result.events);
 				await tick();
 				onSleepEnded?.(domainId, result.sleepSnapshot, result.endTime);

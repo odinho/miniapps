@@ -32,6 +32,46 @@ Parked edges (not urgent):
   resolve banner. Coherent but slightly busy — revisit if it reads as
   noise.
 
+## napBudget / Timer screenshot batch — 2026-06-10
+
+Source: phone bug screenshots of the napBudget/trend feature + Timer.
+Shipped this pass:
+- Timer expected-wake now respects the active cap (napBudget.wakeBy /
+  rescueNap) instead of showing the natural nap-end that contradicted the
+  banner + arc.
+- "Målet ditt er ikkje nåeleg i dag" only shows when a manual
+  target_bedtime is set (auto-bedtime users have no parent goal).
+- Dropped the internal `sourceLabel` ("held baseline (observed-initial)")
+  from the napBudget explainer copy.
+- Skipped-nap surface no longer shows a degenerate "(0m før normalt)"
+  earlier-bedtime tip and yields to after-bedtime once bedtime has passed.
+- **Cap-respect wake now tags `woke_by='woken'`** (`buildEndSleep` +
+  SleepButton `wakeCapActive`). This closes the napBudget→continuation
+  contradiction ("vekk for trenden" → parent wakes → "Forleng luren"):
+  `shouldSuppressContinuation` already suppressed substantial woken naps,
+  but nothing had ever set the tag. WakeUpSheet pre-selects it (correctable).
+- Hid the "~X min til neste lette fase" Timer hint while a cap is active
+  (it contradicted a mid-cycle "vekk no").
+
+Deferred — need more than a unit test:
+- **Established/"presis modus" caps mid-cycle.** `computeNapBudget` in
+  `nap-budget.ts` uses `napBudgetMin - EARLY_WAKE_LEAD_MIN` in established
+  mode, which lands mid-cycle → harder wake (a parent reported the baby
+  cried, 2026-06-01). Candidate: round the established cap DOWN to the
+  nearest sleep-cycle boundary so it still lands under-budget but in a
+  light phase. This shifts how close established days land to the trend
+  target, so validate with a prod-db backtest (see [[reference_prod_db]])
+  before shipping — don't change the cap math blind.
+- **Phantom active sleep (needs repro).** 2026-05-27 19:27: dashboard
+  showed an active night sleep started 19:23 the parent says they didn't
+  log. A fresh 19:23 start means a `sleep.started` event at 19:23; the
+  only client emitter is the Sove button, so the leading hypothesis is an
+  accidental tap (parent hedged "from yesterday or something?"). No
+  auto-start path exists. Next repro: check `/events` for that baby around
+  the timestamp (client_id + event time) to confirm tap vs. sync replay.
+  The >24h stale-sleep guard catches the persistent case; a fresh
+  accidental tap is covered by the 8s undo toast.
+
 ## Pause UX redesign — see dedicated plan
 
 Source: 2026-05-22 design pass with Codex pair-review. Plan lives in

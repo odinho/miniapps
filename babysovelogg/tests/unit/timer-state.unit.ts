@@ -188,6 +188,47 @@ describe("getTimerMode", () => {
       }
     });
 
+    it("expected wake points at the napBudget cap, not the natural nap-end", () => {
+      const input = makeInput({
+        activeSleep: makeSleep({ start_time: "2026-03-27T10:00:00.000Z", type: "nap" }),
+        prediction: makePrediction({
+          expectedNapEnd: "2026-03-27T11:30:00.000Z",
+          napBudget: {
+            wakeBy: "2026-03-27T10:55:00.000Z",
+            recommendedDurationMin: 55,
+            reason: "over_trend",
+            mode: "first-contact",
+            urgency: "firm",
+            context: { blendedTrendMin: 780, bankedMin: 740, toleranceMin: 20, sourceLabel: "x" },
+            cycleNudge: null,
+          },
+        }),
+        now: new Date("2026-03-27T10:30:00.000Z").getTime(),
+      });
+      const mode = getTimerMode(input);
+      expect(mode.kind).toBe("sleeping");
+      if (mode.kind === "sleeping") {
+        // Cap (10:55), not the natural end (11:30) — matches the banner/arc.
+        expect(mode.expectedWake).toBe("2026-03-27T10:55:00.000Z");
+        expect(mode.expectedWakeCountdown).toBe(25 * 60 * 1000);
+      }
+    });
+
+    it("expected wake falls back to rescueNap cap when no napBudget", () => {
+      const input = makeInput({
+        activeSleep: makeSleep({ start_time: "2026-03-27T10:00:00.000Z", type: "nap" }),
+        prediction: makePrediction({
+          expectedNapEnd: "2026-03-27T11:30:00.000Z",
+          rescueNap: { recommendedWakeTime: "2026-03-27T10:50:00.000Z", reason: "short_prior_nap" },
+        }),
+        now: new Date("2026-03-27T10:30:00.000Z").getTime(),
+      });
+      const mode = getTimerMode(input);
+      if (mode.kind === "sleeping") {
+        expect(mode.expectedWake).toBe("2026-03-27T10:50:00.000Z");
+      }
+    });
+
     it("does not treat ended sleep as sleeping", () => {
       const input = makeInput({
         activeSleep: makeSleep({
@@ -252,6 +293,36 @@ describe("getTimerMode", () => {
         // 1 hour overtime
         expect(mode.overtime).toBeCloseTo(60 * 60 * 1000, -2);
       }
+    });
+  });
+
+  describe("skipped nap", () => {
+    const skipPrediction = (overrides: Partial<Prediction> = {}) =>
+      makePrediction({
+        skippedNap: { plannedAt: "2026-03-27T10:00:00.000Z" },
+        postSkipPlan: {
+          kind: "earlier-bedtime",
+          suggestedBedtime: "2026-03-27T19:00:00.000Z",
+          minutesEarlier: 0,
+        },
+        ...overrides,
+      });
+
+    it("shows skipped-nap while bedtime is still ahead", () => {
+      const input = makeInput({
+        prediction: skipPrediction(),
+        now: new Date("2026-03-27T12:00:00.000Z").getTime(),
+      });
+      expect(getTimerMode(input).kind).toBe("skipped-nap");
+    });
+
+    it("yields to after-bedtime once the planned bedtime has passed", () => {
+      const input = makeInput({
+        prediction: skipPrediction(),
+        now: new Date("2026-03-27T20:00:00.000Z").getTime(),
+      });
+      // Past 19:00 bedtime: no longer "Hoppa over lur" + stale earlier-bedtime tip.
+      expect(getTimerMode(input).kind).toBe("after-bedtime");
     });
   });
 

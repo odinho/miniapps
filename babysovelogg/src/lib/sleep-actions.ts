@@ -40,8 +40,18 @@ export interface EndSleepResult {
 	sleepSnapshot: SleepLogRow;
 }
 
-/** Build the events needed to end an active sleep. */
-export function buildEndSleep(activeSleep: SleepLogRow): EndSleepResult {
+/**
+ * Build the events needed to end an active sleep.
+ *
+ * When `capWake` is set, the parent is ending the nap on the engine's
+ * recommendation (a napBudget or rescue cap was showing), so we also tag
+ * `woke_by = 'woken'`. The continuation-suppression logic
+ * (`shouldSuppressContinuation`) was written assuming a cap-respect wake is
+ * tagged 'woken', but nothing in the UI ever set it — so "Forleng luren"
+ * fired right on top of the cap the parent just followed (2026-06-01 report).
+ * The parent can still correct it to 'self' in the wake-up sheet.
+ */
+export function buildEndSleep(activeSleep: SleepLogRow, capWake = false): EndSleepResult {
 	const endTime = new Date().toISOString();
 	const events: Array<{ type: string; payload: Record<string, unknown> }> = [
 		{
@@ -49,9 +59,19 @@ export function buildEndSleep(activeSleep: SleepLogRow): EndSleepResult {
 			payload: { sleepDomainId: activeSleep.domain_id, endTime },
 		},
 	];
+	if (capWake) {
+		events.push({
+			type: 'sleep.updated',
+			payload: { sleepDomainId: activeSleep.domain_id, wokeBy: 'woken' },
+		});
+	}
 
 	// Stamp end_time onto the snapshot so downstream consumers
 	// (WakeUpSheet's undo-end gating in particular) see post-end state.
-	return { events, endTime, sleepSnapshot: { ...activeSleep, end_time: endTime } };
+	return {
+		events,
+		endTime,
+		sleepSnapshot: { ...activeSleep, end_time: endTime, woke_by: capWake ? 'woken' : activeSleep.woke_by },
+	};
 }
 

@@ -103,6 +103,23 @@ describe('buildEndSleep', () => {
 		expect(result.events).toHaveLength(1);
 		expect(result.events[0].type).toBe('sleep.ended');
 	});
+
+	it('does not tag woke_by by default', () => {
+		const result = buildEndSleep(makeSleep());
+		expect(result.events).toHaveLength(1);
+		expect(result.sleepSnapshot.woke_by).toBeNull();
+	});
+
+	it('tags woke_by="woken" on a cap-respect wake so continuation is suppressed', () => {
+		const sleep = makeSleep({ type: 'nap' });
+		const result = buildEndSleep(sleep, true);
+		expect(result.events[0].type).toBe('sleep.ended');
+		expect(result.events[1]).toEqual({
+			type: 'sleep.updated',
+			payload: { sleepDomainId: 'slp_test1', wokeBy: 'woken' },
+		});
+		expect(result.sleepSnapshot.woke_by).toBe('woken');
+	});
 });
 
 // buildPause / buildResume / isPaused removed with the pause UX redesign —
