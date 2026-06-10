@@ -30,6 +30,34 @@
 	let showWakeUpSheet = $state(false);
 	let wakeUpSleepId = $state('');
 	let wakeUpSnapshot = $state<SleepLogRow | null>(null);
+	// Set when the wake-up sheet is closing an over-a-day stale session (shows
+	// a date picker, defaults to the sleep start, always records an end_time).
+	let wakeUpClosingStale = $state(false);
+
+	// Stale-session resolution.
+	let confirmDiscardStale = $state(false);
+	let staleBusy = $state(false);
+
+	function openStaleWakeUp() {
+		if (!staleActiveSleep) return;
+		wakeUpSleepId = staleActiveSleep.domain_id;
+		wakeUpSnapshot = staleActiveSleep;
+		wakeUpClosingStale = true;
+		showWakeUpSheet = true;
+	}
+
+	async function discardStaleSleep() {
+		if (staleBusy || !staleActiveSleep) return;
+		staleBusy = true;
+		try {
+			await sync.sendEvents([
+				{ type: 'sleep.deleted', payload: { sleepDomainId: staleActiveSleep.domain_id } },
+			]);
+			confirmDiscardStale = false;
+		} finally {
+			staleBusy = false;
+		}
+	}
 
 	let showDiaperForm = $state(false);
 	let diaperFromTagSheet = $state(false);
@@ -64,6 +92,10 @@
 	const loaded = $derived(appState.loaded);
 	const baby = $derived(s.baby);
 	const activeSleep = $derived(s.activeSleep);
+	// An open sleep that's run over a day (forgotten wake). The server hides it
+	// from the engine and surfaces it here so we can prompt the parent to
+	// resolve it; at 48h we additionally force the morning re-onboarding.
+	const staleActiveSleep = $derived(s.staleActiveSleep);
 	const todaySleeps = $derived(s.todaySleeps);
 	const prediction = $derived(s.prediction);
 	const stats = $derived(s.stats);
@@ -373,6 +405,7 @@
 	function onSleepEnded(domainId: string, sleepSnapshot: SleepLogRow) {
 		wakeUpSleepId = domainId;
 		wakeUpSnapshot = sleepSnapshot;
+		wakeUpClosingStale = false;
 		showWakeUpSheet = true;
 		showUndoToast('Søvn avslutta', [{
 			type: 'sleep.restarted',
@@ -392,6 +425,7 @@
 
 	function onWakeUpClose() {
 		showWakeUpSheet = false;
+		wakeUpClosingStale = false;
 	}
 
 	function onDiaperClose() {
@@ -451,6 +485,9 @@
 		if (todaySleeps.length > 0) return false;
 		const todayStr = isoToDateInTz(new Date().toISOString(), baby.timezone || 'UTC');
 		if (morningDismissedDate === todayStr) return false;
+		// Abandoned (>48h) open session: no meaningful recovery, so force the
+		// "when did they wake" onboarding regardless of time of day.
+		if (staleActiveSleep?.staleStatus === 'abandoned') return true;
 		const h = new Date().getHours();
 		return h >= 5 && h < 13;
 	});
@@ -491,10 +528,19 @@
 
 		morningBusy = true;
 		try {
-			const result = await sync.sendEvents([{
+			// Setting a fresh wake time also discards any orphaned over-a-day
+			// session — recording today's wake is the parent's "start fresh".
+			const events: Array<{ type: string; payload: Record<string, unknown> }> = [{
 				type: 'day.started',
 				payload: { babyId: baby.id, wakeTime: candidate.toISOString() },
-			}]);
+			}];
+			if (staleActiveSleep) {
+				events.push({
+					type: 'sleep.deleted',
+					payload: { sleepDomainId: staleActiveSleep.domain_id },
+				});
+			}
+			const result = await sync.sendEvents(events);
 			if (result == null) return;
 			showMorningDialog = false;
 		} finally {
@@ -573,6 +619,24 @@
 							Avbryt
 						</button>
 					</div>
+				</div>
+			</div>
+		{/if}
+
+		{#if staleActiveSleep}
+			{@const staleElapsed = now - new Date(staleActiveSleep.start_time).getTime()}
+			<div class="stale-sleep-banner" data-testid="stale-sleep-banner">
+				<div class="stale-sleep-title">⚠️ Søvnøkta er ikkje avslutta</div>
+				<div class="stale-sleep-body">
+					Ei {staleActiveSleep.type === 'night' ? 'nattesøvn' : 'lur'} starta kl. {formatTime(staleActiveSleep.start_time)} og har vart i {formatDuration(staleElapsed)}. Du gløymde truleg å registrere vakning, så vi har sett dagen på pause.
+				</div>
+				<div class="stale-sleep-actions">
+					<button class="btn btn-primary" onclick={openStaleWakeUp} data-testid="stale-set-wake">
+						Sett vaknetid
+					</button>
+					<button class="btn btn-ghost" onclick={() => (confirmDiscardStale = true)} data-testid="stale-discard">
+						Forkast økta
+					</button>
 				</div>
 			</div>
 		{/if}
@@ -832,8 +896,23 @@
 		<WakeUpSheet
 			sleepDomainId={wakeUpSleepId}
 			sleepSnapshot={wakeUpSnapshot}
+			closingStale={wakeUpClosingStale}
 			onClose={onWakeUpClose}
 		/>
+	{/if}
+
+	{#if confirmDiscardStale}
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="modal-overlay" onclick={() => (confirmDiscardStale = false)} data-testid="stale-discard-overlay" style="z-index: 1001;">
+			<div class="morning-prompt" style="position: relative; max-width: 320px; margin: 25vh auto;" role="presentation" onclick={(e) => e.stopPropagation()}>
+				<p style="margin-bottom: 16px;">Forkasta denne uavslutta økta? Vil du heller ta vare på henne, kan du registrere henne manuelt i loggen.</p>
+				<div style="display: flex; gap: 8px;">
+					<button class="btn btn-ghost" onclick={() => (confirmDiscardStale = false)} disabled={staleBusy}>Avbryt</button>
+					<button class="btn btn-danger" onclick={discardStaleSleep} disabled={staleBusy} data-testid="stale-discard-confirm">Forkast</button>
+				</div>
+			</div>
+		</div>
 	{/if}
 
 	{#if showDiaperForm && baby}

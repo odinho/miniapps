@@ -1,4 +1,5 @@
 import type { Baby, SleepLogRow, DayStartRow, NightWakingRow } from "$lib/types.js";
+import type { StaleStatus } from "$lib/stale-sleep.js";
 import type { DayStats, SleepDayTotals } from "$lib/engine/stats.js";
 import type { PredictedNap } from "$lib/engine/schedule.js";
 import type { ConfidenceResult, PredictionRange } from "$lib/engine/confidence.js";
@@ -215,9 +216,19 @@ export interface LearnedSchedule {
 	sleepCycle: import("$lib/types.js").SleepCycleEstimate;
 }
 
+/**
+ * An open sleep that's been running over a day (forgotten wake). The server
+ * stops treating it as `activeSleep` and exposes it here instead, tagged with
+ * how stale it is, so the dashboard can prompt the parent to resolve it. See
+ * `$lib/stale-sleep.ts`.
+ */
+export type StaleActiveSleep = SleepLogRow & { staleStatus: StaleStatus };
+
 export interface AppState {
 	baby: Baby | null;
 	activeSleep: SleepLogRow | null;
+	/** Over-a-day open sleep, hidden from the engine. Null in normal operation. */
+	staleActiveSleep: StaleActiveSleep | null;
 	todaySleeps: SleepLogRow[];
 	stats: DayStats | null;
 	/**
@@ -255,6 +266,7 @@ export interface AppState {
 const emptyState: AppState = {
 	baby: null,
 	activeSleep: null,
+	staleActiveSleep: null,
 	todaySleeps: [],
 	stats: null,
 	dayTotals: null,

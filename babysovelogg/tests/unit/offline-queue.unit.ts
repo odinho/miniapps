@@ -19,6 +19,7 @@ function makeState(overrides: Partial<AppState> = {}): AppState {
 	return {
 		baby: { id: 1, name: 'Halldis', birthdate: '2025-06-01', created_at: '2025-06-01', custom_nap_count: null, potty_mode: 0, track_diaper: 0, timezone: null, target_bedtime: null, created_by_event_id: null, updated_by_event_id: null },
 		activeSleep: null,
+		staleActiveSleep: null,
 		todaySleeps: [],
 		stats: { napCount: 1, totalNapMinutes: 45, totalNightMinutes: 600, sleeps: [] },
 		dayTotals: null,
@@ -265,6 +266,25 @@ describe('applyOptimisticEvent', () => {
 			sleepDomainId: 'slp_del',
 		});
 		expect(result.todaySleeps).toHaveLength(0);
+	});
+
+	it('sleep.deleted clears a matching stale-active-sleep banner', () => {
+		const stale = { ...makeSleep({ domain_id: 'slp_stale' }), staleStatus: 'abandoned' as const };
+		const state = makeState({ staleActiveSleep: stale });
+		const result = applyOptimisticEvent(state, 'sleep.deleted', {
+			sleepDomainId: 'slp_stale',
+		});
+		expect(result.staleActiveSleep).toBeNull();
+	});
+
+	it('sleep.updated with endTime clears a matching stale-active-sleep banner', () => {
+		const stale = { ...makeSleep({ domain_id: 'slp_stale' }), staleStatus: 'stale' as const };
+		const state = makeState({ staleActiveSleep: stale });
+		const result = applyOptimisticEvent(state, 'sleep.updated', {
+			sleepDomainId: 'slp_stale',
+			endTime: '2026-03-28T07:00:00.000Z',
+		});
+		expect(result.staleActiveSleep).toBeNull();
 	});
 
 	it('diaper.logged increments count and updates time', () => {

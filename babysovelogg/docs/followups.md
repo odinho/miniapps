@@ -10,6 +10,28 @@ multi-day testing, the unit-of-work flow — live in
 [`workflow.md`](./workflow.md). Don't put process in this file; this
 is for tracked product/engine/test work.
 
+## Stale active sleep — shipped, minor edges parked
+
+Source: 2026-06-10 phone-bug report (timer at 466:34:51 — a forgotten
+wake left an open sleep counting up ~19 days). Shipped: pure
+`classifyActiveSleep` (`src/lib/stale-sleep.ts`, 24h→`stale`,
+48h→`abandoned`); `getState` hides an over-a-day open sleep from the
+engine and surfaces it as `staleActiveSleep`; dashboard resolve banner
+(set real wake via `WakeUpSheet` `closingStale`, or discard); forced
+morning re-onboarding at 48h with orphan auto-discard on `day.started`.
+
+Parked edges (not urgent):
+- **Offline staleness lag (entry side).** The optimistic offline path
+  doesn't re-classify by elapsed time, so a cached open session only
+  flips *into* stale on the next server fetch. Deep edge (offline + a
+  >24h-open session); reclassify client-side if it ever matters. (The
+  *exit* side is handled: optimistic `sleep.deleted` / `sleep.updated`
+  with endTime now clear `staleActiveSleep` — Codex 2026-06-10 review.)
+- **Double surface in the 24–48h window.** During 05:00–13:00 a `stale`
+  (not yet abandoned) session shows both the morning prompt and the
+  resolve banner. Coherent but slightly busy — revisit if it reads as
+  noise.
+
 ## Pause UX redesign — see dedicated plan
 
 Source: 2026-05-22 design pass with Codex pair-review. Plan lives in

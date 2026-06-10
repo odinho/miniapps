@@ -10,6 +10,7 @@ import type {
   NightWakingRow,
 } from "$lib/types.js";
 import { todayInTz } from "$lib/tz.js";
+import { classifyActiveSleep, type StaleStatus } from "$lib/stale-sleep.js";
 
 export function getState(now?: number) {
   const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby | undefined;
@@ -17,6 +18,7 @@ export function getState(now?: number) {
     return {
       baby: null,
       activeSleep: null,
+      staleActiveSleep: null,
       todaySleeps: [],
       todayNightWakings: [] as NightWakingRow[],
       stats: null,
@@ -25,11 +27,23 @@ export function getState(now?: number) {
       prediction: null,
     };
 
-  const activeSleep = db
+  const openSleep = db
     .prepare(
       "SELECT * FROM sleep_log WHERE baby_id = ? AND end_time IS NULL AND deleted = 0 ORDER BY id DESC LIMIT 1",
     )
     .get(baby.id) as SleepLogRow | undefined;
+
+  // An open sleep that's run over a day is almost certainly a forgotten wake,
+  // not a live session (the 466:34:51 report). Treat it as invalid: hide it
+  // from the engine (no `activeSleep`, so predictions/onboarding behave as if
+  // between sleeps) and surface it separately so the UI can prompt the parent
+  // to set the real wake time, discard it, or — at 48h — re-run onboarding.
+  const nowForStale = now ?? Date.now();
+  const staleStatus: StaleStatus | null = classifyActiveSleep(openSleep, nowForStale);
+  const activeSleep = staleStatus ? undefined : openSleep;
+  const staleActiveSleep = staleStatus && openSleep
+    ? { ...openSleep, staleStatus }
+    : null;
 
   // Backfill timezone from server locale if not set (single-tenant: server TZ = baby TZ)
   if (!baby.timezone) {
@@ -218,7 +232,9 @@ export function getState(now?: number) {
     setTrendTargetState(baby.id, nextTrend);
   }
 
-  return result;
+  // Surface the over-a-day open sleep (hidden from the engine above) so the
+  // dashboard can render the resolve banner and force re-onboarding at 48h.
+  return { ...result, staleActiveSleep };
 }
 
 function sameTrendTargetState(

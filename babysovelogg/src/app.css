@@ -986,6 +986,36 @@ html, body {
   line-height: 1.3;
 }
 
+/* --- stale-session banner (open sleep over a day, forgotten wake) ---
+   Peach to read as "needs attention", distinct from the guidance bands. */
+.stale-sleep-banner {
+  background: var(--peach);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin: 8px 0 4px;
+}
+
+.stale-sleep-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+}
+
+.stale-sleep-body {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  margin-bottom: 10px;
+}
+
+.stale-sleep-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.stale-sleep-actions .btn {
+  flex: 1;
+}
+
 /* --- napBudget banner (active nap, trend cap) ---
    Cream background so it visually differs from peach (continuation) and
    lavender (rescue) — three distinct guidance bands. */

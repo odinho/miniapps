@@ -8,14 +8,22 @@
 	import { toggleOffDay, localDateForOffDay } from '$lib/off-day-actions.js';
 	import { isWithinEndUndoWindow } from '$lib/end-undo.js';
 	import TimeInput from './TimeInput.svelte';
+	import DateInput from './DateInput.svelte';
 
 	interface Props {
 		sleepDomainId: string;
 		sleepSnapshot: SleepLogRow;
 		onClose?: () => void;
+		/**
+		 * Closing an over-a-day "forgotten wake" session (see $lib/stale-sleep).
+		 * Shows a date picker (the real wake may be days back), defaults to the
+		 * sleep's start, and always records an end_time so the open row gets
+		 * closed even if the parent leaves the default.
+		 */
+		closingStale?: boolean;
 	}
 
-	let { sleepDomainId, sleepSnapshot, onClose }: Props = $props();
+	let { sleepDomainId, sleepSnapshot, onClose, closingStale = false }: Props = $props();
 
 	// "Angre slutt" — undo the just-recorded End for a nap, within 15 min and
 	// only if no later sleep has started. Reuses the existing `sleep.restarted`
@@ -38,7 +46,11 @@
 	}
 
 	// svelte-ignore state_referenced_locally — intentional: snapshot is immutable once passed
-	const defaultWakeTime = sleepSnapshot.end_time ? new Date(sleepSnapshot.end_time) : new Date();
+	const defaultWakeTime = sleepSnapshot.end_time
+		? new Date(sleepSnapshot.end_time)
+		: closingStale
+			? new Date(sleepSnapshot.start_time)
+			: new Date();
 	let wakeTime = $state(defaultWakeTime.toTimeString().slice(0, 5));
 	let wakeDate = $state(`${defaultWakeTime.getFullYear()}-${String(defaultWakeTime.getMonth() + 1).padStart(2, '0')}-${String(defaultWakeTime.getDate()).padStart(2, '0')}`);
 
@@ -99,7 +111,7 @@
 		if (busy) return;
 		busy = true;
 		try {
-			const endTimeIso = wakeTimeChanged
+			const endTimeIso = (closingStale || wakeTimeChanged)
 				? new Date(`${wakeDate}T${wakeTime}:00`).toISOString()
 				: null;
 			const event = buildWakeUpEvent(sleepDomainId, wokeBy, notes, endTimeIso, wakeMood);
@@ -216,6 +228,9 @@
 		<div class="form-group">
 			<span class="form-label">Vaknetid</span>
 			<div class="datetime-row">
+				{#if closingStale}
+					<DateInput bind:value={wakeDate} />
+				{/if}
 				<TimeInput bind:value={wakeTime} data-testid="wake-time" />
 			</div>
 			<div style="display: flex; gap: 6px; margin-top: 6px; justify-content: center;">

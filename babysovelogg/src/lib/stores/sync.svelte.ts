@@ -28,6 +28,7 @@ function normalizeState(raw: AppStateResponse): AppState {
 	return {
 		baby: raw.baby ?? null,
 		activeSleep: raw.activeSleep ?? null,
+		staleActiveSleep: raw.staleActiveSleep ?? null,
 		todaySleeps: raw.todaySleeps ?? [],
 		stats: raw.stats ?? null,
 		dayTotals: raw.dayTotals ?? null,

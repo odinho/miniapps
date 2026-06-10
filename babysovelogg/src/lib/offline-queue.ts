@@ -164,7 +164,13 @@ export function applyOptimisticEvent(
 		}
 
 		case "sleep.updated": {
-			const target = findSleep(s, payload.sleepDomainId as string);
+			const sleepDomainId = payload.sleepDomainId as string;
+			// Closing an over-a-day stale session via the wake-up sheet records
+			// an end_time; clear the banner optimistically too.
+			if (payload.endTime && s.staleActiveSleep?.domain_id === sleepDomainId) {
+				s.staleActiveSleep = null;
+			}
+			const target = findSleep(s, sleepDomainId);
 			if (target) {
 				if (payload.startTime !== undefined) target.start_time = payload.startTime as string;
 				if (payload.endTime !== undefined) target.end_time = (payload.endTime as string) || null;
@@ -225,6 +231,9 @@ export function applyOptimisticEvent(
 
 		case "sleep.deleted": {
 			const domainId = payload.sleepDomainId as string;
+			// Discarding an over-a-day stale session offline: clear the banner
+			// optimistically so it doesn't linger until the next server fetch.
+			if (s.staleActiveSleep?.domain_id === domainId) s.staleActiveSleep = null;
 			const deleted = s.todaySleeps.find((sl) => sl.domain_id === domainId);
 			s.todaySleeps = s.todaySleeps.filter((sl) => sl.domain_id !== domainId);
 			if (s.stats && deleted?.end_time) {
