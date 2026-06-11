@@ -707,29 +707,44 @@ real target_bedtime periods.
   event-walking, then re-run `backtest:report` to measure the cap over the
   Apr–May 18:00 window.
 
-## Fixture-export tooling broken on the post-migration schema — 2026-06-11
+## Fixture-export tooling — shipped 2026-06-11 (shared loader)
 
-Surfaced while pulling fresh Halldis prod data to refresh the backtest
-fixture. Both export paths predate the `sleep_pauses → night_waking`
-migration (which DROPs `sleep_pauses`), so they break on any current DB:
+The three DB→`DayRecord` paths (`db-to-fixture.ts`, `merge-fixtures.ts`,
+`backtest-report.ts --db`) each carried their own copy of the loader and the
+same two bugs. Collapsed into one shared module `scripts/lib/db-to-days.ts`
+(unit-tested in `tests/unit/db-to-days.unit.ts`):
+- Reads night wakings from `night_waking` (the dropped `sleep_pauses` no
+  longer crashes it) and nets them via the engine's own
+  `wakingsAsPausesForSleep`, so fixture pause semantics match prod exactly.
+- Walks `baby.updated` events into a per-day settings timeline
+  (`loadSettingsTimeline` / `effectiveSettings`): a change takes effect on
+  its local-date inclusive, carried forward, last-wins for same-day changes.
+  `target_bedtime` is now stamped with the value that was actually in effect
+  (Halldis: 18:00 on 2026-04-05 → 05-03). `--db` MAE is sane again (nap 40.9,
+  wake 28.6 vs the old 1181/1279).
+- `off_day` carried through. In-progress days and wake-time-less days skipped.
 
-- **`scripts/db-to-fixture.ts` crashes** — `SQLiteError: no such table:
-  sleep_pauses` (`db-to-fixture.ts:69`). It must tolerate the dropped table
-  and read pause/waking intervals from `night_waking` instead (nets night
-  duration via `calcPauseMs`). This is the hard blocker on refreshing
-  `tests/fixtures/halldis-sleep.json`.
-- **`scripts/backtest-report.ts --db` is unreliable** — `loadFromDb`
-  (`:129-182`) doesn't crash (separate inline loader) but produces ~20h
-  nap-start/wake MAE on the fresh Halldis db (nap MAE 1181, wake MAE 1279)
-  while the committed merged fixture gives sane numbers (nap MAE 39.7, wake
-  26.3). It reads neither `night_waking` (so night durations aren't
-  pause-netted) nor `off_day` (so sick/travel days poison stats). Don't
-  trust `--db` numbers until this loader matches `db-to-fixture` semantics —
-  ideally collapse the two loaders into one shared helper.
-
-Canonical fixture still backtests fine (it was generated pre-migration via
-the merge pipeline), so nothing shipped is affected — this only blocks
-*refreshing* the fixture from current prod.
+Open from this work:
+- **Per-day `customNapCount` not threaded.** The timeline walks it, but
+  `DayRecord` has no per-day `custom_nap_count` field (backtest takes it as a
+  global option), so historical nap-count changes (Halldis toggled it in late
+  March) aren't replayed. Cheap to add (`DayRecord.custom_nap_count` +
+  `ctx.customNapCount = day.custom_nap_count ?? customNapCount` at
+  `backtest.ts:195`) — do it if a nap-count-transition window ever needs
+  faithful replay.
+- **Don't bake `target_bedtime` into the canonical descriptive fixture.**
+  Measured 2026-06-11: stamping the real 18:00 target over the Apr5–May3
+  window makes *bedtime MAE worse* (32.5 vs 23.0, bias +28) — the family went
+  to bed *earlier* than the 18:00 ceiling, so the prescriptive cap pulls
+  predictions later than the already-well-calibrated natural prediction
+  (bias −1.9 without). Descriptive MAE is the wrong yardstick for a
+  prescriptive target. So `tests/fixtures/halldis-sleep.json` stays
+  target-free for clean accuracy regression; intervention efficacy belongs to
+  the stateful **"Backtest harness doesn't replay `TrendTargetState`"**
+  followup (trend-split section above) — that harness should carry the
+  per-day target from `db-to-days` and measure target-following, not MAE.
+  `db-to-fixture.ts <db>` now produces the target-stamped fixture on demand
+  for that analysis.
 
 ## Newborn stage: drop night/morning framing, treat as naps + wakings?
 

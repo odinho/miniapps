@@ -29,8 +29,8 @@ import {
 } from "$lib/engine/backtest.js";
 import type { DayRecord, BacktestResult, DayResult } from "$lib/engine/backtest.js";
 import type { PredictionFeatures } from "$lib/types.js";
-import { isoToDateInTz } from "$lib/tz.js";
 import { DEFAULT_FEATURES } from "$lib/types.js";
+import { dbToDays } from "./lib/db-to-days.js";
 
 // ── Argument parsing ────────────────────────────────────────────────────────
 
@@ -122,63 +122,6 @@ function parseArgs(argv: string[]): Options | null {
   }
 
   return options;
-}
-
-// ── DB → DayRecords ─────────────────────────────────────────────────────────
-
-async function loadFromDb(dbPath: string, tz: string): Promise<DayRecord[]> {
-  const Database = (await import("bun:sqlite")).default;
-  const db = new Database(dbPath, { readonly: true });
-
-  const sleeps = db.prepare(`
-    SELECT start_time, end_time, type, woke_by
-    FROM sleep_log WHERE deleted = 0
-    ORDER BY start_time
-  `).all() as { start_time: string; end_time: string | null; type: string; woke_by: string | null }[];
-
-  const dayStarts = db.prepare(`
-    SELECT date, wake_time FROM day_start ORDER BY date
-  `).all() as { date: string; wake_time: string }[];
-
-  db.close();
-
-  const wakeByDate = new Map(dayStarts.map((d) => [d.date, d.wake_time]));
-  const byDate = new Map<string, typeof sleeps>();
-  for (const s of sleeps) {
-    const date = isoToDateInTz(s.start_time, tz);
-    const list = byDate.get(date) ?? [];
-    list.push(s);
-    byDate.set(date, list);
-  }
-
-  const days: DayRecord[] = [];
-  const allDates = new Set([...wakeByDate.keys(), ...byDate.keys()]);
-  for (const date of [...allDates].sort()) {
-    const wakeTime = wakeByDate.get(date);
-    const daySleeps = byDate.get(date) ?? [];
-
-    let wake = wakeTime;
-    if (!wake) {
-      const nightEnd = daySleeps.find((s) => s.type === "night" && s.end_time);
-      if (nightEnd?.end_time) wake = nightEnd.end_time;
-      else continue;
-    }
-
-    days.push({
-      date,
-      wakeTime: wake,
-      sleeps: daySleeps
-        .filter((s) => s.end_time)
-        .map((s) => ({
-          start_time: s.start_time,
-          end_time: s.end_time!,
-          type: s.type as "nap" | "night",
-          woke_by: s.woke_by === "self" || s.woke_by === "woken" ? s.woke_by : null,
-        })),
-    });
-  }
-
-  return days;
 }
 
 // ── Analysis helpers ────────────────────────────────────────────────────────
@@ -286,7 +229,7 @@ if (!options) process.exit(0);
 
 let days: DayRecord[];
 if (options.dbPath) {
-  days = await loadFromDb(options.dbPath, options.tz);
+  days = dbToDays(options.dbPath, options.tz).days;
   console.error(`Loaded ${days.length} days from ${options.dbPath}`);
 } else {
   const file = Bun.file(options.fixturePath!);
