@@ -755,15 +755,39 @@ the engine stop imposing a hard "night" / "morning" / day-boundary at all and
 just model naps + wakings, since newborn sleep is polyphasic and the wall-clock
 day/night split doesn't apply yet?
 
-Leaning: **the immediate confusion is already resolved by `night_waking`**
-(now deployed everywhere — Umi updated 06-11), so a full "naps-only newborn
-mode" is probably not worth the downside (parents still want night totals /
-longest-stretch even for newborns). The narrower real bug, if it recurs, is
-the **wall-clock day-boundary logic** (`getHours()` deep-night/evening gates,
-see the "Wall-clock assumptions" followup) mislabeling a late-evening re-sleep
-as a new day/morning instead of a continued fragmented night. Fix that
-specific path rather than removing night handling. Revisit if a newer-build
-parent still reports the confusion.
+Prior leaning was "not worth it." **Reopened 2026-06-11** — after a second
+round of newborn pain (Umi parent couldn't model an evening re-sleep at all;
+the operator confirmed "it's a bit confusing to use the app with a newborn"
+and explicitly asked to rethink newborn mode). So this is now an active
+design unit, not a parked question. Design pass (Codex) pending; the open
+direction is whether the newborn/emerging strategy should drop the hard
+night/morning/day-boundary and model the evening as naps + wakings, while
+still deriving night totals / longest-stretch from the data rather than from
+a wall-clock gate. Tie this to the **wall-clock day-boundary** followup
+(`getHours()` deep-night/evening gates) — that's the concrete mislabel path.
+
+Shipped 2026-06-11 as the immediate de-confusers (commit after this entry):
+- **Add a night waking after the fact.** There was no UI to log a waking
+  retroactively — the only creation path was the live 🌙 toggle during an
+  *active* night (`handleNightWakingToggle`, stamps "now"). Newborn parents
+  reconstruct the night next morning, so this was a dead end.
+  `NightWakingEditSheet` now has a create mode (`create={{babyId,
+  defaultStart}}`); a "🌙 Legg til nattvaking" button on completed night
+  sleeps in `EditSleepModal` (wired on dashboard + history) opens it and
+  emits `night_waking.started` + `.edited`.
+- **Guard end-before-start.** `EditSleepModal` and `NightWakingEditSheet`
+  now reject an end at/before start (`isEndAtOrBeforeStart`) — the slip that
+  made Umi's night end before it began (end time saved on the start's
+  calendar day). `ManualSleepModal` already had this.
+
+Remaining edges from that UI work:
+- A waking created on a *past* night via history optimistically lands in
+  `todayNightWakings` (the only client list); it shows correctly after the
+  next `/api/state` fetch and the engine nets it by time-overlap regardless,
+  but the optimistic display is today-scoped. Tighten only if it confuses.
+- No E2E for the add-waking flow yet (the `started`+`.edited` projection is
+  covered by `tests/integration/night-waking.test.ts`; the new surface is the
+  create-mode form + button wiring).
 
 
 ### Engine: sleepWindow during active sleep shows "now" window, not post-wakeup window

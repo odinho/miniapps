@@ -132,6 +132,15 @@ export function getDateLabel(dateStr: string): string {
 
 // ── Sleep entry formatting ───────────────────────────────────────
 
+/** True when `endIso` is at or before `startIso` (zero/negative duration). A
+ *  null end (ongoing sleep/waking) is never "before". Guards manual edits from
+ *  saving an end on the wrong calendar day — the slip that produced a night
+ *  ending before it started. */
+export function isEndAtOrBeforeStart(startIso: string, endIso: string | null): boolean {
+	if (!endIso) return false;
+	return new Date(endIso).getTime() <= new Date(startIso).getTime();
+}
+
 export function calcSleepDurationMs(entry: SleepLogRow): number {
 	if (!entry.end_time) return 0;
 	const ms = new Date(entry.end_time).getTime() - new Date(entry.start_time).getTime();

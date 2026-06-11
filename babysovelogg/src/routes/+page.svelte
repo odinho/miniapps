@@ -64,6 +64,7 @@
 
 	let editingSleep = $state<SleepLogRow | null>(null);
 	let editingNightWakingId = $state<string | null>(null);
+	let addingWakingForNight = $state<SleepLogRow | null>(null);
 
 	// --- undo toast ---
 	let undoToast = $state<{ message: string; undoEvents: Array<{ type: string; payload: Record<string, unknown> }> } | null>(null);
@@ -929,6 +930,10 @@
 			entry={editingSleep}
 			onClose={onEditSleepClose}
 			onDeleted={onEditSleepClose}
+			onAddWaking={() => {
+				addingWakingForNight = editingSleep;
+				editingSleep = null;
+			}}
 		/>
 	{/if}
 
@@ -937,6 +942,14 @@
 			waking={editingNightWaking}
 			onClose={() => (editingNightWakingId = null)}
 			onDeleted={() => (editingNightWakingId = null)}
+		/>
+	{/if}
+
+	{#if addingWakingForNight && baby}
+		<NightWakingEditSheet
+			create={{ babyId: baby.id, defaultStart: addingWakingForNight.start_time }}
+			onClose={() => (addingWakingForNight = null)}
+			onDeleted={() => (addingWakingForNight = null)}
 		/>
 	{/if}
 

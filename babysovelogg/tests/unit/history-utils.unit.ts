@@ -30,6 +30,7 @@ import {
 	isoToDateInput,
 	isoToTimeInput,
 	dateTimeToIso,
+	isEndAtOrBeforeStart,
 } from '$lib/history-utils.js';
 import type { SleepLogRow, DiaperLogRow } from '$lib/types.js';
 
@@ -544,5 +545,21 @@ describe('dateTimeToIso', () => {
 		expect(result).toContain('2026-03-27');
 		// Should be a valid ISO string
 		expect(new Date(result).toISOString()).toBe(result);
+	});
+});
+
+describe('isEndAtOrBeforeStart', () => {
+	test('end after start is fine', () => {
+		expect(isEndAtOrBeforeStart('2026-06-10T18:39:00.000Z', '2026-06-11T06:00:00.000Z')).toBe(false);
+	});
+	test('end before start (wrong-day slip) is flagged', () => {
+		// The Umi corruption: 04:00 landed on the start day, before the 18:39 start.
+		expect(isEndAtOrBeforeStart('2026-06-10T18:39:00.000Z', '2026-06-10T04:00:00.000Z')).toBe(true);
+	});
+	test('equal start and end (zero duration) is flagged', () => {
+		expect(isEndAtOrBeforeStart('2026-06-10T18:39:00.000Z', '2026-06-10T18:39:00.000Z')).toBe(true);
+	});
+	test('null end (ongoing) is never before', () => {
+		expect(isEndAtOrBeforeStart('2026-06-10T18:39:00.000Z', null)).toBe(false);
 	});
 });

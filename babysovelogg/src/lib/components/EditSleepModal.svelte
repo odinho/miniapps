@@ -10,6 +10,7 @@
 		isoToDateInput,
 		isoToTimeInput,
 		dateTimeToIso,
+		isEndAtOrBeforeStart,
 	} from '$lib/history-utils.js';
 	import { isWithinEndUndoWindow } from '$lib/end-undo.js';
 	import TimeInput from './TimeInput.svelte';
@@ -19,9 +20,13 @@
 		entry: SleepLogRow;
 		onClose?: () => void;
 		onDeleted?: () => void;
+		/** Open the night-waking creator for this night (night entries only). */
+		onAddWaking?: () => void;
 	}
 
-	let { entry, onClose, onDeleted }: Props = $props();
+	let { entry, onClose, onDeleted, onAddWaking }: Props = $props();
+
+	let error = $state('');
 
 	let startDate = $state('');
 	let startTime = $state('');
@@ -83,12 +88,19 @@
 
 	async function save() {
 		if (busy) return;
+		error = '';
+		const startIso = dateTimeToIso(startDate, startTime);
+		const endIso = endDate && endTime ? dateTimeToIso(endDate, endTime) : null;
+		if (isEndAtOrBeforeStart(startIso, endIso)) {
+			error = 'Slutt-tid må vera etter start-tid — sjekk datoen.';
+			return;
+		}
 		busy = true;
 		try {
 			const event = buildSleepUpdateEvent({
 				sleepDomainId: entry.domain_id,
-				startTime: dateTimeToIso(startDate, startTime),
-				endTime: endDate && endTime ? dateTimeToIso(endDate, endTime) : undefined,
+				startTime: startIso,
+				endTime: endIso ?? undefined,
 				type: selectedType,
 				mood: selectedMood,
 				method: selectedMethod,
@@ -202,6 +214,21 @@
 			</div>
 		{/if}
 
+		<!-- Add a night waking after the fact (night sleeps only) -->
+		{#if entry.type === 'night' && !isOngoing && onAddWaking}
+			<div class="form-group">
+				<button
+					type="button"
+					class="btn btn-ghost"
+					style="width: 100%;"
+					onclick={() => onAddWaking?.()}
+					data-testid="add-night-waking"
+				>
+					🌙 Legg til nattvaking
+				</button>
+			</div>
+		{/if}
+
 		<!-- Mood -->
 		<div class="form-group">
 			<span class="form-label">Humør ved legging</span>
@@ -282,6 +309,12 @@
 			<label for="edit-sleep-notes">Notat</label>
 			<input id="edit-sleep-notes" type="text" placeholder="Valfritt notat..." bind:value={notes} />
 		</div>
+
+		{#if error}
+			<div style="color: var(--danger-dark); font-size: 0.85rem; margin-bottom: 8px;" data-testid="edit-sleep-error">
+				{error}
+			</div>
+		{/if}
 
 		<!-- Action buttons -->
 		<div class="btn-row">

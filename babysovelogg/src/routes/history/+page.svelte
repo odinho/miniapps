@@ -34,6 +34,7 @@
 	let editingSleep = $state<SleepLogRow | null>(null);
 	let editingDiaper = $state<DiaperLogRow | null>(null);
 	let editingNightWaking = $state<NightWakingRow | null>(null);
+	let addingWakingForNight = $state<SleepLogRow | null>(null);
 	let showManualSleep = $state(false);
 
 	const baby = $derived(appState.state.baby);
@@ -242,6 +243,18 @@
 		entry={editingSleep}
 		onClose={closeSleepEdit}
 		onDeleted={closeSleepEdit}
+		onAddWaking={() => {
+			addingWakingForNight = editingSleep;
+			editingSleep = null;
+		}}
+	/>
+{/if}
+
+{#if addingWakingForNight && baby}
+	<NightWakingEditSheet
+		create={{ babyId: baby.id, defaultStart: addingWakingForNight.start_time }}
+		onClose={() => (addingWakingForNight = null)}
+		onDeleted={() => (addingWakingForNight = null)}
 	/>
 {/if}
 
