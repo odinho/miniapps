@@ -5,7 +5,7 @@
  * the selector uses to choose between newborn_guidance, emerging_rhythm,
  * and routine_schedule strategies.
  */
-import type { SleepEntry } from "$lib/types.js";
+import type { SleepEntry, SleepPause } from "$lib/types.js";
 import { isoToDateInTz } from "$lib/tz.js";
 import { SLEEP_NEEDS, findByAge } from "./constants.js";
 import { sleepDuration as gallandSleepDuration } from "$lib/data/galland2012.js";
@@ -62,6 +62,8 @@ interface ParsedSleep {
   startMs: number;
   endMs: number;
   durationMin: number;
+  /** Longest unbroken segment (minutes) after splitting on pauses. */
+  longestSegment: number;
   type: "nap" | "night";
   localDate: string;
   startMinuteOfDay: number;
@@ -79,6 +81,7 @@ function parseSleeps(sleeps: SleepEntry[], tz: string): ParsedSleep[] {
       startMs,
       endMs,
       durationMin,
+      longestSegment: longestSegmentMin(startMs, endMs, s.pauses),
       type: s.type,
       localDate: isoToDateInTz(s.start_time, tz),
       startMinuteOfDay: getMinuteOfDay(new Date(startMs), tz),
@@ -101,6 +104,66 @@ function getMinuteOfDay(date: Date, tz: string): number {
   const h = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
   const m = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
   return h * 60 + m;
+}
+
+/**
+ * Pauses resolved to epoch-ms [pause, resume], clipped to a sleep episode,
+ * and merged so overlapping wakings can't double-count. An open waking
+ * (`resume_time: null`, baby still awake inside an active sleep) resolves to
+ * the episode end — for an active sleep that's `endMs = now`.
+ */
+function resolvedBreaks(
+  pauses: SleepPause[] | undefined,
+  startMs: number,
+  endMs: number,
+): Array<{ pause: number; resume: number }> {
+  if (!pauses || pauses.length === 0) return [];
+  const clipped = pauses
+    .map((p) => ({
+      pause: Math.max(new Date(p.pause_time).getTime(), startMs),
+      resume: Math.min(p.resume_time ? new Date(p.resume_time).getTime() : endMs, endMs),
+    }))
+    .filter((b) => b.resume > b.pause)
+    .toSorted((a, b) => a.pause - b.pause);
+  const merged: Array<{ pause: number; resume: number }> = [];
+  for (const b of clipped) {
+    const last = merged[merged.length - 1];
+    if (last && b.pause <= last.resume) last.resume = Math.max(last.resume, b.resume);
+    else merged.push({ ...b });
+  }
+  return merged;
+}
+
+/**
+ * Longest unbroken sleep segment (minutes) within an episode, splitting on
+ * `pauses` (night_waking intervals or coalesced awake gaps). Mirrors
+ * `stats.ts:getLongestNightStretches` so the newborn card and the stats page
+ * agree on what "longest stretch" means. Falls back to full span with no pauses.
+ */
+function longestSegmentMin(startMs: number, endMs: number, pauses?: SleepPause[]): number {
+  const breaks = resolvedBreaks(pauses, startMs, endMs);
+  if (breaks.length === 0) return (endMs - startMs) / 60_000;
+  let longest = 0;
+  let segStart = startMs;
+  for (const b of breaks) {
+    const seg = (b.pause - segStart) / 60_000;
+    if (seg > longest) longest = seg;
+    segStart = b.resume;
+  }
+  const lastSeg = (endMs - segStart) / 60_000;
+  if (lastSeg > longest) longest = lastSeg;
+  return longest;
+}
+
+/** Pause (awake) minutes overlapping the window [winStart, winEnd]. */
+function pauseMinInWindow(
+  pauses: SleepPause[] | undefined,
+  winStart: number,
+  winEnd: number,
+): number {
+  let total = 0;
+  for (const b of resolvedBreaks(pauses, winStart, winEnd)) total += b.resume - b.pause;
+  return total / 60_000;
 }
 
 function sd(values: number[]): number {
@@ -290,15 +353,22 @@ export function computeRollingSleepStats(
 
     const effectiveStart = Math.max(startMs, cutoff);
     const effectiveEnd = Math.min(endMs, refMs);
-    const durationMin = (effectiveEnd - effectiveStart) / 60_000;
+    const spanMin = (effectiveEnd - effectiveStart) / 60_000;
+    if (spanMin <= 0) continue;
+
+    // Net out wakings (night_waking pauses / coalesced awake gaps) so the
+    // "one long night + waking" model doesn't overstate sleep vs a baby
+    // whose night is logged as separate segments.
+    const durationMin = spanMin - pauseMinInWindow(s.pauses, effectiveStart, effectiveEnd);
     if (durationMin <= 0) continue;
 
     totalSleep += durationMin;
     episodeCount++;
 
-    const fullDuration = (endMs - startMs) / 60_000;
+    const fullDuration = (endMs - startMs) / 60_000 - pauseMinInWindow(s.pauses, startMs, endMs);
     totalDuration += fullDuration;
-    if (fullDuration > longestStretch) longestStretch = fullDuration;
+    const segment = longestSegmentMin(startMs, endMs, s.pauses);
+    if (segment > longestStretch) longestStretch = segment;
   }
 
   return {
@@ -342,7 +412,7 @@ export function computeLongestStretchTrend(
     const daySleeps = byDay.get(dateStr)!;
     let longest = 0;
     for (const s of daySleeps) {
-      if (s.durationMin > longest) longest = s.durationMin;
+      if (s.longestSegment > longest) longest = s.longestSegment;
     }
 
     if (daysAgo >= 0 && daysAgo < 7) {

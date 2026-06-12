@@ -849,6 +849,36 @@ Smallest first unit: the read-side coalescer + pause-aware `features.ts`
 longest-stretch/rolling helpers, with a multi-day test asserting the two
 logging models produce identical `longestStretch`/`totalSleep24h`.
 
+**Shipping plan (one commit per unit, Codex-reviewed):**
+- ✅ **Unit 1 — pause-aware newborn metrics.** `features.ts`
+  `computeRollingSleepStats`/`computeLongestStretchTrend` now net wakings out
+  of the 24h total and compute `longestStretch` as the longest segment between
+  pauses (`longestSegmentMin`). Open wakings (`resume_time: null` on an active
+  night) resolve to now; overlapping wakings are merged so they can't
+  double-count. Benefits emerging too (shared helper). Codex review caught the
+  open-waking + overlap edges before commit.
+- ⬜ **Unit 2 — overlap-safe 24h total.** `computeRollingSleepStats` still sums
+  per-episode net duration, so two *separate* overlapping episodes (Umi's id5
+  480m night fully containing the id7 05:00→07:00 night) double-count. Replace
+  the per-episode sum with a union over asleep sub-intervals (episode minus
+  pauses), clipped to the 24h window.
+- ⬜ **Unit 3 — read-side coalescing.** Coalesce adjacent `night` episodes with
+  a short awake gap into one logical night with the gaps as derived pauses,
+  applied at the newborn + emerging engine entry. Acceptance test: the two
+  logging models produce identical `longestStretch`/`totalSleep24h`.
+
+Deferred (not in these three units):
+- Extract ONE shared pause/segment helper for `features.ts` + `stats.ts`
+  (`getLongestNightStretches`) once null-resume/overlap semantics are locked —
+  Codex flagged the two parallel impls can drift.
+- Stats page (`stats-view-utils.ts:784,977`) maps `pauses` away, so historical
+  charts still ignore wakings — extend after the engine units land.
+- Single `priorOvernightSleep` fetch (`server/state.ts:85`) undercounts a
+  fragmented morning night in "Søvn i dag".
+- Emerging/`schedule.ts` learning still treats each `night` row as an
+  independent bedtime/duration/wake sample — coalescing the learning inputs is
+  a bigger, separate unit.
+
 
 ### Engine: sleepWindow during active sleep shows "now" window, not post-wakeup window
 

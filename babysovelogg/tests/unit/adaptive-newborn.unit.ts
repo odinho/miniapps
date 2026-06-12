@@ -2,6 +2,8 @@ import { describe, it, expect } from "bun:test";
 import {
   computeSleepPressure,
   computeSleepWindow,
+  computeRollingSleepStats,
+  computeLongestStretchTrend,
   getAgeNorms,
 } from "$lib/engine/features.js";
 import { predictNewborn } from "$lib/engine/newborn.js";
@@ -12,6 +14,19 @@ import type { SleepEntry, BabyContext } from "$lib/types.js";
 
 function sleep(start: string, end: string, type: "nap" | "night" = "nap"): SleepEntry {
   return { start_time: start, end_time: end, type };
+}
+
+function nightWithPauses(
+  start: string,
+  end: string,
+  pauses: Array<[string, string]>,
+): SleepEntry {
+  return {
+    start_time: start,
+    end_time: end,
+    type: "night",
+    pauses: pauses.map(([pause_time, resume_time]) => ({ pause_time, resume_time })),
+  };
 }
 
 /** Generate wake windows of a specific duration by creating evenly-spaced sleep pairs. */
@@ -368,5 +383,98 @@ describe("adaptive newborn — different baby types", () => {
 
     // Baby with consistent 50min windows should have a narrower window than age defaults
     expect(range8).toBeLessThan(range2);
+  });
+});
+
+// ─── pause-aware newborn metrics ────────────────────────────────────────────
+
+describe("computeRollingSleepStats — pause-aware", () => {
+  // One consolidated night with a 60-min waking in the middle.
+  const night = nightWithPauses(
+    "2026-03-20T23:00:00Z",
+    "2026-03-21T07:00:00Z",
+    [["2026-03-21T02:00:00Z", "2026-03-21T03:00:00Z"]],
+  );
+  const now = new Date("2026-03-21T08:00:00Z").getTime();
+
+  it("nets the waking out of the 24h total", () => {
+    const stats = computeRollingSleepStats([night], "UTC", now);
+    // 480 min span − 60 min awake = 420 min asleep
+    expect(stats.totalSleep24h).toBe(420);
+  });
+
+  it("longest stretch is the longest segment between wakings, not the full span", () => {
+    const stats = computeRollingSleepStats([night], "UTC", now);
+    // segments are 23:00–02:00 (180) and 03:00–07:00 (240) → 240, not 480
+    expect(stats.longestStretch).toBe(240);
+  });
+
+  it("falls back to full duration when there are no pauses", () => {
+    const plain = sleep("2026-03-21T01:00:00Z", "2026-03-21T05:00:00Z", "night");
+    const stats = computeRollingSleepStats([plain], "UTC", now);
+    expect(stats.longestStretch).toBe(240);
+    expect(stats.totalSleep24h).toBe(240);
+  });
+
+  it("treats an open waking on an active night as awake until now", () => {
+    // Active night 22:00 → (now 23:00), baby woke at 22:30 and is still up.
+    const refNow = new Date("2026-03-21T23:00:00Z").getTime();
+    const active: SleepEntry = {
+      start_time: "2026-03-21T22:00:00Z",
+      end_time: null,
+      type: "night",
+      pauses: [{ pause_time: "2026-03-21T22:30:00Z", resume_time: null }],
+    };
+    const stats = computeRollingSleepStats([active], "UTC", refNow);
+    // 22:00–22:30 asleep = 30, the open waking 22:30→now is awake.
+    expect(stats.totalSleep24h).toBe(30);
+    expect(stats.longestStretch).toBe(30);
+  });
+
+  it("does not double-count overlapping wakings", () => {
+    const overlapped = nightWithPauses(
+      "2026-03-21T00:00:00Z",
+      "2026-03-21T02:00:00Z",
+      [
+        ["2026-03-21T00:30:00Z", "2026-03-21T01:15:00Z"],
+        ["2026-03-21T01:00:00Z", "2026-03-21T01:30:00Z"],
+      ],
+    );
+    const stats = computeRollingSleepStats([overlapped], "UTC", now);
+    // Union of the two wakings is 00:30–01:30 = 60 awake; 120 − 60 = 60 asleep.
+    expect(stats.totalSleep24h).toBe(60);
+    // Longest segment is the post-waking tail 01:30–02:00 = 30.
+    expect(stats.longestStretch).toBe(30);
+  });
+
+  it("nets a waking that straddles the 24h window boundary", () => {
+    // 24h cutoff is 2026-03-20T10:00Z. Night 09:30→11:00 straddles it, with a
+    // waking 09:45→10:15 that also straddles the cutoff.
+    const refNow = new Date("2026-03-21T10:00:00Z").getTime();
+    const straddleNight = nightWithPauses(
+      "2026-03-20T09:30:00Z",
+      "2026-03-20T11:00:00Z",
+      [["2026-03-20T09:45:00Z", "2026-03-20T10:15:00Z"]],
+    );
+    const stats = computeRollingSleepStats([straddleNight], "UTC", refNow);
+    // Clipped span 10:00–11:00 = 60. Waking overlap inside window 10:00–10:15
+    // = 15. Net = 45.
+    expect(stats.totalSleep24h).toBe(45);
+  });
+});
+
+describe("computeLongestStretchTrend — pause-aware", () => {
+  it("uses the longest segment between wakings for the daily longest", () => {
+    // Two recent nights, each one long span broken by a 60-min waking.
+    const nights = [
+      nightWithPauses("2026-03-20T23:00:00Z", "2026-03-21T07:00:00Z",
+        [["2026-03-21T02:00:00Z", "2026-03-21T03:00:00Z"]]),
+      nightWithPauses("2026-03-21T23:00:00Z", "2026-03-22T07:00:00Z",
+        [["2026-03-22T02:00:00Z", "2026-03-22T03:00:00Z"]]),
+    ];
+    const now = new Date("2026-03-22T08:00:00Z").getTime();
+    const trend = computeLongestStretchTrend(nights, "UTC", now);
+    // Each night's longest segment is 240 (03:00–07:00), not 480.
+    expect(trend.currentWeekAvg).toBe(240);
   });
 });
