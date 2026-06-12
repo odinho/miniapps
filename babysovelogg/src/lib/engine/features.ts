@@ -34,13 +34,14 @@ export interface StrategySignals {
 
 /** 24h rolling sleep summary for newborn/emerging engines. */
 export interface RollingSleepStats {
-  /** Total sleep in the last 24h (minutes) */
+  /** Total asleep minutes in the last 24h — de-duplicated (union of asleep
+   *  intervals), so overlapping rows count once and wakings are netted out. */
   totalSleep24h: number;
-  /** Longest single sleep stretch in the last 24h (minutes) */
+  /** Longest unbroken sleep segment in the last 24h (minutes), split on wakings */
   longestStretch: number;
-  /** Mean sleep episode duration from recent data (minutes) */
+  /** Mean sleep episode duration (minutes) — per logged row, NOT de-duplicated */
   meanEpisodeDuration: number;
-  /** Number of sleep episodes in last 24h */
+  /** Number of sleep episodes in last 24h — per logged row, NOT de-duplicated */
   episodeCount: number;
 }
 
@@ -163,6 +164,42 @@ function pauseMinInWindow(
 ): number {
   let total = 0;
   for (const b of resolvedBreaks(pauses, winStart, winEnd)) total += b.resume - b.pause;
+  return total / 60_000;
+}
+
+/**
+ * Asleep sub-intervals of one episode within [winStart, winEnd]: the clipped
+ * episode minus its pauses (wakings). Used to union sleep across episodes so
+ * overlapping rows (e.g. a long night with a duplicate inner night row) don't
+ * double-count toward the 24h total.
+ */
+function asleepIntervals(
+  winStart: number,
+  winEnd: number,
+  pauses: SleepPause[] | undefined,
+): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  let cur = winStart;
+  for (const b of resolvedBreaks(pauses, winStart, winEnd)) {
+    if (b.pause > cur) out.push([cur, b.pause]);
+    cur = b.resume;
+  }
+  if (winEnd > cur) out.push([cur, winEnd]);
+  return out;
+}
+
+/** Total minutes covered by the union of [start, end] intervals. */
+function unionMinutes(intervals: Array<[number, number]>): number {
+  if (intervals.length === 0) return 0;
+  const sorted = intervals.toSorted((a, b) => a[0] - b[0]);
+  let total = 0;
+  let [curStart, curEnd] = sorted[0];
+  for (let i = 1; i < sorted.length; i++) {
+    const [s, e] = sorted[i];
+    if (s <= curEnd) curEnd = Math.max(curEnd, e);
+    else { total += curEnd - curStart; curStart = s; curEnd = e; }
+  }
+  total += curEnd - curStart;
   return total / 60_000;
 }
 
@@ -334,10 +371,13 @@ export function computeRollingSleepStats(
   const window24h = 24 * 60 * 60 * 1000;
   const cutoff = refMs - window24h;
 
-  let totalSleep = 0;
   let longestStretch = 0;
   let episodeCount = 0;
   let totalDuration = 0;
+  // Asleep sub-intervals across all episodes, unioned at the end so two
+  // overlapping rows (e.g. Umi's long night fully containing a duplicate
+  // inner night row) count once toward the 24h total instead of summing.
+  const asleep: Array<[number, number]> = [];
 
   for (const s of sleeps) {
     const startMs = new Date(s.start_time).getTime();
@@ -362,8 +402,8 @@ export function computeRollingSleepStats(
     const durationMin = spanMin - pauseMinInWindow(s.pauses, effectiveStart, effectiveEnd);
     if (durationMin <= 0) continue;
 
-    totalSleep += durationMin;
     episodeCount++;
+    asleep.push(...asleepIntervals(effectiveStart, effectiveEnd, s.pauses));
 
     const fullDuration = (endMs - startMs) / 60_000 - pauseMinInWindow(s.pauses, startMs, endMs);
     totalDuration += fullDuration;
@@ -372,7 +412,7 @@ export function computeRollingSleepStats(
   }
 
   return {
-    totalSleep24h: Math.round(totalSleep),
+    totalSleep24h: Math.round(unionMinutes(asleep)),
     longestStretch: Math.round(longestStretch),
     meanEpisodeDuration: episodeCount > 0 ? Math.round(totalDuration / episodeCount) : 0,
     episodeCount,

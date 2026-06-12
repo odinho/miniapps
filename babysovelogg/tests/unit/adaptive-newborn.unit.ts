@@ -447,6 +447,70 @@ describe("computeRollingSleepStats — pause-aware", () => {
     expect(stats.longestStretch).toBe(30);
   });
 
+  it("does not double-count two overlapping night episodes in the 24h total", () => {
+    // Umi's id5/id7 noise: a long night that fully contains a second night row.
+    const long = sleep("2026-03-20T23:00:00Z", "2026-03-21T07:00:00Z", "night");
+    const contained = sleep("2026-03-21T05:00:00Z", "2026-03-21T07:00:00Z", "night");
+    const stats = computeRollingSleepStats([long, contained], "UTC", now);
+    // Union is the 480m night, not 480 + 120.
+    expect(stats.totalSleep24h).toBe(480);
+    expect(stats.episodeCount).toBe(2);
+    expect(stats.longestStretch).toBe(480);
+  });
+
+  it("unions partially overlapping episodes in the 24h total", () => {
+    const a = sleep("2026-03-20T23:00:00Z", "2026-03-21T02:00:00Z", "night");
+    const b = sleep("2026-03-21T01:00:00Z", "2026-03-21T04:00:00Z", "night");
+    const stats = computeRollingSleepStats([a, b], "UTC", now);
+    // 23:00–04:00 union = 300, not 180 + 180.
+    expect(stats.totalSleep24h).toBe(300);
+  });
+
+  it("keeps episodeCount/mean as raw per-row metrics even when rows overlap", () => {
+    // The total is de-duplicated (union), but episodeCount and mean stay
+    // per-logged-row — two overlapping rows read as 2 episodes whose mean is
+    // their gross average. Pinned so the mixed semantic is explicit.
+    const long = sleep("2026-03-20T23:00:00Z", "2026-03-21T07:00:00Z", "night");
+    const contained = sleep("2026-03-21T05:00:00Z", "2026-03-21T07:00:00Z", "night");
+    const stats = computeRollingSleepStats([long, contained], "UTC", now);
+    expect(stats.episodeCount).toBe(2);
+    expect(stats.meanEpisodeDuration).toBe(300); // (480 + 120) / 2
+  });
+
+  it("drops a fully-paused episode (no asleep time) from total and count", () => {
+    const allAwake = nightWithPauses(
+      "2026-03-21T00:00:00Z",
+      "2026-03-21T02:00:00Z",
+      [["2026-03-21T00:00:00Z", "2026-03-21T02:00:00Z"]],
+    );
+    const stats = computeRollingSleepStats([allAwake], "UTC", now);
+    expect(stats.totalSleep24h).toBe(0);
+    expect(stats.episodeCount).toBe(0);
+  });
+
+  it("unions exactly-touching episodes without gap or overlap", () => {
+    const a = sleep("2026-03-20T23:00:00Z", "2026-03-21T01:00:00Z", "night");
+    const b = sleep("2026-03-21T01:00:00Z", "2026-03-21T02:00:00Z", "night");
+    const stats = computeRollingSleepStats([a, b], "UTC", now);
+    expect(stats.totalSleep24h).toBe(180);
+  });
+
+  it("resolves a duplicate row covering an open waking's gap as asleep", () => {
+    // Contradictory data: an active night says awake 22:30→now, a separate
+    // completed row says asleep 22:30→23:00. The union trusts the explicit
+    // sleep row and fills the gap — documented, not a silent bug.
+    const refNow = new Date("2026-03-21T23:00:00Z").getTime();
+    const active: SleepEntry = {
+      start_time: "2026-03-21T22:00:00Z",
+      end_time: null,
+      type: "night",
+      pauses: [{ pause_time: "2026-03-21T22:30:00Z", resume_time: null }],
+    };
+    const dup = sleep("2026-03-21T22:30:00Z", "2026-03-21T23:00:00Z", "night");
+    const stats = computeRollingSleepStats([active, dup], "UTC", refNow);
+    expect(stats.totalSleep24h).toBe(60);
+  });
+
   it("nets a waking that straddles the 24h window boundary", () => {
     // 24h cutoff is 2026-03-20T10:00Z. Night 09:30→11:00 straddles it, with a
     // waking 09:45→10:15 that also straddles the cutoff.
