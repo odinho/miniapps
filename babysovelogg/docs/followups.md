@@ -134,10 +134,35 @@ own design pass.
 - Learned cycle estimator feeds only rescue/napBudget thresholds;
   `predictNapEndTime`/`predictNightEndTime`/re-anchor/scorer still use
   the age prior (re-anchor deliberately, the rest incidentally). One
-  confidence-gated cycle provider (Codex #6).
+  confidence-gated cycle provider (Codex #6). Adversarial pair-review
+  2026-06-12 sharpened the wiring conditions: payoff is single-digit
+  minutes (snap blend is 0.3, scorer W_CYCLE=0.1; worst case ~8 min on
+  night end), and v2 can still confidently learn an in-range harmonic
+  alias (routine 100-min "self-wakes" → c=50 at k=2 passes the
+  outside-prior high-confidence override with alignedStd=0). If wired:
+  gate on `source="learned" && confidence="high"` AND within prior 1σ
+  AND an alias-diversity check (k=1 samples ≥ max(3 eff. samples, 25%
+  eff. weight), or ≥2 k-buckets each ≥25%) — never medium. Keep the
+  re-anchor on age-default. Note the daily backtest can't validate this
+  wiring: it scores `predictDayNaps` planned ends, which use raw
+  learned duration without cycle snap (backtest.ts:253,
+  schedule.ts:295) — needs active-nap/active-night replay.
 - `getLearnedBedtimeWakeWindow` learns from every nap→night gap with
   only a 60–600 min filter — no complete-day, off-day, regime, or
-  recency treatment, yet it drives `recommendBedtime` directly (Codex #8).
+  censoring treatment, yet it drives `recommendBedtime` directly
+  (Codex #8; recency is partly covered by the 7-day `recentSleeps`
+  window). Adversarial pair-review 2026-06-12 ranked the holes: (1) the
+  600-min cap admits unlogged-last-nap gaps (one 480-min gap + one
+  250-min gap → mean 365); (2) n=2 cliff straight to raw mean with no
+  `blendEstimate` ramp; (3) no robust estimator — any outlier dominates
+  a 2–7 sample window. Morning plans are the exposed case: the
+  `allSynthetic` ×0.5 penalty caps habitual-bedtime damping at weight
+  ~0.425, so a +120-min bad WW still moves the morning bedtime ~+69 min
+  before target/clamp. Minimal fix: day-aware samples (off-days out,
+  prior sleep must be that local day's last nap, regime filter,
+  age-based final-WW ceiling instead of 600) + robust prior-blended
+  estimate (trimmed/winsorized, recency-weighted,
+  `blendEstimate(defaultWW, learned, n, 3, 7)`).
 - `buildSleepsForBedtime` cutoff compares local minute-of-day only —
   an after-midnight nap end (00:30 → min 30) passes a 17:00 cutoff.
   Habitual bedtime/wake medians + SDs use linear minute-of-day
