@@ -10,27 +10,37 @@ import {
 	buildEventsQuery,
 } from '../../src/lib/event-view-utils.js';
 
-describe('TYPE_COLORS', () => {
-	it('contains all expected event types', () => {
-		expect(TYPE_COLORS['baby.created']).toBe('#9c27b0');
-		expect(TYPE_COLORS['sleep.started']).toBe('#1565c0');
-		expect(TYPE_COLORS['diaper.logged']).toBe('#2e7d32');
-	});
+describe('view constants', () => {
+	it('renders the full event-type colour map plus derived constants', () => {
+		expect(
+			[
+				'TYPE_COLORS:',
+				...Object.entries(TYPE_COLORS).map(([type, color]) => `  ${type} → ${color}`),
+				`EVENT_TYPES = [${EVENT_TYPES.join(', ')}]`,
+				`PAGE_SIZE = ${PAGE_SIZE}`,
+			].join('\n'),
+		).toMatchInlineSnapshot(`
+		  "TYPE_COLORS:
+		    baby.created → #9c27b0
+		    baby.updated → #ab47bc
+		    sleep.started → #1565c0
+		    sleep.ended → #1976d2
+		    sleep.updated → #1e88e5
+		    sleep.manual → #2196f3
+		    sleep.deleted → #64b5f6
+		    sleep.tagged → #42a5f5
+		    sleep.paused → #90caf9
+		    sleep.resumed → #bbdefb
+		    diaper.logged → #2e7d32
+		    diaper.updated → #43a047
+		    diaper.deleted → #66bb6a
+		    day.started → #ef6c00
+		  EVENT_TYPES = [baby.created, baby.updated, sleep.started, sleep.ended, sleep.updated, sleep.manual, sleep.deleted, sleep.tagged, sleep.paused, sleep.resumed, diaper.logged, diaper.updated, diaper.deleted, day.started]
+		  PAGE_SIZE = 30"
+		`);
 
-	it('has 14 event types', () => {
-		expect(Object.keys(TYPE_COLORS)).toHaveLength(14);
-	});
-});
-
-describe('EVENT_TYPES', () => {
-	it('lists all type keys from TYPE_COLORS', () => {
+		// EVENT_TYPES must stay derived from TYPE_COLORS, never hand-maintained.
 		expect(EVENT_TYPES).toEqual(Object.keys(TYPE_COLORS));
-	});
-});
-
-describe('PAGE_SIZE', () => {
-	it('is 30', () => {
-		expect(PAGE_SIZE).toBe(30);
 	});
 });
 

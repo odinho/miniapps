@@ -30,15 +30,15 @@ function makeSleep(overrides: Partial<SleepLogRow> = {}): SleepLogRow {
 }
 
 describe('WOKE_OPTIONS', () => {
-	it('has self and woken options', () => {
-		expect(WOKE_OPTIONS).toHaveLength(2);
-		expect(WOKE_OPTIONS[0].value).toBe('self');
-		expect(WOKE_OPTIONS[1].value).toBe('woken');
-	});
+	it('renders both woke options (value → Nynorsk label)', () => {
+		expect(
+			WOKE_OPTIONS.map((o) => `${o.value} → ${o.label}`).join('\n'),
+		).toMatchInlineSnapshot(`
+		  "self → Vakna sjølv
+		  woken → Vekt av oss"
+		`);
 
-	it('has Norwegian labels', () => {
-		expect(WOKE_OPTIONS[0].label).toBe('Vakna sjølv');
-		expect(WOKE_OPTIONS[1].label).toBe('Vekt av oss');
+		expect(WOKE_OPTIONS.map((o) => o.value)).toEqual(['self', 'woken']);
 	});
 });
 

@@ -12,19 +12,47 @@ import {
 
 const testId = () => 'dip_test123';
 
+const renderOptions = (opts: readonly { value: string; label: string }[]) =>
+	opts.map((o) => `${o.value} → ${o.label}`).join('\n');
+
 describe('constants', () => {
-	it('DIAPER_TYPES has 4 options', () => {
-		expect(DIAPER_TYPES).toHaveLength(4);
+	it('renders every diaper/potty option set (value → Nynorsk label)', () => {
+		expect(
+			[
+				`DIAPER_TYPES:\n${renderOptions(DIAPER_TYPES)}`,
+				`DIAPER_AMOUNTS:\n${renderOptions(DIAPER_AMOUNTS)}`,
+				`POTTY_RESULTS:\n${renderOptions(POTTY_RESULTS)}`,
+				`POTTY_DIAPER_STATUSES:\n${renderOptions(POTTY_DIAPER_STATUSES)}`,
+			].join('\n\n'),
+		).toMatchInlineSnapshot(`
+		  "DIAPER_TYPES:
+		  wet → 💧 Våt
+		  dirty → 💩 Skitten
+		  both → 💧💩 Begge
+		  dry → ✨ Tørr
+
+		  DIAPER_AMOUNTS:
+		  lite → Lite
+		  middels → Middels
+		  mykje → Mykje
+
+		  POTTY_RESULTS:
+		  potty_wet → 💧 Tiss
+		  potty_dirty → 💩 Bæsj
+		  potty_both → 💧💩 Båe
+		  potty_nothing → ∅ Ingenting
+		  diaper_only → 🧷 Ingen do
+
+		  POTTY_DIAPER_STATUSES:
+		  dry → Tørr ✨
+		  damp → Litt våt 💧
+		  wet → Våt 💧💧
+		  full → Full 💧💧💧
+		  dirty → Skitten 💩"
+		`);
+
 		expect(DIAPER_TYPES.map((t) => t.value)).toEqual(['wet', 'dirty', 'both', 'dry']);
-	});
-
-	it('DIAPER_AMOUNTS has 3 options', () => {
-		expect(DIAPER_AMOUNTS).toHaveLength(3);
 		expect(DIAPER_AMOUNTS.map((a) => a.value)).toEqual(['lite', 'middels', 'mykje']);
-	});
-
-	it('POTTY_RESULTS has 5 options including potty_both', () => {
-		expect(POTTY_RESULTS).toHaveLength(5);
 		expect(POTTY_RESULTS.map((r) => r.value)).toEqual([
 			'potty_wet',
 			'potty_dirty',
@@ -32,10 +60,6 @@ describe('constants', () => {
 			'potty_nothing',
 			'diaper_only',
 		]);
-	});
-
-	it('POTTY_DIAPER_STATUSES has 5 options including dirty', () => {
-		expect(POTTY_DIAPER_STATUSES).toHaveLength(5);
 		expect(POTTY_DIAPER_STATUSES.map((s) => s.value)).toEqual([
 			'dry',
 			'damp',

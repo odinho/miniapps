@@ -40,12 +40,3 @@ describe("service worker routing", () => {
 		expect(shouldHandleRequest("GET", "/robots.txt", "no-cors")).toBe("cache-first");
 	});
 });
-
-describe("service worker cache naming", () => {
-	it("generates versioned cache name", () => {
-		const version = "1774627073064";
-		const cacheName = `babysovelogg-${version}`;
-		expect(cacheName).toBe("babysovelogg-1774627073064");
-		expect(cacheName).toMatch(/^babysovelogg-\d+$/);
-	});
-});
