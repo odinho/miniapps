@@ -3,6 +3,7 @@
 	import type { SleepDayTotals } from '$lib/engine/stats.js';
 	import type { Prediction } from '$lib/stores/app.svelte.js';
 	import { formatDuration, formatDurationCompact, formatTime } from '$lib/utils.js';
+	import { collectOvernightFragments } from '$lib/overnight.js';
 
 	interface Props {
 		/** The overnight that ended this morning, or null when none logged. */
@@ -31,10 +32,16 @@
 			.toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()),
 	);
 
-	const priorNightMin = $derived(dayTotals?.priorNightMinutes ?? 0);
+	// A night logged in several pieces: show the whole night's total, broken
+	// into the logged stretches. Total stays net (pauses excluded); the parts
+	// are wall-clock ranges.
+	const nightFragments = $derived(collectOvernightFragments(priorOvernightSleep, todaySleeps));
+	const nightTotalMin = $derived(
+		(dayTotals?.priorNightMinutes ?? 0) + (dayTotals?.todayNightMinutes ?? 0),
+	);
 	const totalMin = $derived(dayTotals?.totalMinutes ?? 0);
 	const hasMultipleRows = $derived(
-		(priorNightMin > 0 ? 1 : 0) + completedNaps.length >= 2,
+		(nightFragments.length > 0 ? 1 : 0) + completedNaps.length >= 2,
 	);
 
 	// "Neste" line: what the parent should anticipate next.
@@ -56,21 +63,26 @@
 	});
 
 	const showCard = $derived(
-		priorNightMin > 0 || completedNaps.length > 0 || nextLine != null,
+		nightFragments.length > 0 || completedNaps.length > 0 || nextLine != null,
 	);
 </script>
 
 {#if showCard}
 	<div class="today-card" data-testid="today-card">
 		<div class="today-rows">
-			{#if priorNightMin > 0 && priorOvernightSleep?.end_time}
+			{#if nightFragments.length > 0}
 				<div class="today-row" data-testid="today-row-night">
 					<div class="today-row-head">
 						<span class="today-row-label">Natt</span>
-						<span class="today-row-value">{fcMs(priorNightMin)}</span>
+						<span class="today-row-value">{fcMs(nightTotalMin)}</span>
 					</div>
 					<div class="today-row-sub">
-						{formatTime(priorOvernightSleep.start_time)}–{formatTime(priorOvernightSleep.end_time)}
+						{#if nightFragments.length === 1}
+							{formatTime(nightFragments[0].start_time)}–{formatTime(nightFragments[0].end_time!)}
+						{:else}
+							{#each nightFragments as frag, i}<!--
+								-->{formatTime(frag.start_time)}–{formatTime(frag.end_time!)}{i < nightFragments.length - 1 ? ' · ' : ''}{/each}
+						{/if}
 					</div>
 				</div>
 			{/if}

@@ -11,6 +11,7 @@ import type {
 } from "$lib/types.js";
 import { todayInTz } from "$lib/tz.js";
 import { classifyActiveSleep, type StaleStatus } from "$lib/stale-sleep.js";
+import { collectOvernightFragments } from "$lib/overnight.js";
 
 /** Empty single-baby slice, returned by getFamilyState when no baby exists
  *  (brand-new install / onboarding). Matches the legacy getState() null-baby
@@ -95,30 +96,13 @@ export function getBabyState(babyId: number, now?: number) {
     )
     .get(baby.id, midnightIso, midnightIso) as SleepLogRow | undefined;
   // The overnight can be logged as several `night` sleeps split by wake-ups
-  // (parent logs each stretch separately) instead of one sleep with
-  // night_wakings. The morning wake is the end of the LAST such fragment
-  // before today's first nap — not `priorOvernightRow` (the fragment that
+  // instead of one sleep + night_wakings. The morning wake is the end of the
+  // LAST fragment of that block — not `priorOvernightRow` (the fragment that
   // straddles midnight), which only the first piece does. `priorOvernightRow`
   // stays load-bearing below for the pre-midnight duration the "Søvn i dag"
   // total would otherwise drop.
-  //
-  // A fragment only *continues* the overnight if the awake gap from the
-  // previous wake is short — a long stretch means a new block (an evening
-  // bedtime on a no-nap day, or an evening false-start), which must not
-  // overwrite the morning wake. todaySleeps is start_time DESC.
-  const SAME_NIGHT_GAP_MS = 3 * 60 * 60 * 1000;
-  let morningWakeTime = priorOvernightRow?.end_time ?? null;
-  let prevWakeMs = priorOvernightRow?.end_time
-    ? new Date(priorOvernightRow.end_time).getTime()
-    : null;
-  for (let i = todaySleeps.length - 1; i >= 0; i--) {
-    const s = todaySleeps[i];
-    if (s.type !== "night" || !s.end_time) break; // first nap or active sleep closes the block
-    const startMs = new Date(s.start_time).getTime();
-    if (prevWakeMs != null && startMs - prevWakeMs > SAME_NIGHT_GAP_MS) break;
-    morningWakeTime = s.end_time;
-    prevWakeMs = new Date(s.end_time).getTime();
-  }
+  const morningWakeTime = collectOvernightFragments(priorOvernightRow, todaySleeps).at(-1)?.end_time
+    ?? null;
   let todayWakeUp: DayStartRow | undefined;
   if (morningWakeTime) {
     todayWakeUp = {
