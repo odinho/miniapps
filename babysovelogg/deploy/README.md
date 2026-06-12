@@ -41,7 +41,7 @@ silently fails to serve, so TCP is the path that actually works.
 
 | File | Purpose |
 |------|---------|
-| `systemd/babysovelogg@.service` | template unit — `systemctl start babysovelogg@halldis` |
+| `systemd/babysovelogg@.service` | template unit — `systemctl start babysovelogg@<family>` |
 | `nginx/babysovelogg.conf.template` | per-family vhost (HTTP-only bootstrap → full HTTPS once cert exists). Uses Jinja-style `{{family}}`, `{{host}}`, `{{port}}`, `{{tls_ready}}` placeholders. |
 
 The systemd unit reads everything (`ORIGIN`, `HOST`, `PORT`, `DB_PATH`,
@@ -68,6 +68,62 @@ Jinja2, so an ansible `template:` task drops in unchanged. Equivalent
 NixOS modules, Chef cookbooks, or hand-written shell all work; the
 templates don't care.
 
+## Operating with `manage.sh`
+
+`deploy/manage.sh` is the day-to-day entry point — one command for shipping
+code, restarting/inspecting a baby, and onboarding a new family. It's generic
+and env-driven, so it runs from any operator machine (your laptop, openclaw,
+CI). Concrete host config lives in `local/deploy.env` (gitignored), which the
+script auto-sources:
+
+```sh
+# local/deploy.env — fill in with your own host/domain/paths (gitignored)
+SERVER=user@host                                 # ssh target that holds the instances
+SSH_AUTH_SOCK=/run/user/1000/keyring/.ssh        # your ssh agent socket
+ANSIBLE_DIR=/path/to/provisioning-repo/ansible   # private repo: families list + VAPID secrets
+BASE_DOMAIN=example.com                          # *.example.com -> the host (wildcard DNS)
+VAPID_SUBJECT=mailto:you@example.com
+```
+
+Commands:
+
+| Command | What it does |
+|---------|--------------|
+| `manage.sh deploy [family…]` | `bun run build`, rsync code, restart families (default: **all**), warm each up |
+| `manage.sh add <name>` | onboard a family: pick the next port + an unguessable slug, mint a VAPID keypair, patch the ansible `families`/`family_secrets` lists, run the playbook (dir + `.env` + systemd + cert + nginx), verify |
+| `manage.sh list` / `status [family]` | families on the host / their systemd activity |
+| `manage.sh restart <family\|all>` | restart instance(s) and warm up |
+| `manage.sh logs <family> [args…]` | `journalctl -u babysovelogg@<family>` (extra args pass through, e.g. `-f -n100`) |
+| `manage.sh inspect <family>` | pull the family DB into `local/imports/` and run `scripts/inspect-db.ts` |
+| `manage.sh rebuild <family>` | replay events / rebuild projections (`POST /api/admin/rebuild`) |
+| `manage.sh backup [family\|all]` | rsync family data dir(s) into `local/backups/` |
+
+Typical flows:
+
+```sh
+# ship new code to every baby
+deploy/manage.sh deploy
+
+# roll out to one baby first, eyeball it, then the rest
+deploy/manage.sh deploy <family>    # ...check the URL it prints...
+deploy/manage.sh deploy             # fan out to all
+
+# onboard a new baby end-to-end (needs ANSIBLE_DIR set)
+deploy/manage.sh add <name>         # prints https://<name>-<slug>.<base-domain>
+# then commit the vars change in the provisioning repo (the script reminds you how)
+
+# peek at a baby's data without touching the server's live DB
+deploy/manage.sh inspect <family>
+```
+
+`add` requires the private provisioning repo (`ANSIBLE_DIR`) because the
+families list and VAPID secrets live there — that repo is the trust boundary
+(no vault). `deploy`, `restart`, `logs`, `inspect`, `rebuild`, and `backup`
+need only SSH access to `SERVER`.
+
+The sections below document what `deploy` and the provisioning step do under
+the hood — read them if you're setting up a fresh host or debugging the script.
+
 ## Deploy flow
 
 Local (replace `<server>` with the host that holds your instances):
@@ -92,8 +148,8 @@ Two things to notice in that rsync:
 Roll out to one family first to sanity-check before fanning out:
 
 ```sh
-ssh <server> 'sudo systemctl restart babysovelogg@halldis.service'
-# ...check halldis-<suffix>.<base-domain> in a browser...
+ssh <server> 'sudo systemctl restart babysovelogg@<family>.service'
+# ...check <family>-<suffix>.<base-domain> in a browser...
 ssh <server> 'sudo systemctl restart "babysovelogg@*.service"'
 ```
 
