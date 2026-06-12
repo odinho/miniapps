@@ -286,6 +286,11 @@ function applyEventToSlice(
 			// Discarding an over-a-day stale session offline: clear the banner
 			// optimistically so it doesn't linger until the next server fetch.
 			if (s.staleActiveSleep?.domain_id === domainId) s.staleActiveSleep = null;
+			// Undo of "Søvn starta" / "Sove begge" is a sleep.deleted on a sleep
+			// that's still active — clear activeSleep too, or offline the baby
+			// stays "asleep" locally and follow-up events fire against a session
+			// the parent thought was undone.
+			if (s.activeSleep?.domain_id === domainId) s.activeSleep = null;
 			const deleted = s.todaySleeps.find((sl) => sl.domain_id === domainId);
 			s.todaySleeps = s.todaySleeps.filter((sl) => sl.domain_id !== domainId);
 			if (s.stats && deleted?.end_time) {

@@ -43,6 +43,20 @@ second exists" + "log on one lane lands on that child only".
 
 So Phase 1 is functionally complete. Remaining polish / deferred:
 
+From the client+UI Codex review (2026-06-12) — must-fixes already landed
+(off-day toggles in TagSheet/WakeUpSheet now use the focused baby; sleep.deleted
+clears activeSleep; cached state normalized). Lower-priority leftovers:
+- **Active-sleep periodic refresh bypasses normalizeState + the pending-queue
+  overlay** (`+page.svelte` `appState.set(data)`). Family shape is fine (so not
+  a cardinal bug), but it can drop optimistic queued state. Route it through the
+  sync layer / normalizeState.
+- **Settings form `$effect` overwrites unsaved edits** when an SSE/server
+  refresh invalidates `baby` mid-edit. Add a dirty guard or key the reset to
+  the selected baby id / create-mode transition.
+- **EditSleepModal undo-end eligibility reads `appState.state.todaySleeps`**
+  (primary alias), so "Angre slutt" can show/hide wrong in focus mode. Pass the
+  focused slice's todaySleeps in (WakeUpSheet already fixed).
+
 Deferred from the backend unit's Codex review (2026-06-12):
 - **`getBabyState` mixes pure snapshot assembly with derived-state writes**
   (nap-budget mode + trend-target persistence). Fine at N≤2; later split

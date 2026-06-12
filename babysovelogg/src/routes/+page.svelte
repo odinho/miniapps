@@ -931,6 +931,8 @@
 			lastDiaperTime={s.lastDiaperTime}
 			{pottyMode}
 			{trackDiaper}
+			{baby}
+			offDays={s.offDays}
 			onClose={onTagSheetClose}
 			onOpenDiaper={onTagSheetOpenDiaper}
 		/>
@@ -941,6 +943,9 @@
 			sleepDomainId={wakeUpSleepId}
 			sleepSnapshot={wakeUpSnapshot}
 			closingStale={wakeUpClosingStale}
+			{baby}
+			offDays={s.offDays}
+			todaySleeps={s.todaySleeps}
 			onClose={onWakeUpClose}
 		/>
 	{/if}

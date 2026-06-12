@@ -16,11 +16,15 @@
 		lastDiaperTime: string | null;
 		pottyMode?: boolean;
 		trackDiaper?: boolean;
+		/** The baby this sheet acts on. Required in multi-child focus mode so the
+		 *  off-day toggle hits the right child; falls back to the primary alias. */
+		baby?: import('$lib/types.js').Baby | null;
+		offDays?: string[];
 		onClose?: () => void;
 		onOpenDiaper?: () => void;
 	}
 
-	let { sleepDomainId, startTime, lastDiaperTime, pottyMode = false, trackDiaper = false, onClose, onOpenDiaper }: Props =
+	let { sleepDomainId, startTime, lastDiaperTime, pottyMode = false, trackDiaper = false, baby, offDays, onClose, onOpenDiaper }: Props =
 		$props();
 
 	let mood = $state<string | null>(null);
@@ -124,21 +128,24 @@
 	// in this sheet just put the baby down — natural moment to flag a
 	// known-atypical day. Re-derives if the start time gets nudged across
 	// midnight (rare; defensive).
-	const baby = $derived(appState.state.baby);
-	const offDays = $derived(appState.state.offDays);
+	// Use the passed-in (focused) baby/off-days, falling back to the primary
+	// alias for single-baby callers. Reading the alias directly would mark the
+	// WRONG child's day off in multi-child focus mode.
+	const offDayBaby = $derived(baby ?? appState.state.baby);
+	const offDayList = $derived(offDays ?? appState.state.offDays);
 	const sleepDateForOffDay = $derived.by(() => {
-		if (!baby) return null;
-		return localDateForOffDay(adjustedStartTime, baby.timezone || 'UTC');
+		if (!offDayBaby) return null;
+		return localDateForOffDay(adjustedStartTime, offDayBaby.timezone || 'UTC');
 	});
 	const isOffDay = $derived(
-		sleepDateForOffDay != null && offDays.includes(sleepDateForOffDay),
+		sleepDateForOffDay != null && offDayList.includes(sleepDateForOffDay),
 	);
 	let offDayBusy = $state(false);
 	async function toggleOffDayForSleep() {
-		if (offDayBusy || !baby || !sleepDateForOffDay) return;
+		if (offDayBusy || !offDayBaby || !sleepDateForOffDay) return;
 		offDayBusy = true;
 		try {
-			await toggleOffDay(baby.id, sleepDateForOffDay, isOffDay);
+			await toggleOffDay(offDayBaby.id, sleepDateForOffDay, isOffDay);
 		} finally {
 			offDayBusy = false;
 		}

@@ -21,15 +21,21 @@
 		 * closed even if the parent leaves the default.
 		 */
 		closingStale?: boolean;
+		/** The baby/day-context this sheet acts on. Required in multi-child focus
+		 *  mode so the off-day toggle and undo-eligibility use the focused child,
+		 *  not the primary alias. Fall back to the alias for single-baby callers. */
+		baby?: import('$lib/types.js').Baby | null;
+		offDays?: string[];
+		todaySleeps?: SleepLogRow[];
 	}
 
-	let { sleepDomainId, sleepSnapshot, onClose, closingStale = false }: Props = $props();
+	let { sleepDomainId, sleepSnapshot, onClose, closingStale = false, baby, offDays, todaySleeps }: Props = $props();
 
 	// "Angre slutt" — undo the just-recorded End for a nap, within 15 min and
 	// only if no later sleep has started. Reuses the existing `sleep.restarted`
 	// event (same one the post-end undo toast emits).
 	const canUndoEnd = $derived(
-		isWithinEndUndoWindow(sleepSnapshot, appState.state.todaySleeps),
+		isWithinEndUndoWindow(sleepSnapshot, todaySleeps ?? appState.state.todaySleeps),
 	);
 
 	async function undoEnd() {
@@ -141,22 +147,24 @@
 	// the right date to flag (sick night → sick morning). For naps we still
 	// key on the wake's local-date, which is the same day the nap belongs
 	// to in the common case.
-	const baby = $derived(appState.state.baby);
-	const offDays = $derived(appState.state.offDays);
+	// Focused baby/off-days (fall back to the primary alias) — reading the alias
+	// directly would toggle the WRONG child's off-day in multi-child focus mode.
+	const offDayBaby = $derived(baby ?? appState.state.baby);
+	const offDayList = $derived(offDays ?? appState.state.offDays);
 	const wakeDateForOffDay = $derived.by(() => {
-		if (!baby) return null;
+		if (!offDayBaby) return null;
 		const wakeIso = new Date(`${wakeDate}T${wakeTime}:00`).toISOString();
-		return localDateForOffDay(wakeIso, baby.timezone || 'UTC');
+		return localDateForOffDay(wakeIso, offDayBaby.timezone || 'UTC');
 	});
 	const isOffDay = $derived(
-		wakeDateForOffDay != null && offDays.includes(wakeDateForOffDay),
+		wakeDateForOffDay != null && offDayList.includes(wakeDateForOffDay),
 	);
 	let offDayBusy = $state(false);
 	async function toggleOffDayForWake() {
-		if (offDayBusy || !baby || !wakeDateForOffDay) return;
+		if (offDayBusy || !offDayBaby || !wakeDateForOffDay) return;
 		offDayBusy = true;
 		try {
-			await toggleOffDay(baby.id, wakeDateForOffDay, isOffDay);
+			await toggleOffDay(offDayBaby.id, wakeDateForOffDay, isOffDay);
 		} finally {
 			offDayBusy = false;
 		}

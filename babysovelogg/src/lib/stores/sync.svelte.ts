@@ -171,10 +171,13 @@ function createSync() {
 
 		/** Fetch initial state from server and connect SSE. */
 		async init() {
-			// Load cached state first so UI renders immediately even if offline
+			// Load cached state first so UI renders immediately even if offline.
+			// Normalize it — pre-multi-child cached state is flat (no babies[]),
+			// which would leave appState.babies undefined until the network fetch.
 			const cached = getCachedState();
 			if (cached) {
-				const withQueued = hasPendingEvents() ? applyQueuedEvents(cached) : cached;
+				const norm = normalizeState(cached);
+				const withQueued = hasPendingEvents() ? applyQueuedEvents(norm) : norm;
 				appState.set(withQueued);
 			}
 			refreshPendingCount();

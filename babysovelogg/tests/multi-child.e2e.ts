@@ -1,4 +1,4 @@
-import { test, expect, createBaby, fillDateInput } from "./fixtures";
+import { test, expect, createBaby, setWakeUpTime, fillDateInput } from "./fixtures";
 
 const babyNames = async (request: { get: (url: string) => Promise<{ json: () => Promise<unknown> }> }) => {
   const state = (await (await request.get("/api/state")).json()) as {
@@ -111,4 +111,29 @@ test("tapping a lane opens that child's detail, and back returns to the family",
 
   await page.getByTestId("back-to-family").click();
   await expect(page.getByTestId("family-home")).toBeVisible();
+});
+
+test("off-day toggle in a child's detail marks that child, not the primary", async ({
+  page,
+  request,
+}) => {
+  const ada = createBaby("Ada", "2025-06-12");
+  const bo = createBaby("Bo", "2025-06-12");
+  setWakeUpTime(ada);
+  setWakeUpTime(bo);
+
+  await page.goto("/?baby=1");
+  await expect(page.getByTestId("baby-name")).toHaveText("Ada", { timeout: 5000 });
+  await page.getByTestId("sleep-button").click();
+  await page.getByTestId("off-day-toggle-tag").click();
+
+  await expect
+    .poll(async () => {
+      const state = (await (await request.get("/api/state")).json()) as {
+        babies: { baby: { name: string }; offDays: string[] }[];
+      };
+      const get = (name: string) => state.babies.find((b) => b.baby.name === name)!.offDays.length;
+      return { ada: get("Ada"), bo: get("Bo") };
+    })
+    .toEqual({ ada: 1, bo: 0 });
 });

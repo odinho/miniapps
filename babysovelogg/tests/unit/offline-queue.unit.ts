@@ -298,6 +298,15 @@ describe('applyOptimisticEvent', () => {
 		expect(result.todaySleeps).toHaveLength(0);
 	});
 
+	it('sleep.deleted clears a matching activeSleep (undo of a just-started sleep)', () => {
+		const active = makeSleep({ domain_id: 'slp_undo' });
+		const state = makeState({ activeSleep: active });
+		const result = applyOptimisticEvent(state, 'sleep.deleted', {
+			sleepDomainId: 'slp_undo',
+		});
+		expect(result.activeSleep).toBeNull();
+	});
+
 	it('sleep.deleted clears a matching stale-active-sleep banner', () => {
 		const stale = { ...makeSleep({ domain_id: 'slp_stale' }), staleStatus: 'abandoned' as const };
 		const state = makeState({ staleActiveSleep: stale });
