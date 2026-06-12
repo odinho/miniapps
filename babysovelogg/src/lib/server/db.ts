@@ -66,6 +66,20 @@ function initSchema(database: SqliteDb) {
       updated_by_event_id INTEGER
     );
 
+    -- Family-level settings. This app is single-family-per-database (each
+    -- family is its own deployment with its own DB_PATH), so the family is a
+    -- singleton row (id is pinned to 1). It holds household-wide config that
+    -- must NOT diverge between the family's babies -- starting with timezone
+    -- (the household's day-bucketing locale; babies themselves only ever deal
+    -- in absolute instants). One row = one source of truth, so two babies can
+    -- never end up in different zones. Future family-level settings (sync mode,
+    -- schedule coupling) live here too.
+    CREATE TABLE IF NOT EXISTS family (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      timezone TEXT,
+      updated_by_event_id INTEGER
+    );
+
     CREATE TABLE IF NOT EXISTS sleep_log (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       baby_id INTEGER NOT NULL REFERENCES baby(id),
@@ -225,6 +239,23 @@ function initSchema(database: SqliteDb) {
     );
   `);
 
+  // Ensure the singleton family row exists, then migrate timezone off the
+  // per-baby column: existing single-family DBs carry the household TZ on
+  // baby.timezone, so seed family.timezone from the newest baby that has one.
+  // Idempotent — only fills a still-empty family.timezone.
+  database.exec("INSERT OR IGNORE INTO family (id) VALUES (1)");
+  const fam = database.prepare("SELECT timezone FROM family WHERE id = 1").get() as
+    | { timezone: string | null }
+    | undefined;
+  if (fam && !fam.timezone) {
+    const babyTz = database
+      .prepare("SELECT timezone FROM baby WHERE timezone IS NOT NULL ORDER BY id DESC LIMIT 1")
+      .get() as { timezone: string } | undefined;
+    if (babyTz?.timezone) {
+      database.prepare("UPDATE family SET timezone = ? WHERE id = 1").run(babyTz.timezone);
+    }
+  }
+
   // Per-row attempt counter so transient push failures retry a small
   // number of times before being abandoned (see notification-scheduler).
   tryAddColumn(database, "notification_schedule", "attempts", "INTEGER NOT NULL DEFAULT 0");
@@ -339,6 +370,35 @@ export function closeDb() {
  *  read "the current baby" via this query. */
 export function getCurrentBaby(): Baby | undefined {
   return db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby | undefined;
+}
+
+/** The household timezone — the single source of truth for day-bucketing.
+ *  Every TZ read goes through here so the family's babies can never diverge.
+ *  Pure read: when the family row has no zone yet it falls back to the
+ *  server's resolved zone WITHOUT persisting. Persisting here would let a
+ *  projection-time read (e.g. day.started) write a default that shadows a
+ *  later family.updated during replay, making rebuild diverge from live. The
+ *  zone is set deterministically by the event log (baby.created / family.updated)
+ *  and seeded once at boot from a legacy baby.timezone (see initSchema). */
+export function getFamilyTimezone(): string {
+  const row = db.prepare("SELECT timezone FROM family WHERE id = 1").get() as
+    | { timezone: string | null }
+    | undefined;
+  return row?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
+
+/** Resolve the baby a request is scoped to. Reads an explicit `?baby=<id>`
+ *  query param (multi-child) and falls back to the newest baby when absent
+ *  (single-baby families and legacy callers). Returns undefined when the id
+ *  doesn't exist or no baby is configured. */
+export function resolveBaby(url: URL): Baby | undefined {
+  const param = url.searchParams.get("baby");
+  if (param != null && param !== "") {
+    const id = Number(param);
+    if (!Number.isFinite(id)) return undefined;
+    return db.prepare("SELECT * FROM baby WHERE id = ?").get(id) as Baby | undefined;
+  }
+  return getCurrentBaby();
 }
 
 // Auto-initialize for production

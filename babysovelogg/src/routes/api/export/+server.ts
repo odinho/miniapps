@@ -1,6 +1,6 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types.js";
-import { db, getCurrentBaby } from "$lib/server/db.js";
+import { db, resolveBaby, getFamilyTimezone } from "$lib/server/db.js";
 import type { SleepLogRow, NightWakingRow } from "$lib/types.js";
 
 function csvField(value: string): string {
@@ -11,8 +11,11 @@ function csvField(value: string): string {
 }
 
 export const GET: RequestHandler = ({ url }) => {
-  const baby = getCurrentBaby();
+  const baby = resolveBaby(url);
   if (!baby) return json({ error: "No baby configured" }, { status: 404 });
+  // Timezone is family-level; overlay it so exports carry the real zone
+  // rather than a possibly-stale per-baby column.
+  baby.timezone = getFamilyTimezone();
 
   const format = url.searchParams.get("format") || "json";
   const sleeps = db

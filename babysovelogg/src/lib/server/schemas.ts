@@ -52,6 +52,10 @@ const payloadSchemas = {
     timezone: optStr,
   }),
   "baby.updated": v.object({
+    // Optional for replay-compat with pre-multi-child events (which targeted
+    // the sole baby). New events always carry it; the projection falls back
+    // to the newest baby only when absent.
+    babyId: optNum,
     name: optStr,
     birthdate: optStr,
     customNapCount: optNum,
@@ -59,6 +63,12 @@ const payloadSchemas = {
     trackDiaper: v.nullish(v.boolean()),
     timezone: optStr,
     targetBedtime: optStr, // "HH:MM" or null to clear
+  }),
+  // Family-level (household) settings. Single-family-per-DB, so this targets
+  // the singleton family row. Timezone lives here, not on baby, so the
+  // family's babies can never end up in different zones.
+  "family.updated": v.object({
+    timezone: optStr,
   }),
   "sleep.started": v.object({
     babyId: v.number(),

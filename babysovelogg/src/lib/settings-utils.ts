@@ -54,6 +54,7 @@ export interface SettingsPayload {
 export function buildBabyEvent(
 	payload: SettingsPayload,
 	isNew: boolean,
+	babyId?: number,
 ): { type: string; payload: Record<string, unknown> } {
 	const tz = typeof Intl !== "undefined"
 		? Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -65,6 +66,10 @@ export function buildBabyEvent(
 	if (isNew) {
 		p.timezone = tz;
 	} else {
+		// Scope the edit to this exact baby. Without it the projection falls
+		// back to the newest baby, so editing the first of two children would
+		// silently overwrite the second.
+		if (babyId != null) p.babyId = babyId;
 		p.customNapCount = payload.customNapCount ?? null;
 		p.pottyMode = payload.pottyMode ?? false;
 		p.trackDiaper = payload.trackDiaper ?? false;

@@ -1,4 +1,4 @@
-import { db } from "./db.js";
+import { db, getFamilyTimezone } from "./db.js";
 import { assembleState } from "$lib/engine/state.js";
 import { getPrefs } from "./notification-prefs.js";
 import { getNapBudgetState, setNapBudgetState } from "./nap-budget-state.js";
@@ -12,20 +12,28 @@ import type {
 import { todayInTz } from "$lib/tz.js";
 import { classifyActiveSleep, type StaleStatus } from "$lib/stale-sleep.js";
 
-export function getState(now?: number) {
-  const baby = db.prepare("SELECT * FROM baby ORDER BY id DESC LIMIT 1").get() as Baby | undefined;
-  if (!baby)
-    return {
-      baby: null,
-      activeSleep: null,
-      staleActiveSleep: null,
-      todaySleeps: [],
-      todayNightWakings: [] as NightWakingRow[],
-      stats: null,
-      dayTotals: null,
-      priorOvernightSleep: null,
-      prediction: null,
-    };
+/** Empty single-baby slice, returned by getFamilyState when no baby exists
+ *  (brand-new install / onboarding). Matches the legacy getState() null-baby
+ *  shape byte-for-byte so the single-baby UI is unaffected at N=0. */
+const EMPTY_BABY_STATE = {
+  baby: null,
+  activeSleep: null,
+  staleActiveSleep: null,
+  todaySleeps: [],
+  todayNightWakings: [] as NightWakingRow[],
+  stats: null,
+  dayTotals: null,
+  priorOvernightSleep: null,
+  prediction: null,
+};
+
+/** Assemble the full app-state slice for a single baby. This is the per-baby
+ *  half of the family snapshot — the engine stays pure (one BabyContext) and
+ *  getFamilyState calls this once per child. Returns null when the baby id
+ *  doesn't exist. */
+export function getBabyState(babyId: number, now?: number) {
+  const baby = db.prepare("SELECT * FROM baby WHERE id = ?").get(babyId) as Baby | undefined;
+  if (!baby) return null;
 
   const openSleep = db
     .prepare(
@@ -45,13 +53,12 @@ export function getState(now?: number) {
     ? { ...openSleep, staleStatus }
     : null;
 
-  // Backfill timezone from server locale if not set (single-tenant: server TZ = baby TZ)
-  if (!baby.timezone) {
-    const serverTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    db.prepare("UPDATE baby SET timezone = ? WHERE id = ?").run(serverTz, baby.id);
-    baby.timezone = serverTz;
-  }
-  const tz = baby.timezone;
+  // Timezone is family-level (one household zone — see the `family` table).
+  // Overlay it onto the baby object so every downstream reader (engine,
+  // client UI, notifications) keeps reading the familiar `baby.timezone`
+  // field while the single source of truth lives on the family row.
+  const tz = getFamilyTimezone();
+  baby.timezone = tz;
   // Compute the date boundary against the same `now` the engine uses so
   // integration tests passing `?now=...` get a deterministic result, and
   // production calls without `now` fall back to the real wall clock.
@@ -235,6 +242,33 @@ export function getState(now?: number) {
   // Surface the over-a-day open sleep (hidden from the engine above) so the
   // dashboard can render the resolve banner and force re-onboarding at 48h.
   return { ...result, staleActiveSleep };
+}
+
+export type BabyState = NonNullable<ReturnType<typeof getBabyState>>;
+
+/** Assemble one coherent family snapshot: every baby's slice plus legacy
+ *  top-level aliases for the single-baby UI. SSE and offline sync consume
+ *  this single object per event rather than calling getBabyState twice.
+ *
+ *  The top-level alias mirrors the *newest* baby — matching the historical
+ *  `ORDER BY id DESC LIMIT 1` selection — so a single-baby family sees a
+ *  byte-for-byte identical payload (just with an extra `babies` array that
+ *  the legacy client ignores). `babies` is ordered by creation (id ASC) so
+ *  the home lanes have a stable order. `now` is family-wide: both babies
+ *  share the clock for deterministic tests/screenshots. */
+export function getFamilyState(now?: number) {
+  const ids = db.prepare("SELECT id FROM baby ORDER BY id ASC").all() as { id: number }[];
+  const babies = ids
+    .map((r) => getBabyState(r.id, now))
+    .filter((b): b is BabyState => b !== null);
+  const primary = babies.length ? babies[babies.length - 1] : EMPTY_BABY_STATE;
+  return { ...primary, babies };
+}
+
+/** Legacy single-baby entry point. Now an alias for the family snapshot so
+ *  every existing caller (SSE broadcast, /api/state) carries `babies`. */
+export function getState(now?: number) {
+  return getFamilyState(now);
 }
 
 function sameTrendTargetState(

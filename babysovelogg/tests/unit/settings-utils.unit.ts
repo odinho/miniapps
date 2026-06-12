@@ -70,6 +70,16 @@ describe('buildBabyEvent', () => {
 		});
 	});
 
+	it('scopes baby.updated to the given babyId so the edit cannot hit a sibling', () => {
+		const ev = buildBabyEvent({ name: 'Ada', birthdate: '2025-06-15' }, false, 1);
+		expect(ev.payload.babyId).toBe(1);
+	});
+
+	it('omits babyId when none is given (single-baby / replay-compat fallback)', () => {
+		const ev = buildBabyEvent({ name: 'Ada', birthdate: '2025-06-15' }, false);
+		expect(ev.payload).not.toHaveProperty('babyId');
+	});
+
 	it('sets null for customNapCount when not provided on update', () => {
 		const ev = buildBabyEvent({ name: 'Test', birthdate: '2025-01-01' }, false);
 		expect(ev.payload.customNapCount).toBeNull();

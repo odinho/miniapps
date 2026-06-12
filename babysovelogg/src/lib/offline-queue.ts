@@ -374,6 +374,7 @@ export function applyOptimisticEvent(
 		// until the server roundtrips and replaces AppState).
 		case "baby.created":
 		case "baby.updated":
+		case "family.updated":
 		case "day.deleted":
 		case "diaper.updated":
 		case "diaper.deleted":

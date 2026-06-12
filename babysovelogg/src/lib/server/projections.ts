@@ -4,6 +4,7 @@ import { rowToAppEvent } from "./events.js";
 import type { EventRow } from "$lib/types.js";
 import { validateEventPayload } from "./schemas.js";
 import { isoToDateInTz } from "$lib/tz.js";
+import { getFamilyTimezone } from "./db.js";
 import { shouldReclassifyAsNight } from "$lib/engine/classification.js";
 
 export function applyEvent(event: AppEvent): void {
@@ -15,12 +16,36 @@ export function applyEvent(event: AppEvent): void {
       db.prepare(
         `INSERT INTO baby (name, birthdate, timezone, created_at, created_by_event_id) VALUES (?, ?, ?, datetime('now'), ?)`,
       ).run(payload.name, payload.birthdate, payload.timezone ?? null, eventId);
+      // The first baby's timezone establishes the household zone. Only fill an
+      // empty family.timezone so a second baby's creation can't clobber it, and
+      // so a later family.updated wins on replay.
+      if (payload.timezone != null) {
+        db.prepare("UPDATE family SET timezone = ? WHERE id = 1 AND timezone IS NULL").run(
+          payload.timezone,
+        );
+      }
+      break;
+
+    case "family.updated":
+      // Only ever SET a zone, never clear it — there's no "unset household
+      // timezone" use case, and a null would silently re-derive the server's.
+      if (typeof payload.timezone === "string" && payload.timezone) {
+        db.prepare(
+          "UPDATE family SET timezone = ?, updated_by_event_id = ? WHERE id = 1",
+        ).run(payload.timezone, eventId);
+      }
       break;
 
     case "baby.updated": {
-      const baby = db.prepare("SELECT id FROM baby ORDER BY id DESC LIMIT 1").get() as
-        | { id: number }
-        | undefined;
+      // Target the baby named in the event. Pre-multi-child events have no
+      // babyId; fall back to the newest baby (the historical single-baby
+      // selection) so replay stays correct. Without this, an edit to the
+      // first twin would silently hit the second.
+      const baby = (
+        payload.babyId != null
+          ? db.prepare("SELECT id FROM baby WHERE id = ?").get(payload.babyId)
+          : db.prepare("SELECT id FROM baby ORDER BY id DESC LIMIT 1").get()
+      ) as { id: number } | undefined;
       if (!baby) throw new Error("baby.updated: no baby found");
       const sets: string[] = ["updated_by_event_id = ?"];
       const vals: unknown[] = [eventId];
@@ -54,6 +79,16 @@ export function applyEvent(event: AppEvent): void {
       }
       vals.push(baby.id);
       db.prepare(`UPDATE baby SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
+      // Replay-compat: historical TZ changes were emitted as baby.updated
+      // {timezone}. Timezone is now family-level, so mirror any such change
+      // onto the family row (last-writer-wins by event order). New TZ edits
+      // emit family.updated instead. Mirror only real zones, never a null.
+      if (typeof payload.timezone === "string" && payload.timezone) {
+        db.prepare("UPDATE family SET timezone = ?, updated_by_event_id = ? WHERE id = 1").run(
+          payload.timezone,
+          eventId,
+        );
+      }
       break;
     }
 
@@ -368,8 +403,9 @@ export function applyEvent(event: AppEvent): void {
       // off-day marker if a parent marked the day off before opening the
       // morning prompt — or during event replay where ordering is
       // arbitrary.
-      const baby = db.prepare("SELECT timezone FROM baby ORDER BY id DESC LIMIT 1").get() as { timezone: string | null } | undefined;
-      const tz = baby?.timezone || "UTC";
+      // Bucket the local date against the household zone (family-level), so
+      // both babies' day boundaries agree.
+      const tz = getFamilyTimezone();
       const dateStr = isoToDateInTz(payload.wakeTime as string, tz);
       db.prepare(
         `INSERT INTO day_start (baby_id, date, wake_time, created_by_event_id)
@@ -488,6 +524,10 @@ export function rebuildAll(): RebuildReport {
     db.prepare("DELETE FROM notification_subscriptions").run();
     db.prepare("DELETE FROM notification_preferences").run();
     db.prepare("DELETE FROM baby").run();
+    // Keep the singleton family row but clear its timezone so replay
+    // repopulates it from baby.created / baby.updated / family.updated. If
+    // history never set a zone, the next read lazily re-derives the server's.
+    db.prepare("UPDATE family SET timezone = NULL, updated_by_event_id = NULL WHERE id = 1").run();
     // Reset autoincrement so replayed baby IDs match original payload references
     db.prepare(
       "DELETE FROM sqlite_sequence WHERE name IN ('baby', 'sleep_log', 'diaper_log', 'night_waking')",

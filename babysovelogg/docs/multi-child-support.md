@@ -114,8 +114,11 @@ child exists:**
   no `babyId`. Fix at the **event schema** level (add `babyId` to
   `baby.updated`, keep replay compat for old events), not just the
   projection — otherwise edits to the first twin hit the second.
+  RESOLVED: `babyId` added to the event (schema + projection +
+  `buildBabyEvent`); falls back to newest only for replay of old events.
 - **`day.started` timezone lookup uses the newest baby**
-  (`projections.ts:371`).
+  (`projections.ts:371`). RESOLVED: TZ is now family-level (single-row
+  `family` table); the projection reads `getFamilyTimezone()`.
 - **Notification dedupe collisions.** `notification_schedule.dedupe_key`
   is globally unique (`db.ts:185`) and keys like
   `bedtime_approaching:${localDate}` (`notification-scheduler.ts:175`)
@@ -204,7 +207,19 @@ works really well. This phase alone delivers the mixed-age sibling case.
 - All ~10 API routes take/resolve an explicit `babyId` instead of
   `getCurrentBaby()`. Mutations carry `babyId` in the event payload.
 - Add `babyId` to the `baby.updated` event + projection (replay-compat).
-- Fix `day.started` TZ lookup to the right baby. Per-child TZ backfill.
+- Fix `day.started` TZ lookup. **DECIDED (user, 2026-06-12): timezone is
+  family-level, not per-baby.** The DB is one family (each family is its
+  own deployment — `deploy/manage.sh`), so TZ lives on a single-row
+  `family` table, read via `getFamilyTimezone()`, set via a new
+  `family.updated` event (replay-compat from `baby.created` /
+  `baby.updated{timezone}`; seeded at boot from the legacy per-baby
+  column). `getBabyState` overlays it onto `baby.timezone` so every reader
+  is unchanged. Rationale: in every supported case both children share one
+  household zone, so a per-baby column let an *impossible* divergent state
+  exist — which is exactly what made the `day.started` "newest baby" trap
+  possible. One row = one source of truth = divergence is structurally
+  impossible. (Babies deal only in absolute instants; TZ is purely the
+  household's day-bucketing locale.) **LANDED.**
 - `/api/events` broadcasts the family snapshot; `/api/state?baby=` and
   `?now=` family-wide.
 - New-child creation: `baby.created` already inserts; add the

@@ -1,10 +1,10 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types.js";
-import { db, getCurrentBaby } from "$lib/server/db.js";
+import { db, resolveBaby } from "$lib/server/db.js";
 import { parseIntParam } from "$lib/server/request-helpers.js";
 
 export const GET: RequestHandler = ({ url }) => {
-  const baby = getCurrentBaby();
+  const baby = resolveBaby(url);
   if (!baby) return json([]);
 
   const limit = parseIntParam(url, "limit", { default: 50, min: 1, max: 1000 }) ?? 50;

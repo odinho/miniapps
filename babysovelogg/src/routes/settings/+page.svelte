@@ -169,6 +169,7 @@
 				targetBedtime: bedtimeEnabled ? (targetBedtime || '19:00') : null,
 			},
 			isOnboarding,
+			baby?.id,
 		);
 
 		try {

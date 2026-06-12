@@ -15,12 +15,41 @@ is for tracked product/engine/test work.
 Source: 2026-06-12 — a family now has twins, plus we want to track
 older siblings for fun. The app is single-baby today. Multi-phase
 roadmap lives in [`multi-child-support.md`](./multi-child-support.md):
-Phase 1 (add a child + switcher, delivers mixed-age siblings), Phase 2
-(logging ergonomics + at-a-glance), Phase 3 (combined graphs +
-overlap), Phase 4 (opt-in schedule coupling). A Codex UX design pass is
-folding into Phases 2–4. Must-fix trap noted there: `baby.updated`
-projection targets newest baby, will corrupt the first child once a
-second exists.
+Phase 1 (add a child + family home, delivers mixed-age siblings),
+Phase 2 (logging ergonomics + at-a-glance), Phase 3 (combined graphs +
+overlap), Phase 4 (opt-in schedule coupling).
+
+**Phase 1 — backend foundation: LANDED (2026-06-12).** `getState` split
+into `getBabyState(babyId, now)` + `getFamilyState(now)` (family snapshot
+with `babies[]`; newest baby spread as legacy top-level alias so N=1 is
+byte-for-byte). `baby.updated` corruption trap closed: event carries
+`babyId` (schema + projection + `buildBabyEvent`), falls back to newest
+only for replay-compat. Timezone moved to a **single-row `family` table**
+(DB == one family; deploy/manage.sh) so the two babies can never diverge;
+read via `getFamilyTimezone()`, set via new `family.updated` event,
+replay-compat from `baby.created`/`baby.updated{timezone}`,
+rebuild-deterministic (non-writing fallback). API GET routes take `?baby=`.
+
+Remaining Phase 1 units (own followups when started): client store
+(`babies[]`/`babiesById`, optimistic routing by `payload.babyId`); UI
+(Settings "Legg til barn", per-child settings, family home lanes + bulk
+"begge"); notifications (below). E2E regression pin still owed: "edit the
+first child after a second exists" via the live UI.
+
+Deferred from the backend unit's Codex review (2026-06-12):
+- **Notifications are still single-baby.** `/api/events` reconciles only
+  the top-level (newest) slice; subscribe/preferences/test resolve via
+  `getCurrentBaby()`; scheduler reads only `state.baby`. Once a non-newest
+  child can be active this misses/misattributes pushes. Phase 1 notif unit:
+  family-device subscription, per-baby prefs, baby-scoped dedupe keys,
+  baby-named push text, reconcile every `state.babies` slice.
+- **`getBabyState` mixes pure snapshot assembly with derived-state writes**
+  (nap-budget mode + trend-target persistence). Fine at N≤2; later split
+  read from persist (or add a `persistDerived` flag) so a pure family
+  snapshot can be computed without side-effects.
+- **SSE/state payload duplicates the primary baby** inside `babies[0]` plus
+  the top-level alias. Acceptable at N≤2; slim to a summary if SSE size
+  ever matters (and once the client reads `babies[]` natively).
 
 ## Stale active sleep — shipped, minor edges parked
 

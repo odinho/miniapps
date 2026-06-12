@@ -1,11 +1,11 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types.js";
-import { db, getCurrentBaby } from "$lib/server/db.js";
+import { db, resolveBaby } from "$lib/server/db.js";
 import { parseIntParam } from "$lib/server/request-helpers.js";
 import type { SleepLogRow } from "$lib/types.js";
 
 export const GET: RequestHandler = ({ url }) => {
-  const baby = getCurrentBaby();
+  const baby = resolveBaby(url);
   if (!baby) return json([]);
 
   const from = url.searchParams.get("from");
