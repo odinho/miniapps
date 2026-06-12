@@ -386,4 +386,17 @@ describe("buildSleepsForBedtime: late-nap cutoff respects family bedtime", () =>
     const result = buildSleepsForBedtime([], undefined, [nap], c, noon);
     expect(result).toHaveLength(1);
   });
+
+  it("after-midnight nap end is dropped, not slipped under the cutoff by minute-of-day", () => {
+    // A nap ending 00:30 the next local day has minute-of-day 30, which a
+    // minute-of-day-only cutoff (target 19:45 → cutoff 19:15) would wrongly
+    // accept. It ends on a later local day, so it must be dropped.
+    const c = ctx({ targetBedtime: "19:45", recentSleeps: [] });
+    const nap: PredictedNap = {
+      startTime: "2026-03-28T23:00:00Z",
+      endTime: "2026-03-29T00:30:00Z",
+    };
+    const result = buildSleepsForBedtime([], undefined, [nap], c, noon);
+    expect(result).toHaveLength(0);
+  });
 });

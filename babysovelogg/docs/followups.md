@@ -157,12 +157,12 @@ own design pass.
   age-based final-WW ceiling instead of 600) + robust prior-blended
   estimate (trimmed/winsorized, recency-weighted,
   `blendEstimate(defaultWW, learned, n, 3, 7)`).
-- `buildSleepsForBedtime` cutoff compares local minute-of-day only —
-  an after-midnight nap end (00:30 → min 30) passes a 17:00 cutoff.
-  Habitual bedtime/wake medians + SDs use linear minute-of-day
-  (midnight wrap inflates variance). Circular clock stats + date-aware
-  cutoffs; add an engine-level DST suite (Codex #12, suspicion-grade
-  for DST impact).
+- Habitual bedtime/wake medians + SDs use linear minute-of-day
+  (midnight wrap inflates variance — a 23:50/00:10 pair reads ~1360 min
+  apart). Switch to circular clock stats; add an engine-level DST suite
+  (Codex #12, suspicion-grade for DST impact). (The `buildSleepsForBedtime`
+  date-aware cutoff half landed 2026-06-12 — an after-midnight nap end no
+  longer slips under the evening cutoff via minute-of-day.)
 - Tunable to validate against prod data: `NAP_BUDGET.MAX_STDEV_FRACTION`
   (0.12) — normal day-to-day totals often exceed 12% CV, which silently
   nulls the trend and disables napBudget + cap-respect carve-outs.

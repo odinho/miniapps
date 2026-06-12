@@ -2165,9 +2165,14 @@ export function buildSleepsForBedtime(
     });
   }
   const cutoffMin = getLatestNapEndCutoffMin(ctx, now);
+  const nowDateStr = isoToDateInTz(new Date(now).toISOString(), ctx.tz);
   for (const pn of remainingPredicted) {
     const startMs = new Date(pn.startTime).getTime();
     if (startMs <= now) continue; // skipped: planned start is in the past
+    // A nap ending on a later local day is necessarily past the evening cutoff.
+    // Minute-of-day alone would let an after-midnight end (e.g. 00:30 → min 30)
+    // slip under a 17:00+ cutoff and wrongly anchor pressureBedtime.
+    if (isoToDateInTz(pn.endTime, ctx.tz) > nowDateStr) continue;
     const endMin = getMinuteOfDayInTz(new Date(pn.endTime), ctx.tz);
     if (endMin > cutoffMin) continue;
     sleeps.push({ start_time: pn.startTime, end_time: pn.endTime, type: "nap" });
