@@ -151,6 +151,112 @@ test("Wakeup derived from overnight night sleep — no day.started needed", asyn
   expect(state.todayWakeUp.wake_time).toBe(nightEnd);
 });
 
+test("Wakeup is the last night fragment when the night is logged in pieces", async () => {
+  // Umi 2026-06-12: the night was logged as three separate `night` sleeps
+  // split by wake-ups (not one sleep + night_wakings). Only the first
+  // fragment straddles midnight, so the old midnight-straddle selector
+  // reported its end (00:25) as the morning wake — the day arc anchored to
+  // the middle of the night instead of the real ~07:29 wake.
+  const babyId = createBaby("Umi");
+  db.prepare("UPDATE baby SET timezone = ? WHERE id = ?").run("UTC", babyId);
+
+  const night = (start: string, end: string) => {
+    const id = generateSleepId();
+    return [
+      makeEvent("sleep.started", { babyId, startTime: start, type: "night", sleepDomainId: id }),
+      makeEvent("sleep.ended", { sleepDomainId: id, endTime: end }),
+    ];
+  };
+  const nap = (start: string, end: string) => {
+    const id = generateSleepId();
+    return [
+      makeEvent("sleep.started", { babyId, startTime: start, type: "nap", sleepDomainId: id }),
+      makeEvent("sleep.ended", { sleepDomainId: id, endTime: end }),
+    ];
+  };
+
+  await postEvents([
+    ...night("2026-05-19T23:00:00.000Z", "2026-05-20T00:25:00.000Z"), // straddles midnight
+    ...night("2026-05-20T00:56:00.000Z", "2026-05-20T04:29:00.000Z"),
+    ...night("2026-05-20T05:05:00.000Z", "2026-05-20T07:29:00.000Z"), // real morning wake
+    ...nap("2026-05-20T07:41:00.000Z", "2026-05-20T09:25:00.000Z"),
+  ]);
+
+  const nowMs = new Date("2026-05-20T10:00:00.000Z").getTime();
+  const state = await (await get(`/api/state?now=${nowMs}`)).json();
+
+  // The morning wake is the END of the LAST night fragment, not the first.
+  expect(state.todayWakeUp.wake_time).toBe("2026-05-20T07:29:00.000Z");
+
+  // The straddler still drives the pre-midnight duration recovery, so the
+  // "Søvn i dag" total stays whole (85 min pre-midnight + the post-midnight
+  // fragments counted in todaySleeps).
+  expect(state.priorOvernightSleep).toMatchObject({
+    start_time: "2026-05-19T23:00:00.000Z",
+    end_time: "2026-05-20T00:25:00.000Z",
+  });
+  expect(state.dayTotals).toMatchObject({
+    priorNightMinutes: 85, // 23:00 → 00:25
+    todayNightMinutes: 357, // 213 (00:56→04:29) + 144 (05:05→07:29)
+    napMinutes: 104, // 07:41 → 09:25
+    includesPriorNight: true,
+  });
+});
+
+test("Evening night-typed sleep on a no-nap day does NOT become the morning wake", async () => {
+  // A baby who no longer naps has the morning overnight + an evening bedtime
+  // and nothing between. The evening sleep is classified `night` and starts
+  // before any nap that day, so a naive leading-`night` scan would walk it
+  // into the overnight and report 19:30 as the morning wake. The same-night
+  // gap guard breaks on the 12h awake stretch.
+  const babyId = createBaby("Testa");
+  db.prepare("UPDATE baby SET timezone = ? WHERE id = ?").run("UTC", babyId);
+
+  const sleep = (type: string, start: string, end: string) => {
+    const id = generateSleepId();
+    return [
+      makeEvent("sleep.started", { babyId, startTime: start, type, sleepDomainId: id }),
+      makeEvent("sleep.ended", { sleepDomainId: id, endTime: end }),
+    ];
+  };
+
+  await postEvents([
+    ...sleep("night", "2026-05-19T23:00:00.000Z", "2026-05-20T07:00:00.000Z"), // overnight
+    ...sleep("night", "2026-05-20T19:00:00.000Z", "2026-05-20T19:30:00.000Z"), // evening false start
+  ]);
+
+  const nowMs = new Date("2026-05-20T20:00:00.000Z").getTime();
+  const state = await (await get(`/api/state?now=${nowMs}`)).json();
+
+  expect(state.todayWakeUp.wake_time).toBe("2026-05-20T07:00:00.000Z");
+});
+
+test("Active overnight continuation reports the last completed wake, not an earlier fragment", async () => {
+  // Fragmented night where the last piece is still open (baby asleep). The
+  // morning wake hasn't happened yet; todayWakeUp reflects the last completed
+  // fragment end (04:29), not the midnight-straddle fragment (00:25). The
+  // dashboard masks this behind the active-sleep view, but the engine/API
+  // should still get the most recent completed wake.
+  const babyId = createBaby("Testa");
+  db.prepare("UPDATE baby SET timezone = ? WHERE id = ?").run("UTC", babyId);
+
+  const did1 = generateSleepId();
+  const did2 = generateSleepId();
+  const openId = generateSleepId();
+  await postEvents([
+    makeEvent("sleep.started", { babyId, startTime: "2026-05-19T23:00:00.000Z", type: "night", sleepDomainId: did1 }),
+    makeEvent("sleep.ended", { sleepDomainId: did1, endTime: "2026-05-20T00:25:00.000Z" }),
+    makeEvent("sleep.started", { babyId, startTime: "2026-05-20T00:56:00.000Z", type: "night", sleepDomainId: did2 }),
+    makeEvent("sleep.ended", { sleepDomainId: did2, endTime: "2026-05-20T04:29:00.000Z" }),
+    makeEvent("sleep.started", { babyId, startTime: "2026-05-20T05:05:00.000Z", type: "night", sleepDomainId: openId }),
+  ]);
+
+  const nowMs = new Date("2026-05-20T06:00:00.000Z").getTime();
+  const state = await (await get(`/api/state?now=${nowMs}`)).json();
+
+  expect(state.todayWakeUp.wake_time).toBe("2026-05-20T04:29:00.000Z");
+});
+
 // --- Sleep-day totals: prior overnight contributes to today's daily total ---
 
 test("dayTotals includes the overnight that ended this morning", async () => {

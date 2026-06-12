@@ -77,6 +77,16 @@ own design pass.
   absolute day positions and be *consumed*, not re-generated with a
   shrunken count.
 
+- **TodayCard "I dag" night row shows only the midnight-straddle fragment.**
+  Surfaced 2026-06-12 alongside the morning-wake fix below. When a night is
+  logged as several `night` sleeps, `priorOvernightSleep` (kept as the
+  midnight-straddler so `getSleepDayTotals` recovers the pre-midnight
+  duration) is rendered as the night's time range in `TodayCard.svelte:66,73`
+  — so a fragmented night shows e.g. `23:00–00:25` instead of the whole
+  night ending at the real morning wake. Cosmetic (expandable detail only);
+  totals are correct. Fix: render the range from the first fragment's start
+  to `todayWakeUp.wake_time`, or pass the full fragment list.
+
 ### Architecture: big simplification candidates (each its own unit)
 
 - **One shared evidence layer.** Six modules independently re-derive

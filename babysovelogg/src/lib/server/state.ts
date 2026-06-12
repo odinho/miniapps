@@ -94,14 +94,39 @@ export function getBabyState(babyId: number, now?: number) {
       "SELECT * FROM sleep_log WHERE baby_id = ? AND type = 'night' AND start_time < ? AND end_time >= ? AND deleted = 0 ORDER BY end_time DESC LIMIT 1",
     )
     .get(baby.id, midnightIso, midnightIso) as SleepLogRow | undefined;
+  // The overnight can be logged as several `night` sleeps split by wake-ups
+  // (parent logs each stretch separately) instead of one sleep with
+  // night_wakings. The morning wake is the end of the LAST such fragment
+  // before today's first nap — not `priorOvernightRow` (the fragment that
+  // straddles midnight), which only the first piece does. `priorOvernightRow`
+  // stays load-bearing below for the pre-midnight duration the "Søvn i dag"
+  // total would otherwise drop.
+  //
+  // A fragment only *continues* the overnight if the awake gap from the
+  // previous wake is short — a long stretch means a new block (an evening
+  // bedtime on a no-nap day, or an evening false-start), which must not
+  // overwrite the morning wake. todaySleeps is start_time DESC.
+  const SAME_NIGHT_GAP_MS = 3 * 60 * 60 * 1000;
+  let morningWakeTime = priorOvernightRow?.end_time ?? null;
+  let prevWakeMs = priorOvernightRow?.end_time
+    ? new Date(priorOvernightRow.end_time).getTime()
+    : null;
+  for (let i = todaySleeps.length - 1; i >= 0; i--) {
+    const s = todaySleeps[i];
+    if (s.type !== "night" || !s.end_time) break; // first nap or active sleep closes the block
+    const startMs = new Date(s.start_time).getTime();
+    if (prevWakeMs != null && startMs - prevWakeMs > SAME_NIGHT_GAP_MS) break;
+    morningWakeTime = s.end_time;
+    prevWakeMs = new Date(s.end_time).getTime();
+  }
   let todayWakeUp: DayStartRow | undefined;
-  if (priorOvernightRow?.end_time) {
+  if (morningWakeTime) {
     todayWakeUp = {
       id: dayStartRow?.id ?? 0,
       baby_id: baby.id,
       date: todayDateStr,
-      wake_time: priorOvernightRow.end_time,
-      created_at: priorOvernightRow.end_time,
+      wake_time: morningWakeTime,
+      created_at: morningWakeTime,
       created_by_event_id: null,
       off_day: dayStartRow?.off_day ?? 0,
       off_day_reason: dayStartRow?.off_day_reason ?? null,
