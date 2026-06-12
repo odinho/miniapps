@@ -88,8 +88,6 @@ export const NAP_BUDGET = {
   /** Blend weights for the trend target: 0.6·avg7d + 0.4·avg30d. */
   BLEND_WEIGHT_7D: 0.6,
   BLEND_WEIGHT_30D: 0.4,
-  /** Cycle-boundary nudge window — only nudge wakeBy inward within this. */
-  CYCLE_NUDGE_WINDOW_MIN: 10,
   /**
    * Lead time subtracted from the cap so the parent has a minute or two to
    * physically get to the baby before the next cycle starts. Only applied

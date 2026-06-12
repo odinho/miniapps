@@ -4,6 +4,7 @@ import { getPrefs, type NotificationKind } from "./notification-prefs.js";
 import { isoToDateInTz } from "$lib/tz.js";
 import type { Baby, SleepLogRow } from "$lib/types.js";
 import type { Prediction } from "$lib/stores/app.svelte.js";
+import { NAP_BUDGET } from "$lib/engine/constants.js";
 
 /** Pre-notify offset: fire this many minutes before end-of-nap / bedtime. */
 const PRE_NOTIFY_MIN = 2;
@@ -122,7 +123,7 @@ export function reconcileNotifications(state: ReconcileInput): void {
     pred.napBudget.urgency === "firm"
   ) {
     const wakeByMs = new Date(pred.napBudget.wakeBy).getTime();
-    const fireAt = wakeByMs - 5 * 60_000;
+    const fireAt = wakeByMs - NAP_BUDGET.FIRM_PUSH_LEAD_MIN * 60_000;
     const dedupe = `nap_budget_cap:${active.domain_id}`;
     upsert(baby, multi, "nap_budget_cap", fireAt, dedupe, {
       title: "Tidleg vekking for å halda trenden",

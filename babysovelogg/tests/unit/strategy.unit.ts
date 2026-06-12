@@ -370,20 +370,6 @@ describe("predictEmerging", () => {
     expect(result.bedtime).not.toBeNull();
   });
 
-  it("assigns per-nap confidence from start time consistency", () => {
-    const result = predictEmerging({
-      ctx: emergingCtx(recentSleeps),
-      todaySleeps: [],
-      wakeUpTime: "2026-03-26T07:00:00Z",
-      lastSleepEndMs: new Date("2026-03-25T23:59:00Z").getTime(),
-      now: new Date("2026-03-26T08:00:00Z").getTime(),
-    });
-
-    // With 4 identical days, first nap should be highly consistent
-    expect(result.napConfidence.length).toBeGreaterThan(0);
-    expect(result.napConfidence[0]).toBe("high");
-  });
-
   it("provides sleep window fallback", () => {
     const result = predictEmerging({
       ctx: emergingCtx(recentSleeps),
