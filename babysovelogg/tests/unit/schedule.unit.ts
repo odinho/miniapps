@@ -9,7 +9,6 @@ import {
   decomposeFirstNapPrediction,
   predictNightEndTime,
   recommendBedtime,
-  detectNapTransition,
   findByAge,
   shineDaytimeSleepMinutes,
   WAKE_WINDOWS,
@@ -216,42 +215,6 @@ describe("recommendBedtime", () => {
     const bt = recommendBedtime([sleep(t(17, 0), t(18, 0))], ctx(9));
     const d = new Date(bt);
     expect(d.getHours()).toBeLessThanOrEqual(23);
-  });
-});
-
-// --- detectNapTransition ---
-
-describe("detectNapTransition", () => {
-  it("returns null with fewer than 5 days", () => {
-    const days = Array.from({ length: 4 }, () => [sleep(t(9, 0), t(10, 0))]);
-    expect(detectNapTransition(days)).toBeNull();
-  });
-
-  it("detects dropping trend", () => {
-    // 4 days of 3 naps, then 3 days of 2 naps
-    const days = [
-      ...Array.from({ length: 4 }, () => [
-        sleep(t(9, 0), t(10, 0)),
-        sleep(t(12, 0), t(13, 0)),
-        sleep(t(15, 0), t(16, 0)),
-      ]),
-      ...Array.from({ length: 3 }, () => [sleep(t(9, 0), t(10, 0)), sleep(t(13, 0), t(14, 0))]),
-    ];
-    const result = detectNapTransition(days);
-    expect(result).not.toBeNull();
-    expect(result!.dropping).toBe(true);
-    expect(result!.suggestedNaps).toBe(2);
-  });
-
-  it("reports stable when not dropping", () => {
-    const days = Array.from({ length: 7 }, () => [
-      sleep(t(9, 0), t(10, 0)),
-      sleep(t(13, 0), t(14, 0)),
-    ]);
-    const result = detectNapTransition(days);
-    expect(result).not.toBeNull();
-    expect(result!.dropping).toBe(false);
-    expect(result!.suggestedNaps).toBe(2);
   });
 });
 

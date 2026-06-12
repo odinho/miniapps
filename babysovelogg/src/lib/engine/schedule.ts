@@ -649,38 +649,6 @@ export function recommendBedtime(todaySleeps: SleepEntry[], ctx: BabyContext, no
   return bedtime.toISOString();
 }
 
-/** Detect if baby is transitioning to fewer naps. Returns suggested new nap count or null. */
-export function detectNapTransition(
-  recentDaysSleeps: SleepEntry[][],
-): { dropping: boolean; currentAvgNaps: number; suggestedNaps: number } | null {
-  if (recentDaysSleeps.length < 5) return null;
-
-  const napCounts = recentDaysSleeps.map(
-    (day) => day.filter((s) => s.type === "nap" && s.end_time).length,
-  );
-  const avgNaps = napCounts.reduce((a, b) => a + b, 0) / napCounts.length;
-
-  // Check if trending lower (last 3 days vs first days)
-  const recent3 = napCounts.slice(-3);
-  const earlier = napCounts.slice(0, -3);
-  const recentAvg = recent3.reduce((a, b) => a + b, 0) / recent3.length;
-  const earlierAvg = earlier.reduce((a, b) => a + b, 0) / earlier.length;
-
-  if (earlierAvg - recentAvg >= 0.5) {
-    return {
-      dropping: true,
-      currentAvgNaps: Math.round(avgNaps * 10) / 10,
-      suggestedNaps: Math.round(recentAvg),
-    };
-  }
-
-  return {
-    dropping: false,
-    currentAvgNaps: Math.round(avgNaps * 10) / 10,
-    suggestedNaps: Math.round(avgNaps),
-  };
-}
-
 /**
  * Find the morning-wake anchor for the given day's bucket: end_time of the
  * overnight that started yesterday and ended this morning. The cache buckets
@@ -1229,7 +1197,7 @@ export function predictNapEndTime(startTime: string, ctx: BabyContext): string {
   let predictedDuration = targetDuration;
   if (feat(ctx, "cycleBias")) {
     const cycleMinutes = getSleepCycleMinutes(ctx.ageMonths);
-    predictedDuration = snapToCycleBoundary(targetDuration, cycleMinutes, 1, 3, 10, 180);
+    predictedDuration = snapToCycleBoundary(targetDuration, cycleMinutes, 10, 180);
   }
   return new Date(startMs + predictedDuration * 60_000).toISOString();
 }
@@ -1341,7 +1309,7 @@ export function predictNightEndTime(startTime: string, ctx: BabyContext, todayNa
   }
   let durationMin = durationEstimate;
   if (feat(ctx, "cycleBias")) {
-    durationMin = snapToCycleBoundary(durationEstimate, cycleMinutes, 6, 16, 360, 900);
+    durationMin = snapToCycleBoundary(durationEstimate, cycleMinutes, 360, 900);
   }
   const durationBasedMs = startMs + durationMin * 60_000;
 
@@ -1771,8 +1739,6 @@ function getSleepCycleMinutes(ageMonths: number): number {
 function snapToCycleBoundary(
   durationMinutes: number,
   cycleMinutes: number,
-  _minCycles: number,
-  _maxCycles: number,
   minMinutes: number,
   maxMinutes: number,
 ): number {
@@ -2324,7 +2290,7 @@ export function scorePlan(
 
   // Cycle alignment
   for (const dur of durs) {
-    const snapped = snapToCycleBoundary(dur, cycleMin, 1, 3, 10, 180);
+    const snapped = snapToCycleBoundary(dur, cycleMin, 10, 180);
     const diff = dur - snapped;
     cost += W_CYCLE * diff * diff;
   }
