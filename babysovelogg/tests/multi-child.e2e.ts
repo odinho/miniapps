@@ -46,3 +46,69 @@ test("a single-baby family sees no child tabs, only the add-child entry", async 
   await expect(page.getByTestId("add-child")).toBeVisible();
   await expect(page.getByRole("button", { name: "Ada", exact: true })).toHaveCount(0);
 });
+
+const sliceByName = async (
+  request: { get: (url: string) => Promise<{ json: () => Promise<unknown> }> },
+  name: string,
+) => {
+  const state = (await (await request.get("/api/state")).json()) as {
+    babies: { baby: { name: string }; activeSleep: unknown }[];
+  };
+  return state.babies.find((b) => b.baby.name === name)!;
+};
+
+test("a single-baby family sees the normal dashboard, no family lanes", async ({ page }) => {
+  createBaby("Ada", "2025-06-12");
+
+  await page.goto("/");
+
+  await expect(page.getByTestId("baby-name")).toHaveText("Ada", { timeout: 5000 });
+  await expect(page.getByTestId("family-home")).toHaveCount(0);
+});
+
+test("home shows a lane per child; logging on one lane lands on that child only", async ({
+  page,
+  request,
+}) => {
+  createBaby("Ada", "2025-06-12");
+  createBaby("Bo", "2025-06-12");
+
+  await page.goto("/");
+  await expect(page.getByTestId("family-home")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByTestId("baby-lane")).toHaveCount(2);
+
+  const adaLane = page.getByTestId("baby-lane").filter({ hasText: "Ada" });
+  await adaLane.getByTestId("sleep-button").click();
+  await expect(adaLane.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 3000 });
+
+  expect(!!(await sliceByName(request, "Ada")).activeSleep).toBe(true);
+  expect(!!(await sliceByName(request, "Bo")).activeSleep).toBe(false);
+});
+
+test('"Sove begge" starts a sleep for both children', async ({ page, request }) => {
+  createBaby("Ada", "2025-06-12");
+  createBaby("Bo", "2025-06-12");
+
+  await page.goto("/");
+  await page.getByTestId("sleep-both").click();
+  await expect(page.getByTestId("wake-both")).toBeVisible({ timeout: 3000 });
+
+  expect(!!(await sliceByName(request, "Ada")).activeSleep).toBe(true);
+  expect(!!(await sliceByName(request, "Bo")).activeSleep).toBe(true);
+});
+
+test("tapping a lane opens that child's detail, and back returns to the family", async ({
+  page,
+}) => {
+  createBaby("Ada", "2025-06-12");
+  createBaby("Bo", "2025-06-12");
+
+  await page.goto("/");
+  await page.getByTestId("baby-lane").filter({ hasText: "Ada" }).getByTestId("lane-focus").click();
+
+  await expect(page).toHaveURL(/\?baby=1$/, { timeout: 5000 });
+  await expect(page.getByTestId("baby-name")).toHaveText("Ada");
+
+  await page.getByTestId("back-to-family").click();
+  await expect(page.getByTestId("family-home")).toBeVisible();
+});

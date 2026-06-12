@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { SleepLogRow } from '$lib/types.js';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { appState } from '$lib/stores/app.svelte.js';
 	import { sync } from '$lib/stores/sync.svelte.js';
 	import Arc from '$lib/components/Arc.svelte';
@@ -20,6 +21,7 @@
 	import ContextCard from '$lib/components/ContextCard.svelte';
 	import ManualSleepModal from '$lib/components/ManualSleepModal.svelte';
 	import TodayCard from '$lib/components/TodayCard.svelte';
+	import FamilyHome from '$lib/components/FamilyHome.svelte';
 	import { isoToDateInTz } from '$lib/tz.js';
 
 	// --- modal state ---
@@ -89,7 +91,15 @@
 	}
 
 	// --- derived state from store ---
-	const s = $derived(appState.state);
+	// `?baby=<id>` focuses one child's full dashboard (opened from a family
+	// lane); otherwise the primary baby (single-baby default). At 2+ children
+	// with no focus, the home is the family lane view instead.
+	const focusedId = $derived(Number(page.url.searchParams.get('baby')) || null);
+	const babies = $derived(appState.babies);
+	const showFamilyHome = $derived(babies.length > 1 && focusedId == null);
+	const s = $derived(
+		focusedId != null ? (appState.babyById(focusedId) ?? appState.state) : appState.state,
+	);
 	const loaded = $derived(appState.loaded);
 	const baby = $derived(s.baby);
 	const activeSleep = $derived(s.activeSleep);
@@ -574,8 +584,40 @@
 	<div class="dashboard">
 		<p style="color: var(--text-light); margin-top: 4rem;">Lastar...</p>
 	</div>
+{:else if showFamilyHome}
+	<div class="dashboard" data-testid="dashboard">
+		<div class="header-row">
+			<span class="baby-name">Familien</span>
+			{#if sync.pendingCount > 0}
+				<span class="sync-badge sync-badge-pending" data-testid="sync-badge">{sync.pendingCount} ventande</span>
+			{:else if sync.status === 'connected'}
+				<span class="sync-badge sync-badge-ok" data-testid="sync-badge"></span>
+			{:else if sync.status === 'connecting'}
+				<span class="sync-badge sync-badge-pending" data-testid="sync-badge">...</span>
+			{:else}
+				<span class="sync-badge sync-badge-offline" data-testid="sync-badge">offline</span>
+			{/if}
+		</div>
+		<FamilyHome {babies} onUndo={showUndoToast} onFocus={(id) => goto(`/?baby=${id}`)} />
+		{#if undoToast}
+			<div class="undo-toast">
+				<span>{undoToast.message}</span>
+				<button class="btn btn-ghost" onclick={handleUndo}>Angre</button>
+			</div>
+		{/if}
+	</div>
 {:else}
 	<div class="dashboard" data-testid="dashboard">
+		{#if focusedId != null && babies.length > 1}
+			<button
+				class="btn btn-ghost"
+				data-testid="back-to-family"
+				style="align-self: flex-start; margin-bottom: 4px;"
+				onclick={() => goto('/')}
+			>
+				← Familien
+			</button>
+		{/if}
 		{#if needsMorningPrompt}
 			<div class="morning-prompt" data-testid="morning-prompt">
 				<div class="morning-icon" data-testid="morning-icon">🌅</div>

@@ -10,6 +10,15 @@ import {
   generateId,
 } from "./fixtures";
 
+/** A birthdate `n` months before today — keeps age-dependent tests stable
+ *  regardless of the run date (a hardcoded birthdate silently ages past the
+ *  intended band). */
+const monthsAgoDate = (n: number) => {
+  const d = new Date();
+  d.setMonth(d.getMonth() - n);
+  return d.toISOString().slice(0, 10);
+};
+
 
 // --- B11: Dashboard shows overtime when a nap is skipped ---
 // When the predicted nap window has passed without a nap being logged,
@@ -198,7 +207,8 @@ test("B18: ending night sleep derives wakeup from end time", async ({ page }) =>
 // --- B19: Settings prediction shows all naps and reacts to nap count change ---
 
 test("B19: stats shows all predicted nap times", async ({ page }) => {
-  const babyId = createBaby("Testa");
+  // 10-month-old → 2-nap band (age-relative so it doesn't drift past 12 mo).
+  const babyId = createBaby("Testa", monthsAgoDate(10));
   setWakeUpTime(babyId);
 
   // Fix server time to 09:00 so predicted naps (at ~10:00, ~14:00) are in the future
@@ -222,7 +232,8 @@ test("B19: stats shows all predicted nap times", async ({ page }) => {
 });
 
 test("B19: stats prediction updates when nap count is changed in settings", async ({ page }) => {
-  const babyId = createBaby("Testa");
+  // 10-month-old → 2-nap band (age-relative so it doesn't drift past 12 mo).
+  const babyId = createBaby("Testa", monthsAgoDate(10));
   setWakeUpTime(babyId);
 
   // Fix server time to 09:00 so predicted naps are in the future
