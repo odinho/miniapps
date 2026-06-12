@@ -158,12 +158,33 @@ own design pass.
   age-based final-WW ceiling instead of 600) + robust prior-blended
   estimate (trimmed/winsorized, recency-weighted,
   `blendEstimate(defaultWW, learned, n, 3, 7)`).
+  **2026-06-12 attempt REVERTED — the exact prescription above regresses
+  backtest bed MAE on every clean fixture** (9mo 25.2→37.2, 11mo 21.1→34,
+  6mo 28.7→36.8, day15+ 21.5→27.1). Diagnosis: the clean fixtures contain
+  *no* unlogged-last-nap gaps, so the robustness changes add only bias —
+  the `blendEstimate` pull toward the age-mid default and the `max×1.6`
+  ceiling both bias a well-learned (long) final WW *downward*, predicting
+  bedtime too early. The naive raw mean fits these fixtures better. Real
+  unit needs: (a) a fixture that actually contains the pathological case
+  (unlogged-nap gap, e.g. Umi-shaped) to prove the robustness *helps*,
+  and (b) backtest-gated tuning that does NOT regress clean fixtures —
+  likely a much gentler blend (or none) + a looser ceiling, gated so it
+  only suppresses clear garbage. Do NOT re-ship the prescription blind.
 - Habitual bedtime/wake medians + SDs use linear minute-of-day
   (midnight wrap inflates variance — a 23:50/00:10 pair reads ~1360 min
   apart). Switch to circular clock stats; add an engine-level DST suite
   (Codex #12, suspicion-grade for DST impact). (The `buildSleepsForBedtime`
   date-aware cutoff half landed 2026-06-12 — an after-midnight nap end no
   longer slips under the evening cutoff via minute-of-day.)
+  **2026-06-12 scope note:** the exposure is narrower than it looks.
+  `recommendBedtime` clamps bedtime to 17:00–23:00 and morning wakes don't
+  straddle midnight, so the wrap only bites for *actually-logged*
+  post-midnight bedtime onsets (00:xx) mixed with evening ones — uncommon
+  for this app's babies. Worth doing for correctness + the DST suite, but
+  apply circular math ONLY to the wrapping clock-time samples
+  (`collectBedtimeMinuteSamples` / `collectNightWakeMinuteSamples`), NOT to
+  the shared `weightedSD`/`weightedMedian` (also used for spans/WWs that
+  must stay linear). Low priority vs. the regression-bearing items above.
 - Tunable to validate against prod data: `NAP_BUDGET.MAX_STDEV_FRACTION`
   (0.12) — normal day-to-day totals often exceed 12% CV, which silently
   nulls the trend and disables napBudget + cap-respect carve-outs.
