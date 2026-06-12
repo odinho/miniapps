@@ -1,4 +1,4 @@
-import { appState, type AppState } from "./app.svelte.js";
+import { appState, type AppState, type BabyState } from "./app.svelte.js";
 import { getClientId, generateId } from "$lib/identity.js";
 import {
 	getQueue,
@@ -24,7 +24,7 @@ interface DomainEvent {
  *  undefined → null/[] is exactly what normalizeState exists to do. */
 type AppStateResponse = Partial<AppState>;
 
-function normalizeState(raw: AppStateResponse): AppState {
+function normalizeSlice(raw: Partial<BabyState>): BabyState {
 	return {
 		baby: raw.baby ?? null,
 		activeSleep: raw.activeSleep ?? null,
@@ -41,6 +41,21 @@ function normalizeState(raw: AppStateResponse): AppState {
 		offDays: raw.offDays ?? [],
 		todayNightWakings: raw.todayNightWakings ?? [],
 	};
+}
+
+function normalizeState(raw: AppStateResponse): AppState {
+	// A family snapshot carries `babies`. An older server (or a single-baby
+	// `?baby=` slice) doesn't — synthesize a one-element array from the flat
+	// fields so `babies` is always coherent with the alias.
+	const babies =
+		Array.isArray(raw.babies) && raw.babies.length
+			? raw.babies.map(normalizeSlice)
+			: raw.baby
+				? [normalizeSlice(raw)]
+				: [];
+	// Flat alias = the primary (newest = last) baby, matching the server.
+	const primary = babies.length ? babies[babies.length - 1] : normalizeSlice(raw);
+	return { ...primary, babies };
 }
 
 function createSync() {

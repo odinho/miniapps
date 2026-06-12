@@ -224,7 +224,12 @@ export interface LearnedSchedule {
  */
 export type StaleActiveSleep = SleepLogRow & { staleStatus: StaleStatus };
 
-export interface AppState {
+/**
+ * The full app-state slice for a SINGLE baby. This is the unit the engine and
+ * every existing single-baby surface work with. A family snapshot is an array
+ * of these (`AppState.babies`) plus a top-level alias to the primary baby.
+ */
+export interface BabyState {
 	baby: Baby | null;
 	activeSleep: SleepLogRow | null;
 	/** Over-a-day open sleep, hidden from the engine. Null in normal operation. */
@@ -263,6 +268,19 @@ export interface AppState {
 	todayNightWakings: NightWakingRow[];
 }
 
+/**
+ * The whole-family snapshot. `babies` holds one slice per child (ordered by
+ * creation — id ASC). The flat fields are a legacy alias to the PRIMARY baby
+ * (the newest, matching the server) so every existing single-baby surface
+ * keeps reading `appState.state.baby`/`.activeSleep`/… unchanged. Multi-child
+ * surfaces (home lanes, per-baby detail) read `babies` / `babiesById`. At
+ * N=1, `babies` has one element and the alias is that baby — byte-for-byte
+ * the old behaviour.
+ */
+export interface AppState extends BabyState {
+	babies: BabyState[];
+}
+
 const emptyState: AppState = {
 	baby: null,
 	activeSleep: null,
@@ -278,6 +296,7 @@ const emptyState: AppState = {
 	todayWakeUp: null,
 	offDays: [],
 	todayNightWakings: [],
+	babies: [],
 };
 
 /** Reactive app state — the single source of truth for the UI. */
@@ -291,6 +310,22 @@ function createAppState() {
 		get state() {
 			return state;
 		},
+		/** Per-baby slices (ordered by creation). Drives multi-child surfaces;
+		 *  single-baby surfaces keep reading the top-level alias on `state`. */
+		get babies(): BabyState[] {
+			return state.babies;
+		},
+		/** True once the family has more than one child — the gate for showing
+		 *  any multi-child chrome. At false, the UI is the untouched single-baby
+		 *  experience. */
+		get isMultiBaby(): boolean {
+			return state.babies.length > 1;
+		},
+		/** Look up one baby's slice by id. Returns undefined if absent. */
+		babyById(id: number): BabyState | undefined {
+			return state.babies.find((b) => b.baby?.id === id);
+		},
+
 		/** Whether initial state has been loaded from the server. */
 		get loaded() {
 			return loaded;

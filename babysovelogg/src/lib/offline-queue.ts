@@ -3,7 +3,7 @@
  * Pure module (no Svelte runes), fully unit-testable.
  */
 
-import type { AppState } from "./stores/app.svelte.js";
+import type { AppState, BabyState } from "./stores/app.svelte.js";
 import type { SleepLogRow, DayStartRow } from "./types.js";
 import type { AppEventType } from "./server/schemas.js";
 import { isoToDateInTz } from "./tz.js";
@@ -76,7 +76,14 @@ export function getCachedState(): AppState | null {
 
 // --- Optimistic state updates ---
 
-/** Apply a single event optimistically to local state so UI reflects offline changes. */
+/**
+ * Apply a single event optimistically to local state so the UI reflects
+ * offline changes. Routes the event into the correct baby's slice — by
+ * `payload.babyId`, else by the slice that owns the event's domain_id, else
+ * the primary (newest) baby — so logging on one twin never lands on the
+ * other. The top-level alias is re-derived from the primary slice afterward,
+ * keeping single-baby surfaces in sync without double-bookkeeping.
+ */
 export function applyOptimisticEvent(
 	state: AppState,
 	type: string,
@@ -87,7 +94,52 @@ export function applyOptimisticEvent(
 	// the proxy's internal hooks aren't structured-clone-serializable. JSON
 	// is sufficient because AppState is plain JSON-safe data (no Date,
 	// Map, etc).
-	const s: AppState = JSON.parse(JSON.stringify(state));
+	const full: AppState = JSON.parse(JSON.stringify(state));
+	let babies: BabyState[] = Array.isArray(full.babies) ? full.babies : [];
+	// Legacy cache / older server without a babies[] array: treat the flat
+	// top-level as the single slice so optimistic updates still work offline.
+	if (babies.length === 0) {
+		if (!full.baby) return { ...full, babies: [] };
+		const { babies: _omit, ...slice } = full;
+		babies = [slice];
+	}
+
+	const idx = findSliceIndex(babies, payload);
+	babies[idx] = applyEventToSlice(babies[idx], type, payload);
+	const primary = babies[babies.length - 1];
+	return { ...primary, babies };
+}
+
+/** Which baby slice an event belongs to (see applyOptimisticEvent). */
+function findSliceIndex(babies: BabyState[], payload: Record<string, unknown>): number {
+	const last = babies.length - 1;
+	if (payload.babyId != null) {
+		const i = babies.findIndex((b) => b.baby?.id === payload.babyId);
+		return i >= 0 ? i : last;
+	}
+	// Events that carry only a domain_id (sleep.ended/updated/…,
+	// night_waking.*): find the slice that owns that entity.
+	const domainId = (payload.sleepDomainId ?? payload.wakingDomainId) as string | undefined;
+	if (domainId) {
+		const i = babies.findIndex(
+			(b) =>
+				b.activeSleep?.domain_id === domainId ||
+				b.staleActiveSleep?.domain_id === domainId ||
+				b.todaySleeps.some((s) => s.domain_id === domainId) ||
+				b.todayNightWakings.some((w) => w.domain_id === domainId),
+		);
+		return i >= 0 ? i : last;
+	}
+	return last;
+}
+
+/** Apply one event to a single baby's slice (mutates and returns the slice;
+ *  the caller has already cloned). */
+function applyEventToSlice(
+	s: BabyState,
+	type: string,
+	payload: Record<string, unknown>,
+): BabyState {
 	// Defensive default: pre-redesign cached state in localStorage may lack
 	// todayNightWakings. Without this, the night_waking.* cases below would
 	// throw on `s.todayNightWakings.map(...)` etc.
@@ -405,7 +457,7 @@ export function applyQueuedEvents(state: AppState): AppState {
 }
 
 /** Find a sleep entry by domain_id in activeSleep or todaySleeps (returns mutable ref). */
-function findSleep(state: AppState, domainId: string): SleepLogRow | undefined {
+function findSleep(state: BabyState, domainId: string): SleepLogRow | undefined {
 	if (state.activeSleep?.domain_id === domainId) return state.activeSleep;
 	return state.todaySleeps.find((s) => s.domain_id === domainId);
 }

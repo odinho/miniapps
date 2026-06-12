@@ -12,12 +12,16 @@ import {
 	applyQueuedEvents,
 	type QueuedEvent,
 } from '$lib/offline-queue.js';
-import type { AppState } from '$lib/stores/app.svelte.js';
-import type { SleepLogRow } from '$lib/types.js';
+import type { AppState, BabyState } from '$lib/stores/app.svelte.js';
+import type { SleepLogRow, Baby } from '$lib/types.js';
+
+function makeBaby(id: number, name: string): Baby {
+	return { id, name, birthdate: '2025-06-01', created_at: '2025-06-01', custom_nap_count: null, potty_mode: 0, track_diaper: 0, timezone: null, target_bedtime: null, created_by_event_id: null, updated_by_event_id: null };
+}
 
 function makeState(overrides: Partial<AppState> = {}): AppState {
 	return {
-		baby: { id: 1, name: 'Halldis', birthdate: '2025-06-01', created_at: '2025-06-01', custom_nap_count: null, potty_mode: 0, track_diaper: 0, timezone: null, target_bedtime: null, created_by_event_id: null, updated_by_event_id: null },
+		baby: makeBaby(1, 'Halldis'),
 		activeSleep: null,
 		staleActiveSleep: null,
 		todaySleeps: [],
@@ -31,8 +35,34 @@ function makeState(overrides: Partial<AppState> = {}): AppState {
 		todayWakeUp: null,
 		offDays: [],
 		todayNightWakings: [],
+		babies: [],
 		...overrides,
 	};
+}
+
+function makeSlice(id: number, name: string, overrides: Partial<BabyState> = {}): BabyState {
+	return {
+		baby: makeBaby(id, name),
+		activeSleep: null,
+		staleActiveSleep: null,
+		todaySleeps: [],
+		stats: null,
+		dayTotals: null,
+		priorOvernightSleep: null,
+		prediction: null,
+		ageMonths: 0,
+		diaperCount: 0,
+		lastDiaperTime: null,
+		todayWakeUp: null,
+		offDays: [],
+		todayNightWakings: [],
+		...overrides,
+	};
+}
+
+/** Build a family snapshot from per-baby slices; the alias is the last (newest). */
+function makeFamily(slices: BabyState[]): AppState {
+	return { ...slices[slices.length - 1], babies: slices };
 }
 
 function makeSleep(overrides: Partial<SleepLogRow> = {}): SleepLogRow {
@@ -320,6 +350,51 @@ describe('applyOptimisticEvent', () => {
 		const state = makeState();
 		const result = applyOptimisticEvent(state, 'unknown.event', { foo: 'bar' });
 		expect(result.baby?.name).toBe('Halldis');
+	});
+});
+
+describe('applyOptimisticEvent — multi-baby routing', () => {
+	it('routes sleep.started to the baby in the payload, never the primary', () => {
+		const family = makeFamily([makeSlice(1, 'Ada'), makeSlice(2, 'Bo')]);
+
+		const result = applyOptimisticEvent(family, 'sleep.started', {
+			babyId: 1,
+			startTime: '2026-03-27T12:00:00.000Z',
+			type: 'nap',
+			sleepDomainId: 'slp_ada',
+		});
+
+		expect(result.babies[0].activeSleep?.domain_id).toBe('slp_ada');
+		expect(result.babies[1].activeSleep).toBeNull();
+		expect(result.activeSleep).toBeNull();
+	});
+
+	it('routes a domain-only event (sleep.ended) to the slice that owns the entity', () => {
+		const adaSleep = makeSleep({ domain_id: 'slp_ada', baby_id: 1 });
+		const family = makeFamily([makeSlice(1, 'Ada', { activeSleep: adaSleep }), makeSlice(2, 'Bo')]);
+
+		const result = applyOptimisticEvent(family, 'sleep.ended', {
+			sleepDomainId: 'slp_ada',
+			endTime: '2026-03-27T12:30:00.000Z',
+		});
+
+		expect(result.babies[0].activeSleep).toBeNull();
+		expect(result.babies[0].todaySleeps).toHaveLength(1);
+		expect(result.babies[1].activeSleep).toBeNull();
+	});
+
+	it('an event on the primary baby also refreshes the top-level alias', () => {
+		const family = makeFamily([makeSlice(1, 'Ada'), makeSlice(2, 'Bo')]);
+
+		const result = applyOptimisticEvent(family, 'sleep.started', {
+			babyId: 2,
+			startTime: '2026-03-27T12:00:00.000Z',
+			type: 'nap',
+			sleepDomainId: 'slp_bo',
+		});
+
+		expect(result.babies[1].activeSleep?.domain_id).toBe('slp_bo');
+		expect(result.activeSleep?.domain_id).toBe('slp_bo');
 	});
 });
 
