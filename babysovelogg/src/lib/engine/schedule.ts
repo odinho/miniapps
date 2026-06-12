@@ -1370,13 +1370,34 @@ function collectWeightedDurationsFromCache(
     .filter((sample) => sample.value >= minMinutes && sample.value <= maxMinutes);
 }
 
+// Trim `trimFraction` of the total *weight* mass off each value-sorted tail,
+// not a fixed sample count. Count-trimming (floor(n·f)) only bit at n≥7 and
+// then discarded a whole sample regardless of its recency weight — so a recent
+// high-weight extreme was dropped purely for being extreme. Weight-trimming
+// caps an outlier's pull while keeping its recency contribution: the boundary
+// sample is partially weighted by the overflow rather than removed wholesale.
 function weightedTrimmedMean(samples: WeightedSample[], trimFraction = 0.15): number {
-  const sorted = [...samples].toSorted((a, b) => a.value - b.value);
-  if (sorted.length <= 2) return weightedMean(sorted);
+  if (samples.length <= 2) return weightedMean(samples);
+  const sorted = samples.toSorted((a, b) => a.value - b.value).map((s) => ({ ...s }));
+  const totalWeight = sorted.reduce((sum, s) => sum + s.weight, 0);
+  if (totalWeight === 0) return 0;
 
-  const trimCount = Math.floor(sorted.length * trimFraction);
-  const kept = sorted.slice(trimCount, Math.max(trimCount + 1, sorted.length - trimCount));
-  return weightedMean(kept);
+  const trimWeight = totalWeight * trimFraction;
+  let lowBudget = trimWeight;
+  for (const s of sorted) {
+    if (lowBudget <= 0) break;
+    const cut = Math.min(s.weight, lowBudget);
+    s.weight -= cut;
+    lowBudget -= cut;
+  }
+  let highBudget = trimWeight;
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    if (highBudget <= 0) break;
+    const cut = Math.min(sorted[i].weight, highBudget);
+    sorted[i].weight -= cut;
+    highBudget -= cut;
+  }
+  return weightedMean(sorted);
 }
 
 function weightedMean(samples: WeightedSample[]): number {

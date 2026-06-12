@@ -1087,7 +1087,7 @@ describe("Mina Learned (3-nap routine_schedule)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (3 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 07:30 pre first nap
         now: 07:30
@@ -1102,7 +1102,7 @@ describe("Mina Learned (3-nap routine_schedule)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (3 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 08:30 right at first-nap door
         now: 08:30
@@ -1117,7 +1117,7 @@ describe("Mina Learned (3-nap routine_schedule)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (3 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 10:00 after first nap
         now: 10:00
@@ -1132,7 +1132,7 @@ describe("Mina Learned (3-nap routine_schedule)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (2 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 12:00 mid-day, before nap 2
         now: 12:00
@@ -1147,7 +1147,7 @@ describe("Mina Learned (3-nap routine_schedule)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (2 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 12:30 active nap 2
         now: 12:30
@@ -1157,12 +1157,12 @@ describe("Mina Learned (3-nap routine_schedule)", () => {
         bedtime: 19:15 (+6h 45m)
         predictedNaps: 15:55-16:35
         napsAllDone: false (3 expected)
-        expectedNapEnd: 12:58 (+28m)
+        expectedNapEnd: 13:02 (+32m)
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
         confidence: high (1 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 14:00 between nap 2 and nap 3
         now: 14:00
@@ -1177,7 +1177,7 @@ describe("Mina Learned (3-nap routine_schedule)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (1 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 16:00 right after nap 3
         now: 16:00
@@ -1192,7 +1192,7 @@ describe("Mina Learned (3-nap routine_schedule)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (0 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 17:30 napsAllDone wind-down
         now: 17:30
@@ -1207,7 +1207,7 @@ describe("Mina Learned (3-nap routine_schedule)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (0 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 19:00 just before bedtime
         now: 19:00
@@ -1222,7 +1222,7 @@ describe("Mina Learned (3-nap routine_schedule)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (0 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 19:45 active night sleep
         now: 19:45
@@ -1233,11 +1233,11 @@ describe("Mina Learned (3-nap routine_schedule)", () => {
         predictedNaps: none
         napsAllDone: true (3 expected)
         expectedNapEnd: none
-        expectedNightEnd: 06:29 (+10h 44m)
+        expectedNightEnd: 06:32 (+10h 47m)
         rescueNap: none
         continuationWindow: none
         confidence: high (0 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 16:20 cut-short nap 3 (28m)
         now: 16:20
@@ -1252,7 +1252,7 @@ describe("Mina Learned (3-nap routine_schedule)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (0 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 16:30 nap 2 skipped 4h+ ago
         now: 16:30
@@ -1267,7 +1267,7 @@ describe("Mina Learned (3-nap routine_schedule)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (0 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 10:00 no wake reference
         now: 10:00
@@ -1934,7 +1934,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        learned: nap=48m night=630m ww=125.2m bedww=95m
+        learned: nap=49m night=630m ww=125.2m bedww=95m
         sleepWindow: 07:15–08:35
         sleepPressure: low
 
@@ -1951,7 +1951,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        learned: nap=48m night=630m ww=125.2m bedww=95m
+        learned: nap=49m night=630m ww=125.2m bedww=95m
         sleepWindow: 08:15–09:35
         sleepPressure: high
 
@@ -1968,7 +1968,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        learned: nap=48m night=630m ww=125.2m bedww=95m
+        learned: nap=49m night=630m ww=125.2m bedww=95m
         sleepWindow: 10:05–11:25
         sleepPressure: low
 
@@ -1985,7 +1985,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        learned: nap=48m night=630m ww=125.2m bedww=95m
+        learned: nap=49m night=630m ww=125.2m bedww=95m
         sleepWindow: 13:05–14:25
         sleepPressure: low
 
@@ -2002,7 +2002,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        learned: nap=48m night=630m ww=125.2m bedww=95m
+        learned: nap=49m night=630m ww=125.2m bedww=95m
         sleepWindow: 14:15–15:35
         sleepPressure: high
 
@@ -2019,7 +2019,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        learned: nap=48m night=630m ww=125.2m bedww=95m
+        learned: nap=49m night=630m ww=125.2m bedww=95m
         sleepWindow: 19:00–20:20
         sleepPressure: low
 
@@ -2036,7 +2036,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        learned: nap=48m night=630m ww=125.2m bedww=95m
+        learned: nap=49m night=630m ww=125.2m bedww=95m
         sleepWindow: 19:30–20:50
         sleepPressure: rising
 
@@ -2053,7 +2053,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        learned: nap=48m night=630m ww=125.2m bedww=95m
+        learned: nap=49m night=630m ww=125.2m bedww=95m
         sleepWindow: 12:45–14:05
         sleepPressure: low
 
@@ -2070,7 +2070,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        learned: nap=48m night=630m ww=125.2m bedww=95m
+        learned: nap=49m night=630m ww=125.2m bedww=95m
         sleepWindow: 09:45–11:05
         sleepPressure: high"
     `);
@@ -2666,7 +2666,7 @@ describe("settings sweep: Mina × target_bedtime (3-nap regime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (3 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 10:00 after first nap
         now: 10:00
@@ -2681,7 +2681,7 @@ describe("settings sweep: Mina × target_bedtime (3-nap regime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (2 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 16:30 napsAllDone
         now: 16:30
@@ -2696,7 +2696,7 @@ describe("settings sweep: Mina × target_bedtime (3-nap regime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (0 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       ══ setting: target=18:30 (early) ══
 
@@ -2713,7 +2713,7 @@ describe("settings sweep: Mina × target_bedtime (3-nap regime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (3 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 10:00 after first nap
         now: 10:00
@@ -2728,7 +2728,7 @@ describe("settings sweep: Mina × target_bedtime (3-nap regime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (2 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 16:30 napsAllDone
         now: 16:30
@@ -2743,7 +2743,7 @@ describe("settings sweep: Mina × target_bedtime (3-nap regime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (0 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       ══ setting: target=19:15 (baseline) ══
 
@@ -2760,7 +2760,7 @@ describe("settings sweep: Mina × target_bedtime (3-nap regime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (3 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 10:00 after first nap
         now: 10:00
@@ -2775,7 +2775,7 @@ describe("settings sweep: Mina × target_bedtime (3-nap regime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (2 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 16:30 napsAllDone
         now: 16:30
@@ -2790,7 +2790,7 @@ describe("settings sweep: Mina × target_bedtime (3-nap regime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (0 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       ══ setting: target=20:30 (late) ══
 
@@ -2807,7 +2807,7 @@ describe("settings sweep: Mina × target_bedtime (3-nap regime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (3 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 10:00 after first nap
         now: 10:00
@@ -2822,7 +2822,7 @@ describe("settings sweep: Mina × target_bedtime (3-nap regime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (2 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: 16:30 napsAllDone
         now: 16:30
@@ -2837,7 +2837,7 @@ describe("settings sweep: Mina × target_bedtime (3-nap regime)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (0 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m"
+        learned: nap=50m night=675m ww=150.5m bedww=160m"
     `);
   });
 });
@@ -3238,7 +3238,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        learned: nap=48m night=630m ww=125.2m bedww=95m
+        learned: nap=49m night=630m ww=125.2m bedww=95m
         sleepWindow: 09:45–11:05
         sleepPressure: high
 
@@ -3251,11 +3251,11 @@ describe("cross-archetype shared scenarios", () => {
         predictedNaps: none
         napsAllDone: true (4 expected)
         expectedNapEnd: none
-        expectedNightEnd: 07:05 (+8h 35m)
+        expectedNightEnd: 07:06 (+8h 36m)
         rescueNap: none
         continuationWindow: none
         confidence: none
-        learned: nap=48m night=630m ww=125.2m bedww=95m
+        learned: nap=49m night=630m ww=125.2m bedww=95m
         sleepWindow: 22:15–23:35
         sleepPressure: high
 
@@ -3272,7 +3272,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        learned: nap=48m night=630m ww=125.2m bedww=95m
+        learned: nap=49m night=630m ww=125.2m bedww=95m
         sleepWindow: 12:45–14:05
         sleepPressure: high
 
@@ -3298,7 +3298,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (0 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       scenario: midday no sleeps logged at 13:00
         now: 13:00
@@ -3313,7 +3313,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: high (2 napRanges)
-        learned: nap=45m night=675m ww=150.5m bedww=160m
+        learned: nap=50m night=675m ww=150.5m bedww=160m
 
       ──────────
 

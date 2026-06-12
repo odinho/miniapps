@@ -73,22 +73,22 @@ const ablations = featureNames.map(({ key, label }) => ({
 
 describe("feature ablation", () => {
   it("all features enabled (baseline)", () => {
-    expect(renderSummary(allOn, "all-on")).toMatchInlineSnapshot(`"all-on: 138 days, count 86% (118/138), naps 1.5p/1.5a, nap MAE 39.7, dur MAE 25, bed MAE 22, wake MAE 26.3, nap bias -3.3, count bias +0.03, cycle 138/0/0 (l/m/h), cut-short 8"`);
+    expect(renderSummary(allOn, "all-on")).toMatchInlineSnapshot(`"all-on: 138 days, count 86% (118/138), naps 1.5p/1.5a, nap MAE 39.7, dur MAE 25, bed MAE 22, wake MAE 26.4, nap bias -3.3, count bias +0.03, cycle 138/0/0 (l/m/h), cut-short 8"`);
   });
 
   it("per-feature contribution", () => {
     const lines = ablations.map((a) => renderAblation(allOn, a.label, a.result));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "positional nap duration:
-        nap MAE 0 (neutral)
-        dur MAE +0.7 (helps)
+        nap MAE -0.1 (hurts)
+        dur MAE +1.1 (helps)
         bed MAE 0 (neutral)
         wake MAE 0 (neutral)
       habitual wake anchor:
         nap MAE 0 (neutral)
         dur MAE 0 (neutral)
         bed MAE 0 (neutral)
-        wake MAE +5.5 (helps)
+        wake MAE +5.7 (helps)
       habitual bedtime anchor:
         nap MAE 0 (neutral)
         dur MAE 0 (neutral)
@@ -103,7 +103,7 @@ describe("feature ablation", () => {
         nap MAE 0 (neutral)
         dur MAE 0 (neutral)
         bed MAE 0 (neutral)
-        wake MAE 0 (neutral)
+        wake MAE -0.1 (hurts)
       sleep budget:
         nap MAE 0 (neutral)
         dur MAE 0 (neutral)
@@ -113,7 +113,7 @@ describe("feature ablation", () => {
         nap MAE 0 (neutral)
         dur MAE 0 (neutral)
         bed MAE 0 (neutral)
-        wake MAE -0.1 (hurts)"
+        wake MAE -0.2 (hurts)"
     `);
   });
 

@@ -73,11 +73,11 @@ describe("baseline", () => {
     const lines = buckets.map((b) => renderSummary(b.result, b.label));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "6mo: 5 days, count 60% (3/5), naps 2.4p/2.8a, nap MAE 56.5, dur MAE 27.7, bed MAE 28.7, wake MAE 19.9, nap bias +12.9, count bias -0.4, cycle 5/0/0 (l/m/h), cut-short 0
-      7mo: 31 days, count 77% (24/31), naps 2.1p/1.9a, nap MAE 50.4, dur MAE 26.8, bed MAE 22.3, wake MAE 29.1, nap bias -12.7, count bias +0.16, cycle 31/0/0 (l/m/h), cut-short 0
-      8mo: 28 days, count 89% (25/28), naps 2.0p/1.9a, nap MAE 27, dur MAE 18.9, bed MAE 15.8, wake MAE 21.8, nap bias -4.8, count bias +0.11, cycle 28/0/0 (l/m/h), cut-short 0
-      9mo: 31 days, count 87% (27/31), naps 1.1p/1.1a, nap MAE 47.1, dur MAE 26.2, bed MAE 25.2, wake MAE 26.3, nap bias +3.3, count bias 0, cycle 31/0/0 (l/m/h), cut-short 0
-      10mo: 30 days, count 90% (27/30), naps 1.0p/1.1a, nap MAE 24.7, dur MAE 34, bed MAE 22.8, wake MAE 23.5, nap bias +8.7, count bias -0.1, cycle 30/0/0 (l/m/h), cut-short 6
-      11mo: 13 days, count 92% (12/13), naps 1.0p/0.9a, nap MAE 41.2, dur MAE 14.5, bed MAE 21.1, wake MAE 38.6, nap bias -15.2, count bias +0.08, cycle 13/0/0 (l/m/h), cut-short 2"
+      7mo: 31 days, count 77% (24/31), naps 2.1p/1.9a, nap MAE 50.4, dur MAE 26.8, bed MAE 22.3, wake MAE 29.3, nap bias -12.7, count bias +0.16, cycle 31/0/0 (l/m/h), cut-short 0
+      8mo: 28 days, count 89% (25/28), naps 2.0p/1.9a, nap MAE 27, dur MAE 18.9, bed MAE 15.8, wake MAE 22, nap bias -4.8, count bias +0.11, cycle 28/0/0 (l/m/h), cut-short 0
+      9mo: 31 days, count 87% (27/31), naps 1.1p/1.1a, nap MAE 47.1, dur MAE 26.2, bed MAE 25.2, wake MAE 26.4, nap bias +3.3, count bias 0, cycle 31/0/0 (l/m/h), cut-short 0
+      10mo: 30 days, count 90% (27/30), naps 1.0p/1.1a, nap MAE 24.7, dur MAE 34, bed MAE 22.8, wake MAE 23.7, nap bias +8.7, count bias -0.1, cycle 30/0/0 (l/m/h), cut-short 6
+      11mo: 13 days, count 92% (12/13), naps 1.0p/0.9a, nap MAE 41.2, dur MAE 14.5, bed MAE 21.1, wake MAE 37.7, nap bias -15.2, count bias +0.08, cycle 13/0/0 (l/m/h), cut-short 2"
     `);
   });
 
@@ -99,17 +99,17 @@ describe("baseline", () => {
       return renderSummary(manualBucket.result, `${b.label} manual=${n}`);
     });
     expect(lines.join("\n")).toMatchInlineSnapshot(`
-      "6mo manual=3: 5 days, count 80% (4/5), naps 3.0p/2.8a, nap MAE 59.7, dur MAE 26.2, bed MAE 35.3, wake MAE 21.2, nap bias +13.9, count bias +0.2, cycle 5/0/0 (l/m/h), cut-short 0
-      7mo manual=2: 31 days, count 84% (26/31), naps 2.0p/1.9a, nap MAE 48.2, dur MAE 27.3, bed MAE 20, wake MAE 29, nap bias -12.2, count bias +0.1, cycle 31/0/0 (l/m/h), cut-short 0
-      8mo manual=2: 28 days, count 89% (25/28), naps 2.0p/1.9a, nap MAE 27, dur MAE 18.9, bed MAE 15.8, wake MAE 21.8, nap bias -4.8, count bias +0.11, cycle 28/0/0 (l/m/h), cut-short 0
-      9mo manual=1: 31 days, count 90% (28/31), naps 1.0p/1.1a, nap MAE 46.8, dur MAE 26.3, bed MAE 23.1, wake MAE 26, nap bias +3.1, count bias -0.1, cycle 31/0/0 (l/m/h), cut-short 0
-      10mo manual=1: 30 days, count 90% (27/30), naps 1.0p/1.1a, nap MAE 24.7, dur MAE 34, bed MAE 22.8, wake MAE 23.5, nap bias +8.7, count bias -0.1, cycle 30/0/0 (l/m/h), cut-short 6
-      11mo manual=1: 13 days, count 92% (12/13), naps 1.0p/0.9a, nap MAE 41.2, dur MAE 14.5, bed MAE 21.1, wake MAE 38.6, nap bias -15.2, count bias +0.08, cycle 13/0/0 (l/m/h), cut-short 2"
+      "6mo manual=3: 5 days, count 80% (4/5), naps 3.0p/2.8a, nap MAE 59.7, dur MAE 26.3, bed MAE 35.3, wake MAE 21.1, nap bias +13.9, count bias +0.2, cycle 5/0/0 (l/m/h), cut-short 0
+      7mo manual=2: 31 days, count 84% (26/31), naps 2.0p/1.9a, nap MAE 48.2, dur MAE 27.3, bed MAE 20, wake MAE 29.2, nap bias -12.2, count bias +0.1, cycle 31/0/0 (l/m/h), cut-short 0
+      8mo manual=2: 28 days, count 89% (25/28), naps 2.0p/1.9a, nap MAE 27, dur MAE 18.9, bed MAE 15.8, wake MAE 22, nap bias -4.8, count bias +0.11, cycle 28/0/0 (l/m/h), cut-short 0
+      9mo manual=1: 31 days, count 90% (28/31), naps 1.0p/1.1a, nap MAE 46.8, dur MAE 26.3, bed MAE 23.1, wake MAE 26.2, nap bias +3.1, count bias -0.1, cycle 31/0/0 (l/m/h), cut-short 0
+      10mo manual=1: 30 days, count 90% (27/30), naps 1.0p/1.1a, nap MAE 24.7, dur MAE 34, bed MAE 22.8, wake MAE 23.7, nap bias +8.7, count bias -0.1, cycle 30/0/0 (l/m/h), cut-short 6
+      11mo manual=1: 13 days, count 92% (12/13), naps 1.0p/0.9a, nap MAE 41.2, dur MAE 14.5, bed MAE 21.1, wake MAE 37.7, nap bias -15.2, count bias +0.08, cycle 13/0/0 (l/m/h), cut-short 2"
     `);
   });
 
   it("combined summary", () => {
-    expect(renderSummary(auto, "all")).toMatchInlineSnapshot(`"all: 138 days, count 86% (118/138), naps 1.5p/1.5a, nap MAE 39.7, dur MAE 25, bed MAE 22, wake MAE 26.3, nap bias -3.3, count bias +0.03, cycle 138/0/0 (l/m/h), cut-short 8"`);
+    expect(renderSummary(auto, "all")).toMatchInlineSnapshot(`"all: 138 days, count 86% (118/138), naps 1.5p/1.5a, nap MAE 39.7, dur MAE 25, bed MAE 22, wake MAE 26.4, nap bias -3.3, count bias +0.03, cycle 138/0/0 (l/m/h), cut-short 8"`);
   });
 
   it("warm-up curve", () => {
@@ -117,9 +117,9 @@ describe("baseline", () => {
     const lines = warmup.map((b) => renderSummary(b.result, b.label));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "day 1-3: 3 days, count 33% (1/3), naps 2.0p/2.7a, nap MAE 71.3, dur MAE 28.4, bed MAE 36.3, wake MAE 17.9, nap bias +46.8, count bias -0.67, cycle 3/0/0 (l/m/h), cut-short 0
-      day 4-7: 4 days, count 50% (2/4), naps 3.0p/2.5a, nap MAE 54.7, dur MAE 36.6, bed MAE 39.2, wake MAE 35.8, nap bias -26.4, count bias +0.5, cycle 4/0/0 (l/m/h), cut-short 0
-      day 8-14: 7 days, count 86% (6/7), naps 2.0p/1.9a, nap MAE 66.5, dur MAE 20.8, bed MAE 13.5, wake MAE 23.7, nap bias -40.4, count bias +0.14, cycle 7/0/0 (l/m/h), cut-short 0
-      day 15+: 124 days, count 88% (109/124), naps 1.4p/1.4a, nap MAE 35.3, dur MAE 24.5, bed MAE 21.5, wake MAE 26.3, nap bias -1.1, count bias +0.02, cycle 124/0/0 (l/m/h), cut-short 8"
+      day 4-7: 4 days, count 50% (2/4), naps 3.0p/2.5a, nap MAE 54.7, dur MAE 36.6, bed MAE 39.2, wake MAE 36.3, nap bias -26.4, count bias +0.5, cycle 4/0/0 (l/m/h), cut-short 0
+      day 8-14: 7 days, count 86% (6/7), naps 2.0p/1.9a, nap MAE 66.5, dur MAE 20.8, bed MAE 13.5, wake MAE 23.9, nap bias -40.4, count bias +0.14, cycle 7/0/0 (l/m/h), cut-short 0
+      day 15+: 124 days, count 88% (109/124), naps 1.4p/1.4a, nap MAE 35.3, dur MAE 24.5, bed MAE 21.5, wake MAE 26.4, nap bias -1.1, count bias +0.02, cycle 124/0/0 (l/m/h), cut-short 8"
     `);
   });
 
@@ -147,25 +147,25 @@ describe("baseline", () => {
       .map((w) => renderSummary(w.result, w.label));
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "wk 2026-01-05: 5 days, count 60% (3/5), naps 2.4p/2.8a, nap MAE 56.5, dur MAE 27.7, bed MAE 28.7, wake MAE 19.9, nap bias +12.9, count bias -0.4, cycle 5/0/0 (l/m/h), cut-short 0
-      wk 2026-01-12: 7 days, count 71% (5/7), naps 2.3p/2.0a, nap MAE 60.9, dur MAE 26, bed MAE 25.2, wake MAE 33.6, nap bias -36.2, count bias +0.29, cycle 7/0/0 (l/m/h), cut-short 0
-      wk 2026-01-19: 7 days, count 57% (4/7), naps 2.0p/1.6a, nap MAE 64.5, dur MAE 33.5, bed MAE 27.1, wake MAE 19.6, nap bias -23.5, count bias +0.43, cycle 7/0/0 (l/m/h), cut-short 0
-      wk 2026-01-26: 7 days, count 86% (6/7), naps 2.0p/1.9a, nap MAE 51.2, dur MAE 39.9, bed MAE 21.3, wake MAE 26.4, nap bias -13.8, count bias +0.14, cycle 7/0/0 (l/m/h), cut-short 0
-      wk 2026-02-02: 7 days, count 100% (7/7), naps 2.0p/2.0a, nap MAE 17.8, dur MAE 17.5, bed MAE 14.5, wake MAE 29.2, nap bias -4.6, count bias 0, cycle 7/0/0 (l/m/h), cut-short 0
-      wk 2026-02-09: 7 days, count 86% (6/7), naps 2.0p/2.1a, nap MAE 39.2, dur MAE 14.1, bed MAE 18.7, wake MAE 33.8, nap bias +13.2, count bias -0.14, cycle 7/0/0 (l/m/h), cut-short 0
-      wk 2026-02-16: 7 days, count 100% (7/7), naps 2.0p/2.0a, nap MAE 21.3, dur MAE 14.3, bed MAE 16.7, wake MAE 19, nap bias -11.1, count bias 0, cycle 7/0/0 (l/m/h), cut-short 0
-      wk 2026-02-23: 7 days, count 100% (7/7), naps 2.0p/2.0a, nap MAE 22.1, dur MAE 16.6, bed MAE 18.6, wake MAE 24.1, nap bias +9.5, count bias 0, cycle 7/0/0 (l/m/h), cut-short 0
-      wk 2026-03-02: 7 days, count 71% (5/7), naps 2.0p/1.7a, nap MAE 42.6, dur MAE 26, bed MAE 9.5, wake MAE 25.7, nap bias -5.5, count bias +0.29, cycle 7/0/0 (l/m/h), cut-short 0
+      wk 2026-01-12: 7 days, count 71% (5/7), naps 2.3p/2.0a, nap MAE 60.9, dur MAE 26, bed MAE 25.2, wake MAE 34.9, nap bias -36.2, count bias +0.29, cycle 7/0/0 (l/m/h), cut-short 0
+      wk 2026-01-19: 7 days, count 57% (4/7), naps 2.0p/1.6a, nap MAE 64.5, dur MAE 33.5, bed MAE 27.1, wake MAE 18.1, nap bias -23.5, count bias +0.43, cycle 7/0/0 (l/m/h), cut-short 0
+      wk 2026-01-26: 7 days, count 86% (6/7), naps 2.0p/1.9a, nap MAE 51.2, dur MAE 39.9, bed MAE 21.3, wake MAE 25.7, nap bias -13.8, count bias +0.14, cycle 7/0/0 (l/m/h), cut-short 0
+      wk 2026-02-02: 7 days, count 100% (7/7), naps 2.0p/2.0a, nap MAE 17.8, dur MAE 17.5, bed MAE 14.5, wake MAE 30, nap bias -4.6, count bias 0, cycle 7/0/0 (l/m/h), cut-short 0
+      wk 2026-02-09: 7 days, count 86% (6/7), naps 2.0p/2.1a, nap MAE 39.2, dur MAE 14.1, bed MAE 18.7, wake MAE 33.1, nap bias +13.2, count bias -0.14, cycle 7/0/0 (l/m/h), cut-short 0
+      wk 2026-02-16: 7 days, count 100% (7/7), naps 2.0p/2.0a, nap MAE 21.3, dur MAE 14.3, bed MAE 16.7, wake MAE 20.7, nap bias -11.1, count bias 0, cycle 7/0/0 (l/m/h), cut-short 0
+      wk 2026-02-23: 7 days, count 100% (7/7), naps 2.0p/2.0a, nap MAE 22.1, dur MAE 16.6, bed MAE 18.6, wake MAE 23.7, nap bias +9.5, count bias 0, cycle 7/0/0 (l/m/h), cut-short 0
+      wk 2026-03-02: 7 days, count 71% (5/7), naps 2.0p/1.7a, nap MAE 42.6, dur MAE 26, bed MAE 9.5, wake MAE 27, nap bias -5.5, count bias +0.29, cycle 7/0/0 (l/m/h), cut-short 0
       wk 2026-03-09: 7 days, count 57% (4/7), naps 1.9p/1.4a, nap MAE 53.1, dur MAE 21.2, bed MAE 31.2, wake MAE 24.3, nap bias -25.4, count bias +0.43, cycle 7/0/0 (l/m/h), cut-short 0
-      wk 2026-03-16: 7 days, count 86% (6/7), naps 1.0p/1.1a, nap MAE 45.8, dur MAE 26.9, bed MAE 21.5, wake MAE 32.8, nap bias -22.7, count bias -0.14, cycle 7/0/0 (l/m/h), cut-short 0
-      wk 2026-03-23: 7 days, count 86% (6/7), naps 1.0p/1.1a, nap MAE 68.4, dur MAE 27.9, bed MAE 14.1, wake MAE 26.3, nap bias +61.3, count bias -0.14, cycle 7/0/0 (l/m/h), cut-short 0
-      wk 2026-03-30: 7 days, count 100% (7/7), naps 1.0p/1.0a, nap MAE 25, dur MAE 21.8, bed MAE 35, wake MAE 12.2, nap bias +13.6, count bias 0, cycle 7/0/0 (l/m/h), cut-short 0
-      wk 2026-04-06: 7 days, count 86% (6/7), naps 1.0p/1.1a, nap MAE 16.9, dur MAE 39.2, bed MAE 27.5, wake MAE 30.6, nap bias +8.1, count bias -0.14, cycle 7/0/0 (l/m/h), cut-short 0
+      wk 2026-03-16: 7 days, count 86% (6/7), naps 1.0p/1.1a, nap MAE 45.8, dur MAE 26.9, bed MAE 21.5, wake MAE 34.3, nap bias -22.7, count bias -0.14, cycle 7/0/0 (l/m/h), cut-short 0
+      wk 2026-03-23: 7 days, count 86% (6/7), naps 1.0p/1.1a, nap MAE 68.4, dur MAE 27.9, bed MAE 14.1, wake MAE 26.1, nap bias +61.3, count bias -0.14, cycle 7/0/0 (l/m/h), cut-short 0
+      wk 2026-03-30: 7 days, count 100% (7/7), naps 1.0p/1.0a, nap MAE 25, dur MAE 21.8, bed MAE 35, wake MAE 12.4, nap bias +13.6, count bias 0, cycle 7/0/0 (l/m/h), cut-short 0
+      wk 2026-04-06: 7 days, count 86% (6/7), naps 1.0p/1.1a, nap MAE 16.9, dur MAE 39.2, bed MAE 27.5, wake MAE 29.8, nap bias +8.1, count bias -0.14, cycle 7/0/0 (l/m/h), cut-short 0
       wk 2026-04-13: 7 days, count 100% (7/7), naps 1.0p/1.0a, nap MAE 24.3, dur MAE 23, bed MAE 15.1, wake MAE 20.3, nap bias -19.3, count bias 0, cycle 7/0/0 (l/m/h), cut-short 0
-      wk 2026-04-20: 7 days, count 100% (7/7), naps 1.0p/1.0a, nap MAE 33.3, dur MAE 32, bed MAE 20.5, wake MAE 24.9, nap bias +17.2, count bias 0, cycle 7/0/0 (l/m/h), cut-short 2
-      wk 2026-04-27: 7 days, count 100% (7/7), naps 1.0p/1.0a, nap MAE 12.1, dur MAE 23.7, bed MAE 25.5, wake MAE 24.2, nap bias +8.6, count bias 0, cycle 7/0/0 (l/m/h), cut-short 1
-      wk 2026-05-04: 7 days, count 71% (5/7), naps 1.0p/1.3a, nap MAE 27.8, dur MAE 56.1, bed MAE 26.9, wake MAE 19, nap bias +21, count bias -0.29, cycle 7/0/0 (l/m/h), cut-short 3
-      wk 2026-05-11: 7 days, count 86% (6/7), naps 1.0p/0.9a, nap MAE 34.1, dur MAE 14.1, bed MAE 22.2, wake MAE 42.8, nap bias -15.9, count bias +0.14, cycle 7/0/0 (l/m/h), cut-short 1
-      wk 2026-05-18: 7 days, count 100% (7/7), naps 1.0p/1.0a, nap MAE 42.9, dur MAE 14.3, bed MAE 19.9, wake MAE 34.9, nap bias -11.7, count bias 0, cycle 7/0/0 (l/m/h), cut-short 1"
+      wk 2026-04-20: 7 days, count 100% (7/7), naps 1.0p/1.0a, nap MAE 33.3, dur MAE 32, bed MAE 20.5, wake MAE 25.8, nap bias +17.2, count bias 0, cycle 7/0/0 (l/m/h), cut-short 2
+      wk 2026-04-27: 7 days, count 100% (7/7), naps 1.0p/1.0a, nap MAE 12.1, dur MAE 23.7, bed MAE 25.5, wake MAE 24.4, nap bias +8.6, count bias 0, cycle 7/0/0 (l/m/h), cut-short 1
+      wk 2026-05-04: 7 days, count 71% (5/7), naps 1.0p/1.3a, nap MAE 27.8, dur MAE 56.1, bed MAE 26.9, wake MAE 19.5, nap bias +21, count bias -0.29, cycle 7/0/0 (l/m/h), cut-short 3
+      wk 2026-05-11: 7 days, count 86% (6/7), naps 1.0p/0.9a, nap MAE 34.1, dur MAE 14.1, bed MAE 22.2, wake MAE 40.1, nap bias -15.9, count bias +0.14, cycle 7/0/0 (l/m/h), cut-short 1
+      wk 2026-05-18: 7 days, count 100% (7/7), naps 1.0p/1.0a, nap MAE 42.9, dur MAE 14.3, bed MAE 19.9, wake MAE 35.7, nap bias -11.7, count bias 0, cycle 7/0/0 (l/m/h), cut-short 1"
     `);
 
     // Invariants — algorithm-correctness pins that survive snapshot

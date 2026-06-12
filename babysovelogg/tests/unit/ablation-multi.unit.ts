@@ -78,15 +78,15 @@ describe("multi-baby ablation", () => {
     }
     expect(lines.join("\n")).toMatchInlineSnapshot(`
       "positionalDuration:
-        halldis: nap 0, wake 0
-        baby_1: nap -5.8, wake 0
+        halldis: nap -0.1, wake 0
+        baby_1: nap -6.6, wake 0
         baby_2: nap +2.8, wake 0
-        baby_3: nap -2.8, wake 0
+        baby_3: nap -3.3, wake 0
       habitualWake:
-        halldis: nap 0, wake +5.5
-        baby_1: nap 0, wake +20.2
-        baby_2: nap 0, wake +7.9
-        baby_3: nap 0, wake +55.6
+        halldis: nap 0, wake +5.7
+        baby_1: nap 0, wake +20.4
+        baby_2: nap 0, wake +7.1
+        baby_3: nap 0, wake +58
       habitualBedtime:
         halldis: nap 0, wake 0
         baby_1: nap 0, wake 0
@@ -98,20 +98,20 @@ describe("multi-baby ablation", () => {
         baby_2: nap 0, wake 0
         baby_3: nap 0, wake 0
       cycleBias:
-        halldis: nap 0, wake 0
-        baby_1: nap 0, wake 0
+        halldis: nap 0, wake -0.1
+        baby_1: nap 0, wake -0.1
         baby_2: nap 0, wake -0.2
-        baby_3: nap 0, wake -0.2
+        baby_3: nap 0, wake -0.4
       sleepBudget:
         halldis: nap 0, wake -0.4
-        baby_1: nap 0, wake -0.2
-        baby_2: nap 0, wake +4.6
-        baby_3: nap 0, wake -3
+        baby_1: nap 0, wake -0.3
+        baby_2: nap 0, wake +4.4
+        baby_3: nap 0, wake -2.8
       weightedRecency:
-        halldis: nap 0, wake -0.1
-        baby_1: nap +0.1, wake -0.1
-        baby_2: nap +0.4, wake +2.2
-        baby_3: nap 0, wake +7.3"
+        halldis: nap 0, wake -0.2
+        baby_1: nap +0.2, wake -0.2
+        baby_2: nap +0.3, wake +2
+        baby_3: nap 0, wake +7.2"
     `);
   });
 
