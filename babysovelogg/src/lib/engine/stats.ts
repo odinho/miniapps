@@ -27,7 +27,12 @@ function pauseMinutes(pauses: SleepPause[] | undefined, endTime: string): number
   return total / 60000;
 }
 
-function durationMinutes(s: SleepEntry): number {
+/** Actual sleep minutes: wall-clock span minus night-waking (pause) time.
+ *  Use this for sleep-AMOUNT quantities (daily totals, trend classification).
+ *  Do NOT use it for wall-clock span predictions (e.g. night-end = bedtime +
+ *  span): those want the gross span because the baby is in the crib through
+ *  the wakings. Open wakings clip to end_time. */
+export function netDurationMin(s: SleepEntry): number {
   if (!s.end_time) return 0;
   const raw = (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60000;
   return raw - pauseMinutes(s.pauses, s.end_time);
@@ -41,7 +46,7 @@ export function getTodayStats(sleeps: SleepEntry[]): DayStats {
 
   for (const s of sleeps) {
     if (!s.end_time) continue;
-    const dur = durationMinutes(s);
+    const dur = netDurationMin(s);
     if (dur <= 0) continue;
 
     if (s.type === "nap") {
@@ -87,7 +92,7 @@ export function getSleepDayTotals(
   const today = getTodayStats(todaySleeps);
   let priorNightMinutes = 0;
   if (priorOvernight?.end_time) {
-    const raw = durationMinutes(priorOvernight);
+    const raw = netDurationMin(priorOvernight);
     if (raw > 0) priorNightMinutes = Math.round(raw);
   }
   return {

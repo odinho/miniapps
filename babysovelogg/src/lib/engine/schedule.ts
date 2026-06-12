@@ -6,6 +6,7 @@ import type {
 } from "$lib/types.js";
 export type { SleepCyclePrior, SleepCycleEstimate } from "$lib/types.js";
 import { getHourInTz, setHourInTz, isoToDateInTz, getMinuteOfDayInTz } from "$lib/tz.js";
+import { netDurationMin } from "./stats.js";
 import type { SleepLogRow } from "$lib/types.js";
 import { daytimeSleepDuration } from "$lib/data/shine2021.js";
 
@@ -941,7 +942,11 @@ export function getLearnedBedtimeWakeWindow(ctx: BabyContext): number {
   return gaps.reduce((a, b) => a + b, 0) / gaps.length;
 }
 
-/** Learn average night sleep duration (minutes) from recent completed nights. */
+/** Learn average night sleep duration (minutes) from recent completed nights.
+ *  Intentionally the GROSS bedtime→wake span (includes night wakings): the
+ *  prediction is morning-wake = bedtime + this span, and the baby is in the
+ *  crib through the wakings. Netting pauses here would predict wake too early.
+ *  (Sleep-amount totals net pauses via netDurationMin; this is a span.) */
 export function getLearnedNightDuration(ctx: BabyContext): number {
   const sleepNeed = findByAge(SLEEP_NEEDS, ctx.ageMonths);
   const napDur = getLearnedNapDuration(ctx);
@@ -1113,7 +1118,11 @@ function censorCutShortNaps(
   }
   for (const s of ctx.recentSleeps) {
     if (s.type !== "night" || !s.end_time) continue;
-    const dur = (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60_000;
+    // Net night wakings out: this total is compared against `dayTargetMin`,
+    // which derives from the net trend reference. A gross night would inflate
+    // the total on a wakeful night and wrongly qualify the last nap for the
+    // cap-respect carve-out.
+    const dur = netDurationMin(s);
     const dayKey = localDate(s.start_time, ctx.tz);
     totalMinByDay.set(dayKey, (totalMinByDay.get(dayKey) ?? 0) + dur);
   }

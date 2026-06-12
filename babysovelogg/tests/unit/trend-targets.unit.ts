@@ -128,6 +128,31 @@ describe("classifyTrendDay", () => {
     expect(d.reason).toBe("untagged complete");
   });
 
+  it("nets night wakings out of the day total (sleep-amount, not wall-clock span)", () => {
+    const nightWithWaking: SleepEntry = {
+      start_time: day(10, 19, 0), end_time: day(11, 8, 0), type: "night", woke_by: "self",
+      pauses: [{ pause_time: day(11, 2, 0), resume_time: day(11, 3, 0) }], // 60 min awake
+    };
+    const sleeps = [sleep(day(10, 9, 0), day(10, 11, 0), "nap", "self"), nightWithWaking];
+    const d = classifyTrendDay("2026-04-10", sleeps, ref, tol, undefined);
+    // Gross would be 120 + 780 = 900; netting the 60-min waking → 840.
+    expect(d.nightMin).toBe(720);
+    expect(d.totalMin).toBe(840);
+  });
+
+  it("a wakeful parent-woken night nets below near-target → 'natural', not 'policy-affected'", () => {
+    const nightWithLongWaking: SleepEntry = {
+      start_time: day(11, 19, 0), end_time: day(12, 8, 0), type: "night", woke_by: "self",
+      pauses: [{ pause_time: day(12, 1, 0), resume_time: day(12, 3, 20) }], // 140 min awake
+    };
+    const sleeps = [sleep(day(11, 9, 0), day(11, 10, 50), "nap", "woken"), nightWithLongWaking];
+    const d = classifyTrendDay("2026-04-11", sleeps, ref, tol, undefined);
+    // Gross total 890 (>= ref-tol 760) would read as policy-affected; net 750 is
+    // below near-target, so the cap math didn't push them down → natural.
+    expect(d.totalMin).toBe(750);
+    expect(d.kind).toBe("natural-untagged");
+  });
+
   it("classifies an off-day as 'off-day' regardless of contents", () => {
     const sleeps = [
       sleep(day(13, 9, 0), day(13, 10, 50), "nap", "self"),

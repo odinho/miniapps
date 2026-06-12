@@ -282,6 +282,8 @@ function getNightDurationStats(
 
   // Match the 360–900 min plausibility window used by getLearnedNightDuration
   // in schedule.ts so the variance samples align with the point estimate.
+  // Gross span (no pause-netting) on purpose: this is the variance of the same
+  // bedtime→wake span the point estimate predicts, not a sleep-amount total.
   const durations = recentSleeps
     .filter((s) => s.type === "night" && s.end_time)
     .map((s) => (new Date(s.end_time!).getTime() - new Date(s.start_time).getTime()) / 60_000)

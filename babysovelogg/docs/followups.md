@@ -53,15 +53,20 @@ own design pass.
   an unconditional `setUTCDate(+1)`. New DST-safe `addLocalDay` helper.
   Regression pinned in `schedule.unit.ts`.
 
-**Still open (2 of 6):**
+**Still open (1 of 6):**
 
-- **Pause-aware duration math inconsistent across consumers** (Codex).
-  State threads night wakings as pauses and stats/napBudget net them
-  out, but: schedule's `buildCache` drops pauses, `getLearnedNightDuration`
-  learns from gross night length, `censorCutShortNaps`' day totals add
-  gross night duration, confidence night variance is gross, and
-  `trend.ts:durationOf` is gross. Same rows → different "total sleep"
-  per subsystem. Centralize one `netDurationMin(s)` helper.
+- ~~**Pause-aware duration math inconsistent across consumers.**~~ Resolved
+  2026-06-12, but NOT by "net everywhere" — that premise was wrong. The
+  decision is **net for sleep-AMOUNT comparisons, gross for wall-clock SPAN
+  predictions**: `trend.ts:classifyTrendDay` and `censorCutShortNaps`' day
+  totals now net via a shared `netDurationMin(s)` (exported from stats.ts),
+  because both compare against the *net* trend reference. `getLearnedNightDuration`
+  and confidence's night variance stay GROSS on purpose — night-end is predicted
+  as `bedtime + span` and the baby is in the crib through the wakings, so netting
+  would predict wake too early; both now carry a comment saying so. `buildCache`
+  is untouched (the net-needing consumers read raw entries with `.pauses`).
+  Pinned: a 60-min-waking night nets to 840 not 900, and a 140-min-waking
+  parent-woken night flips policy-affected→natural (trend-targets.unit.ts).
 - **Mid-day re-plans lose positional identity.** Both assemble branches
   re-plan via `selectBestPlan(..., {...ctx, customNapCount: remaining.length})`
   (state.ts:1046-1049, 1176-1181). The re-plan then (a) pulls positional

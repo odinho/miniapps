@@ -15,7 +15,7 @@
 import type { SleepEntry, BabyContext } from "$lib/types.js";
 import { NAP_BUDGET, SLEEP_NEEDS, findByAge } from "./constants.js";
 import { isoToDateInTz } from "$lib/tz.js";
-import { getWeekStats } from "./stats.js";
+import { getWeekStats, netDurationMin } from "./stats.js";
 
 export interface BlendedTrend {
   blendedTrendMin: number;
@@ -256,8 +256,8 @@ export function classifyTrendDay(
     .filter((s) => s.type === "nap")
     .toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
   const nights = completed.filter((s) => s.type === "night");
-  const napMin = naps.reduce((sum, s) => sum + durationOf(s), 0);
-  const nightMin = nights.reduce((sum, s) => sum + durationOf(s), 0);
+  const napMin = naps.reduce((sum, s) => sum + netDurationMin(s), 0);
+  const nightMin = nights.reduce((sum, s) => sum + netDurationMin(s), 0);
   const totalMin = napMin + nightMin;
   const lastNap = naps.at(-1) ?? null;
 
@@ -282,7 +282,7 @@ export function classifyTrendDay(
   if (nights.length === 0) return { ...base, kind: "incomplete", reason: "no night bucket" };
 
   const nearTarget = totalMin >= reference - toleranceMin;
-  const lastNapDurMin = lastNap ? durationOf(lastNap) : 0;
+  const lastNapDurMin = lastNap ? netDurationMin(lastNap) : 0;
   const lastNapParentEnded = lastNap?.woke_by === "woken";
   const lastNapSubstantial = lastNapDurMin >= 30;
 
@@ -309,11 +309,6 @@ function isNaturalKind(d: TrendDay): boolean {
 
 function isCompletedKind(d: TrendDay): boolean {
   return isNaturalKind(d) || d.kind === "policy-affected";
-}
-
-function durationOf(s: SleepEntry): number {
-  if (!s.end_time) return 0;
-  return (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60_000;
 }
 
 /** True when `date` immediately precedes any off-day in the set — see
