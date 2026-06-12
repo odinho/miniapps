@@ -9,6 +9,7 @@ import {
   decomposeFirstNapPrediction,
   predictNightEndTime,
   recommendBedtime,
+  detectRescueNap,
   findByAge,
   shineDaytimeSleepMinutes,
   WAKE_WINDOWS,
@@ -215,6 +216,32 @@ describe("recommendBedtime", () => {
     const bt = recommendBedtime([sleep(t(17, 0), t(18, 0))], ctx(9));
     const d = new Date(bt);
     expect(d.getHours()).toBeLessThanOrEqual(23);
+  });
+});
+
+// --- detectRescueNap order independence ---
+
+describe("detectRescueNap picks the latest nap regardless of input order", () => {
+  // The decision gate keys off the most-recently-ended nap. It must not depend
+  // on callers passing completedNaps pre-sorted (server start_time DESC).
+  const earlyShort = { start_time: t(9, 0), end_time: t(9, 30) }; // 30m
+  const earlyLong = { start_time: t(9, 0), end_time: t(10, 30) }; // 90m
+  const lateShort = { start_time: t(13, 0), end_time: t(13, 30) }; // 30m
+  const lateLong = { start_time: t(13, 0), end_time: t(14, 30) }; // 90m
+  const napStart = t(16, 0);
+
+  it("latest nap long, not an extra nap → no rescue, both orders", () => {
+    const desc = detectRescueNap(napStart, [lateLong, earlyShort], 3, null, 60, 30);
+    const asc = detectRescueNap(napStart, [earlyShort, lateLong], 3, null, 60, 30);
+    expect(asc).toEqual(desc);
+    expect(desc).toBeNull();
+  });
+
+  it("latest nap short → rescue fires, both orders", () => {
+    const desc = detectRescueNap(napStart, [lateShort, earlyLong], 3, null, 60, 30);
+    const asc = detectRescueNap(napStart, [earlyLong, lateShort], 3, null, 60, 30);
+    expect(asc).toEqual(desc);
+    expect(desc).not.toBeNull();
   });
 });
 

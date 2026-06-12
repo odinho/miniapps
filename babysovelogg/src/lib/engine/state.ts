@@ -998,6 +998,21 @@ function assembleNewbornPrediction(
   };
 }
 
+/** Most-recently-started completed sleep, independent of input order.
+ *  Callers historically read `todaySleeps.find((s) => s.end_time)`, which only
+ *  returns the latest sleep because the server query sorts `start_time DESC`.
+ *  Selecting the max explicitly removes that hidden dependency. */
+function latestCompletedSleep(sleeps: SleepLogRow[]): SleepLogRow | undefined {
+  let latest: SleepLogRow | undefined;
+  for (const s of sleeps) {
+    if (!s.end_time) continue;
+    if (!latest || new Date(s.start_time).getTime() > new Date(latest.start_time).getTime()) {
+      latest = s;
+    }
+  }
+  return latest;
+}
+
 /** Assemble an emerging-rhythm prediction (adapter between newborn and schedule). */
 function assembleEmergingPrediction(
   ctx: BabyContext,
@@ -1015,7 +1030,7 @@ function assembleEmergingPrediction(
     .map((s) => new Date(s.end_time!).getTime());
   const lastSleepEndMs = allCompleted.length > 0 ? Math.max(...allCompleted) : null;
 
-  const lastCompleted = todaySleeps.find((s) => s.end_time);
+  const lastCompleted = latestCompletedSleep(todaySleeps);
   const wakeTimeForPrediction = lastCompleted?.end_time || todayWakeUp?.wake_time;
 
   const result = predictEmerging({
@@ -1145,7 +1160,7 @@ function assembleSchedulePrediction(
   napBudgetOptedIn: boolean,
   priorNapBudgetState: { mode: "first-contact" | "established"; enteredAt: string } | null,
 ): Prediction | null {
-  const lastCompleted = todaySleeps.find((s) => s.end_time);
+  const lastCompleted = latestCompletedSleep(todaySleeps);
   const wakeTimeForPrediction = lastCompleted?.end_time || todayWakeUp?.wake_time;
 
   if (!wakeTimeForPrediction) return null;

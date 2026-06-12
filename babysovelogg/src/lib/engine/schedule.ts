@@ -1258,7 +1258,13 @@ export function detectRescueNap(
 ): RescueNapInfo | null {
   const isExtraNap = completedNaps.length >= expectedNapCount;
 
-  const lastNap = completedNaps[0]; // sorted most recent first
+  // Most recently-ended nap, independent of input order (callers previously
+  // relied on the server's start_time DESC ordering passing in completedNaps[0]).
+  const lastNap = completedNaps.reduce<(typeof completedNaps)[number] | undefined>(
+    (latest, n) =>
+      !latest || new Date(n.end_time).getTime() > new Date(latest.end_time).getTime() ? n : latest,
+    undefined,
+  );
   const lastNapShort = lastNap && (
     (new Date(lastNap.end_time).getTime() - new Date(lastNap.start_time).getTime())
     < shortNapThresholdMin * 60_000

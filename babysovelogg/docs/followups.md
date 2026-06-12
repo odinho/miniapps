@@ -121,10 +121,6 @@ own design pass.
 
 - `decomposeFirstNapPrediction` hand-mirrors `predictDayNaps`' first
   iteration (drift risk) — derive via an optional trace hook instead.
-- `todaySleeps.find(s => s.end_time)` as "last completed sleep"
-  (state.ts:1013,1143) silently depends on the server's
-  `ORDER BY start_time DESC`; same for `detectRescueNap`'s
-  `completedNaps[0]`. Sort locally or document the contract at the type.
 - Learned cycle estimator feeds only rescue/napBudget thresholds;
   `predictNapEndTime`/`predictNightEndTime`/re-anchor/scorer still use
   the age prior (re-anchor deliberately, the rest incidentally). One
@@ -1157,8 +1153,6 @@ These are non-bug improvements both reviewers want:
   morning, post-nap, and skipped-nap states).
 - Pause during active nap affecting `expectedNapEnd`.
 - Strategy override (`StrategyOverride`) through `assembleState`.
-- `nextNap` consistency across shuffled `todaySleeps` order (currently
-  every test assumes prod's DESC ordering).
 
 ## Arc visual rendering — what landed 2026-05-17
 

@@ -1742,3 +1742,40 @@ describe("assembleState", () => {
     });
   });
 });
+
+describe("assembleState: todaySleeps order independence", () => {
+  // The server passes todaySleeps sorted start_time DESC; the engine must not
+  // silently depend on that ordering. This uses a sparse-data baby so the
+  // emerging strategy runs (it derives the wake reference from the last
+  // completed sleep via latestCompletedSleep). Under the old
+  // `todaySleeps.find((s) => s.end_time)` the ASC and DESC orders picked
+  // different "last completed" sleeps → different nextNap.
+  const wakeUp: DayStartRow = {
+    id: 1, baby_id: 1, date: "2026-03-26",
+    wake_time: "2026-03-26T06:30:00.000Z",
+    created_at: "2026-03-26T06:30:00.000Z",
+    created_by_event_id: null,
+  };
+  // Two days of data only → data-quality demotion to emerging_rhythm.
+  const sparseRecent: SleepLogRow[] = [
+    sleepRow({ id: 1, start_time: "2026-03-24T09:30:00Z", end_time: "2026-03-24T11:00:00Z", domain_id: "slp_s1" }),
+    sleepRow({ id: 2, start_time: "2026-03-24T19:30:00Z", end_time: "2026-03-24T23:59:00Z", type: "night", domain_id: "slp_s2" }),
+    sleepRow({ id: 3, start_time: "2026-03-25T09:30:00Z", end_time: "2026-03-25T11:00:00Z", domain_id: "slp_s3" }),
+    sleepRow({ id: 4, start_time: "2026-03-25T19:30:00Z", end_time: "2026-03-25T23:59:00Z", type: "night", domain_id: "slp_s4" }),
+  ];
+  const nap1 = sleepRow({ id: 101, start_time: "2026-03-26T09:30:00.000Z", end_time: "2026-03-26T11:00:00.000Z", domain_id: "slp_o1" });
+  const nap2 = sleepRow({ id: 102, start_time: "2026-03-26T13:00:00.000Z", end_time: "2026-03-26T13:50:00.000Z", domain_id: "slp_o2" });
+  const now = new Date("2026-03-26T14:30:00.000Z").getTime();
+
+  function resultFor(todaySleeps: SleepLogRow[]) {
+    return assembleState(dayData({ todaySleeps, recentSleeps: sparseRecent, todayWakeUp: wakeUp, now }));
+  }
+
+  it("emerging nextNap is identical whether todaySleeps is ASC or DESC", () => {
+    const desc = resultFor([nap2, nap1]); // server ordering
+    const asc = resultFor([nap1, nap2]);
+    expect(desc.prediction!.strategy).toBe("emerging_rhythm"); // guard: the path under test is live
+    expect(asc.prediction).not.toBeNull();
+    expect(asc.prediction!.nextNap).toEqual(desc.prediction!.nextNap);
+  });
+});
