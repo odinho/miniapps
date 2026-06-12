@@ -10,6 +10,139 @@ multi-day testing, the unit-of-work flow — live in
 [`workflow.md`](./workflow.md). Don't put process in this file; this
 is for tracked product/engine/test work.
 
+## Engine deep review — 2026-06-12 (Claude full read + Codex pair-review)
+
+Source: full end-to-end read of `src/lib/engine/` plus an independent
+Codex review (session `019ebb96-7ff4-7a03-9400-44b810e4c77d`). Bugs are
+verified unless marked suspicion. Work the bugs first; the architecture
+units are the high-leverage simplifications and should each get their
+own design pass.
+
+### Verified bugs
+
+- **Confidence positional SDs off by one nap position.**
+  `confidence.ts:getNapWakeWindowStats` buckets by start-anchored local
+  date, so the morning overnight (which carries the wake→nap1 gap) lives
+  in *yesterday's* bucket and position 0 actually measures nap1→nap2.
+  `napRanges[0]` then shows the second gap's variance — repro in
+  `local/review-confidence-offbyone.ts` (stable 150 min first WW renders
+  SD 66). Schedule.ts gets this right via `morningWakeMs`; fix by
+  reusing that, or fold into the shared-evidence refactor below.
+- **Active night emits `nextNap`/`bedtime` in the past.** With an
+  active night, `derivePostPlanFields` sets `napsAllDone` and
+  `nextNap = bedtime` (state.ts:551-564) — at 22:30 that's
+  `nextNap: 19:00 (-3h 30m)`, pinned in `engine-scenarios.unit.ts`
+  ("active night at 22:30" snapshot). Contract should emit no
+  actionable next-step during an active night (keep `expectedNightEnd`).
+- **Server-TZ leaks into classification.**
+  `shouldReclassifyAsNight` uses `start.getHours()` (process TZ) and is
+  called from `projections.ts:126,192` — on a UTC server a >6h sleep
+  starting 17:00–18:59 Oslo is *not* reclassified as night.
+  `classifySleepType`/`classifySleepTypeByHour` default to
+  `new Date().getHours()` (client local — OK in practice but not
+  baby.timezone), and `calculateAgeMonths` +
+  `computeStrategySignals` use process-local calendar fields. Thread
+  baby tz / explicit local hour everywhere (see [[feedback_server_tz]]).
+- **Pause-aware duration math inconsistent across consumers** (Codex).
+  State threads night wakings as pauses and stats/napBudget net them
+  out, but: schedule's `buildCache` drops pauses, `getLearnedNightDuration`
+  learns from gross night length, `censorCutShortNaps`' day totals add
+  gross night duration, confidence night variance is gross, and
+  `trend.ts:durationOf` is gross. Same rows → different "total sleep"
+  per subsystem. Centralize one `netDurationMin(s)` helper.
+- **Mid-day re-plans lose positional identity.** Both assemble branches
+  re-plan via `selectBestPlan(..., {...ctx, customNapCount: remaining.length})`
+  (state.ts:1046-1049, 1176-1181). The re-plan then (a) pulls positional
+  WW/duration data for the *wrong regime* (`getPositionalDataForNapCount(ctx, 1)`
+  for a 2-nap baby's afternoon), and (b) discards the real nap-2 habitual
+  anchor (position 0's habitual start is the morning nap; the
+  `habitualMs > currentWake` guard then drops it). Plans should carry
+  absolute day positions and be *consumed*, not re-generated with a
+  shrunken count.
+- **Habitual wake prediction off by a day for post-midnight bedtimes.**
+  `getHabitualWakeTimePrediction` (schedule.ts:1871-1884) does
+  `setUTCDate(+1)` from the night start; a night starting 00:30 local
+  resolves the wake to the *next* local date (~24h late), partially
+  masked by the 360–900 min clamp. Rare but wrong direction.
+
+### Architecture: big simplification candidates (each its own unit)
+
+- **One shared evidence layer.** Six modules independently re-derive
+  day-bucketing + gap/duration stats with diverging filters:
+  schedule.ts (complete-day + censor + regime filter), confidence.ts
+  (none of those), calibration.ts (own thresholds that drift from
+  `getLearnedNapCount`), emerging.ts consistency fns, features.ts,
+  weighted.ts. Build one `DayEvidence`/learned-profile extractor
+  (positional WW {mean, sd, n}, positional durations, habitual anchors,
+  nap-count posterior, night duration, censored sets) computed once per
+  ctx; confidence/calibration/emerging-confidence become *reads*. Kills
+  the whole misalignment bug class above; est. −700–1000 lines.
+- **One planning core.** Forward planner, backward planner, scorer,
+  stale-replan, comeback compression, fallback-nextNap, skip detection,
+  rescue, continuation, napBudget arbitration are variants of "given
+  today's facts, choose the next valid plan", spread across schedule.ts
+  + state.ts post-processing. Target: `PlanRequest → PlanResult` core;
+  assemble* becomes formatting. Includes folding the four
+  wake-recommendation surfaces (rescueNap/continuation/napBudget/
+  postSkipPlan) into the already-planned `WakeRecommendation` union.
+- **Kill or finish the plan-scoring layer.** `scorePlan`'s `W_TARGET`
+  term is provably dead in prod: both candidates always carry the same
+  bedtime that is also passed as target (schedule.ts:2354,2371), so the
+  scorer arbitrates only on WW/duration shape between forward and
+  backward walks of the *same* bedtime. Also, the backward walk +
+  scorer read *unfiltered* positional data while the forward walk reads
+  regime-filtered data — inconsistent evidence during transitions
+  (Codex #5). Either delete backward+scorer (keep a small hard-
+  constraint feasibility check for `Prediction.feasible`) or make the
+  scorer real (generate genuinely different candidates and score them).
+  `plan-scoring.unit.ts` pins the dead divergent-target behavior — it
+  exercises a call shape prod never makes.
+- **De-duplicate the emerging path.** `predictEmerging` computes
+  predictedNaps/nextNap/bedtime/napConfidence/bedtimeConfidence that
+  `assembleEmergingPrediction` discards (it re-plans via
+  `selectBestPlan`); only sleepWindow/pressure/rolling/fallback-nextNap
+  are used. Reduce emerging.ts to context computation; route both
+  strategies through the one planner with different visibility policy.
+- **Backtest fidelity.** `backtest.ts` replays `predictDayNaps` +
+  `recommendBedtime`, not the production assembly path
+  (selectBestPlan + derivePostPlanFields + trend state) — MAE numbers
+  silently diverge from shipped behavior. A replay harness over
+  `assembleState` (morning, post-nap, active-nap, bedtime evaluation
+  points) would also cover the stateful TrendTargetState item below.
+
+### Smaller cleanups
+
+- Dead in prod: `engine/latency.ts` (only its own test imports it;
+  messages are English, UI is Nynorsk), `detectNapTransition`,
+  `EmergingPrediction.napConfidence`/`bedtimeConfidence`,
+  `snapToCycleBoundary`'s `_minCycles`/`_maxCycles` params.
+- `getLocalMinuteOfDay` + formatter cache duplicated 3× (schedule.ts,
+  features.ts, emerging.ts) — move to `tz.ts`.
+- `decomposeFirstNapPrediction` hand-mirrors `predictDayNaps`' first
+  iteration (drift risk) — derive via an optional trace hook instead.
+- `todaySleeps.find(s => s.end_time)` as "last completed sleep"
+  (state.ts:1013,1143) silently depends on the server's
+  `ORDER BY start_time DESC`; same for `detectRescueNap`'s
+  `completedNaps[0]`. Sort locally or document the contract at the type.
+- Learned cycle estimator feeds only rescue/napBudget thresholds;
+  `predictNapEndTime`/`predictNightEndTime`/re-anchor/scorer still use
+  the age prior (re-anchor deliberately, the rest incidentally). One
+  confidence-gated cycle provider (Codex #6).
+- `getLearnedBedtimeWakeWindow` learns from every nap→night gap with
+  only a 60–600 min filter — no complete-day, off-day, regime, or
+  recency treatment, yet it drives `recommendBedtime` directly (Codex #8).
+- `buildSleepsForBedtime` cutoff compares local minute-of-day only —
+  an after-midnight nap end (00:30 → min 30) passes a 17:00 cutoff.
+  Habitual bedtime/wake medians + SDs use linear minute-of-day
+  (midnight wrap inflates variance). Circular clock stats + date-aware
+  cutoffs; add an engine-level DST suite (Codex #12, suspicion-grade
+  for DST impact).
+- `weightedTrimmedMean` trims by sample *count*, not weight — can drop
+  the highest-weight recent samples.
+- Tunable to validate against prod data: `NAP_BUDGET.MAX_STDEV_FRACTION`
+  (0.12) — normal day-to-day totals often exceed 12% CV, which silently
+  nulls the trend and disables napBudget + cap-respect carve-outs.
+
 ## Multi-child support (twins + siblings) — see dedicated plan
 
 Source: 2026-06-12 — a family now has twins, plus we want to track
