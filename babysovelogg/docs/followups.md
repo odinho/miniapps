@@ -10,6 +10,18 @@ multi-day testing, the unit-of-work flow — live in
 [`workflow.md`](./workflow.md). Don't put process in this file; this
 is for tracked product/engine/test work.
 
+## Multi-child support (twins + siblings) — see dedicated plan
+
+Source: 2026-06-12 — a family now has twins, plus we want to track
+older siblings for fun. The app is single-baby today. Multi-phase
+roadmap lives in [`multi-child-support.md`](./multi-child-support.md):
+Phase 1 (add a child + switcher, delivers mixed-age siblings), Phase 2
+(logging ergonomics + at-a-glance), Phase 3 (combined graphs +
+overlap), Phase 4 (opt-in schedule coupling). A Codex UX design pass is
+folding into Phases 2–4. Must-fix trap noted there: `baby.updated`
+projection targets newest baby, will corrupt the first child once a
+second exists.
+
 ## Stale active sleep — shipped, minor edges parked
 
 Source: 2026-06-10 phone-bug report (timer at 466:34:51 — a forgotten
