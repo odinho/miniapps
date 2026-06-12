@@ -224,17 +224,27 @@ So Phase 1 is functionally complete. Remaining polish / deferred:
 
 From the client+UI Codex review (2026-06-12) — must-fixes already landed
 (off-day toggles in TagSheet/WakeUpSheet now use the focused baby; sleep.deleted
-clears activeSleep; cached state normalized). Lower-priority leftovers:
-- **Active-sleep periodic refresh bypasses normalizeState + the pending-queue
-  overlay** (`+page.svelte` `appState.set(data)`). Family shape is fine (so not
-  a cardinal bug), but it can drop optimistic queued state. Route it through the
-  sync layer / normalizeState.
-- **Settings form `$effect` overwrites unsaved edits** when an SSE/server
-  refresh invalidates `baby` mid-edit. Add a dirty guard or key the reset to
-  the selected baby id / create-mode transition.
-- **EditSleepModal undo-end eligibility reads `appState.state.todaySleeps`**
-  (primary alias), so "Angre slutt" can show/hide wrong in focus mode. Pass the
-  focused slice's todaySleeps in (WakeUpSheet already fixed).
+clears activeSleep; cached state normalized).
+
+The three lower-priority client-state leftovers **LANDED (2026-06-12)**: the
+active-sleep periodic refresh now goes through a new `sync.refresh()` (normalize
++ cache + pending-queue overlay, no more raw `appState.set`); the SSE update
+handler got the same overlay (it had the identical bug); the settings form reset
+is keyed on baby identity (`formKey`) so an SSE refresh no longer clobbers
+unsaved edits; EditSleepModal resolves the entry's own slice by `entry.baby_id`
+for undo-eligibility. New e2e pins the settings-clobber case.
+
+Still open from the Codex review of that polish (2026-06-12):
+- **No revision/version on `AppState` → last-writer-wins races.** `sync.refresh()`,
+  `sendEvents()`, and the SSE handler all `appState.set(...)` unconditionally
+  (`sync.svelte.ts`; `app.svelte.ts:set`). A slower/older `/api/state` response can
+  land after a newer event-response or SSE and briefly clobber it. Pre-existing,
+  but `refresh()` makes it marginally more reachable. Fix: stamp state with a
+  monotonic server revision and drop stale applies in `appState.set`.
+- **EditSleepModal undo coverage gap.** The fix-3 slice resolution is verified by
+  Codex + the unit-tested `isWithinEndUndoWindow`, but there's no e2e for
+  "focused non-primary baby + undo-end eligibility" (opening EditSleepModal needs
+  an arc-segment tap, fragile). Add when the arc has a stable test handle.
 
 Deferred from the backend unit's Codex review (2026-06-12):
 - **`getBabyState` mixes pure snapshot assembly with derived-state writes**
@@ -244,6 +254,20 @@ Deferred from the backend unit's Codex review (2026-06-12):
 - **SSE/state payload duplicates the primary baby** inside `babies[0]` plus
   the top-level alias. Acceptable at N≤2; slim to a summary if SSE size
   ever matters (and once the client reads `babies[]` natively).
+
+## E2E: arc-scenes + B18 are wall-clock-fragile
+
+Surfaced 2026-06-12 (during Phase-1 polish). `arc-scenes.e2e.ts` (9 visual
+snapshots) and `bugs.e2e.ts` B18 pass or fail depending on the real time of day:
+the same `main` commit passed all of them at ~17:00 UTC and failed 10 at ~21:00
+UTC with no code change. Root cause: `src/routes/dev/arc-scenes/+page.svelte:21`
+builds every scene from `const today = new Date()` (real wall clock), so the
+active-sleep scenes' elapsed fill / now-marker drift away from the committed
+baselines as the day advances; B18 uses `new Date()` day-offsets + `forceHour`.
+Fix: thread a FIXED `now` into the arc-scenes dev page (query param or hardcoded
+instant) so the snapshots are deterministic, and pin B18's clock. Until then a
+clean `bun run test:e2e` is only reliable near the baseline-capture time. NOT a
+product bug — pure test-infra fragility.
 
 ## Stale active sleep — shipped, minor edges parked
 

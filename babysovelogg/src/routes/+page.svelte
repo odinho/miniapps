@@ -200,18 +200,12 @@
 		}
 	});
 
-	// Periodically refresh state during active sleep so predictions stay current
+	// Periodically refresh state during active sleep so predictions stay current.
+	// Goes through sync.refresh() so the normalize + pending-queue overlay isn't
+	// bypassed (a raw appState.set would drop optimistic queued events).
 	$effect(() => {
 		if (!activeSleep || activeSleep.end_time) return;
-		const iv = setInterval(async () => {
-			try {
-				const res = await fetch('/api/state');
-				if (res.ok) {
-					const data = await res.json();
-					appState.set(data);
-				}
-			} catch { /* offline — skip refresh */ }
-		}, 5 * 60_000); // every 5 minutes
+		const iv = setInterval(() => { void sync.refresh(); }, 5 * 60_000); // every 5 minutes
 		return () => clearInterval(iv);
 	});
 

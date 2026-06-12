@@ -129,10 +129,14 @@
 	}
 
 	// "Angre slutt" — undo End within 15 min, only when no later sleep
-	// exists. Reuses the existing `sleep.restarted` event.
-	const canUndoEnd = $derived(
-		isWithinEndUndoWindow(entry, appState.state.todaySleeps),
+	// exists. Reuses the existing `sleep.restarted` event. Resolve the right
+	// child's sleeps from the entry itself (not the primary alias) so the
+	// "later sleep" check is correct in a focused/second-baby view.
+	const focusedSleeps = $derived(
+		appState.state.babies.find((b) => b.baby?.id === entry.baby_id)?.todaySleeps
+		?? appState.state.todaySleeps,
 	);
+	const canUndoEnd = $derived(isWithinEndUndoWindow(entry, focusedSleeps));
 
 	async function undoEnd() {
 		if (busy) return;

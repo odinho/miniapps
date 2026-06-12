@@ -90,7 +90,9 @@ function createSync() {
 				if (data.state) {
 					const normalized = normalizeState(data.state);
 					cacheState(normalized);
-					appState.set(normalized);
+					// Keep the optimistic overlay (same as init/refresh) — an SSE
+					// update mustn't drop events still queued offline.
+					appState.set(hasPendingEvents() ? applyQueuedEvents(normalized) : normalized);
 				}
 			} catch {
 				// Ignore malformed SSE data
@@ -198,6 +200,24 @@ function createSync() {
 				}
 			}
 			connect();
+		},
+
+		/** Re-fetch server state and apply it through the same normalize + cache +
+		 *  pending-queue overlay as `init`, so a background refresh (e.g. during
+		 *  active sleep) can't drop optimistic queued events or de-normalize the
+		 *  family shape. No-op on network failure (stay on current state). */
+		async refresh(): Promise<void> {
+			let raw: AppStateResponse;
+			try {
+				const res = await fetch("/api/state");
+				if (!res.ok) return;
+				raw = await res.json();
+			} catch {
+				return;
+			}
+			const normalized = normalizeState(raw);
+			cacheState(normalized);
+			appState.set(hasPendingEvents() ? applyQueuedEvents(normalized) : normalized);
 		},
 
 		/** Send domain events to the server, or queue offline with optimistic state update.

@@ -59,9 +59,15 @@
 	let toast = $state<{ text: string; type: 'success' | 'error' | 'warning' } | null>(null);
 	let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
-	// Keep form in sync when the selected baby changes (SSE update, or switching
-	// which child is being edited). When adding a new child, start blank.
+	// Reset the form only when the *selected child* changes (switching which
+	// baby is edited, or entering create-mode) — keyed on identity, NOT on the
+	// `baby` object, which gets a fresh reference on every SSE/state refresh.
+	// Resetting on each refresh would clobber the parent's unsaved edits mid-typing.
+	let formKey = $state<number | 'new' | null>(null);
 	$effect(() => {
+		const key = isCreatingNew ? 'new' : (baby?.id ?? null);
+		if (key === formKey) return;
+		formKey = key;
 		if (baby) {
 			name = baby.name;
 			birthdate = baby.birthdate;
@@ -70,7 +76,7 @@
 			trackDiaperEnabled = baby.track_diaper === 1;
 			targetBedtime = baby.target_bedtime;
 			bedtimeEnabled = !!baby.target_bedtime;
-		} else if (isCreatingNew) {
+		} else {
 			name = '';
 			birthdate = '';
 			selectedNapCount = null;

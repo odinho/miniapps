@@ -1,4 +1,12 @@
-import { test, expect, createBaby, setWakeUpTime, fillDateInput } from "./fixtures";
+import {
+  test,
+  expect,
+  createBaby,
+  setWakeUpTime,
+  fillDateInput,
+  postEvents,
+  makeEvent,
+} from "./fixtures";
 
 const babyNames = async (request: { get: (url: string) => Promise<{ json: () => Promise<unknown> }> }) => {
   const state = (await (await request.get("/api/state")).json()) as {
@@ -21,6 +29,28 @@ test("editing the first child after a second exists does not corrupt the second"
 
   await expect(page).toHaveURL("/", { timeout: 5000 });
   expect(await babyNames(request)).toEqual(["Ada Endra", "Bo"]);
+});
+
+test("settings keeps an unsaved edit when a state refresh arrives", async ({ page }) => {
+  const ada = createBaby("Ada", "2025-06-12");
+  createBaby("Bo", "2025-06-12");
+
+  await page.goto("/settings?baby=1");
+  await expect(page.locator("#baby-name")).toHaveValue("Ada", { timeout: 5000 });
+
+  // Parent edits the name but hasn't saved yet.
+  await page.locator("#baby-name").fill("Ada WIP");
+
+  // A state refresh arrives over SSE (another device renamed Ada). The active
+  // tab reflects the server value, but the in-progress edit must NOT be reset.
+  await postEvents(page, [makeEvent("baby.updated", { babyId: ada, name: "Ada Server" })]);
+
+  // SSE propagated (tab now shows the server name)...
+  await expect(
+    page.getByTestId("child-tabs").getByRole("button", { name: "Ada Server" }),
+  ).toBeVisible({ timeout: 5000 });
+  // ...but the unsaved edit survived.
+  await expect(page.locator("#baby-name")).toHaveValue("Ada WIP");
 });
 
 test("can add a second child from settings", async ({ page, request }) => {
