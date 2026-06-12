@@ -790,6 +790,66 @@ Remaining edges from that UI work:
   create-mode form + button wiring).
 
 
+### 2026-06-12: prod-data investigation — fragmented nights corrupt newborn metrics
+
+Pulled Umi's prod db (`local/imports/umi-data.db`, ~5 weeks old) to ground
+the redesign. She logged two consecutive nights with **two different models**:
+- 10→11 Jun, *intended* model: one `night` 23:00→07:00 (480m) + a
+  `night_waking` 02:00–03:00.
+- 11→12 Jun, *fragmented* model: three `night` rows 23:00→00:25, 00:56→04:29,
+  05:05→open, with ~30-min awake gaps — i.e. several nights instead of one.
+
+**Root cause of fragmentation:** the parent never picks nap/night — type is
+auto-assigned by clock in `classifySleepType` (before 06:00 ⇒ `night`). The
+intended path for a mid-night feed is the 🌙 Nattvaking button (logs a
+`night_waking` inside the open night). But tapping **Vakne** (end) then
+**Sove** later auto-types the next sleep as `night` again ⇒ a second night row.
+So fragmentation is the natural result of using the main button for a waking.
+
+**What it corrupts (measured on real data):**
+1. **`longestStretch` is logging-model-dependent.** `computeRollingSleepStats`
+   (`features.ts:265`) uses raw `end−start` per episode and ignores `pauses`:
+   consolidated night ⇒ **480m** (the 02:00–03:00 waking is *not* netted out,
+   over-counts); fragmented night ⇒ **213m** (only the biggest segment, the
+   ~5h consolidation is invisible). Same behaviour reads ~2× different — and
+   this is the headline newborn metric ("is she sleeping longer at night?").
+   Confirmed by Codex: newborn rolling/trend helpers ignore pauses
+   (`features.ts:265`, `:70`).
+2. **24h total double-counts overlaps.** Reported `totalSleep24h`=**821m**; an
+   overlapping `night` 05:00→07:00 inside the 480m night injects ~110m phantom
+   (real ≈711m). No interval-merge anywhere.
+3. **Two longest-stretch impls disagree.** `stats.ts:getLongestNightStretches`
+   *does* net wakings but operates per night-row and groups by start-date, so
+   the fragmented night splits across two calendar dates (85m on the 11th,
+   213m on the 12th) ⇒ stats graph shows two artificially-short nights. And
+   `stats-view-utils.ts:784,977` maps `pauses` away, so charts ignore wakings.
+4. Single `priorOvernightSleep` fetch (`server/state.ts:85`, `ORDER BY end_time
+   DESC LIMIT 1`) picks only one fragment ⇒ home "Søvn i dag" undercounts.
+
+**Time-sensitive:** newborn strategy is `ageWeeks < 6` (`strategy.ts:77`). Umi
+is 5w now, so within ~1 week she moves to `emerging_rhythm`, where schedule
+learning treats each `night` row as an independent bedtime/night-duration/wake
+sample (`schedule.ts:977`, `:1815`, `:1860`) — fragmented nights will then
+pollute learning, not just the context card.
+
+**Merged recommendation (Codex + Claude independently converged):** a blend
+leaning B — don't force "one long night + wakings" as *correct* for a no-rhythm
+baby, and don't build a first-class multi-segment-night schema. Instead:
+- **Read-side coalescing**: a pure normalizer that merges adjacent `night`
+  episodes separated by < N min into one logical night with the gaps as
+  derived `pauses`, applied before metrics. Both logging models then converge
+  to the same numbers. `SleepEntry.pauses` already exists; `nap-budget.ts:290`
+  already sums night fragments in a 12h window as precedent.
+- **Make newborn `features.ts` duration math pause-aware** (must pair with
+  coalescing, else the consolidated model keeps over-counting).
+- No event rewrites, no schema change, no forced retro-edits. Later extend to
+  `stats-view-utils.ts` so charts stop dropping wakings.
+
+Smallest first unit: the read-side coalescer + pause-aware `features.ts`
+longest-stretch/rolling helpers, with a multi-day test asserting the two
+logging models produce identical `longestStretch`/`totalSleep24h`.
+
+
 ### Engine: sleepWindow during active sleep shows "now" window, not post-wakeup window
 
 Codex flagged (2026-05-09) during the sleepWindow staleness fix. When a
