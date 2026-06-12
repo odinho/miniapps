@@ -603,14 +603,17 @@ function assertInvariants({ archetype, scenario, prediction }: InvariantContext)
     expect(dt, `${where}: bedtime within 18h of now`).toBeLessThan(18 * 3_600_000);
   }
 
-  // I-7: napsAllDone implies nextNap == bedtime AND predictedNaps is null
-  // AND (when idle) rescueNap is null.
-  //
-  // The engine treats an active night as ending the day's nap budget, so
-  // the napsAllDone collapse (nextNap = bedtime, predictedNaps = null)
-  // applies uniformly — no active-night gate needed.
+  // I-7: napsAllDone implies predictedNaps is null AND (when idle) rescueNap
+  // is null. nextNap collapses to bedtime as the day winds down — EXCEPT
+  // during an active night, where the baby is already down for the night and
+  // there is no actionable next-step (bedtime is in the past). The live signal
+  // is expectedNightEnd instead.
   if (p?.napsAllDone) {
-    expect(p.nextNap, `${where}: napsAllDone → nextNap == bedtime`).toBe(p.bedtime);
+    if (data.activeSleep?.type === "night") {
+      expect(p.nextNap, `${where}: active night → no actionable nextNap`).toBeNull();
+    } else {
+      expect(p.nextNap, `${where}: napsAllDone → nextNap == bedtime`).toBe(p.bedtime);
+    }
     expect(p.predictedNaps, `${where}: napsAllDone → predictedNaps null`).toBeNull();
     if (!data.activeSleep) {
       expect(p.rescueNap, `${where}: napsAllDone (idle) → rescueNap null`).toBeNull();
@@ -1225,7 +1228,7 @@ describe("Mina Learned (3-nap routine_schedule)", () => {
         now: 19:45
         inputs: wake=06:30 done=[15:55-16:35, 12:10-13:20, 08:50-09:35] active=19:20(night) target=19:15
         strategy: routine_schedule
-        nextNap: 19:15 (-30m)
+        nextNap: none
         bedtime: 19:15 (-30m)
         predictedNaps: none
         napsAllDone: true (3 expected)
@@ -1371,7 +1374,7 @@ describe("Oskar OneNap (1-nap routine_schedule, cut-short matrix)", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: 08:00 morning ramp
@@ -1386,7 +1389,7 @@ describe("Oskar OneNap (1-nap routine_schedule, cut-short matrix)", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: 11:00 right at nap door
@@ -1401,7 +1404,7 @@ describe("Oskar OneNap (1-nap routine_schedule, cut-short matrix)", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: 12:00 active nap (started 11:30)
@@ -1468,7 +1471,7 @@ describe("Oskar OneNap (1-nap routine_schedule, cut-short matrix)", () => {
         now: 19:45
         inputs: wake=06:00 done=[11:30-13:20] active=19:25(night) target=19:30
         strategy: routine_schedule
-        nextNap: 19:30 (-15m)
+        nextNap: none
         bedtime: 19:30 (-15m)
         predictedNaps: none
         napsAllDone: true (1 expected)
@@ -1491,7 +1494,7 @@ describe("Oskar OneNap (1-nap routine_schedule, cut-short matrix)", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: closes 12:00 cap 13:23
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: 5m micro: cont closed at 12:01
@@ -1506,7 +1509,7 @@ describe("Oskar OneNap (1-nap routine_schedule, cut-short matrix)", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: 20m car: 11:30-11:50 cs, now 11:55 (cont open)
@@ -1521,7 +1524,7 @@ describe("Oskar OneNap (1-nap routine_schedule, cut-short matrix)", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: closes 12:15 cap 13:23
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: 20m car: cont closed at 12:16
@@ -1536,7 +1539,7 @@ describe("Oskar OneNap (1-nap routine_schedule, cut-short matrix)", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: 20m car: comeback +2h45m floor
@@ -1551,7 +1554,7 @@ describe("Oskar OneNap (1-nap routine_schedule, cut-short matrix)", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: 35m cs: just-after at 12:05 (cont open)
@@ -1566,7 +1569,7 @@ describe("Oskar OneNap (1-nap routine_schedule, cut-short matrix)", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: closes 12:30 cap 13:23
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: 35m cs: 1h later
@@ -1581,7 +1584,7 @@ describe("Oskar OneNap (1-nap routine_schedule, cut-short matrix)", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: 35m cs: at expected comeback +2h45m
@@ -1596,7 +1599,7 @@ describe("Oskar OneNap (1-nap routine_schedule, cut-short matrix)", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: 35m cs: skipped comeback +5h
@@ -1611,7 +1614,7 @@ describe("Oskar OneNap (1-nap routine_schedule, cut-short matrix)", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: 55m cs: just-after 12:30 (cont open)
@@ -1716,7 +1719,7 @@ describe("Oskar OneNap (1-nap routine_schedule, cut-short matrix)", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: no wake set yet (returns null)
@@ -2024,7 +2027,7 @@ describe("Eli Emerging (emerging_rhythm)", () => {
         now: 19:45
         inputs: wake=06:00 done=[17:00-17:45, 14:30-15:20, 11:00-11:50, 08:00-08:50] active=19:30(night) target=19:45
         strategy: emerging_rhythm
-        nextNap: 19:45 (+00m)
+        nextNap: none
         bedtime: 19:45 (+00m)
         predictedNaps: none
         napsAllDone: true (4 expected)
@@ -2876,7 +2879,7 @@ describe("settings sweep: Oskar × target_bedtime", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: 13:30 right after full nap
@@ -2921,7 +2924,7 @@ describe("settings sweep: Oskar × target_bedtime", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       ══ setting: target=18:00 (early) ══
@@ -2938,7 +2941,7 @@ describe("settings sweep: Oskar × target_bedtime", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: 13:30 right after full nap
@@ -2983,7 +2986,7 @@ describe("settings sweep: Oskar × target_bedtime", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       ══ setting: target=19:30 (baseline) ══
@@ -3000,7 +3003,7 @@ describe("settings sweep: Oskar × target_bedtime", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: 13:30 right after full nap
@@ -3045,7 +3048,7 @@ describe("settings sweep: Oskar × target_bedtime", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       ══ setting: target=21:00 (late) ══
@@ -3062,7 +3065,7 @@ describe("settings sweep: Oskar × target_bedtime", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m
 
       scenario: 13:30 right after full nap
@@ -3107,7 +3110,7 @@ describe("settings sweep: Oskar × target_bedtime", () => {
         expectedNightEnd: none
         rescueNap: none
         continuationWindow: none
-        confidence: medium (1 napRanges)
+        confidence: high (1 napRanges)
         learned: nap=113m night=630m ww=300m bedww=370m"
     `);
   });
@@ -3243,7 +3246,7 @@ describe("cross-archetype shared scenarios", () => {
         now: 22:30
         inputs: wake=06:00 active=22:00(night) target=19:45
         strategy: emerging_rhythm
-        nextNap: 19:00 (-3h 30m)
+        nextNap: none
         bedtime: 19:00 (-3h 30m)
         predictedNaps: none
         napsAllDone: true (4 expected)
@@ -3286,7 +3289,7 @@ describe("cross-archetype shared scenarios", () => {
         now: 22:30
         inputs: wake=06:30 active=22:00(night) target=19:15
         strategy: routine_schedule
-        nextNap: 19:00 (-3h 30m)
+        nextNap: none
         bedtime: 19:00 (-3h 30m)
         predictedNaps: none
         napsAllDone: true (3 expected)
@@ -3325,7 +3328,7 @@ describe("cross-archetype shared scenarios", () => {
         now: 22:30
         inputs: wake=06:00 active=22:00(night) target=19:30
         strategy: routine_schedule
-        nextNap: 19:00 (-3h 30m)
+        nextNap: none
         bedtime: 19:00 (-3h 30m)
         predictedNaps: none
         napsAllDone: true (1 expected)
@@ -3364,7 +3367,7 @@ describe("cross-archetype shared scenarios", () => {
         now: 22:30
         inputs: wake=06:00 active=22:00(night) target=none
         strategy: routine_schedule
-        nextNap: 19:00 (-3h 30m)
+        nextNap: none
         bedtime: 19:00 (-3h 30m)
         predictedNaps: none
         napsAllDone: true (2 expected)
@@ -3415,7 +3418,7 @@ describe("cross-archetype shared scenarios", () => {
         now: 22:30
         inputs: wake=06:30 active=22:00(night) target=20:00
         strategy: emerging_rhythm
-        nextNap: 19:00 (-3h 30m)
+        nextNap: none
         bedtime: 19:00 (-3h 30m)
         predictedNaps: none
         napsAllDone: true (2 expected)

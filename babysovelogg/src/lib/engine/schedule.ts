@@ -1876,9 +1876,13 @@ function getHabitualWakeTimePrediction(
   if (samples.length < 2) return null;
 
   const habitualMinute = weightedMedian(samples);
-  const predicted = new Date(start);
-  predicted.setUTCDate(predicted.getUTCDate() + 1);
-  const wakeDate = isoToDateInTz(predicted.toISOString(), ctx.tz);
+  // The morning wake lands on the NEXT local day for an evening bedtime, but
+  // on the SAME local day for a post-midnight start (e.g. a 00:30 night wakes
+  // that same morning). Keying off `start`'s local hour instead of blindly
+  // adding a UTC day avoids predicting the wake ~24h late (deep-review bug #6).
+  const startLocalDate = isoToDateInTz(start.toISOString(), ctx.tz);
+  const startHour = getHourInTz(start, ctx.tz);
+  const wakeDate = startHour >= 12 ? addLocalDay(startLocalDate) : startLocalDate;
   const candidate = setLocalClockTime(wakeDate, habitualMinute, ctx.tz);
   return candidate.getTime();
 }
@@ -1914,6 +1918,14 @@ function getLocalMinuteOfDay(date: Date, tz: string): number {
   const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
   const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
   return hour * 60 + minute;
+}
+
+/** Advance a YYYY-MM-DD local-date string by one calendar day. Anchored at
+ *  UTC noon so the increment can't slip across a date boundary on DST days. */
+function addLocalDay(dateStr: string): string {
+  const d = new Date(`${dateStr}T12:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
 }
 
 function setLocalClockTime(dateStr: string, minuteOfDay: number, tz: string): Date {

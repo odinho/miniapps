@@ -140,7 +140,13 @@ function getNapWakeWindowStats(
     return { globalSD: fallbackSD, positionalSDs: [], dataPoints: 0 };
   }
 
-  // Group by day, collect gaps before naps by position
+  // Group by start-anchored local day, then collect wake→nap gaps by position.
+  // The morning overnight that ends *this* morning is start-anchored to
+  // YESTERDAY's bucket, so position 0's gap (morning wake → nap1) has to be
+  // anchored to the previous day's last night end — mirroring schedule.ts's
+  // `morningWakeMs`. Without it, the first gap measured inside today's bucket
+  // is nap1→nap2 and every positional SD is shifted by one (Codex/Claude
+  // 2026-06-12 deep-review bug #1).
   const byDay = new Map<string, SleepEntry[]>();
   for (const s of recentSleeps) {
     if (!s.end_time) continue;
@@ -148,19 +154,37 @@ function getNapWakeWindowStats(
     if (!byDay.has(day)) byDay.set(day, []);
     byDay.get(day)!.push(s);
   }
+  const sortedDayKeys = [...byDay.keys()].toSorted();
+  for (const [day, list] of byDay) {
+    byDay.set(day, list.toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()));
+  }
+  const morningWakeMs = (dayKey: string): number | null => {
+    const idx = sortedDayKeys.indexOf(dayKey);
+    if (idx <= 0) return null;
+    const prev = byDay.get(sortedDayKeys[idx - 1]);
+    if (!prev) return null;
+    for (let k = prev.length - 1; k >= 0; k--) {
+      if (prev[k].type === "night") return new Date(prev[k].end_time!).getTime();
+    }
+    return null;
+  };
 
   const gapsByPosition = new Map<number, number[]>();
   const allGaps: number[] = [];
 
-  for (const daySleeps of byDay.values()) {
-    const sorted = [...daySleeps]
-      .filter((s) => s.end_time)
-      .toSorted((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+  for (const dayKey of sortedDayKeys) {
+    const daySleeps = byDay.get(dayKey)!;
+    const priorEndMs = morningWakeMs(dayKey);
 
     let napPos = 0;
-    for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i].type !== "nap") continue;
-      const gapMin = (new Date(sorted[i].start_time).getTime() - new Date(sorted[i - 1].end_time!).getTime()) / 60_000;
+    for (let i = 0; i < daySleeps.length; i++) {
+      if (daySleeps[i].type !== "nap") continue;
+      const prevEndMs = i === 0 ? priorEndMs : new Date(daySleeps[i - 1].end_time!).getTime();
+      if (prevEndMs == null) {
+        napPos++;
+        continue;
+      }
+      const gapMin = (new Date(daySleeps[i].start_time).getTime() - prevEndMs) / 60_000;
       if (gapMin >= 10 && gapMin <= 480) {
         if (!gapsByPosition.has(napPos)) gapsByPosition.set(napPos, []);
         gapsByPosition.get(napPos)!.push(gapMin);

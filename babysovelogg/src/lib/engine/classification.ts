@@ -1,4 +1,5 @@
 import { getExpectedNapCount } from "./schedule.js";
+import { getHourInTz } from "$lib/tz.js";
 import type { SleepLogRow } from "$lib/types.js";
 
 /** Simple hour-based classification fallback. */
@@ -38,13 +39,16 @@ export function classifySleepType(
 }
 
 /** Check if a completed sleep should be reclassified as night based on duration and start time.
- *  Sleeps >6h starting after 17:00 are almost certainly night sleeps. */
-export function shouldReclassifyAsNight(startTime: string, endTime: string): boolean {
+ *  Sleeps >6h starting after 17:00 are almost certainly night sleeps.
+ *  `tz` is the household/baby timezone — without it a UTC server reads the
+ *  start hour in process-local time and fails to reclassify an evening sleep
+ *  that started 17:00–18:59 Oslo (see [[feedback_server_tz]]). */
+export function shouldReclassifyAsNight(startTime: string, endTime: string, tz?: string): boolean {
   const start = new Date(startTime);
   const end = new Date(endTime);
   const durationMs = end.getTime() - start.getTime();
   const durationHours = durationMs / (1000 * 60 * 60);
-  const startHour = start.getHours();
+  const startHour = tz ? getHourInTz(start, tz) : start.getHours();
   return durationHours > 6 && startHour >= 17;
 }
 

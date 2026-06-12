@@ -125,6 +125,14 @@ describe("shouldReclassifyAsNight", () => {
   it("exactly 6h starting at 17:00 → no reclassify (not > 6h)", () => {
     expect(shouldReclassifyAsNight("2026-03-27T17:00:00.000Z", "2026-03-27T23:00:00.000Z")).toBe(false);
   });
+
+  // Server-TZ leak (deep-review bug #3): a 7.5h sleep that starts 17:30 Oslo
+  // is 15:30Z in June (CEST +2). On a UTC server the bare-hour read sees 15
+  // and refuses to reclassify; passing baby tz reads the real local hour.
+  it("evening Oslo sleep (15:30Z = 17:30 local) → reclassify only with tz", () => {
+    expect(shouldReclassifyAsNight("2026-06-01T15:30:00.000Z", "2026-06-01T23:00:00.000Z")).toBe(false);
+    expect(shouldReclassifyAsNight("2026-06-01T15:30:00.000Z", "2026-06-01T23:00:00.000Z", "Europe/Oslo")).toBe(true);
+  });
 });
 
 // --- calcPauseMs ---

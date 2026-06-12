@@ -7,6 +7,7 @@ import {
   getExpectedNapCount,
   predictDayNaps,
   decomposeFirstNapPrediction,
+  predictNightEndTime,
   recommendBedtime,
   detectNapTransition,
   findByAge,
@@ -58,6 +59,38 @@ describe("calculateAgeMonths", () => {
       expect(calculateAgeMonths(birthdate, now)).toBe(expected);
     });
   }
+});
+
+// --- predictNightEndTime: habitual-wake day anchoring ---
+
+describe("predictNightEndTime habitual wake", () => {
+  // Deep-review bug #6: a post-midnight night start (00:30 local) wakes the
+  // SAME local morning, not the next day. The old `setUTCDate(+1)` pushed the
+  // habitual wake ~24h out (masked by the 360–900 min clamp landing it mid-day).
+  it("post-midnight start wakes the same local morning, not a day late", () => {
+    const nights: SleepEntry[] = [];
+    for (let d = 1; d <= 6; d++) {
+      nights.push({
+        start_time: `2026-06-0${d}T17:30:00.000Z`, // 19:30 Oslo
+        end_time: `2026-06-0${d + 1}T04:45:00.000Z`, // 06:45 Oslo, rock-stable
+        type: "night",
+      });
+    }
+    const c: BabyContext = {
+      birthdate: "2025-09-12", ageMonths: 9, tz: "Europe/Oslo",
+      customNapCount: null, recentSleeps: nights,
+    };
+
+    // Active night starts 00:30 Oslo on 2026-06-08 (= 22:30Z on 06-07).
+    const startIso = "2026-06-07T22:30:00.000Z";
+    const endMs = new Date(predictNightEndTime(startIso, c)).getTime();
+    const deltaHours = (endMs - new Date(startIso).getTime()) / 3_600_000;
+
+    // ~06:45 Oslo same morning is ~6.25h after 00:30 — habitual-dominated blend
+    // lands well under 10h. The bug clamped it to start+15h.
+    expect(deltaHours).toBeLessThan(10);
+    expect(deltaHours).toBeGreaterThan(4);
+  });
 });
 
 // --- findByAge ---

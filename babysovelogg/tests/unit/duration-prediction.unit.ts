@@ -204,7 +204,7 @@ describe("duration and wake-time prediction", () => {
 
 describe("confidence interval coverage", () => {
   it("±1 SD ranges contain a reasonable fraction of actuals", () => {
-    expect(renderCIcoverage()).toMatchInlineSnapshot(`"115/181 naps within ±1 SD range (64%)"`);
+    expect(renderCIcoverage()).toMatchInlineSnapshot(`"138/181 naps within ±1 SD range (76%)"`);
 
     // Ranges are ±1 SD so ~68% coverage expected if well-calibrated.
     // We accept ≥40% as a floor — below that the ranges are meaningless.

@@ -102,10 +102,10 @@ describe("confidence intervals", () => {
     });
 
     expect(snapshots.join("\n")).toMatchInlineSnapshot(`
-      "day 10 (7mo): level=low, nap SDs=[28/45], bed SD=55, data=7d
-      day 30 (7mo): level=low, nap SDs=[25/47], bed SD=25, data=7d
-      day 50 (8mo): level=low, nap SDs=[33/49], bed SD=30, data=7d
-      day 70 (9mo): level=low, nap SDs=[15], bed SD=82, data=7d"
+      "day 10 (7mo): level=low, nap SDs=[39/55], bed SD=55, data=7d
+      day 30 (7mo): level=low, nap SDs=[36/47], bed SD=25, data=7d
+      day 50 (8mo): level=low, nap SDs=[32/49], bed SD=30, data=7d
+      day 70 (9mo): level=low, nap SDs=[91], bed SD=82, data=7d"
     `);
   });
 
@@ -146,6 +146,44 @@ describe("confidence intervals", () => {
     const censored = sd2(withCutShort);
     const uncensored = sd2(withoutLabels);
     expect(censored).toBeLessThan(uncensored);
+  });
+
+  // Pin: positional SDs are aligned to the same nap positions schedule.ts
+  // uses. Position 0 must measure morning-wake → nap1, NOT nap1 → nap2. The
+  // morning overnight is start-anchored to yesterday's day bucket, so a naive
+  // per-day loop shifts every position by one (deep-review bug #1). Here the
+  // first WW is rock-stable (nap1 at 09:30 sharp) while the second gap swings
+  // wildly — an aligned reading gives nap0 a tight band.
+  it("positional SD aligns position 0 to the morning wake window", () => {
+    const sleeps: SleepEntry[] = [];
+    for (let d = 1; d <= 6; d++) {
+      const day = `2026-06-0${d}`;
+      sleeps.push({
+        start_time: `2026-06-0${d - 1 === 0 ? d : d - 1}T17:30:00.000Z`,
+        end_time: `${day}T05:00:00.000Z`, // 07:00 Oslo, stable
+        type: "night",
+      });
+      sleeps.push({
+        start_time: `${day}T07:30:00.000Z`, // 09:30 Oslo, stable → first WW ~150m
+        end_time: `${day}T09:00:00.000Z`,
+        type: "nap",
+      });
+      const startH = d % 2 === 0 ? 11 : 13; // nap2 start swings 13:00 vs 15:00 Oslo
+      sleeps.push({
+        start_time: `${day}T${String(startH).padStart(2, "0")}:00:00.000Z`,
+        end_time: `${day}T${String(startH + 1).padStart(2, "0")}:00:00.000Z`,
+        type: "nap",
+      });
+    }
+    const naps = [
+      { startTime: "2026-06-07T07:30:00.000Z", endTime: "2026-06-07T09:00:00.000Z" },
+      { startTime: "2026-06-07T12:00:00.000Z", endTime: "2026-06-07T13:00:00.000Z" },
+    ];
+
+    const conf = computeConfidence(naps, "2026-06-07T17:30:00.000Z", 10, sleeps, TZ);
+
+    expect(conf.napRanges[0].startRange.sdMinutes).toBe(10); // floored — stable first WW
+    expect(conf.napRanges[1].startRange.sdMinutes).toBeGreaterThan(60); // wild second gap
   });
 });
 

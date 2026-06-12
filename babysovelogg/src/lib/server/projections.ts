@@ -123,7 +123,7 @@ export function applyEvent(event: AppEvent): void {
       }
       // Auto-reclassify long evening sleeps as night (B23)
       const sleep = db.prepare("SELECT start_time, type FROM sleep_log WHERE domain_id = ?").get(payload.sleepDomainId) as { start_time: string; type: string } | undefined;
-      if (sleep && sleep.type === "nap" && shouldReclassifyAsNight(sleep.start_time, payload.endTime as string)) {
+      if (sleep && sleep.type === "nap" && shouldReclassifyAsNight(sleep.start_time, payload.endTime as string, getFamilyTimezone())) {
         db.prepare("UPDATE sleep_log SET type = 'night' WHERE domain_id = ?").run(payload.sleepDomainId);
       }
       break;
@@ -189,7 +189,7 @@ export function applyEvent(event: AppEvent): void {
     case "sleep.manual": {
       let manualType = (payload.type as string) || "nap";
       // Auto-reclassify long evening sleeps as night (B23)
-      if (manualType === "nap" && payload.endTime && shouldReclassifyAsNight(payload.startTime as string, payload.endTime as string)) {
+      if (manualType === "nap" && payload.endTime && shouldReclassifyAsNight(payload.startTime as string, payload.endTime as string, getFamilyTimezone())) {
         manualType = "night";
       }
       db.prepare(

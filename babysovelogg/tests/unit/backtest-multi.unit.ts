@@ -66,7 +66,7 @@ describe("multi-baby backtest", () => {
       3mo: 23 days, count 17% (4/23), naps 6.2p/7.0a, nap MAE 552, dur MAE 31.6, bed MAE 488.5, wake MAE 731.7, nap bias +552, count bias -0.78, cycle 23/0/0 (l/m/h), cut-short 0
       4mo: 19 days, count 0% (0/19), naps 5.1p/7.2a, nap MAE 366, dur MAE 32.1, bed MAE 459.2, wake MAE 457.2, nap bias +361.5, count bias -2.05, cycle 19/0/0 (l/m/h), cut-short 0
       5mo: 13 days, count 8% (1/13), naps 4.4p/6.5a, nap MAE 582.7, dur MAE 31, bed MAE 1312.3, wake MAE 916.7, nap bias +582.2, count bias -2.08, cycle 13/0/0 (l/m/h), cut-short 0
-      6mo: 17 days, count 35% (6/17), naps 5.0p/6.4a, nap MAE 316.8, dur MAE 37.8, bed MAE 999.5, wake MAE 434.9, nap bias +312.1, count bias -1.41, cycle 17/0/0 (l/m/h), cut-short 0
+      6mo: 17 days, count 35% (6/17), naps 5.0p/6.4a, nap MAE 316.8, dur MAE 37.8, bed MAE 999.5, wake MAE 435.7, nap bias +312.1, count bias -1.41, cycle 17/0/0 (l/m/h), cut-short 0
       7mo: 28 days, count 68% (19/28), naps 3.3p/3.1a, nap MAE 107.7, dur MAE 25.2, bed MAE 83.6, wake MAE 58.8, nap bias +63, count bias +0.11, cycle 28/0/0 (l/m/h), cut-short 0
       8mo: 31 days, count 77% (24/31), naps 2.9p/2.9a, nap MAE 27.1, dur MAE 20.1, bed MAE 25.2, wake MAE 22.2, nap bias +11.4, count bias -0.03, cycle 31/0/0 (l/m/h), cut-short 0
       9mo: 28 days, count 75% (21/28), naps 2.8p/2.7a, nap MAE 28, dur MAE 20.4, bed MAE 29.4, wake MAE 22.2, nap bias +3.6, count bias +0.11, cycle 28/0/0 (l/m/h), cut-short 0

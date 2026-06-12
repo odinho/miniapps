@@ -558,8 +558,13 @@ function derivePostPlanFields(input: PostPlanInput): PostPlanOutput {
     napSkipped, nextNap, bedtime, now, ctx.ageMonths,
   );
 
+  // During an active night the baby is already down for the night, so there
+  // is no actionable next-step — bedtime has passed and surfacing it as
+  // `nextNap` produces a time in the past (e.g. "next nap 19:00 (-3h 30m)" at
+  // 22:30). Keep `expectedNightEnd` as the live signal instead.
+  const activeNight = activeSleep?.type === "night" && !activeSleep.end_time;
   if (napsAllDone) {
-    nextNap = bedtime;
+    nextNap = activeNight ? null : bedtime;
     predictedNaps = null;
   }
 

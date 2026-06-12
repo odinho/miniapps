@@ -20,29 +20,41 @@ own design pass.
 
 ### Verified bugs
 
-- **Confidence positional SDs off by one nap position.**
-  `confidence.ts:getNapWakeWindowStats` buckets by start-anchored local
-  date, so the morning overnight (which carries the wake→nap1 gap) lives
-  in *yesterday's* bucket and position 0 actually measures nap1→nap2.
-  `napRanges[0]` then shows the second gap's variance — repro in
-  `local/review-confidence-offbyone.ts` (stable 150 min first WW renders
-  SD 66). Schedule.ts gets this right via `morningWakeMs`; fix by
-  reusing that, or fold into the shared-evidence refactor below.
-- **Active night emits `nextNap`/`bedtime` in the past.** With an
-  active night, `derivePostPlanFields` sets `napsAllDone` and
-  `nextNap = bedtime` (state.ts:551-564) — at 22:30 that's
-  `nextNap: 19:00 (-3h 30m)`, pinned in `engine-scenarios.unit.ts`
-  ("active night at 22:30" snapshot). Contract should emit no
-  actionable next-step during an active night (keep `expectedNightEnd`).
-- **Server-TZ leaks into classification.**
-  `shouldReclassifyAsNight` uses `start.getHours()` (process TZ) and is
-  called from `projections.ts:126,192` — on a UTC server a >6h sleep
-  starting 17:00–18:59 Oslo is *not* reclassified as night.
-  `classifySleepType`/`classifySleepTypeByHour` default to
+**Landed 2026-06-12** (4 of 6 — quick units first, Codex pair-reviewed):
+
+- ~~**Confidence positional SDs off by one nap position.**~~ Fixed in
+  `confidence.ts:getNapWakeWindowStats` by mirroring schedule.ts's
+  `morningWakeMs` — position 0 now anchors to the previous day's last
+  night end (wake→nap1) instead of nap1→nap2. ±1 SD coverage on the
+  Halldis fixture rose 64% → 76% (closer to the 68% ideal). Regression
+  pinned in `confidence.unit.ts` ("positional SD aligns position 0…").
+- ~~**Active night emits `nextNap`/`bedtime` in the past.**~~ Fixed in
+  `derivePostPlanFields`: during an active night `nextNap = null` (no
+  actionable next-step; `expectedNightEnd` is the live signal). The
+  non-active-night `napsAllDone` collapse to bedtime is unchanged.
+  I-7 invariant in `engine-scenarios.unit.ts` rewritten to pin it.
+  Verified: Timer's active-sleep branch returns before reading
+  `nextNap`, so the change is display-safe.
+- ~~**Server-TZ leaks into `shouldReclassifyAsNight`.**~~ Fixed: it now
+  takes an optional `tz` and reads `getHourInTz`; both `projections.ts`
+  call sites pass `getFamilyTimezone()`. Strict improvement over the
+  unconditional `start.getHours()` and consistent with the established
+  replay-determinism contract (`baby.created` seeds `family.timezone`
+  before any sleep event; null falls back without persisting).
+  Regression pinned in `classification.unit.ts`. STILL OPEN within this
+  bug: `classifySleepType`/`classifySleepTypeByHour` default to
   `new Date().getHours()` (client local — OK in practice but not
-  baby.timezone), and `calculateAgeMonths` +
-  `computeStrategySignals` use process-local calendar fields. Thread
-  baby tz / explicit local hour everywhere (see [[feedback_server_tz]]).
+  baby.timezone), and `calculateAgeMonths` + `computeStrategySignals`
+  use process-local calendar fields. Thread baby tz there too
+  (see [[feedback_server_tz]]).
+- ~~**Habitual wake off by a day for post-midnight bedtimes.**~~ Fixed
+  in `getHabitualWakeTimePrediction`: wake date keys off the start's
+  local hour (`>= 12` → next local day, else same morning) instead of
+  an unconditional `setUTCDate(+1)`. New DST-safe `addLocalDay` helper.
+  Regression pinned in `schedule.unit.ts`.
+
+**Still open (2 of 6):**
+
 - **Pause-aware duration math inconsistent across consumers** (Codex).
   State threads night wakings as pauses and stats/napBudget net them
   out, but: schedule's `buildCache` drops pauses, `getLearnedNightDuration`
@@ -59,11 +71,6 @@ own design pass.
   `habitualMs > currentWake` guard then drops it). Plans should carry
   absolute day positions and be *consumed*, not re-generated with a
   shrunken count.
-- **Habitual wake prediction off by a day for post-midnight bedtimes.**
-  `getHabitualWakeTimePrediction` (schedule.ts:1871-1884) does
-  `setUTCDate(+1)` from the night start; a night starting 00:30 local
-  resolves the wake to the *next* local date (~24h late), partially
-  masked by the 360–900 min clamp. Rare but wrong direction.
 
 ### Architecture: big simplification candidates (each its own unit)
 
