@@ -15,6 +15,7 @@ import {
   recommendBedtime,
 } from "./schedule.js";
 import {
+  coalesceNightFragments,
   computeRollingSleepStats,
   computeLongestStretchTrend,
   computeSleepPressure,
@@ -64,9 +65,11 @@ export function predictEmerging(input: EmergingContext): EmergingPrediction {
   const { ctx, todaySleeps, wakeUpTime, lastSleepEndMs } = input;
   const now = input.now ?? Date.now();
 
-  // Always compute context data (useful regardless of schedule confidence)
-  const rolling = computeRollingSleepStats(ctx.recentSleeps, ctx.tz, now);
-  const trend = computeLongestStretchTrend(ctx.recentSleeps, ctx.tz, now);
+  // Context-card metrics treat a fragmented night as one logical night (see
+  // predictNewborn). Schedule learning below still uses raw rows.
+  const coalesced = coalesceNightFragments(ctx.recentSleeps);
+  const rolling = computeRollingSleepStats(coalesced, ctx.tz, now);
+  const trend = computeLongestStretchTrend(coalesced, ctx.tz, now);
   const ageNorms = getAgeNorms(ctx.ageMonths);
 
   // Compute per-position nap start consistency from recent data
@@ -109,7 +112,7 @@ export function predictEmerging(input: EmergingContext): EmergingPrediction {
   let sleepPressure: "low" | "rising" | "high" | null = null;
 
   if (lastSleepEndMs !== null) {
-    const wws = extractWakeWindows(ctx.recentSleeps);
+    const wws = extractWakeWindows(coalesced);
     const window = computeSleepWindow(lastSleepEndMs, wws, ctx.ageMonths);
     // Same invariant as newborn: earliest ≥ now − 15 min.
     const graceMs = 15 * 60_000;

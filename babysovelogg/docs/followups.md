@@ -857,15 +857,20 @@ logging models produce identical `longestStretch`/`totalSleep24h`.
   night) resolve to now; overlapping wakings are merged so they can't
   double-count. Benefits emerging too (shared helper). Codex review caught the
   open-waking + overlap edges before commit.
-- ⬜ **Unit 2 — overlap-safe 24h total.** `computeRollingSleepStats` still sums
-  per-episode net duration, so two *separate* overlapping episodes (Umi's id5
-  480m night fully containing the id7 05:00→07:00 night) double-count. Replace
-  the per-episode sum with a union over asleep sub-intervals (episode minus
-  pauses), clipped to the 24h window.
-- ⬜ **Unit 3 — read-side coalescing.** Coalesce adjacent `night` episodes with
-  a short awake gap into one logical night with the gaps as derived pauses,
-  applied at the newborn + emerging engine entry. Acceptance test: the two
-  logging models produce identical `longestStretch`/`totalSleep24h`.
+- ✅ **Unit 2 — overlap-safe 24h total.** `computeRollingSleepStats` now unions
+  asleep sub-intervals (episode minus pauses, clipped to the window) instead of
+  summing per-episode, so two *separate* overlapping rows (Umi's id5 480m night
+  containing the id7 05:00→07:00 night) count once. `episodeCount`/
+  `meanEpisodeDuration` stay per-row (documented on `RollingSleepStats`).
+- ✅ **Unit 3 — read-side coalescing.** `coalesceNightFragments` merges adjacent
+  `night` rows with an awake gap < `NIGHT_COALESCE_GAP_MIN` (60m) into one
+  logical night, gaps becoming derived pauses; applied at both the newborn
+  (`predictNewborn`, all metric inputs) and emerging (`predictEmerging`,
+  display metrics only) engine entries. Invariant test pins that fragmented and
+  consolidated logging yield identical `longestStretch`/`totalSleep24h`.
+  Verified on Umi's prod db: episodeCount 11→9, total unchanged (sleep-
+  preserving). Codex confirmed open-fragment safety, the 60m threshold,
+  identity inheritance, and that `computeExpectedDuration` needs no change.
 
 Deferred (not in these three units):
 - Extract ONE shared pause/segment helper for `features.ts` + `stats.ts`

@@ -353,6 +353,54 @@ export function computeStrategySignals(
   };
 }
 
+/**
+ * Max awake gap (minutes) between two `night` rows for them to read as one
+ * logical night. A feed-and-resettle waking is well under this; a longer gap
+ * is treated as a genuinely separate sleep.
+ */
+export const NIGHT_COALESCE_GAP_MIN = 60;
+
+/**
+ * Coalesce adjacent `night` episodes separated by a short awake gap into one
+ * logical night, turning each gap into a derived pause. Newborn nights are
+ * polyphasic — a parent who taps Vakne/Sove around a feed produces several
+ * `night` rows for what is really one fragmented night. Coalescing makes that
+ * read identically to "one long night + night_wakings" for the metrics.
+ *
+ * Pure. Non-night entries pass through and break a night run. Overlapping
+ * rows (negative gap) are left alone — the 24h total unions them, and merging
+ * an overlap into a derived pause would be wrong. A trailing open fragment
+ * keeps the logical night open.
+ */
+export function coalesceNightFragments(
+  sleeps: SleepEntry[],
+  gapThresholdMin = NIGHT_COALESCE_GAP_MIN,
+): SleepEntry[] {
+  const sorted = sleeps.toSorted(
+    (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
+  );
+  const out: SleepEntry[] = [];
+  for (const s of sorted) {
+    const prev = out[out.length - 1];
+    if (prev && prev.type === "night" && s.type === "night" && prev.end_time != null) {
+      const gapMs = new Date(s.start_time).getTime() - new Date(prev.end_time).getTime();
+      if (gapMs >= 0 && gapMs < gapThresholdMin * 60_000) {
+        const pauses = [...(prev.pauses ?? []), ...(s.pauses ?? [])];
+        if (gapMs > 0) pauses.push({ pause_time: prev.end_time, resume_time: s.start_time });
+        out[out.length - 1] = {
+          ...prev,
+          end_time: s.end_time,
+          pauses,
+          woke_by: s.woke_by ?? prev.woke_by,
+        };
+        continue;
+      }
+    }
+    out.push({ ...s });
+  }
+  return out;
+}
+
 // ─── Newborn engine helpers ───────────────────────────────────────────────────
 
 /**

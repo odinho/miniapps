@@ -1770,7 +1770,7 @@ describe("Nora Newborn (newborn_guidance)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 06:45–07:45
+        sleepWindow: 06:45–07:40
         sleepPressure: high
 
       scenario: 09:00 fed and active
@@ -1786,8 +1786,8 @@ describe("Nora Newborn (newborn_guidance)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 08:50–09:50
-        sleepPressure: rising
+        sleepWindow: 08:55–09:50
+        sleepPressure: low
 
       scenario: 10:30 active nap
         now: 10:30
@@ -1802,7 +1802,7 @@ describe("Nora Newborn (newborn_guidance)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 10:15–11:15
+        sleepWindow: 10:15–11:10
         sleepPressure: high
 
       scenario: 12:30 just woke from second nap
@@ -1818,7 +1818,7 @@ describe("Nora Newborn (newborn_guidance)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 12:15–13:15
+        sleepWindow: 12:15–13:10
         sleepPressure: high
 
       scenario: 16:00 mid-afternoon
@@ -1834,7 +1834,7 @@ describe("Nora Newborn (newborn_guidance)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 15:45–16:45
+        sleepWindow: 15:45–16:40
         sleepPressure: high
 
       scenario: 20:00 evening, sleep window opens
@@ -1850,7 +1850,7 @@ describe("Nora Newborn (newborn_guidance)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 19:45–20:45
+        sleepWindow: 19:45–20:40
         sleepPressure: high
 
       scenario: 22:00 active night sleep
@@ -1866,7 +1866,7 @@ describe("Nora Newborn (newborn_guidance)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 21:45–22:45
+        sleepWindow: 21:45–22:40
         sleepPressure: high
 
       scenario: no wake set: still produces newborn output
@@ -1882,7 +1882,7 @@ describe("Nora Newborn (newborn_guidance)", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 07:45–08:45
+        sleepWindow: 07:45–08:40
         sleepPressure: high"
     `);
   });
@@ -3183,7 +3183,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 09:45–10:45
+        sleepWindow: 09:45–10:40
         sleepPressure: high
 
       scenario: active night at 22:30
@@ -3199,7 +3199,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 22:15–23:15
+        sleepWindow: 22:15–23:10
         sleepPressure: high
 
       scenario: midday no sleeps logged at 13:00
@@ -3215,7 +3215,7 @@ describe("cross-archetype shared scenarios", () => {
         rescueNap: none
         continuationWindow: none
         confidence: none
-        sleepWindow: 12:45–13:45
+        sleepWindow: 12:45–13:40
         sleepPressure: high
 
       ──────────

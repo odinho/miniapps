@@ -15,6 +15,7 @@
  */
 import type { SleepEntry } from "$lib/types.js";
 import {
+  coalesceNightFragments,
   computeRollingSleepStats,
   computeLongestStretchTrend,
   computeSleepPressure,
@@ -56,9 +57,13 @@ export interface NewbornContext {
 /** Run the newborn prediction engine. */
 export function predictNewborn(ctx: NewbornContext): NewbornPrediction {
   const now = ctx.now ?? Date.now();
-  const recentWakeWindows = extractWakeWindows(ctx.recentSleeps);
-  const rolling = computeRollingSleepStats(ctx.recentSleeps, ctx.tz, now);
-  const trend = computeLongestStretchTrend(ctx.recentSleeps, ctx.tz, now);
+  // A polyphasic night logged as several `night` rows reads as one logical
+  // night with derived wakings, so fragmented and "one long night + waking"
+  // logging converge on the same stats.
+  const sleeps = coalesceNightFragments(ctx.recentSleeps);
+  const recentWakeWindows = extractWakeWindows(sleeps);
+  const rolling = computeRollingSleepStats(sleeps, ctx.tz, now);
+  const trend = computeLongestStretchTrend(sleeps, ctx.tz, now);
   const ageNorms = getAgeNorms(ctx.ageMonths);
 
   // Sleep window and pressure — need a last sleep end time
@@ -89,7 +94,7 @@ export function predictNewborn(ctx: NewbornContext): NewbornPrediction {
   }
 
   // Expected duration range from recent episodes
-  const expectedDuration = computeExpectedDuration(ctx.recentSleeps, ctx.ageMonths);
+  const expectedDuration = computeExpectedDuration(sleeps, ctx.ageMonths);
 
   return {
     strategy: "newborn_guidance",

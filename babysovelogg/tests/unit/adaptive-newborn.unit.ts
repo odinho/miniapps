@@ -4,6 +4,7 @@ import {
   computeSleepWindow,
   computeRollingSleepStats,
   computeLongestStretchTrend,
+  coalesceNightFragments,
   getAgeNorms,
 } from "$lib/engine/features.js";
 import { predictNewborn } from "$lib/engine/newborn.js";
@@ -540,5 +541,109 @@ describe("computeLongestStretchTrend — pause-aware", () => {
     const trend = computeLongestStretchTrend(nights, "UTC", now);
     // Each night's longest segment is 240 (03:00–07:00), not 480.
     expect(trend.currentWeekAvg).toBe(240);
+  });
+});
+
+// ─── read-side coalescing of fragmented nights ──────────────────────────────
+
+describe("coalesceNightFragments", () => {
+  it("merges adjacent night fragments into one logical night with derived pauses", () => {
+    const fragmented = [
+      sleep("2026-03-20T23:00:00Z", "2026-03-21T02:00:00Z", "night"),
+      sleep("2026-03-21T02:45:00Z", "2026-03-21T07:00:00Z", "night"),
+    ];
+    const out = coalesceNightFragments(fragmented);
+    expect(out).toHaveLength(1);
+    expect(out[0].start_time).toBe("2026-03-20T23:00:00Z");
+    expect(out[0].end_time).toBe("2026-03-21T07:00:00Z");
+    expect(out[0].pauses).toEqual([
+      { pause_time: "2026-03-21T02:00:00Z", resume_time: "2026-03-21T02:45:00Z" },
+    ]);
+  });
+
+  it("does not merge when the awake gap exceeds the threshold", () => {
+    const separate = [
+      sleep("2026-03-20T23:00:00Z", "2026-03-21T01:00:00Z", "night"),
+      sleep("2026-03-21T03:30:00Z", "2026-03-21T07:00:00Z", "night"), // 2.5h gap
+    ];
+    expect(coalesceNightFragments(separate)).toHaveLength(2);
+  });
+
+  it("does not merge across an intervening nap", () => {
+    const withNap = [
+      sleep("2026-03-21T01:00:00Z", "2026-03-21T02:00:00Z", "night"),
+      sleep("2026-03-21T02:10:00Z", "2026-03-21T02:40:00Z", "nap"),
+      sleep("2026-03-21T02:50:00Z", "2026-03-21T05:00:00Z", "night"),
+    ];
+    expect(coalesceNightFragments(withNap)).toHaveLength(3);
+  });
+
+  it("chains three or more consecutive fragments into one night", () => {
+    const fragmented = [
+      sleep("2026-03-20T21:00:00Z", "2026-03-20T23:30:00Z", "night"),
+      sleep("2026-03-20T23:50:00Z", "2026-03-21T03:00:00Z", "night"), // 20m gap
+      sleep("2026-03-21T03:30:00Z", "2026-03-21T06:30:00Z", "night"), // 30m gap
+    ];
+    const out = coalesceNightFragments(fragmented);
+    expect(out).toHaveLength(1);
+    expect(out[0].start_time).toBe("2026-03-20T21:00:00Z");
+    expect(out[0].end_time).toBe("2026-03-21T06:30:00Z");
+    expect(out[0].pauses).toEqual([
+      { pause_time: "2026-03-20T23:30:00Z", resume_time: "2026-03-20T23:50:00Z" },
+      { pause_time: "2026-03-21T03:00:00Z", resume_time: "2026-03-21T03:30:00Z" },
+    ]);
+  });
+
+  it("merges a closed fragment into a following open one without chaining past it", () => {
+    // Active night is always the latest by start in valid data, so an open
+    // fragment ends the chain: merge into it, then stop.
+    const entries: SleepEntry[] = [
+      sleep("2026-03-21T21:00:00Z", "2026-03-21T23:30:00Z", "night"),
+      { start_time: "2026-03-21T23:50:00Z", end_time: null, type: "night" },
+    ];
+    const out = coalesceNightFragments(entries);
+    expect(out).toHaveLength(1);
+    expect(out[0].start_time).toBe("2026-03-21T21:00:00Z");
+    expect(out[0].end_time).toBeNull();
+    expect(out[0].pauses).toEqual([
+      { pause_time: "2026-03-21T23:30:00Z", resume_time: "2026-03-21T23:50:00Z" },
+    ]);
+  });
+
+  it("keeps a trailing open fragment open", () => {
+    const fragmented: SleepEntry[] = [
+      sleep("2026-03-21T23:00:00Z", "2026-03-22T00:25:00Z", "night"),
+      { start_time: "2026-03-22T00:56:00Z", end_time: null, type: "night" },
+    ];
+    const out = coalesceNightFragments(fragmented);
+    expect(out).toHaveLength(1);
+    expect(out[0].end_time).toBeNull();
+  });
+
+  it("leaves overlapping night rows alone (handled by the union total)", () => {
+    const overlapping = [
+      sleep("2026-03-20T23:00:00Z", "2026-03-21T07:00:00Z", "night"),
+      sleep("2026-03-21T05:00:00Z", "2026-03-21T07:00:00Z", "night"),
+    ];
+    expect(coalesceNightFragments(overlapping)).toHaveLength(2);
+  });
+
+  it("INVARIANT: fragmented and consolidated nights yield identical metrics", () => {
+    const now = new Date("2026-03-21T08:00:00Z").getTime();
+    // Consolidated: one night with a 45-min night_waking.
+    const consolidated = [
+      nightWithPauses("2026-03-20T23:00:00Z", "2026-03-21T07:00:00Z",
+        [["2026-03-21T02:00:00Z", "2026-03-21T02:45:00Z"]]),
+    ];
+    // Fragmented: same night logged as two rows split by that 45-min gap.
+    const fragmented = [
+      sleep("2026-03-20T23:00:00Z", "2026-03-21T02:00:00Z", "night"),
+      sleep("2026-03-21T02:45:00Z", "2026-03-21T07:00:00Z", "night"),
+    ];
+
+    const a = computeRollingSleepStats(consolidated, "UTC", now);
+    const b = computeRollingSleepStats(coalesceNightFragments(fragmented), "UTC", now);
+    expect(b.totalSleep24h).toBe(a.totalSleep24h);
+    expect(b.longestStretch).toBe(a.longestStretch);
   });
 });
