@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { appState } from '$lib/stores/app.svelte.js';
 	import { sync } from '$lib/stores/sync.svelte.js';
 	import {
@@ -26,8 +27,23 @@
 
 	// --- derived state ---
 	const s = $derived(appState.state);
-	const baby = $derived(s.baby);
-	const isOnboarding = $derived(!baby);
+	const babies = $derived(s.babies);
+	// Which child this page acts on. `?new=1` adds a child; `?baby=<id>` edits
+	// that child (the home lanes deep-link here); otherwise the primary baby
+	// (the single-baby default). Max 2 children, so no list/dropdown is needed.
+	const isCreatingNew = $derived(page.url.searchParams.get('new') === '1');
+	const requestedId = $derived(Number(page.url.searchParams.get('baby')) || null);
+	const baby = $derived(
+		isCreatingNew
+			? null
+			: requestedId != null
+				? (babies.find((b) => b.baby?.id === requestedId)?.baby ?? s.baby)
+				: s.baby,
+	);
+	const isOnboarding = $derived(babies.length === 0 && !isCreatingNew);
+	// baby.created covers both first-run onboarding and adding a 2nd child.
+	const isNew = $derived(isCreatingNew || isOnboarding);
+	const canAddChild = $derived(babies.length >= 1 && babies.length < 2);
 
 	// --- form state (initialized via $effect below) ---
 	let name = $state('');
@@ -43,7 +59,8 @@
 	let toast = $state<{ text: string; type: 'success' | 'error' | 'warning' } | null>(null);
 	let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
-	// Keep form in sync when baby data changes (e.g. after SSE update)
+	// Keep form in sync when the selected baby changes (SSE update, or switching
+	// which child is being edited). When adding a new child, start blank.
 	$effect(() => {
 		if (baby) {
 			name = baby.name;
@@ -53,6 +70,14 @@
 			trackDiaperEnabled = baby.track_diaper === 1;
 			targetBedtime = baby.target_bedtime;
 			bedtimeEnabled = !!baby.target_bedtime;
+		} else if (isCreatingNew) {
+			name = '';
+			birthdate = '';
+			selectedNapCount = null;
+			pottyEnabled = false;
+			trackDiaperEnabled = false;
+			targetBedtime = null;
+			bedtimeEnabled = false;
 		}
 	});
 
@@ -168,7 +193,7 @@
 				trackDiaper: trackDiaperEnabled,
 				targetBedtime: bedtimeEnabled ? (targetBedtime || '19:00') : null,
 			},
-			isOnboarding,
+			isNew,
 			baby?.id,
 		);
 
@@ -228,8 +253,39 @@
 			<p style="color: var(--text-light); margin-bottom: 24px;">
 				Fortel oss om den vesle, så kjem me i gang.
 			</p>
+		{:else if isCreatingNew}
+			<h1>Legg til barn</h1>
 		{:else}
-			<h1>Innstillingar</h1>
+			<h1>Innstillingar{#if babies.length > 1 && baby}<span style="color: var(--text-light); font-weight: normal;"> · {baby.name}</span>{/if}</h1>
+		{/if}
+
+		<!-- Child tabs + add-child entry. Hidden during first-run onboarding.
+		     Max 2 children, so this is "this one / the other / add one" — no list. -->
+		{#if !isOnboarding && (babies.length > 1 || isCreatingNew || canAddChild)}
+			<div class="type-pills" style="margin-bottom: 16px;" data-testid="child-tabs">
+				{#if babies.length > 1 || isCreatingNew}
+					{#each babies as b (b.baby?.id)}
+						<button
+							class="type-pill"
+							class:active={!isCreatingNew && baby?.id === b.baby?.id}
+							onclick={() => goto(`/settings?baby=${b.baby?.id}`)}
+						>
+							{b.baby?.name}
+						</button>
+					{/each}
+				{/if}
+				{#if isCreatingNew}
+					<button class="type-pill active" disabled>+ Nytt barn</button>
+				{:else if canAddChild}
+					<button
+						class="type-pill"
+						data-testid="add-child"
+						onclick={() => goto('/settings?new=1')}
+					>
+						+ Legg til barn
+					</button>
+				{/if}
+			</div>
 		{/if}
 
 		<!-- Baby name -->
@@ -341,7 +397,7 @@
 		<!-- Save button -->
 		<div style="margin-top: 24px;">
 			<button class="btn btn-primary" onclick={save} disabled={saving}>
-				{isOnboarding ? 'Kom i gang ✨' : 'Lagra'}
+				{isOnboarding ? 'Kom i gang ✨' : isCreatingNew ? 'Legg til barn' : 'Lagra'}
 			</button>
 		</div>
 
