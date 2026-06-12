@@ -119,12 +119,9 @@ own design pass.
 
 ### Smaller cleanups
 
-- Dead in prod: `engine/latency.ts` (only its own test imports it;
-  messages are English, UI is Nynorsk), `detectNapTransition`,
-  `EmergingPrediction.napConfidence`/`bedtimeConfidence`,
-  `snapToCycleBoundary`'s `_minCycles`/`_maxCycles` params.
-- `getLocalMinuteOfDay` + formatter cache duplicated 3× (schedule.ts,
-  features.ts, emerging.ts) — move to `tz.ts`.
+- `getLocalMinuteOfDay` + formatter cache duplicated 2× (schedule.ts,
+  features.ts) — move to `tz.ts`. (The emerging.ts copy was removed when
+  its dead confidence fields went; only schedule.ts + features.ts remain.)
 - `decomposeFirstNapPrediction` hand-mirrors `predictDayNaps`' first
   iteration (drift risk) — derive via an optional trace hook instead.
 - `todaySleeps.find(s => s.end_time)` as "last completed sleep"
@@ -169,8 +166,6 @@ own design pass.
   (midnight wrap inflates variance). Circular clock stats + date-aware
   cutoffs; add an engine-level DST suite (Codex #12, suspicion-grade
   for DST impact).
-- `weightedTrimmedMean` trims by sample *count*, not weight — can drop
-  the highest-weight recent samples.
 - Tunable to validate against prod data: `NAP_BUDGET.MAX_STDEV_FRACTION`
   (0.12) — normal day-to-day totals often exceed 12% CV, which silently
   nulls the trend and disables napBudget + cap-respect carve-outs.
@@ -740,13 +735,12 @@ deliberately deferred:
   last nap can become "last" because the next prediction was filtered
   out of display.
 
-- **Dead constant + scattered policy literals.**
-  `NAP_BUDGET.CYCLE_NUDGE_WINDOW_MIN` is defined but never read.
-  `FIRM_PUSH_LEAD_MIN` is defined but the scheduler hardcodes 5
-  (`src/lib/server/notification-scheduler.ts:112`). Many policy
-  thresholds (25-min continuation, 30-min rescue delay, 3-h horizon,
-  60-min stale, 18-h skip guard, 12-h overnight) live as literals in
-  `src/lib/engine/state.ts`. Consolidate into `constants.ts` or kill.
+- **Scattered policy literals.** (The two dead constants are resolved:
+  `CYCLE_NUDGE_WINDOW_MIN` was deleted; `FIRM_PUSH_LEAD_MIN` is now
+  load-bearing in `notification-scheduler.ts` instead of a literal `5`.)
+  Still open: many policy thresholds (25-min continuation, 30-min rescue
+  delay, 3-h horizon, 60-min stale, 18-h skip guard, 12-h overnight) live
+  as literals in `src/lib/engine/state.ts`. Consolidate into `constants.ts`.
 
 - **Arc time math uses browser local TZ, not baby TZ.**
   `arc-utils.ts:11,21` use `Date.getHours()`. The rest of the engine
@@ -1154,10 +1148,6 @@ These are non-bug improvements both reviewers want:
   sweep.
 - `state.unit.ts:304-792` — bug-pin regression tests (May-7, May-8, etc.)
   duplicated in the engine-scenarios paired-baseline section. Consolidate.
-- `diaper-form-actions.unit.ts:15-46`, `event-view-utils.unit.ts:13-34`,
-  `wake-sheet-actions.unit.ts:32-43`, `service-worker.unit.ts:11-67` —
-  constants-restatement / single-field-per-test anti-patterns. Delete or
-  collapse into table snapshots.
 - `arc.e2e.ts:39-56`, `prediction.e2e.ts:175-203`, `bugs.e2e.ts:148-178` —
   E2E tests that assert "settings saved" or "arc visible" but not the
   prediction *effect*.
