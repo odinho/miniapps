@@ -1,5 +1,5 @@
 import { db } from "./db.js";
-import { sendPushToBaby } from "./webpush.js";
+import { sendPushToFamily } from "./webpush.js";
 import { getPrefs, type NotificationKind } from "./notification-prefs.js";
 import { isoToDateInTz } from "$lib/tz.js";
 import type { Baby, SleepLogRow } from "$lib/types.js";
@@ -46,14 +46,24 @@ function formatTime(iso: string): string {
 }
 
 function upsert(
-  babyId: number,
+  baby: { id: number; name: string },
+  multi: boolean,
   kind: NotificationKind,
   fireAtMs: number,
   dedupeKey: string,
   payload: { title: string; body: string; data?: Record<string, unknown> },
 ): void {
+  // dedupe_key is globally UNIQUE; scope it (and the device-side notification
+  // tag) by baby so two children's same-kind, same-day notifications don't
+  // collide — one twin's "bedtime_approaching" would otherwise overwrite or
+  // collapse the other's. The id-keyed kinds are already unique, but scoping
+  // everything keeps it uniform and the tag distinct per baby.
+  const scopedKey = `b${baby.id}:${dedupeKey}`;
+  // Name the baby in the title when the family has more than one child, so a
+  // shared device knows which baby a push is about. Single-baby is untouched.
+  const title = multi ? `${baby.name}: ${payload.title}` : payload.title;
   const fireAt = new Date(fireAtMs).toISOString();
-  const payloadJson = JSON.stringify({ ...payload, tag: dedupeKey });
+  const payloadJson = JSON.stringify({ ...payload, title, tag: scopedKey });
   db.prepare(
     `INSERT INTO notification_schedule (baby_id, kind, fire_at, dedupe_key, payload_json)
      VALUES (?, ?, ?, ?, ?)
@@ -62,7 +72,7 @@ function upsert(
        payload_json = excluded.payload_json,
        cancelled_at = NULL
      WHERE notification_schedule.sent_at IS NULL`,
-  ).run(babyId, kind, fireAt, dedupeKey, payloadJson);
+  ).run(baby.id, kind, fireAt, scopedKey, payloadJson);
 }
 
 function cancelByKind(babyId: number, kind: NotificationKind): void {
@@ -82,6 +92,8 @@ export function reconcileNotifications(state: ReconcileInput): void {
   const baby = state.baby;
   if (!baby) return;
   const prefs = getPrefs(baby.id);
+  // Whether this is a multi-child family — drives baby-named push titles.
+  const multi = (db.prepare("SELECT COUNT(*) AS c FROM baby").get() as { c: number }).c > 1;
 
   const active = state.activeSleep ?? null;
   const pred = state.prediction;
@@ -112,7 +124,7 @@ export function reconcileNotifications(state: ReconcileInput): void {
     const wakeByMs = new Date(pred.napBudget.wakeBy).getTime();
     const fireAt = wakeByMs - 5 * 60_000;
     const dedupe = `nap_budget_cap:${active.domain_id}`;
-    upsert(baby.id, "nap_budget_cap", fireAt, dedupe, {
+    upsert(baby, multi, "nap_budget_cap", fireAt, dedupe, {
       title: "Tidleg vekking for å halda trenden",
       body: `Vekk kl. ${formatTime(pred.napBudget.wakeBy)} – dagens søvn ligg an til å gå over snittet`,
       data: { kind: "nap_budget_cap", sleepDomainId: active.domain_id },
@@ -126,7 +138,7 @@ export function reconcileNotifications(state: ReconcileInput): void {
     const dedupe = `rescue_wake:${active.domain_id}`;
     const fireAt =
       new Date(pred.rescueNap.recommendedWakeTime).getTime() - PRE_NOTIFY_MIN * 60_000;
-    upsert(baby.id, "rescue_wake", fireAt, dedupe, {
+    upsert(baby, multi, "rescue_wake", fireAt, dedupe, {
       title: "Vekk frå kort ekstralur",
       body: `Tilrådd å vekka kl. ${formatTime(pred.rescueNap.recommendedWakeTime)} (lett fase)`,
       data: { kind: "rescue_wake", sleepDomainId: active.domain_id },
@@ -150,7 +162,7 @@ export function reconcileNotifications(state: ReconcileInput): void {
   ) {
     const dedupe = `nap_ending_soon:${active.domain_id}`;
     const fireAt = new Date(pred.expectedNapEnd).getTime() - PRE_NOTIFY_MIN * 60_000;
-    upsert(baby.id, "nap_ending_soon", fireAt, dedupe, {
+    upsert(baby, multi, "nap_ending_soon", fireAt, dedupe, {
       title: "Luren sluttar snart",
       body: `Forventa vaknetid kl. ${formatTime(pred.expectedNapEnd)} – lett fase no`,
       data: { kind: "nap_ending_soon", sleepDomainId: active.domain_id },
@@ -163,7 +175,7 @@ export function reconcileNotifications(state: ReconcileInput): void {
   if (prefs.nap_overtime && isNappingActive && active && pred?.expectedNapEnd) {
     const dedupe = `nap_overtime:${active.domain_id}`;
     const fireAt = new Date(pred.expectedNapEnd).getTime() + OVERTIME_OFFSET_MIN * 60_000;
-    upsert(baby.id, "nap_overtime", fireAt, dedupe, {
+    upsert(baby, multi, "nap_overtime", fireAt, dedupe, {
       title: "Luren er over forventa",
       body: `Starta kl. ${formatTime(active.start_time)} – sjekk om ho bør vekkast`,
       data: { kind: "nap_overtime", sleepDomainId: active.domain_id },
@@ -178,7 +190,7 @@ export function reconcileNotifications(state: ReconcileInput): void {
     const fireAt = bedtimeMs - BEDTIME_APPROACH_MIN * 60_000;
     const localDate = isoToDateInTz(new Date(bedtimeMs).toISOString(), tz);
     const dedupe = `bedtime_approaching:${localDate}`;
-    upsert(baby.id, "bedtime_approaching", fireAt, dedupe, {
+    upsert(baby, multi, "bedtime_approaching", fireAt, dedupe, {
       title: "Leggetid snart",
       body: `Forventa kl. ${formatTime(pred.bedtime)}`,
       data: { kind: "bedtime_approaching" },
@@ -208,7 +220,7 @@ export function reconcileNotifications(state: ReconcileInput): void {
     const dedupe = rescuePlan
       ? `nap_approaching:rescue:${rescuePlan.recommendedStart}`
       : `nap_approaching:${napFireTarget}`;
-    upsert(baby.id, "nap_approaching", fireAt, dedupe, {
+    upsert(baby, multi, "nap_approaching", fireAt, dedupe, {
       title: rescuePlan ? "Kort ekstralur snart" : "Snart lurtid",
       body: rescuePlan
         ? `Hoppa over ein lur. Vurder å legge henne ned ca. kl. ${formatTime(napFireTarget)}.`
@@ -228,7 +240,7 @@ export function reconcileNotifications(state: ReconcileInput): void {
   if (prefs.continuation_open && isAwake && pred?.continuationWindow) {
     const cw = pred.continuationWindow;
     const dedupe = `continuation_open:${cw.closesAt}`;
-    upsert(baby.id, "continuation_open", Date.now(), dedupe, {
+    upsert(baby, multi, "continuation_open", Date.now(), dedupe, {
       title: "Forleng luren",
       body: `Førre lur var altfor kort. Prøv å la henne sove att — vindauget stenger ${formatTime(cw.closesAt)}.`,
       data: { kind: "continuation_open", closesAt: cw.closesAt, capLatestEnd: cw.capLatestEnd },
@@ -248,7 +260,7 @@ export function reconcileNotifications(state: ReconcileInput): void {
     const fireAt = nextNapMs + OVERDUE_OFFSET_MIN * 60_000;
     const localDate = isoToDateInTz(new Date(nextNapMs).toISOString(), tz);
     const dedupe = `nap_overdue:${localDate}:${pred.expectedNapCount - (pred.predictedNaps?.length ?? 0)}`;
-    upsert(baby.id, "nap_overdue", fireAt, dedupe, {
+    upsert(baby, multi, "nap_overdue", fireAt, dedupe, {
       title: "Lur er forsinka",
       body: `Venta kl. ${formatTime(pred.nextNap)} – søvntrykk byggjer seg opp`,
       data: { kind: "nap_overdue" },
@@ -277,7 +289,7 @@ export async function fireDueNotifications(now: Date = new Date()): Promise<numb
     due.map(async (row) => {
       try {
         const payload = JSON.parse(row.payload_json);
-        const result = await sendPushToBaby(row.baby_id, payload);
+        const result = await sendPushToFamily(payload);
         const attempts = (row.attempts ?? 0) + 1;
         // Terminal: every send either succeeded or removed a dead subscription.
         if (result.failed === 0) {

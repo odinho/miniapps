@@ -1,14 +1,11 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types.js";
-import { getCurrentBaby } from "$lib/server/db.js";
-import { sendPushToBaby } from "$lib/server/webpush.js";
+import { sendPushToFamily } from "$lib/server/webpush.js";
 
-/** Trigger a test notification for debugging. Useful after subscribing. */
+/** Trigger a test notification for debugging. Useful after subscribing. Sends
+ *  to every device in the family (the DB is a single family). */
 export const POST: RequestHandler = async () => {
-  const baby = getCurrentBaby();
-  if (!baby) return json({ error: "no_baby" }, { status: 400 });
-
-  const result = await sendPushToBaby(baby.id, {
+  const result = await sendPushToFamily({
     title: "Babysovelogg",
     body: "Varsel verkar! 👶",
     tag: "test",

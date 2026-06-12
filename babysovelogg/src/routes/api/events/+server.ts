@@ -86,7 +86,9 @@ export const POST: RequestHandler = async ({ request }) => {
     if (results.some((r) => !r.duplicate)) {
       broadcast("update", { state });
       try {
-        reconcileNotifications(state);
+        // Reconcile every baby's slice, not just the top-level alias —
+        // otherwise the non-newest child never gets notifications scheduled.
+        for (const slice of state.babies) reconcileNotifications(slice);
         // Fire any newly-due notifications (e.g. continuation-window opens
         // immediately on cut-short logging) without waiting on web-push so
         // the HTTP response stays fast. The 30s poll loop is a safety net.

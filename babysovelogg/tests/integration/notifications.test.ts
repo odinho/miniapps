@@ -168,4 +168,18 @@ describe("PUT /api/notifications/preferences", () => {
     const body = await res.json();
     expect(body.prefs.nap_overdue).toBe(true);
   });
+
+  it("are per-baby when scoped with ?baby=", async () => {
+    const ada = createBaby("Ada");
+    const bo = createBaby("Bo");
+
+    await put(`/api/notifications/preferences?baby=${ada}`, { nap_overdue: true });
+    const adaPrefs = await (await get(`/api/notifications/preferences?baby=${ada}`)).json();
+    const boPrefs = await (await get(`/api/notifications/preferences?baby=${bo}`)).json();
+
+    expect({ ada: adaPrefs.prefs.nap_overdue, bo: boPrefs.prefs.nap_overdue }).toEqual({
+      ada: true,
+      bo: false,
+    });
+  });
 });

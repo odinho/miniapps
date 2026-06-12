@@ -194,17 +194,27 @@ export const TRIGGER_LABELS: Record<NotificationKind, { title: string; hint: str
   },
 };
 
-export async function getPrefs(): Promise<{
+/** Per-baby notification prefs. Pass the baby id when a family has more than
+ *  one child so the call targets the right child (defaults to the newest). */
+const prefsUrl = (babyId?: number) =>
+  babyId != null
+    ? `/api/notifications/preferences?baby=${babyId}`
+    : "/api/notifications/preferences";
+
+export async function getPrefs(babyId?: number): Promise<{
   prefs: NotificationPrefs;
   kinds: NotificationKind[];
 } | null> {
-  const res = await fetch("/api/notifications/preferences");
+  const res = await fetch(prefsUrl(babyId));
   if (!res.ok) return null;
   return res.json();
 }
 
-export async function setPrefs(patch: Partial<NotificationPrefs>): Promise<NotificationPrefs | null> {
-  const res = await fetch("/api/notifications/preferences", {
+export async function setPrefs(
+  patch: Partial<NotificationPrefs>,
+  babyId?: number,
+): Promise<NotificationPrefs | null> {
+  const res = await fetch(prefsUrl(babyId), {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(patch),

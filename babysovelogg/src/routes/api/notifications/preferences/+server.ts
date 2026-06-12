@@ -1,6 +1,6 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types.js";
-import { getCurrentBaby } from "$lib/server/db.js";
+import { resolveBaby } from "$lib/server/db.js";
 import { safeJson } from "$lib/server/request-helpers.js";
 import {
   getPrefs,
@@ -10,14 +10,14 @@ import {
   type NotificationPrefs,
 } from "$lib/server/notification-prefs.js";
 
-export const GET: RequestHandler = () => {
-  const baby = getCurrentBaby();
+export const GET: RequestHandler = ({ url }) => {
+  const baby = resolveBaby(url);
   if (!baby) return json({ error: "no_baby" }, { status: 400 });
   return json({ prefs: getPrefs(baby.id), kinds: ALL_KINDS });
 };
 
-export const PUT: RequestHandler = async ({ request }) => {
-  const baby = getCurrentBaby();
+export const PUT: RequestHandler = async ({ request, url }) => {
+  const baby = resolveBaby(url);
   if (!baby) return json({ error: "no_baby" }, { status: 400 });
 
   const body = await safeJson<Partial<NotificationPrefs>>(request);

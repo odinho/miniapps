@@ -681,3 +681,25 @@ describe("reconcileNotifications – nap_budget_cap", () => {
     expect(rowsOf("nap_ending_soon")).toHaveLength(0);
   });
 });
+
+describe("reconcileNotifications – multi-baby", () => {
+  it("schedules per-baby with baby-scoped dedupe keys and names each baby in the title", () => {
+    db.prepare("INSERT INTO baby (id, name, birthdate) VALUES (2, 'Bo', '2025-06-12')").run();
+    const ada = { ...baby, id: 1, name: "Ada" };
+    const bo = { ...baby, id: 2, name: "Bo" };
+    const pred = makePrediction({ bedtime: "2026-04-13T18:00:00.000Z" });
+
+    reconcileNotifications({ baby: ada, activeSleep: null, prediction: pred });
+    reconcileNotifications({ baby: bo, activeSleep: null, prediction: pred });
+
+    const rows = rowsOf("bedtime_approaching");
+    expect(rows.map((r) => r.dedupe_key).toSorted()).toEqual([
+      "b1:bedtime_approaching:2026-04-13",
+      "b2:bedtime_approaching:2026-04-13",
+    ]);
+    expect(rows.map((r) => JSON.parse(r.payload_json).title).toSorted()).toEqual([
+      "Ada: Leggetid snart",
+      "Bo: Leggetid snart",
+    ]);
+  });
+});

@@ -77,16 +77,17 @@ async function sendPush(
 }
 
 /**
- * Send a push to every subscription for a given baby. Removes subscriptions
- * that return 404/410 (unsubscribed or expired).
+ * Send a push to every subscription in the family. The database is a single
+ * family (each family is its own deployment), so a device subscribes to the
+ * household and must receive pushes for BOTH babies — the payload itself names
+ * the baby. Removes subscriptions that return 404/410 (unsubscribed/expired).
  */
-export async function sendPushToBaby(
-  babyId: number,
+export async function sendPushToFamily(
   payload: PushPayload,
 ): Promise<{ sent: number; removed: number; failed: number }> {
   const subs = db
-    .prepare("SELECT * FROM notification_subscriptions WHERE baby_id = ?")
-    .all(babyId) as Array<{ id: number; endpoint: string; p256dh: string; auth: string }>;
+    .prepare("SELECT * FROM notification_subscriptions")
+    .all() as Array<{ id: number; endpoint: string; p256dh: string; auth: string }>;
 
   const results = await Promise.all(
     subs.map((s) =>

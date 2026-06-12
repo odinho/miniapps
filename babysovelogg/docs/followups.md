@@ -30,19 +30,20 @@ read via `getFamilyTimezone()`, set via new `family.updated` event,
 replay-compat from `baby.created`/`baby.updated{timezone}`,
 rebuild-deterministic (non-writing fallback). API GET routes take `?baby=`.
 
-Remaining Phase 1 units (own followups when started): client store
-(`babies[]`/`babiesById`, optimistic routing by `payload.babyId`); UI
-(Settings "Legg til barn", per-child settings, family home lanes + bulk
-"begge"); notifications (below). E2E regression pin still owed: "edit the
-first child after a second exists" via the live UI.
+**Phase 1 — client store, add-child UI, family home, notifications: all
+LANDED (2026-06-12).** Client store holds `babies[]`/`babiesById`;
+optimistic events route by `payload.babyId` (else owning-domain slice, else
+primary). Settings adds/edits per child (`?new=1` / `?baby=<id>`); home shows
+lanes + "Sove/Vakne begge" at 2+ children, with a per-baby focus view
+(`/?baby=<id>`). Notifications: family-wide push delivery (sendPushToFamily;
+the DB is one family), baby-scoped dedupe keys + tags, baby-named push titles
+when multi, per-baby prefs via `?baby=`, and `/api/events` reconciles every
+`state.babies` slice. E2E regression pin landed: "edit the first child after a
+second exists" + "log on one lane lands on that child only".
+
+So Phase 1 is functionally complete. Remaining polish / deferred:
 
 Deferred from the backend unit's Codex review (2026-06-12):
-- **Notifications are still single-baby.** `/api/events` reconciles only
-  the top-level (newest) slice; subscribe/preferences/test resolve via
-  `getCurrentBaby()`; scheduler reads only `state.baby`. Once a non-newest
-  child can be active this misses/misattributes pushes. Phase 1 notif unit:
-  family-device subscription, per-baby prefs, baby-scoped dedupe keys,
-  baby-named push text, reconcile every `state.babies` slice.
 - **`getBabyState` mixes pure snapshot assembly with derived-state writes**
   (nap-budget mode + trend-target persistence). Fine at N≤2; later split
   read from persist (or add a `persistDerived` flag) so a pure family

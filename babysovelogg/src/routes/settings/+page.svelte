@@ -96,7 +96,7 @@
 	}
 
 	async function loadPrefs() {
-		const res = await getNotifPrefs();
+		const res = await getNotifPrefs(baby?.id);
 		if (res) {
 			notifPrefs = res.prefs;
 			notifKinds = res.kinds;
@@ -114,7 +114,7 @@
 		const next = !notifPrefs[kind];
 		// Optimistic update
 		notifPrefs = { ...notifPrefs, [kind]: next };
-		const result = await setNotifPrefs({ [kind]: next });
+		const result = await setNotifPrefs({ [kind]: next }, baby?.id);
 		if (result) {
 			notifPrefs = result;
 		} else {
