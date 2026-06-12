@@ -191,6 +191,13 @@ followups → commit). Don't start a phase before the prior one is solid.
 
 ### Phase 1 — Multi-child foundation: add a child + family home
 
+**Status: LANDED (2026-06-12).** Backend family snapshot + data-corruption
+guards + family-level TZ; client `babies[]` store with per-baby optimistic
+routing; add-child / per-child settings; family home lanes + "begge" bulk +
+per-baby focus; notifications multi-child-safe (family delivery, baby-scoped
+dedupe, named pushes, per-baby prefs). E2E regression pins in place. (A Codex
+review of the client+UI may still surface polish — folded into followups.)
+
 **Goal:** a parent can add a second child; the home screen shows both and
 every action is unambiguously scoped; switching to a child's detail views
 works really well. This phase alone delivers the mixed-age sibling case.
