@@ -119,9 +119,6 @@ own design pass.
 
 ### Smaller cleanups
 
-- `getLocalMinuteOfDay` + formatter cache duplicated 2× (schedule.ts,
-  features.ts) — move to `tz.ts`. (The emerging.ts copy was removed when
-  its dead confidence fields went; only schedule.ts + features.ts remain.)
 - `decomposeFirstNapPrediction` hand-mirrors `predictDayNaps`' first
   iteration (drift risk) — derive via an optional trace hook instead.
 - `todaySleeps.find(s => s.end_time)` as "last completed sleep"

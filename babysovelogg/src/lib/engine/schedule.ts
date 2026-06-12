@@ -5,7 +5,7 @@ import type {
   SleepEntry, BabyContext, PredictionFeatures, SleepCyclePrior, SleepCycleEstimate,
 } from "$lib/types.js";
 export type { SleepCyclePrior, SleepCycleEstimate } from "$lib/types.js";
-import { getHourInTz, setHourInTz, isoToDateInTz } from "$lib/tz.js";
+import { getHourInTz, setHourInTz, isoToDateInTz, getMinuteOfDayInTz } from "$lib/tz.js";
 import type { SleepLogRow } from "$lib/types.js";
 import { daytimeSleepDuration } from "$lib/data/shine2021.js";
 
@@ -383,7 +383,7 @@ export function decomposeFirstNapPrediction(
   // Age-research default cycle; see the matching note in `predictDayNaps`.
   const cycleMin = getSleepCycleMinutes(ctx.ageMonths);
   const recentWakeAnchorMin = reAnchorEligible ? recentWakeMedianMinute(ctx, wakeUpTime) : null;
-  const todayWakeMin = getLocalMinuteOfDay(wakeDate, ctx.tz);
+  const todayWakeMin = getMinuteOfDayInTz(wakeDate, ctx.tz);
   const reAnchorOutcome = reAnchorEligible
     ? applyLateWakeReAnchor({
         blendMs,
@@ -441,7 +441,7 @@ function recentWakeMedianMinute(ctx: BabyContext, wakeUpTime: string): number | 
   if (past.length < 3) return null;
   const samples: WeightedSample[] = [];
   for (let i = 0; i < past.length; i++) {
-    const minute = getLocalMinuteOfDay(new Date(past[i].endMs), ctx.tz);
+    const minute = getMinuteOfDayInTz(new Date(past[i].endMs), ctx.tz);
     samples.push({ value: minute, weight: Math.pow(0.85, i) });
   }
   return weightedMedian(samples);
@@ -493,7 +493,7 @@ function applyLateWakeReAnchor(input: LateWakeReAnchorInput): LateWakeReAnchorOu
   if (recentWakeAnchorMin === null) return inert;
   if (pressureMs <= habitualMs) return inert;
 
-  const todayWakeMin = getLocalMinuteOfDay(new Date(wakeMs), tz);
+  const todayWakeMin = getMinuteOfDayInTz(new Date(wakeMs), tz);
   const offsetMin = todayWakeMin - recentWakeAnchorMin;
   if (offsetMin < cycleMin) return inert;
 
@@ -1803,7 +1803,7 @@ function collectBedtimeMinuteSamples(ctx: BabyContext): WeightedSample[] {
   const cache = getCache(ctx);
   // cache.nights is already sorted by startMs
   return cache.nights.map((s, idx) => ({
-    value: getLocalMinuteOfDay(new Date(s.startMs), ctx.tz),
+    value: getMinuteOfDayInTz(new Date(s.startMs), ctx.tz),
     weight: Math.pow(0.85, cache.nights.length - 1 - idx),
   }));
 }
@@ -1850,7 +1850,7 @@ function collectNightWakeMinuteSamples(ctx: BabyContext): WeightedSample[] {
   const sorted = cache.nights.toSorted((a, b) => a.endMs - b.endMs);
 
   return sorted.map((s, idx) => ({
-    value: getLocalMinuteOfDay(new Date(s.endMs), ctx.tz),
+    value: getMinuteOfDayInTz(new Date(s.endMs), ctx.tz),
     weight: Math.pow(0.85, sorted.length - 1 - idx),
   }));
 }
@@ -1886,25 +1886,6 @@ function weightedMedian(samples: WeightedSample[]): number {
   }
 
   return sorted[sorted.length - 1]?.value ?? 0;
-}
-
-const minuteOfDayFormatters = new Map<string, Intl.DateTimeFormat>();
-function getLocalMinuteOfDay(date: Date, tz: string): number {
-  let fmt = minuteOfDayFormatters.get(tz);
-  if (!fmt) {
-    fmt = new Intl.DateTimeFormat("en-GB", {
-      timeZone: tz,
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-    minuteOfDayFormatters.set(tz, fmt);
-  }
-  const parts = fmt.formatToParts(date);
-
-  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
-  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
-  return hour * 60 + minute;
 }
 
 /** Advance a YYYY-MM-DD local-date string by one calendar day. Anchored at
@@ -1960,7 +1941,7 @@ function collectHabitualNapData(
     let pos = 0;
     for (const s of daySleeps) {
       if (s.type !== "nap") continue;
-      const minuteOfDay = getLocalMinuteOfDay(new Date(s.startMs), ctx.tz);
+      const minuteOfDay = getMinuteOfDayInTz(new Date(s.startMs), ctx.tz);
       if (!startSamples.has(pos)) startSamples.set(pos, []);
       startSamples.get(pos)!.push({ value: minuteOfDay, weight: recencyWeight });
       pos++;
@@ -2187,7 +2168,7 @@ export function buildSleepsForBedtime(
   for (const pn of remainingPredicted) {
     const startMs = new Date(pn.startTime).getTime();
     if (startMs <= now) continue; // skipped: planned start is in the past
-    const endMin = getLocalMinuteOfDay(new Date(pn.endTime), ctx.tz);
+    const endMin = getMinuteOfDayInTz(new Date(pn.endTime), ctx.tz);
     if (endMin > cutoffMin) continue;
     sleeps.push({ start_time: pn.startTime, end_time: pn.endTime, type: "nap" });
   }
@@ -2209,11 +2190,11 @@ function getLatestNapEndCutoffMin(ctx: BabyContext, now: number): number {
   const habitualMs = feat(ctx, "habitualBedtime")
     ? getHabitualBedtimePrediction(new Date(now), ctx) : null;
   if (habitualMs !== null) {
-    return getLocalMinuteOfDay(new Date(habitualMs), ctx.tz) - minPreBedtime;
+    return getMinuteOfDayInTz(new Date(habitualMs), ctx.tz) - minPreBedtime;
   }
   if (ctx.targetBedtime) {
     const targetMs = new Date(targetBedtimeToISO(ctx.targetBedtime, now, ctx.tz)).getTime();
-    return getLocalMinuteOfDay(new Date(targetMs), ctx.tz) - minPreBedtime;
+    return getMinuteOfDayInTz(new Date(targetMs), ctx.tz) - minPreBedtime;
   }
   return 17 * 60;
 }

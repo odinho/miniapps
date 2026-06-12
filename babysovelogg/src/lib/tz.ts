@@ -30,6 +30,27 @@ export function isoToDateInTz(iso: string, tz: string): string {
 	return getDateFmt(tz).format(new Date(iso));
 }
 
+const minuteOfDayFmts = new Map<string, Intl.DateTimeFormat>();
+
+/** Local minute-of-day (0..1439) of a Date in the given IANA timezone.
+ *  en-GB hour12:false renders midnight as "00", so no %24 normalization needed. */
+export function getMinuteOfDayInTz(date: Date, tz: string): number {
+	let fmt = minuteOfDayFmts.get(tz);
+	if (!fmt) {
+		fmt = new Intl.DateTimeFormat("en-GB", {
+			timeZone: tz,
+			hour: "2-digit",
+			minute: "2-digit",
+			hour12: false,
+		});
+		minuteOfDayFmts.set(tz, fmt);
+	}
+	const parts = fmt.formatToParts(date);
+	const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+	const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+	return hour * 60 + minute;
+}
+
 /** Get the fractional hour (e.g. 18.5 = 18:30) of a Date in a given IANA timezone. */
 export function getHourInTz(date: Date, tz: string): number {
 	const h = parseInt(getHourFmt(tz).format(date));

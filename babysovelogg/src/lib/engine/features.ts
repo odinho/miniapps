@@ -6,7 +6,7 @@
  * and routine_schedule strategies.
  */
 import type { SleepEntry, SleepPause } from "$lib/types.js";
-import { isoToDateInTz } from "$lib/tz.js";
+import { isoToDateInTz, getMinuteOfDayInTz } from "$lib/tz.js";
 import { SLEEP_NEEDS, findByAge } from "./constants.js";
 import { sleepDuration as gallandSleepDuration } from "$lib/data/galland2012.js";
 
@@ -85,27 +85,13 @@ function parseSleeps(sleeps: SleepEntry[], tz: string): ParsedSleep[] {
       longestSegment: longestSegmentMin(startMs, endMs, s.pauses),
       type: s.type,
       localDate: isoToDateInTz(s.start_time, tz),
-      startMinuteOfDay: getMinuteOfDay(new Date(startMs), tz),
+      startMinuteOfDay: getMinuteOfDayInTz(new Date(startMs), tz),
     });
   }
   result.sort((a, b) => a.startMs - b.startMs);
   return result;
 }
 
-const minuteFmts = new Map<string, Intl.DateTimeFormat>();
-function getMinuteOfDay(date: Date, tz: string): number {
-  let fmt = minuteFmts.get(tz);
-  if (!fmt) {
-    fmt = new Intl.DateTimeFormat("en-GB", {
-      timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false,
-    });
-    minuteFmts.set(tz, fmt);
-  }
-  const parts = fmt.formatToParts(date);
-  const h = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
-  const m = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
-  return h * 60 + m;
-}
 
 /**
  * Pauses resolved to epoch-ms [pause, resume], clipped to a sleep episode,
