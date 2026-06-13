@@ -107,6 +107,38 @@ test("twin-mode is off for a single-baby family", async () => {
   expect(await familyMode()).toBe("twin=false override=null");
 });
 
+// Render the whole family roll-up, but reduce firstWake to its baby (the `at`
+// time is engine-derived and not the subject of this test) so the assertion
+// stays full-state yet deterministic.
+const renderFamily = async () => {
+  const { family } = (await (await get("/api/state")).json()) as {
+    family: {
+      isTwinMode: boolean;
+      modeOverride: string | null;
+      bothAsleep: boolean;
+      firstWake: { name: string } | null;
+    };
+  };
+  return `twin=${family.isTwinMode} override=${family.modeOverride} bothAsleep=${family.bothAsleep} firstWake=${family.firstWake?.name ?? "none"}`;
+};
+
+test("family roll-up: bothAsleep needs both children down", async () => {
+  const ada = createBaby("Ada", "2025-06-12");
+  const bo = createBaby("Bo", "2025-06-12");
+
+  expect(await renderFamily()).toBe("twin=true override=null bothAsleep=false firstWake=none");
+
+  await postEvents([
+    makeEvent("sleep.started", { babyId: ada, startTime: "2026-06-14T09:30:00.000Z", type: "nap", sleepDomainId: generateSleepId() }),
+  ]);
+  expect(await renderFamily()).toContain("bothAsleep=false");
+
+  await postEvents([
+    makeEvent("sleep.started", { babyId: bo, startTime: "2026-06-14T09:40:00.000Z", type: "nap", sleepDomainId: generateSleepId() }),
+  ]);
+  expect(await renderFamily()).toContain("bothAsleep=true");
+});
+
 test("rebuild is deterministic: mode_override replays from the log, residue is cleared", async () => {
   createBaby("Ada", "2025-06-12");
   createBaby("Bo", "2025-06-20"); // twins by inference, no override event

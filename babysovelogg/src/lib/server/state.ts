@@ -1,5 +1,5 @@
 import { db, getFamilyTimezone, getFamilyModeOverride } from "./db.js";
-import { isTwinMode } from "$lib/family.js";
+import { isTwinMode, computeFamilyStatus } from "$lib/family.js";
 import { assembleState } from "$lib/engine/state.js";
 import { getPrefs } from "./notification-prefs.js";
 import { getNapBudgetState, setNapBudgetState } from "./nap-budget-state.js";
@@ -279,6 +279,7 @@ export function getFamilyState(now?: number) {
       modeOverride,
     ),
     modeOverride,
+    ...computeFamilyStatus(babies),
   };
   return { ...primary, babies, family };
 }

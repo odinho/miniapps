@@ -56,7 +56,12 @@ function normalizeState(raw: AppStateResponse): AppState {
 	// Flat alias = the primary (newest = last) baby, matching the server.
 	const primary = babies.length ? babies[babies.length - 1] : normalizeSlice(raw);
 	const family = raw.family
-		? { isTwinMode: !!raw.family.isTwinMode, modeOverride: raw.family.modeOverride ?? null }
+		? {
+				isTwinMode: !!raw.family.isTwinMode,
+				modeOverride: raw.family.modeOverride ?? null,
+				bothAsleep: !!raw.family.bothAsleep,
+				firstWake: raw.family.firstWake ?? null,
+			}
 		: emptyFamily;
 	return { ...primary, babies, family };
 }

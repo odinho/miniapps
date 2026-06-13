@@ -365,9 +365,10 @@ locked for this run:
 - **Merge to main, DO NOT deploy.** Each unit fast-forwards to main +
   pushes (pre-push gates run). No `deploy/manage.sh deploy`. The user
   reviews + deploys in the morning.
-- **Oracles:** Codex (`codex:codex-rescue`) for verification/diagnosis;
-  a Fable subagent (`Agent`, model `fable`) for holistic architecture /
-  refactor sanity on cross-cutting units. Brief them cold + thorough.
+- **Oracles:** Codex (`codex:codex-rescue`) for verification, diagnosis,
+  AND holistic/architecture review. (The Fable subagent model is NOT
+  accessible in this environment — tried 2026-06-13, errors as no-access — so
+  Codex covers both roles.) Brief cold + thorough.
 
 ### Per-unit protocol (one unit at a time, serial)
 
@@ -416,7 +417,7 @@ recommendation, then skip to the next independent unit. Oracles answer
 
 Phase 2 — logging ergonomics + at-a-glance:
 - [x] P2-1  `isTwinMode` (age-gap ±21d) + settings override; gate begge/sync on it
-- [ ] P2-2  `getFamilyState().family` aggregate (bothAsleep, firstWake, nextAction, overlapWindows) — backend, if not already present
+- [x] P2-2  `getFamilyState().family` aggregate (bothAsleep, firstWake, nextAction, overlapWindows) — backend, if not already present
 - [ ] P2-3  Richer lanes: elapsed, next nap/bedtime, stale warning
 - [ ] P2-4  Combined status line ("Begge søv. Første venta vakning: Ada om 18 min")
 - [ ] P2-5  begge with immediate per-baby correction ("Berre Ada vakna" / "Bo søv vidare")
@@ -445,3 +446,4 @@ Cross-cutting follow-on (do as they surface or after Phase 4):
 - [ ] X-5  Offline optimistic `family.updated` is a no-op (`offline-queue.ts`); once `family` carries derived aggregates (bothAsleep/firstWake), re-derive the family summary client-side after queued baby events so it doesn't go stale offline (Codex, P2-1)
 - [ ] X-6  Birthdate is only `v.string()` in schemas (`baby.created`/`baby.updated`); add strict `YYYY-MM-DD` validation — date-only is currently just a convention `isTwinMode` relies on (Codex, P2-1)
 - [ ] X-7  N=1 payload no longer byte-for-byte identical (carries `babies[]` since Phase 1 + now `family`); legacy UI ignores both. Update the "byte-for-byte" contract wording or pin the accepted N=1 shape in a snapshot test (Codex, P2-1)
+- [ ] X-8  Unify expected-wake precedence: `family.ts:expectedWakeFor` (nap branch) duplicates `timer-state.ts:getTimerMode` (~L114-119). Extract a shared leaf helper `src/lib/expected-wake.ts: expectedWakeForActiveSleep(activeSleep, prediction)`. NOTE the deliberate divergence: getTimerMode's `sleeping` branch returns null for night (night → `deep-night` display), whereas the family roll-up wants night→`expectedNightEnd`. Decide whether the single-baby Timer should also surface a night wake (a real Timer behavior change → its own unit + e2e) or keep them intentionally different. (Codex, P2-2)

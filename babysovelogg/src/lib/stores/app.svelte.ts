@@ -1,5 +1,5 @@
 import type { Baby, SleepLogRow, DayStartRow, NightWakingRow } from "$lib/types.js";
-import type { FamilyModeOverride } from "$lib/family.js";
+import type { FamilyModeOverride, FirstWake } from "$lib/family.js";
 import type { StaleStatus } from "$lib/stale-sleep.js";
 import type { DayStats, SleepDayTotals } from "$lib/engine/stats.js";
 import type { PredictedNap } from "$lib/engine/schedule.js";
@@ -284,6 +284,10 @@ export interface BabyState {
 export interface FamilySummary {
 	isTwinMode: boolean;
 	modeOverride: FamilyModeOverride;
+	/** Both children currently asleep (max 2 per family). */
+	bothAsleep: boolean;
+	/** Soonest expected wake among the asleep children, or null. */
+	firstWake: FirstWake | null;
 }
 
 export interface AppState extends BabyState {
@@ -291,7 +295,12 @@ export interface AppState extends BabyState {
 	family: FamilySummary;
 }
 
-export const emptyFamily: FamilySummary = { isTwinMode: false, modeOverride: null };
+export const emptyFamily: FamilySummary = {
+	isTwinMode: false,
+	modeOverride: null,
+	bothAsleep: false,
+	firstWake: null,
+};
 
 const emptyState: AppState = {
 	baby: null,
