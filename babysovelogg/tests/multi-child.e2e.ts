@@ -6,6 +6,7 @@ import {
   fillDateInput,
   postEvents,
   makeEvent,
+  addActiveSleep,
 } from "./fixtures";
 
 const babyNames = async (request: { get: (url: string) => Promise<{ json: () => Promise<unknown> }> }) => {
@@ -108,8 +109,13 @@ test("home shows a lane per child; logging on one lane lands on that child only"
   await expect(page.getByTestId("baby-lane")).toHaveCount(2);
 
   const adaLane = page.getByTestId("baby-lane").filter({ hasText: "Ada" });
+  const boLane = page.getByTestId("baby-lane").filter({ hasText: "Bo" });
+  await expect(boLane.getByTestId("lane-status")).toContainText("Vaken");
+
   await adaLane.getByTestId("sleep-button").click();
   await expect(adaLane.getByTestId("sleep-button")).toHaveClass(/sleeping/, { timeout: 3000 });
+  // The lane now reflects the asleep state with elapsed time.
+  await expect(adaLane.getByTestId("lane-status")).toContainText("Søv", { timeout: 3000 });
 
   expect(!!(await sliceByName(request, "Ada")).activeSleep).toBe(true);
   expect(!!(await sliceByName(request, "Bo")).activeSleep).toBe(false);
@@ -125,6 +131,19 @@ test('"Sove begge" starts a sleep for both children', async ({ page, request }) 
 
   expect(!!(await sliceByName(request, "Ada")).activeSleep).toBe(true);
   expect(!!(await sliceByName(request, "Bo")).activeSleep).toBe(true);
+});
+
+test("a non-primary child's forgotten (stale) sleep surfaces on its own lane", async ({ page }) => {
+  const ada = createBaby("Ada", "2025-06-12"); // id 1 — non-primary (primary alias = newest)
+  createBaby("Bo", "2025-06-12");
+  // 30h open sleep → stale regardless of the exact current time.
+  addActiveSleep(ada, new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString(), "night");
+
+  await page.goto("/");
+  await expect(page.getByTestId("family-home")).toBeVisible({ timeout: 5000 });
+
+  const adaLane = page.getByTestId("baby-lane").filter({ hasText: "Ada" });
+  await expect(adaLane.getByTestId("lane-status")).toContainText("Sjekk vaknetid", { timeout: 5000 });
 });
 
 test("mixed-age siblings get lanes but no 'begge' bulk actions", async ({ page }) => {

@@ -3,7 +3,8 @@
 	import { sync } from '$lib/stores/sync.svelte.js';
 	import { buildStartSleep, buildEndSleep } from '$lib/sleep-actions.js';
 	import SleepButton from './SleepButton.svelte';
-	import { formatTime } from '$lib/utils.js';
+	import { formatTime, formatDurationCompact } from '$lib/utils.js';
+	import { getLaneStatus } from '$lib/lane-status.js';
 
 	type DomainEvent = { type: string; payload: Record<string, unknown> };
 
@@ -12,12 +13,14 @@
 		/** Twin-mode (two same-age babies): show the "begge" bulk actions. Mixed-age
 		 *  siblings get independent lanes only — no bulk. */
 		isTwinMode: boolean;
+		/** Live clock (ms) for lane elapsed/expected-wake — owned by the dashboard. */
+		now: number;
 		/** Surface an undo toast (owned by the dashboard). */
 		onUndo: (message: string, undoEvents: DomainEvent[]) => void;
 		/** Open a single child's full detail view. */
 		onFocus: (babyId: number) => void;
 	}
-	let { babies, isTwinMode, onUndo, onFocus }: Props = $props();
+	let { babies, isTwinMode, now, onUndo, onFocus }: Props = $props();
 
 	const isAsleep = (b: BabyState) => !!(b.activeSleep && !b.activeSleep.end_time);
 	const anyAwake = $derived(babies.some((b) => b.baby && !isAsleep(b)));
@@ -81,11 +84,22 @@
 		{#each babies as b (b.baby?.id)}
 			{#if b.baby}
 				{@const baby = b.baby}
+				{@const status = getLaneStatus(b, now)}
 				<div class="lane" data-testid="baby-lane">
 					<button class="lane-info" onclick={() => onFocus(baby.id)} data-testid="lane-focus">
 						<span class="lane-name" data-testid="lane-name">{baby.name}</span>
-						<span class="lane-status">
-							{#if isAsleep(b)}Søv sidan {formatTime(b.activeSleep!.start_time)}{:else}Vaken{/if}
+						<span
+							class="lane-status"
+							class:lane-status-stale={status.kind === 'stale'}
+							data-testid="lane-status"
+						>
+							{#if status.kind === 'stale'}
+								⚠️ Sjekk vaknetid
+							{:else if status.kind === 'asleep'}
+								Søv {formatDurationCompact(status.sinceMs)}{#if status.expectedWake} · vaknar ~{formatTime(status.expectedWake)}{/if}
+							{:else}
+								Vaken{#if status.sinceMs} {formatDurationCompact(status.sinceMs)}{/if}{#if status.next} · {status.next.kind === 'nap' ? 'lur' : 'leggetid'} ~{formatTime(status.next.at)}{/if}
+							{/if}
 						</span>
 					</button>
 					<SleepButton
@@ -168,6 +182,10 @@
 	.lane-status {
 		font-size: 0.85rem;
 		color: var(--text-light);
+	}
+	.lane-status-stale {
+		color: var(--danger, #c0392b);
+		font-weight: 600;
 	}
 	.family-bulk {
 		display: flex;

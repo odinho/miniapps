@@ -200,11 +200,14 @@
 		}
 	});
 
-	// Periodically refresh state during active sleep so predictions stay current.
+	// Periodically refresh state while ANY child has an open sleep so predictions
+	// (and server-side stale classification) stay current — keyed on the whole
+	// family, not just the primary alias, so a non-primary lane still refreshes.
 	// Goes through sync.refresh() so the normalize + pending-queue overlay isn't
 	// bypassed (a raw appState.set would drop optimistic queued events).
 	$effect(() => {
-		if (!activeSleep || activeSleep.end_time) return;
+		const anyOpenSleep = babies.some((b) => b.activeSleep && !b.activeSleep.end_time);
+		if (!anyOpenSleep) return;
 		const iv = setInterval(() => { void sync.refresh(); }, 5 * 60_000); // every 5 minutes
 		return () => clearInterval(iv);
 	});
@@ -592,7 +595,7 @@
 				<span class="sync-badge sync-badge-offline" data-testid="sync-badge">offline</span>
 			{/if}
 		</div>
-		<FamilyHome {babies} isTwinMode={appState.state.family.isTwinMode} onUndo={showUndoToast} onFocus={(id) => goto(`/?baby=${id}`)} />
+		<FamilyHome {babies} {now} isTwinMode={appState.state.family.isTwinMode} onUndo={showUndoToast} onFocus={(id) => goto(`/?baby=${id}`)} />
 		{#if undoToast}
 			<div class="undo-toast">
 				<span>{undoToast.message}</span>
