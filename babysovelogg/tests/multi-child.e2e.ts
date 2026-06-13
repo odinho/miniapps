@@ -127,6 +127,17 @@ test('"Sove begge" starts a sleep for both children', async ({ page, request }) 
   expect(!!(await sliceByName(request, "Bo")).activeSleep).toBe(true);
 });
 
+test("mixed-age siblings get lanes but no 'begge' bulk actions", async ({ page }) => {
+  createBaby("Ada", "2025-06-12");
+  createBaby("Storesøster", "2020-01-01"); // years apart → sibling mode
+
+  await page.goto("/");
+  await expect(page.getByTestId("family-home")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByTestId("baby-lane")).toHaveCount(2);
+  await expect(page.getByTestId("sleep-both")).toHaveCount(0);
+  await expect(page.getByTestId("wake-both")).toHaveCount(0);
+});
+
 test("tapping a lane opens that child's detail, and back returns to the family", async ({
   page,
 }) => {

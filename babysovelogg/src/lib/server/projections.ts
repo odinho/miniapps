@@ -34,6 +34,16 @@ export function applyEvent(event: AppEvent): void {
           "UPDATE family SET timezone = ?, updated_by_event_id = ? WHERE id = 1",
         ).run(payload.timezone, eventId);
       }
+      // Twin/sibling override. Unlike timezone this CAN be cleared (null = back
+      // to auto-infer), so act whenever the key is present at all.
+      if ("modeOverride" in payload) {
+        const mode = payload.modeOverride === "twin" || payload.modeOverride === "sibling"
+          ? payload.modeOverride
+          : null;
+        db.prepare(
+          "UPDATE family SET mode_override = ?, updated_by_event_id = ? WHERE id = 1",
+        ).run(mode, eventId);
+      }
       break;
 
     case "baby.updated": {
@@ -524,10 +534,13 @@ export function rebuildAll(): RebuildReport {
     db.prepare("DELETE FROM notification_subscriptions").run();
     db.prepare("DELETE FROM notification_preferences").run();
     db.prepare("DELETE FROM baby").run();
-    // Keep the singleton family row but clear its timezone so replay
-    // repopulates it from baby.created / baby.updated / family.updated. If
-    // history never set a zone, the next read lazily re-derives the server's.
-    db.prepare("UPDATE family SET timezone = NULL, updated_by_event_id = NULL WHERE id = 1").run();
+    // Keep the singleton family row but clear its settings so replay
+    // repopulates them from baby.created / baby.updated / family.updated. If
+    // history never set a zone, the next read lazily re-derives the server's;
+    // a never-set mode_override stays null (auto-infer).
+    db.prepare(
+      "UPDATE family SET timezone = NULL, mode_override = NULL, updated_by_event_id = NULL WHERE id = 1",
+    ).run();
     // Reset autoincrement so replayed baby IDs match original payload references
     db.prepare(
       "DELETE FROM sqlite_sequence WHERE name IN ('baby', 'sleep_log', 'diaper_log', 'night_waking')",

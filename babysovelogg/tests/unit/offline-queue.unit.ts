@@ -36,6 +36,7 @@ function makeState(overrides: Partial<AppState> = {}): AppState {
 		offDays: [],
 		todayNightWakings: [],
 		babies: [],
+		family: { isTwinMode: false, modeOverride: null },
 		...overrides,
 	};
 }
@@ -62,7 +63,11 @@ function makeSlice(id: number, name: string, overrides: Partial<BabyState> = {})
 
 /** Build a family snapshot from per-baby slices; the alias is the last (newest). */
 function makeFamily(slices: BabyState[]): AppState {
-	return { ...slices[slices.length - 1], babies: slices };
+	return {
+		...slices[slices.length - 1],
+		babies: slices,
+		family: { isTwinMode: false, modeOverride: null },
+	};
 }
 
 function makeSleep(overrides: Partial<SleepLogRow> = {}): SleepLogRow {

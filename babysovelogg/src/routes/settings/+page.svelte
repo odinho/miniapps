@@ -217,6 +217,13 @@
 		}
 	}
 
+	// Family-level twin/sibling override (null = auto-infer from age gap).
+	const modeOverride = $derived(s.family.modeOverride);
+	async function setModeOverride(value: 'twin' | 'sibling' | null) {
+		if (value === modeOverride) return;
+		await sync.sendEvents([{ type: 'family.updated', payload: { modeOverride: value } }]);
+	}
+
 	function onFileChange(e: Event) {
 		const input = e.target as HTMLInputElement;
 		importFile = input.files?.[0] ?? null;
@@ -406,6 +413,43 @@
 				{isOnboarding ? 'Kom i gang ✨' : isCreatingNew ? 'Legg til barn' : 'Lagra'}
 			</button>
 		</div>
+
+		<!-- Family mode (only with two children) — twin affordances vs siblings -->
+		{#if babies.length >= 2}
+			<div
+				style="margin-top: 32px; border-top: 1px solid var(--cream-dark); padding-top: 24px;"
+				data-testid="family-mode-section"
+			>
+				<h2 style="font-size: 1.1rem; margin-bottom: 8px;">Tvillingar eller søsken</h2>
+				<div style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 12px;">
+					Tvillingmodus viser «Sove/Vakne begge» og samkøyring. Auto gjettar ut frå
+					alder; overstyr om gjettet er feil.
+				</div>
+				<div class="type-pills" data-testid="family-mode-pills">
+					<button
+						class="type-pill"
+						class:active={modeOverride === null}
+						onclick={() => setModeOverride(null)}
+					>
+						Auto
+					</button>
+					<button
+						class="type-pill"
+						class:active={modeOverride === 'twin'}
+						onclick={() => setModeOverride('twin')}
+					>
+						Tvillingar
+					</button>
+					<button
+						class="type-pill"
+						class:active={modeOverride === 'sibling'}
+						onclick={() => setModeOverride('sibling')}
+					>
+						Søsken
+					</button>
+				</div>
+			</div>
+		{/if}
 
 		<!-- Notifications (only when baby exists) -->
 		{#if baby}

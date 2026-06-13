@@ -226,7 +226,7 @@ export function setupHarness() {
     db.prepare("DELETE FROM notification_preferences").run();
     db.prepare("DELETE FROM baby").run();
     db.prepare("DELETE FROM events").run();
-    db.prepare("UPDATE family SET timezone = NULL, updated_by_event_id = NULL WHERE id = 1").run();
+    db.prepare("UPDATE family SET timezone = NULL, mode_override = NULL, updated_by_event_id = NULL WHERE id = 1").run();
     try {
       db.prepare("DELETE FROM sqlite_sequence").run();
     } catch {}

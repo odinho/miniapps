@@ -107,7 +107,9 @@ export function applyOptimisticEvent(
 	const idx = findSliceIndex(babies, payload);
 	babies[idx] = applyEventToSlice(babies[idx], type, payload);
 	const primary = babies[babies.length - 1];
-	return { ...primary, babies };
+	// `family` is household-level — carry it through unchanged (the flat alias
+	// is rebuilt from `primary`, which is a per-baby slice without it).
+	return { ...primary, babies, family: full.family };
 }
 
 /** Which baby slice an event belongs to (see applyOptimisticEvent). */

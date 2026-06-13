@@ -1,6 +1,7 @@
 import { Database as BunDatabase } from "bun:sqlite";
 import path from "path";
 import type { Baby } from "$lib/types.js";
+import type { FamilyModeOverride } from "$lib/family.js";
 
 /** Minimal SQLite interface matching the subset used by this app. */
 export interface SqliteStatement {
@@ -244,6 +245,9 @@ function initSchema(database: SqliteDb) {
   // baby.timezone, so seed family.timezone from the newest baby that has one.
   // Idempotent — only fills a still-empty family.timezone.
   database.exec("INSERT OR IGNORE INTO family (id) VALUES (1)");
+  // Twin-vs-sibling override (null = auto-infer from age gap). Added after the
+  // family table shipped, so migrate it onto existing single-family DBs.
+  tryAddColumn(database, "family", "mode_override", "TEXT");
   const fam = database.prepare("SELECT timezone FROM family WHERE id = 1").get() as
     | { timezone: string | null }
     | undefined;
@@ -385,6 +389,16 @@ export function getFamilyTimezone(): string {
     | { timezone: string | null }
     | undefined;
   return row?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
+
+/** The family's explicit twin/sibling override, or null when on auto-infer. */
+export function getFamilyModeOverride(): FamilyModeOverride {
+  const row = db.prepare("SELECT mode_override FROM family WHERE id = 1").get() as
+    | { mode_override: string | null }
+    | undefined;
+  return row?.mode_override === "twin" || row?.mode_override === "sibling"
+    ? row.mode_override
+    : null;
 }
 
 /** Resolve the baby a request is scoped to. Reads an explicit `?baby=<id>`

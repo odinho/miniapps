@@ -415,7 +415,7 @@ recommendation, then skip to the next independent unit. Oracles answer
 ### Unit queue
 
 Phase 2 — logging ergonomics + at-a-glance:
-- [ ] P2-1  `isTwinMode` (age-gap ±21d) + settings override; gate begge/sync on it
+- [x] P2-1  `isTwinMode` (age-gap ±21d) + settings override; gate begge/sync on it
 - [ ] P2-2  `getFamilyState().family` aggregate (bothAsleep, firstWake, nextAction, overlapWindows) — backend, if not already present
 - [ ] P2-3  Richer lanes: elapsed, next nap/bedtime, stale warning
 - [ ] P2-4  Combined status line ("Begge søv. Første venta vakning: Ada om 18 min")
@@ -442,3 +442,6 @@ Cross-cutting follow-on (do as they surface or after Phase 4):
 - [ ] X-2  AppState revision field → kill last-writer-wins races (from Phase-1-polish followup)
 - [ ] X-3  arc-scenes + B18 e2e wall-clock determinism (thread fixed `now`) — unblocks a clean full e2e
 - [ ] X-4  Mixed-age/older-child mode simplicity pass (does a 5yo need naps/strategy, or just bedtime+duration?)
+- [ ] X-5  Offline optimistic `family.updated` is a no-op (`offline-queue.ts`); once `family` carries derived aggregates (bothAsleep/firstWake), re-derive the family summary client-side after queued baby events so it doesn't go stale offline (Codex, P2-1)
+- [ ] X-6  Birthdate is only `v.string()` in schemas (`baby.created`/`baby.updated`); add strict `YYYY-MM-DD` validation — date-only is currently just a convention `isTwinMode` relies on (Codex, P2-1)
+- [ ] X-7  N=1 payload no longer byte-for-byte identical (carries `babies[]` since Phase 1 + now `family`); legacy UI ignores both. Update the "byte-for-byte" contract wording or pin the accepted N=1 shape in a snapshot test (Codex, P2-1)

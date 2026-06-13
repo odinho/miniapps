@@ -1,4 +1,4 @@
-import { appState, type AppState, type BabyState } from "./app.svelte.js";
+import { appState, emptyFamily, type AppState, type BabyState } from "./app.svelte.js";
 import { getClientId, generateId } from "$lib/identity.js";
 import {
 	getQueue,
@@ -55,7 +55,10 @@ function normalizeState(raw: AppStateResponse): AppState {
 				: [];
 	// Flat alias = the primary (newest = last) baby, matching the server.
 	const primary = babies.length ? babies[babies.length - 1] : normalizeSlice(raw);
-	return { ...primary, babies };
+	const family = raw.family
+		? { isTwinMode: !!raw.family.isTwinMode, modeOverride: raw.family.modeOverride ?? null }
+		: emptyFamily;
+	return { ...primary, babies, family };
 }
 
 function createSync() {

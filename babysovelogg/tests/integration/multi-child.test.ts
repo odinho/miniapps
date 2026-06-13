@@ -75,6 +75,52 @@ test("timezone is family-wide: one zone buckets both babies' day boundaries", as
   `);
 });
 
+const familyMode = async () => {
+  const data = (await (await get("/api/state")).json()) as {
+    family: { isTwinMode: boolean; modeOverride: string | null };
+  };
+  return `twin=${data.family.isTwinMode} override=${data.family.modeOverride}`;
+};
+
+test("twin-mode: inferred from age gap, family.updated override wins", async () => {
+  createBaby("Ada", "2025-06-12");
+  const bo = createBaby("Bo", "2025-06-20"); // 8 days apart → twins
+
+  expect(await familyMode()).toBe("twin=true override=null");
+
+  await postEvents([makeEvent("family.updated", { modeOverride: "sibling" })]);
+  expect(await familyMode()).toBe("twin=false override=sibling");
+
+  await postEvents([makeEvent("family.updated", { modeOverride: null })]);
+  expect(await familyMode()).toBe("twin=true override=null");
+
+  // Re-target Bo far from Ada → now siblings by inference.
+  await postEvents([makeEvent("baby.updated", { babyId: bo, birthdate: "2023-01-01" })]);
+  expect(await familyMode()).toBe("twin=false override=null");
+
+  await postEvents([makeEvent("family.updated", { modeOverride: "twin" })]);
+  expect(await familyMode()).toBe("twin=true override=twin");
+});
+
+test("twin-mode is off for a single-baby family", async () => {
+  createBaby("Ada", "2025-06-12");
+  expect(await familyMode()).toBe("twin=false override=null");
+});
+
+test("rebuild is deterministic: mode_override replays from the log, residue is cleared", async () => {
+  createBaby("Ada", "2025-06-12");
+  createBaby("Bo", "2025-06-20"); // twins by inference, no override event
+
+  // Contaminate the family row as if a stale override leaked in.
+  db.prepare("UPDATE family SET mode_override = 'twin' WHERE id = 1").run();
+
+  const { rebuildAll } = await import("$lib/server/projections.js");
+  rebuildAll();
+
+  // The event log has no override, so rebuild must return to auto-infer.
+  expect(await familyMode()).toBe("twin=true override=null");
+});
+
 test("the family zone is overlaid on every baby slice — divergence is impossible", async () => {
   createBaby("Ada", "2025-06-12");
   createBaby("Bo", "2025-06-12");

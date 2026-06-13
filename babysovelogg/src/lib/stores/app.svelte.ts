@@ -1,4 +1,5 @@
 import type { Baby, SleepLogRow, DayStartRow, NightWakingRow } from "$lib/types.js";
+import type { FamilyModeOverride } from "$lib/family.js";
 import type { StaleStatus } from "$lib/stale-sleep.js";
 import type { DayStats, SleepDayTotals } from "$lib/engine/stats.js";
 import type { PredictedNap } from "$lib/engine/schedule.js";
@@ -277,9 +278,20 @@ export interface BabyState {
  * N=1, `babies` has one element and the alias is that baby — byte-for-byte
  * the old behaviour.
  */
+/** Household-wide derived facts that aren't tied to one baby. Grows over the
+ *  multi-child phases (overlap windows, combined next-action, …); starts with
+ *  the twin/sibling mode that gates begge + sync affordances. */
+export interface FamilySummary {
+	isTwinMode: boolean;
+	modeOverride: FamilyModeOverride;
+}
+
 export interface AppState extends BabyState {
 	babies: BabyState[];
+	family: FamilySummary;
 }
+
+export const emptyFamily: FamilySummary = { isTwinMode: false, modeOverride: null };
 
 const emptyState: AppState = {
 	baby: null,
@@ -297,6 +309,7 @@ const emptyState: AppState = {
 	offDays: [],
 	todayNightWakings: [],
 	babies: [],
+	family: emptyFamily,
 };
 
 /** Reactive app state — the single source of truth for the UI. */

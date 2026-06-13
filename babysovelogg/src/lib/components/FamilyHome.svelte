@@ -9,12 +9,15 @@
 
 	interface Props {
 		babies: BabyState[];
+		/** Twin-mode (two same-age babies): show the "begge" bulk actions. Mixed-age
+		 *  siblings get independent lanes only — no bulk. */
+		isTwinMode: boolean;
 		/** Surface an undo toast (owned by the dashboard). */
 		onUndo: (message: string, undoEvents: DomainEvent[]) => void;
 		/** Open a single child's full detail view. */
 		onFocus: (babyId: number) => void;
 	}
-	let { babies, onUndo, onFocus }: Props = $props();
+	let { babies, isTwinMode, onUndo, onFocus }: Props = $props();
 
 	const isAsleep = (b: BabyState) => !!(b.activeSleep && !b.activeSleep.end_time);
 	const anyAwake = $derived(babies.some((b) => b.baby && !isAsleep(b)));
@@ -107,7 +110,7 @@
 		{/each}
 	</div>
 
-	{#if anyAwake || anyAsleep}
+	{#if isTwinMode && (anyAwake || anyAsleep)}
 		<div class="family-bulk" data-testid="family-bulk">
 			{#if anyAwake}
 				<button class="btn btn-primary" data-testid="sleep-both" onclick={sleepBoth} disabled={busy}>

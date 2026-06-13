@@ -1,4 +1,5 @@
-import { db, getFamilyTimezone } from "./db.js";
+import { db, getFamilyTimezone, getFamilyModeOverride } from "./db.js";
+import { isTwinMode } from "$lib/family.js";
 import { assembleState } from "$lib/engine/state.js";
 import { getPrefs } from "./notification-prefs.js";
 import { getNapBudgetState, setNapBudgetState } from "./nap-budget-state.js";
@@ -271,7 +272,15 @@ export function getFamilyState(now?: number) {
     .map((r) => getBabyState(r.id, now))
     .filter((b): b is BabyState => b !== null);
   const primary = babies.length ? babies[babies.length - 1] : EMPTY_BABY_STATE;
-  return { ...primary, babies };
+  const modeOverride = getFamilyModeOverride();
+  const family = {
+    isTwinMode: isTwinMode(
+      babies.map((b) => b.baby?.birthdate).filter((d): d is string => !!d),
+      modeOverride,
+    ),
+    modeOverride,
+  };
+  return { ...primary, babies, family };
 }
 
 /** Legacy single-baby entry point. Now an alias for the family snapshot so

@@ -69,6 +69,9 @@ const payloadSchemas = {
   // family's babies can never end up in different zones.
   "family.updated": v.object({
     timezone: optStr,
+    // null = back to auto-infer; absent = unchanged. Present-but-null is the
+    // "reset to auto" signal, so keep it nullable-and-optional, not just optional.
+    modeOverride: v.optional(v.nullable(v.picklist(["twin", "sibling"]))),
   }),
   "sleep.started": v.object({
     babyId: v.number(),
