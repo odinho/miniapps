@@ -33,6 +33,8 @@ export interface FamilySleepView {
   // Optional/nullable so a `BabyState` slice (whose activeSleep is
   // `SleepLogRow | undefined`) structurally satisfies this without a cast.
   activeSleep?: { type: string; end_time: string | null } | null;
+  /** A forgotten (>24h) open sleep the server has hidden from activeSleep. */
+  staleActiveSleep?: unknown | null;
   prediction?: {
     expectedNapEnd: string | null;
     expectedNightEnd: string | null;
@@ -92,4 +94,38 @@ export function computeFamilyStatus(babies: FamilySleepView[]): {
     }
   }
   return { bothAsleep, firstWake };
+}
+
+/** Structured combined family status — the component renders the copy + formats
+ *  the countdown, so this stays formatting/i18n-free and unit-testable. Null
+ *  for fewer than two children (the combined line is a two-up affordance). */
+export type CombinedStatus =
+  | { kind: "both-asleep"; firstWake: { name: string; inMs: number } | null }
+  | { kind: "both-awake" }
+  | { kind: "mixed"; asleepName: string; awakeName: string };
+
+export function getCombinedStatus(
+  babies: FamilySleepView[],
+  firstWake: FirstWake | null,
+  now: number,
+): CombinedStatus | null {
+  const present = babies.filter((b) => b.baby);
+  // The combined line is a strictly two-up affordance (family cap is 2).
+  if (present.length !== 2) return null;
+  // A forgotten/stale sleep is the priority signal and the server hides it from
+  // activeSleep — so we'd otherwise call that child "vaken" while its lane says
+  // "Sjekk vaknetid". Suppress the headline and let the stale lane carry it.
+  if (present.some((b) => b.staleActiveSleep)) return null;
+  const asleep = present.filter(isAsleep);
+
+  if (asleep.length === present.length) {
+    return {
+      kind: "both-asleep",
+      firstWake: firstWake ? { name: firstWake.name, inMs: new Date(firstWake.at).getTime() - now } : null,
+    };
+  }
+  if (asleep.length === 0) return { kind: "both-awake" };
+
+  const awakeBaby = present.find((b) => !isAsleep(b))!;
+  return { kind: "mixed", asleepName: asleep[0].baby!.name, awakeName: awakeBaby.baby!.name };
 }

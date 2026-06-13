@@ -595,7 +595,7 @@
 				<span class="sync-badge sync-badge-offline" data-testid="sync-badge">offline</span>
 			{/if}
 		</div>
-		<FamilyHome {babies} {now} isTwinMode={appState.state.family.isTwinMode} onUndo={showUndoToast} onFocus={(id) => goto(`/?baby=${id}`)} />
+		<FamilyHome {babies} {now} family={appState.state.family} onUndo={showUndoToast} onFocus={(id) => goto(`/?baby=${id}`)} />
 		{#if undoToast}
 			<div class="undo-toast">
 				<span>{undoToast.message}</span>

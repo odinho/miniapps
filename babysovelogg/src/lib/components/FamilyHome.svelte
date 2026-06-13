@@ -1,18 +1,19 @@
 <script lang="ts">
-	import type { BabyState } from '$lib/stores/app.svelte.js';
+	import type { BabyState, FamilySummary } from '$lib/stores/app.svelte.js';
 	import { sync } from '$lib/stores/sync.svelte.js';
 	import { buildStartSleep, buildEndSleep } from '$lib/sleep-actions.js';
 	import SleepButton from './SleepButton.svelte';
-	import { formatTime, formatDurationCompact } from '$lib/utils.js';
+	import { formatTime, formatDurationCompact, formatDuration } from '$lib/utils.js';
 	import { getLaneStatus } from '$lib/lane-status.js';
+	import { getCombinedStatus } from '$lib/family.js';
 
 	type DomainEvent = { type: string; payload: Record<string, unknown> };
 
 	interface Props {
 		babies: BabyState[];
-		/** Twin-mode (two same-age babies): show the "begge" bulk actions. Mixed-age
-		 *  siblings get independent lanes only — no bulk. */
-		isTwinMode: boolean;
+		/** Household roll-up: twin-mode gates the "begge" bulk actions; firstWake
+		 *  drives the combined status line. */
+		family: FamilySummary;
 		/** Live clock (ms) for lane elapsed/expected-wake — owned by the dashboard. */
 		now: number;
 		/** Surface an undo toast (owned by the dashboard). */
@@ -20,7 +21,9 @@
 		/** Open a single child's full detail view. */
 		onFocus: (babyId: number) => void;
 	}
-	let { babies, isTwinMode, now, onUndo, onFocus }: Props = $props();
+	let { babies, family, now, onUndo, onFocus }: Props = $props();
+
+	const combined = $derived(getCombinedStatus(babies, family.firstWake, now));
 
 	const isAsleep = (b: BabyState) => !!(b.activeSleep && !b.activeSleep.end_time);
 	const anyAwake = $derived(babies.some((b) => b.baby && !isAsleep(b)));
@@ -80,6 +83,17 @@
 </script>
 
 <div class="family-home" data-testid="family-home">
+	{#if combined}
+		<p class="family-status" data-testid="combined-status">
+			{#if combined.kind === 'both-asleep'}
+				Begge søv.{#if combined.firstWake} Fyrste venta vakning: {combined.firstWake.name} {combined.firstWake.inMs >= 60_000 ? `om ${formatDuration(combined.firstWake.inMs)}` : 'når som helst'}.{/if}
+			{:else if combined.kind === 'both-awake'}
+				Begge vakne.
+			{:else}
+				{combined.asleepName} søv, {combined.awakeName} vaken.
+			{/if}
+		</p>
+	{/if}
 	<div class="family-lanes">
 		{#each babies as b (b.baby?.id)}
 			{#if b.baby}
@@ -124,7 +138,7 @@
 		{/each}
 	</div>
 
-	{#if isTwinMode && (anyAwake || anyAsleep)}
+	{#if family.isTwinMode && (anyAwake || anyAsleep)}
 		<div class="family-bulk" data-testid="family-bulk">
 			{#if anyAwake}
 				<button class="btn btn-primary" data-testid="sleep-both" onclick={sleepBoth} disabled={busy}>
@@ -146,6 +160,12 @@
 		flex-direction: column;
 		gap: 16px;
 		margin-top: 16px;
+	}
+	.family-status {
+		margin: 0;
+		text-align: center;
+		font-size: 0.95rem;
+		color: var(--text);
 	}
 	.family-lanes {
 		display: flex;

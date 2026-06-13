@@ -133,6 +133,34 @@ test('"Sove begge" starts a sleep for both children', async ({ page, request }) 
   expect(!!(await sliceByName(request, "Bo")).activeSleep).toBe(true);
 });
 
+test("combined status line: both awake, then both asleep", async ({ page }) => {
+  createBaby("Ada", "2025-06-12");
+  createBaby("Bo", "2025-06-12");
+
+  await page.goto("/");
+  await expect(page.getByTestId("combined-status")).toContainText("Begge vakne");
+});
+
+test("combined status line reads 'Begge søv' when both children are down", async ({ page }) => {
+  const ada = createBaby("Ada", "2025-06-12");
+  const bo = createBaby("Bo", "2025-06-12");
+  const recent = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+  addActiveSleep(ada, recent, "nap");
+  addActiveSleep(bo, recent, "nap");
+
+  await page.goto("/");
+  await expect(page.getByTestId("combined-status")).toContainText("Begge søv");
+});
+
+test("combined status line names who's asleep vs awake when mixed", async ({ page }) => {
+  const ada = createBaby("Ada", "2025-06-12");
+  createBaby("Bo", "2025-06-12");
+  addActiveSleep(ada, new Date(Date.now() - 20 * 60 * 1000).toISOString(), "nap");
+
+  await page.goto("/");
+  await expect(page.getByTestId("combined-status")).toContainText("Ada søv, Bo vaken");
+});
+
 test("a non-primary child's forgotten (stale) sleep surfaces on its own lane", async ({ page }) => {
   const ada = createBaby("Ada", "2025-06-12"); // id 1 — non-primary (primary alias = newest)
   createBaby("Bo", "2025-06-12");
