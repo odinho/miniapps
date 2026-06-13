@@ -420,7 +420,7 @@ Phase 2 — logging ergonomics + at-a-glance:
 - [x] P2-2  `getFamilyState().family` aggregate (bothAsleep, firstWake, nextAction, overlapWindows) — backend, if not already present
 - [x] P2-3  Richer lanes: elapsed, next nap/bedtime, stale warning
 - [x] P2-4  Combined status line ("Begge søv. Første venta vakning: Ada om 18 min")
-- [ ] P2-5  begge with immediate per-baby correction ("Berre Ada vakna" / "Bo søv vidare")
+- [x] P2-5  begge with immediate per-baby correction ("Berre Ada vakna" / "Bo søv vidare")
 - [ ] P2-6  Morning prompt for both ("Når vakna dei?" same-time default + per-baby adjust)
 - [ ] P2-7  Sync vs individual mode toggle (stored family preference; real coupling stays Phase 4)
 - [ ] P2-8  Night-waking flow: which baby + "Vekte den andre også?"
@@ -449,3 +449,4 @@ Cross-cutting follow-on (do as they surface or after Phase 4):
 - [ ] X-8  Unify expected-wake precedence: `family.ts:expectedWakeFor` (nap branch) duplicates `timer-state.ts:getTimerMode` (~L114-119). Extract a shared leaf helper `src/lib/expected-wake.ts: expectedWakeForActiveSleep(activeSleep, prediction)`. NOTE the deliberate divergence: getTimerMode's `sleeping` branch returns null for night (night → `deep-night` display), whereas the family roll-up wants night→`expectedNightEnd`. Decide whether the single-baby Timer should also surface a night wake (a real Timer behavior change → its own unit + e2e) or keep them intentionally different. (Codex, P2-2)
 - [ ] X-9  Lane `nextAction` (`lane-status.ts`) isn't `now`-aware: it shows the predicted nap/bedtime even when that time is already past (Timer shows overtime / after-bedtime instead). Thread `now` into nextAction for overtime/after-bedtime parity on lanes. Also fold `awakeSinceMs` (duplicates `timer-state.ts:getAwakeSince`) into the X-8 shared-helper extraction. (Codex, P2-3)
 - [ ] X-10  Enforce the max-2-children cap at the event/projection level. Today only the add-child UI gates it (`canAddChild = babies.length < 2`); `baby.created` schema/projection has no guard, and several family roll-ups assumed exactly 2. `getCombinedStatus` now requires exactly 2 defensively, but a 3rd child via a raw event would still half-work elsewhere. Add a projection-time guard (reject/ignore `baby.created` beyond 2) + a test. (Codex, P2-4)
+- [ ] X-11  Fold the two duplicate undo-toast render blocks in `+page.svelte` (family-home branch + general branch) into one `<UndoToast>` component now that it carries corrections. Pre-existing duplication; low risk (mutually exclusive branches). (Codex, P2-5)

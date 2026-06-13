@@ -83,7 +83,7 @@ const sliceByName = async (
   name: string,
 ) => {
   const state = (await (await request.get("/api/state")).json()) as {
-    babies: { baby: { name: string }; activeSleep: unknown }[];
+    babies: { baby: { name: string }; activeSleep: unknown; staleActiveSleep: unknown }[];
   };
   return state.babies.find((b) => b.baby.name === name)!;
 };
@@ -131,6 +131,70 @@ test('"Sove begge" starts a sleep for both children', async ({ page, request }) 
 
   expect(!!(await sliceByName(request, "Ada")).activeSleep).toBe(true);
   expect(!!(await sliceByName(request, "Bo")).activeSleep).toBe(true);
+});
+
+test("'Vakne begge' then a per-baby correction keeps the other child asleep", async ({
+  page,
+  request,
+}) => {
+  const ada = createBaby("Ada", "2025-06-12");
+  const bo = createBaby("Bo", "2025-06-12");
+  const recent = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+  addActiveSleep(ada, recent, "nap");
+  addActiveSleep(bo, recent, "nap");
+
+  await page.goto("/");
+  await page.getByTestId("wake-both").click();
+
+  // The bulk action woke both; correct it — only Ada really woke.
+  await page.getByRole("button", { name: "Bo søv vidare" }).click();
+
+  await expect
+    .poll(async () => ({
+      ada: !!(await sliceByName(request, "Ada")).activeSleep,
+      bo: !!(await sliceByName(request, "Bo")).activeSleep,
+    }))
+    .toEqual({ ada: false, bo: true });
+});
+
+test("'Sove begge' then a per-baby correction keeps the other child awake", async ({
+  page,
+  request,
+}) => {
+  createBaby("Ada", "2025-06-12");
+  createBaby("Bo", "2025-06-12");
+
+  await page.goto("/");
+  await page.getByTestId("sleep-both").click();
+  await page.getByRole("button", { name: "Bo er vaken" }).click();
+
+  await expect
+    .poll(async () => ({
+      ada: !!(await sliceByName(request, "Ada")).activeSleep,
+      bo: !!(await sliceByName(request, "Bo")).activeSleep,
+    }))
+    .toEqual({ ada: true, bo: false });
+});
+
+test("'Sove begge' does not start a fresh sleep for a child with a forgotten (stale) sleep", async ({
+  page,
+  request,
+}) => {
+  createBaby("Ada", "2025-06-12");
+  const bo = createBaby("Bo", "2025-06-12");
+  addActiveSleep(bo, new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString(), "night"); // stale
+
+  await page.goto("/");
+  await page.getByTestId("sleep-both").click();
+
+  // Ada goes down; Bo's stale sleep is left untouched (no fresh activeSleep).
+  await expect
+    .poll(async () => {
+      const ada = (await sliceByName(request, "Ada")) as { activeSleep: unknown };
+      const boSlice = (await sliceByName(request, "Bo")) as { activeSleep: unknown; staleActiveSleep: unknown };
+      return { adaAsleep: !!ada.activeSleep, boActive: !!boSlice.activeSleep, boStale: !!boSlice.staleActiveSleep };
+    })
+    .toEqual({ adaAsleep: true, boActive: false, boStale: true });
 });
 
 test("combined status line: both awake, then both asleep", async ({ page }) => {

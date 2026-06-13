@@ -8,6 +8,8 @@
 	import { getCombinedStatus } from '$lib/family.js';
 
 	type DomainEvent = { type: string; payload: Record<string, unknown> };
+	/** A one-tap correction after a bulk action: revert just one child. */
+	type Correction = { label: string; events: DomainEvent[] };
 
 	interface Props {
 		babies: BabyState[];
@@ -16,8 +18,9 @@
 		family: FamilySummary;
 		/** Live clock (ms) for lane elapsed/expected-wake — owned by the dashboard. */
 		now: number;
-		/** Surface an undo toast (owned by the dashboard). */
-		onUndo: (message: string, undoEvents: DomainEvent[]) => void;
+		/** Surface an undo toast (owned by the dashboard). `corrections` adds
+		 *  per-child revert chips alongside "Angre" after a bulk action. */
+		onUndo: (message: string, undoEvents: DomainEvent[], corrections?: Correction[]) => void;
 		/** Open a single child's full detail view. */
 		onFocus: (babyId: number) => void;
 	}
@@ -26,7 +29,11 @@
 	const combined = $derived(getCombinedStatus(babies, family.firstWake, now));
 
 	const isAsleep = (b: BabyState) => !!(b.activeSleep && !b.activeSleep.end_time);
-	const anyAwake = $derived(babies.some((b) => b.baby && !isAsleep(b)));
+	// A child with a forgotten/stale open sleep (hidden from activeSleep by the
+	// server) is neither cleanly asleep nor awake — never bulk-act on them; the
+	// stale lane warning prompts resolving it first.
+	const isAwake = (b: BabyState) => !!b.baby && !isAsleep(b) && !b.staleActiveSleep;
+	const anyAwake = $derived(babies.some(isAwake));
 	const anyAsleep = $derived(babies.some((b) => isAsleep(b)));
 
 	let busy = $state(false);
@@ -39,8 +46,9 @@
 		try {
 			const events: DomainEvent[] = [];
 			const undo: DomainEvent[] = [];
+			const corrections: Correction[] = [];
 			for (const b of babies) {
-				if (!b.baby || isAsleep(b)) continue;
+				if (!isAwake(b) || !b.baby) continue;
 				const r = buildStartSleep(
 					b.baby.id,
 					b.todaySleeps,
@@ -49,11 +57,14 @@
 					b.prediction?.napsAllDone ?? undefined,
 				);
 				events.push(...r.events);
-				undo.push({ type: 'sleep.deleted', payload: { sleepDomainId: r.sleepDomainId } });
+				const revert: DomainEvent = { type: 'sleep.deleted', payload: { sleepDomainId: r.sleepDomainId } };
+				undo.push(revert);
+				// "Berre den eine sovna" — revert just this child back to awake.
+				corrections.push({ label: `${b.baby.name} er vaken`, events: [revert] });
 			}
 			if (events.length) {
 				await sync.sendEvents(events);
-				onUndo('Sove begge', undo);
+				onUndo('Sove begge', undo, corrections.length > 1 ? corrections : undefined);
 			}
 		} finally {
 			busy = false;
@@ -66,15 +77,19 @@
 		try {
 			const events: DomainEvent[] = [];
 			const undo: DomainEvent[] = [];
+			const corrections: Correction[] = [];
 			for (const b of babies) {
-				if (!isAsleep(b) || !b.activeSleep) continue;
+				if (!isAsleep(b) || !b.activeSleep || !b.baby) continue;
 				const r = buildEndSleep(b.activeSleep);
 				events.push(...r.events);
-				undo.push({ type: 'sleep.restarted', payload: { sleepDomainId: b.activeSleep.domain_id } });
+				const revert: DomainEvent = { type: 'sleep.restarted', payload: { sleepDomainId: b.activeSleep.domain_id } };
+				undo.push(revert);
+				// "Berre den eine vakna" — keep this child sleeping.
+				corrections.push({ label: `${b.baby.name} søv vidare`, events: [revert] });
 			}
 			if (events.length) {
 				await sync.sendEvents(events);
-				onUndo('Vakne begge', undo);
+				onUndo('Vakne begge', undo, corrections.length > 1 ? corrections : undefined);
 			}
 		} finally {
 			busy = false;

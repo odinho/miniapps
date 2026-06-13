@@ -69,24 +69,37 @@
 	let addingWakingForNight = $state<SleepLogRow | null>(null);
 
 	// --- undo toast ---
-	let undoToast = $state<{ message: string; undoEvents: Array<{ type: string; payload: Record<string, unknown> }> } | null>(null);
+	type ToastEvent = { type: string; payload: Record<string, unknown> };
+	/** Optional per-baby corrections shown alongside "Angre" after a bulk
+	 *  "begge" action — e.g. "Bo søv vidare" reverts just Bo (see FamilyHome). */
+	type ToastCorrection = { label: string; events: ToastEvent[] };
+	let undoToast = $state<{ message: string; undoEvents: ToastEvent[]; corrections?: ToastCorrection[] } | null>(null);
 	let undoTimer: ReturnType<typeof setTimeout> | null = null;
 
-	function showUndoToast(message: string, undoEvents: Array<{ type: string; payload: Record<string, unknown> }>) {
+	function showUndoToast(message: string, undoEvents: ToastEvent[], corrections?: ToastCorrection[]) {
 		if (undoTimer) clearTimeout(undoTimer);
-		undoToast = { message, undoEvents };
+		undoToast = { message, undoEvents, corrections };
 		undoTimer = setTimeout(() => { undoToast = null; }, 8000);
 	}
 
-	async function handleUndo() {
-		if (!undoToast) return;
-		const events = undoToast.undoEvents;
+	function dismissToast() {
 		undoToast = null;
 		if (undoTimer) clearTimeout(undoTimer);
 		// Close any modals that may reference the entity being undone
 		showTagSheet = false;
 		showWakeUpSheet = false;
 		editingSleep = null;
+	}
+
+	async function handleUndo() {
+		if (!undoToast) return;
+		const events = undoToast.undoEvents;
+		dismissToast();
+		await sync.sendEvents(events);
+	}
+
+	async function handleCorrection(events: ToastEvent[]) {
+		dismissToast();
 		await sync.sendEvents(events);
 	}
 
@@ -599,6 +612,11 @@
 		{#if undoToast}
 			<div class="undo-toast">
 				<span>{undoToast.message}</span>
+				{#if undoToast.corrections}
+					{#each undoToast.corrections as c}
+						<button class="btn btn-ghost" onclick={() => handleCorrection(c.events)}>{c.label}</button>
+					{/each}
+				{/if}
 				<button class="btn btn-ghost" onclick={handleUndo}>Angre</button>
 			</div>
 		{/if}
@@ -1008,6 +1026,11 @@
 	{#if undoToast}
 		<div class="undo-toast">
 			<span>{undoToast.message}</span>
+			{#if undoToast.corrections}
+				{#each undoToast.corrections as c}
+					<button class="btn btn-ghost" onclick={() => handleCorrection(c.events)}>{c.label}</button>
+				{/each}
+			{/if}
 			<button class="btn btn-ghost" onclick={handleUndo}>Angre</button>
 		</div>
 	{/if}
