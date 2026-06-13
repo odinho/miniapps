@@ -348,3 +348,97 @@ opt-in overlay; (4) family-device subscriptions + baby-scoped dedupe +
 named pushes; (5) the must-fix traps above (esp. `baby.updated` needs
 event-level `babyId`). Codex review notes stay out of git per repo
 convention; only decisions land here.
+
+---
+
+## Execution loop (autonomous, 2026-06-13 → )
+
+Authorised by the user (2026-06-13, going to sleep) to build out **all
+remaining phases + follow-on QA** as a self-paced serial loop. Decisions
+locked for this run:
+
+- **Twin-vs-sibling = infer from age gap + override.** Twin-mode
+  affordances (begge / sync / overlaid stats) light up when the two
+  children's birthdates are within **±21 days**; otherwise sibling-mode
+  (independent, no begge). A per-family settings override can force either
+  mode. (`isTwinMode(babies)` helper, family-level.)
+- **Merge to main, DO NOT deploy.** Each unit fast-forwards to main +
+  pushes (pre-push gates run). No `deploy/manage.sh deploy`. The user
+  reviews + deploys in the morning.
+- **Oracles:** Codex (`codex:codex-rescue`) for verification/diagnosis;
+  a Fable subagent (`Agent`, model `fable`) for holistic architecture /
+  refactor sanity on cross-cutting units. Brief them cold + thorough.
+
+### Per-unit protocol (one unit at a time, serial)
+
+1. Pick the **top unfinished unit** from the queue below.
+2. Read the docs that apply BEFORE coding: always
+   [`workflow.md`](./workflow.md); [`testing.md`](./testing.md) before
+   writing ANY test; [`agent-guide.md`](./agent-guide.md) for the repo
+   map; this file for multi-child decisions.
+3. **Test-first** where possible (read testing.md first — pick the right
+   layer; renderer+snapshot+pinned-invariants; no `.spec.ts`; use
+   `.unit/.test/.e2e`). Watch it fail.
+4. Implement the unit. Keep the **N=1 regression line**: a single-baby
+   family must stay byte-for-byte unchanged.
+5. Validate: `bun run test:unit`, `bun run test:integration`,
+   `bun run lint`, `bun run typecheck`; for UI/route changes also
+   `bun run build && bun run test:e2e` (note: arc-scenes + B18 e2e are
+   wall-clock-fragile — see followups; ignore those specific reds if they
+   fail identically on main).
+6. **Oracle review** for any non-trivial unit (engine/state/UX logic):
+   Codex always; add a Fable architecture pass when the unit is
+   cross-cutting or smells like it wants a refactor. Fix what they
+   surface or record it as a followup.
+7. Update [`followups.md`](./followups.md) (remove landed, add surfaced)
+   and tick the queue box here.
+8. Commit (why-focused message, note oracle outcome) → `git checkout main`
+   → `git merge --ff-only <branch>` → `git push`. **No deploy.**
+9. Next unit.
+
+### Subagent briefing rules (the user flagged this)
+
+Subagents forget to read about testing and write weak tests. EVERY
+subagent prompt that writes or reviews tests MUST be told to **read
+`docs/testing.md` first** and follow it (right layer, renderer+snapshot,
+pinned invariants, no narrow low-value tests). Tell every subagent to be
+**thorough** and to read the docs that exist rather than guessing.
+
+### Blocking decisions
+
+If a genuine **product/UX decision** arises that isn't already locked
+here and can't be safely defaulted, DO NOT guess: append it to
+`local/loop-questions.md` (gitignored) with context + options + a
+recommendation, then skip to the next independent unit. Oracles answer
+*technical* questions; only the user answers product ones.
+
+### Unit queue
+
+Phase 2 — logging ergonomics + at-a-glance:
+- [ ] P2-1  `isTwinMode` (age-gap ±21d) + settings override; gate begge/sync on it
+- [ ] P2-2  `getFamilyState().family` aggregate (bothAsleep, firstWake, nextAction, overlapWindows) — backend, if not already present
+- [ ] P2-3  Richer lanes: elapsed, next nap/bedtime, stale warning
+- [ ] P2-4  Combined status line ("Begge søv. Første venta vakning: Ada om 18 min")
+- [ ] P2-5  begge with immediate per-baby correction ("Berre Ada vakna" / "Bo søv vidare")
+- [ ] P2-6  Morning prompt for both ("Når vakna dei?" same-time default + per-baby adjust)
+- [ ] P2-7  Sync vs individual mode toggle (stored family preference; real coupling stays Phase 4)
+- [ ] P2-8  Night-waking flow: which baby + "Vekte den andre også?"
+- [ ] P2-QA  Adversarial + QA + UX review run (dedicated oracle/subagent runs); fix findings
+
+Phase 3 — twin views: combined graphs, comparison, overlap:
+- [ ] P3-1  Stats show both by default (twins overlaid; siblings two-up/segmented)
+- [ ] P3-2  Overlap visualisation (both-asleep windows = parent downtime)
+- [ ] P3-3  Comparison stats (total sleep, nap count, longest stretch, divergence)
+- [ ] P3-4  Family handoff "siste 6 timar" timeline
+- [ ] P3-QA  Adversarial + QA + UX review run; fix findings
+
+Phase 4 — twin scheduling intelligence (coupling, experimental):
+- [ ] P4-0  Design pass + multi-day simulation test design (oracle-heavy; likely surfaces user questions → park them)
+- [ ] P4-1  What-if overlap planner (suggestion-only, opt-in, inside each baby's window; parent policy not evidence)
+- [ ] P4-QA  Adversarial + multi-day simulation review; fix findings
+
+Cross-cutting follow-on (do as they surface or after Phase 4):
+- [ ] X-1  Notification de-noising (merge same-kind non-urgent within 10–15 min; never merge urgent; co-sleep "wake other" stays in-app)
+- [ ] X-2  AppState revision field → kill last-writer-wins races (from Phase-1-polish followup)
+- [ ] X-3  arc-scenes + B18 e2e wall-clock determinism (thread fixed `now`) — unblocks a clean full e2e
+- [ ] X-4  Mixed-age/older-child mode simplicity pass (does a 5yo need naps/strategy, or just bedtime+duration?)
