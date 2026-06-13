@@ -72,6 +72,8 @@ const payloadSchemas = {
     // null = back to auto-infer; absent = unchanged. Present-but-null is the
     // "reset to auto" signal, so keep it nullable-and-optional, not just optional.
     modeOverride: v.optional(v.nullable(v.picklist(["twin", "sibling"]))),
+    // Twin schedule-sync preference. Stored intent only (Phase 4 acts on it).
+    syncMode: v.optional(v.boolean()),
   }),
   "sleep.started": v.object({
     babyId: v.number(),

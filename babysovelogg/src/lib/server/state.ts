@@ -1,4 +1,4 @@
-import { db, getFamilyTimezone, getFamilyModeOverride } from "./db.js";
+import { db, getFamilyTimezone, getFamilyModeOverride, getFamilySyncMode } from "./db.js";
 import { isTwinMode, computeFamilyStatus } from "$lib/family.js";
 import { assembleState } from "$lib/engine/state.js";
 import { getPrefs } from "./notification-prefs.js";
@@ -279,6 +279,7 @@ export function getFamilyState(now?: number) {
       modeOverride,
     ),
     modeOverride,
+    syncMode: getFamilySyncMode(),
     ...computeFamilyStatus(babies),
   };
   return { ...primary, babies, family };

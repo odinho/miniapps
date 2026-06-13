@@ -44,6 +44,11 @@ export function applyEvent(event: AppEvent): void {
           "UPDATE family SET mode_override = ?, updated_by_event_id = ? WHERE id = 1",
         ).run(mode, eventId);
       }
+      if ("syncMode" in payload) {
+        db.prepare(
+          "UPDATE family SET sync_mode = ?, updated_by_event_id = ? WHERE id = 1",
+        ).run(payload.syncMode ? 1 : 0, eventId);
+      }
       break;
 
     case "baby.updated": {
@@ -539,7 +544,7 @@ export function rebuildAll(): RebuildReport {
     // history never set a zone, the next read lazily re-derives the server's;
     // a never-set mode_override stays null (auto-infer).
     db.prepare(
-      "UPDATE family SET timezone = NULL, mode_override = NULL, updated_by_event_id = NULL WHERE id = 1",
+      "UPDATE family SET timezone = NULL, mode_override = NULL, sync_mode = NULL, updated_by_event_id = NULL WHERE id = 1",
     ).run();
     // Reset autoincrement so replayed baby IDs match original payload references
     db.prepare(

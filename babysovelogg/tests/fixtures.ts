@@ -129,6 +129,11 @@ function resetDb() {
   _db.prepare("DELETE FROM baby").run();
   _db.prepare("DELETE FROM events").run();
   _db.prepare("DELETE FROM sqlite_sequence").run();
+  // Reset the singleton family row too — timezone / mode_override / sync_mode
+  // would otherwise leak between e2e tests (e.g. a set sync preference).
+  _db.prepare(
+    "UPDATE family SET timezone = NULL, mode_override = NULL, sync_mode = NULL, updated_by_event_id = NULL WHERE id = 1",
+  ).run();
   _db.exec("PRAGMA foreign_keys = ON");
 }
 

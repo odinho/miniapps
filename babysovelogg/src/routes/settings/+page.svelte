@@ -224,6 +224,14 @@
 		await sync.sendEvents([{ type: 'family.updated', payload: { modeOverride: value } }]);
 	}
 
+	// Twin schedule-sync preference. Stored intent only — Phase 4 wires the actual
+	// coupling; today it just records how the parent wants the day run.
+	const syncMode = $derived(s.family.syncMode);
+	async function setSyncMode(value: boolean) {
+		if (value === syncMode) return;
+		await sync.sendEvents([{ type: 'family.updated', payload: { syncMode: value } }]);
+	}
+
 	function onFileChange(e: Event) {
 		const input = e.target as HTMLInputElement;
 		importFile = input.files?.[0] ?? null;
@@ -448,6 +456,32 @@
 						Søsken
 					</button>
 				</div>
+
+				{#if s.family.isTwinMode}
+					<div style="margin-top: 20px;" data-testid="sync-mode-section">
+						<h3 style="font-size: 0.95rem; margin: 0 0 4px;">Dagsrytme</h3>
+						<div style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 10px;">
+							Korleis vil du køyra dagen? «Samkøyr» siktar mot overlappande søvn (so
+							de får pause samtidig). Føresetnad — verkar frå seinare oppdatering.
+						</div>
+						<div class="type-pills" data-testid="sync-mode-pills">
+							<button
+								class="type-pill"
+								class:active={!syncMode}
+								onclick={() => setSyncMode(false)}
+							>
+								Følg kvar rytme
+							</button>
+							<button
+								class="type-pill"
+								class:active={syncMode}
+								onclick={() => setSyncMode(true)}
+							>
+								Samkøyr dagen
+							</button>
+						</div>
+					</div>
+				{/if}
 			</div>
 		{/if}
 

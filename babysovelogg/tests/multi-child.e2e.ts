@@ -54,6 +54,34 @@ test("settings keeps an unsaved edit when a state refresh arrives", async ({ pag
   await expect(page.locator("#baby-name")).toHaveValue("Ada WIP");
 });
 
+test("twin families can set the day-sync preference (stored)", async ({ page, request }) => {
+  createBaby("Ada", "2025-06-12");
+  createBaby("Bo", "2025-06-12"); // same birthdate → twin mode → sync section shows
+
+  await page.goto("/settings?baby=1");
+  const sync = page.getByTestId("sync-mode-pills");
+  await expect(sync).toBeVisible({ timeout: 5000 });
+  await sync.getByRole("button", { name: "Samkøyr dagen" }).click();
+
+  await expect
+    .poll(async () => {
+      const state = (await (await request.get("/api/state")).json()) as { family: { syncMode: boolean } };
+      return state.family.syncMode;
+    })
+    .toBe(true);
+});
+
+test("mixed-age siblings get no day-sync toggle (sync is twin-only)", async ({ page }) => {
+  createBaby("Ada", "2025-06-12");
+  createBaby("Storesøster", "2020-01-01"); // years apart → sibling mode
+
+  await page.goto("/settings?baby=1");
+  // The family-mode override pills still show (you can force twin), but the
+  // sync preference is hidden until twin-mode is active.
+  await expect(page.getByTestId("family-mode-pills")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByTestId("sync-mode-pills")).toHaveCount(0);
+});
+
 test("can add a second child from settings", async ({ page, request }) => {
   createBaby("Ada", "2025-06-12");
 

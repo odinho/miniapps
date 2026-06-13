@@ -248,6 +248,9 @@ function initSchema(database: SqliteDb) {
   // Twin-vs-sibling override (null = auto-infer from age gap). Added after the
   // family table shipped, so migrate it onto existing single-family DBs.
   tryAddColumn(database, "family", "mode_override", "TEXT");
+  // Twin schedule-sync preference (1 = "samkøyr dagen"). A stored intent only —
+  // the actual coupling is Phase 4; nothing reads it for scheduling yet.
+  tryAddColumn(database, "family", "sync_mode", "INTEGER");
   const fam = database.prepare("SELECT timezone FROM family WHERE id = 1").get() as
     | { timezone: string | null }
     | undefined;
@@ -399,6 +402,15 @@ export function getFamilyModeOverride(): FamilyModeOverride {
   return row?.mode_override === "twin" || row?.mode_override === "sibling"
     ? row.mode_override
     : null;
+}
+
+/** Whether the family opted into twin schedule-sync ("samkøyr dagen"). A stored
+ *  preference only — Phase 4 will read it for coupling; nothing does yet. */
+export function getFamilySyncMode(): boolean {
+  const row = db.prepare("SELECT sync_mode FROM family WHERE id = 1").get() as
+    | { sync_mode: number | null }
+    | undefined;
+  return row?.sync_mode === 1;
 }
 
 /** Resolve the baby a request is scoped to. Reads an explicit `?baby=<id>`

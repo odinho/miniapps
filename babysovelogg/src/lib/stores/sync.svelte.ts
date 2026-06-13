@@ -61,6 +61,7 @@ function normalizeState(raw: AppStateResponse): AppState {
 				modeOverride: raw.family.modeOverride ?? null,
 				bothAsleep: !!raw.family.bothAsleep,
 				firstWake: raw.family.firstWake ?? null,
+				syncMode: !!raw.family.syncMode,
 			}
 		: emptyFamily;
 	return { ...primary, babies, family };

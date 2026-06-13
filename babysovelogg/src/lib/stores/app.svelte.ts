@@ -288,6 +288,8 @@ export interface FamilySummary {
 	bothAsleep: boolean;
 	/** Soonest expected wake among the asleep children, or null. */
 	firstWake: FirstWake | null;
+	/** Twin schedule-sync preference ("samkøyr dagen"). Stored only; Phase 4 acts on it. */
+	syncMode: boolean;
 }
 
 export interface AppState extends BabyState {
@@ -300,6 +302,7 @@ export const emptyFamily: FamilySummary = {
 	modeOverride: null,
 	bothAsleep: false,
 	firstWake: null,
+	syncMode: false,
 };
 
 const emptyState: AppState = {

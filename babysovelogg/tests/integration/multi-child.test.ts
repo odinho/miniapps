@@ -102,6 +102,37 @@ test("twin-mode: inferred from age gap, family.updated override wins", async () 
   expect(await familyMode()).toBe("twin=true override=twin");
 });
 
+test("sync-mode is a stored family preference, replayed deterministically on rebuild", async () => {
+  createBaby("Ada", "2025-06-12");
+  createBaby("Bo", "2025-06-20"); // twins
+
+  const syncMode = async () =>
+    ((await (await get("/api/state")).json()) as { family: { syncMode: boolean } }).family.syncMode;
+
+  expect(await syncMode()).toBe(false);
+
+  await postEvents([makeEvent("family.updated", { syncMode: true })]);
+  expect(await syncMode()).toBe(true);
+
+  // Explicit clear (present-but-false) turns it back off.
+  await postEvents([makeEvent("family.updated", { syncMode: false })]);
+  expect(await syncMode()).toBe(false);
+
+  const { rebuildAll } = await import("$lib/server/projections.js");
+
+  // Residue clear: drift the row to 1 with NO syncMode event in the log →
+  // rebuild must reset it (this is the exact P2-1 reset-omission bug class).
+  db.prepare("UPDATE family SET sync_mode = 1 WHERE id = 1").run();
+  rebuildAll();
+  expect(await syncMode()).toBe(false);
+
+  // And a logged preference replays deterministically.
+  await postEvents([makeEvent("family.updated", { syncMode: true })]);
+  db.prepare("UPDATE family SET sync_mode = 0 WHERE id = 1").run();
+  rebuildAll();
+  expect(await syncMode()).toBe(true);
+});
+
 test("twin-mode is off for a single-baby family", async () => {
   createBaby("Ada", "2025-06-12");
   expect(await familyMode()).toBe("twin=false override=null");
