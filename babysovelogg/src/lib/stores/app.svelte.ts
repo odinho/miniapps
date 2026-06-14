@@ -9,6 +9,7 @@ import type { CalibrationReport } from "$lib/engine/calibration.js";
 import type { Strategy } from "$lib/engine/strategy.js";
 import type { RollingSleepStats, AgeNorms } from "$lib/engine/features.js";
 import type { TrendTargets } from "$lib/engine/trend.js";
+import type { OverlapSuggestion } from "$lib/engine/overlap.js";
 
 export interface Prediction {
 	/** Which prediction strategy produced this result */
@@ -289,8 +290,11 @@ export interface FamilySummary {
 	bothAsleep: boolean;
 	/** Soonest expected wake among the asleep children, or null. */
 	firstWake: FirstWake | null;
-	/** Twin schedule-sync preference ("samkøyr dagen"). Stored only; Phase 4 acts on it. */
+	/** Twin schedule-sync preference ("samkøyr dagen"). Phase 4 acts on it. */
 	syncMode: boolean;
+	/** Phase 4 (opt-in twins): a suggested start-time nudge to overlap the twins'
+	 *  sleep, or null. Suggestion-only — the parent accepts or ignores it. */
+	overlapSuggestion: OverlapSuggestion | null;
 }
 
 export interface AppState extends BabyState {
@@ -308,6 +312,7 @@ export const emptyFamily: FamilySummary = {
 	bothAsleep: false,
 	firstWake: null,
 	syncMode: false,
+	overlapSuggestion: null,
 };
 
 const emptyState: AppState = {

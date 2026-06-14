@@ -63,6 +63,7 @@ function normalizeState(raw: AppStateResponse): AppState {
 				bothAsleep: !!raw.family.bothAsleep,
 				firstWake: raw.family.firstWake ?? null,
 				syncMode: !!raw.family.syncMode,
+				overlapSuggestion: raw.family.overlapSuggestion ?? null,
 			}
 		: emptyFamily;
 	return { ...primary, babies, family, revision };

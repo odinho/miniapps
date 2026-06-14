@@ -1762,7 +1762,7 @@ export function estimateSleepCycleFromData(ctx: BabyContext): number {
   return estimateSleepCycleDetails(ctx).minutes;
 }
 
-function getSleepCycleMinutes(ageMonths: number): number {
+export function getSleepCycleMinutes(ageMonths: number): number {
   return getSleepCyclePrior(ageMonths).meanMin;
 }
 

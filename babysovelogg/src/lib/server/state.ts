@@ -1,5 +1,6 @@
 import { db, getFamilyTimezone, getFamilyModeOverride, getFamilySyncMode } from "./db.js";
 import { isTwinMode, computeFamilyStatus } from "$lib/family.js";
+import { computeOverlapSuggestion } from "$lib/family-overlap.js";
 import { assembleState } from "$lib/engine/state.js";
 import { getPrefs } from "./notification-prefs.js";
 import { getNapBudgetState, setNapBudgetState } from "./nap-budget-state.js";
@@ -273,13 +274,20 @@ export function getFamilyState(now?: number) {
     .filter((b): b is BabyState => b !== null);
   const primary = babies.length ? babies[babies.length - 1] : EMPTY_BABY_STATE;
   const modeOverride = getFamilyModeOverride();
-  const family = {
-    isTwinMode: isTwinMode(
-      babies.map((b) => b.baby?.birthdate).filter((d): d is string => !!d),
-      modeOverride,
-    ),
+  const twinMode = isTwinMode(
+    babies.map((b) => b.baby?.birthdate).filter((d): d is string => !!d),
     modeOverride,
-    syncMode: getFamilySyncMode(),
+  );
+  const syncMode = getFamilySyncMode();
+  const family = {
+    isTwinMode: twinMode,
+    modeOverride,
+    syncMode,
+    // Phase 4 coupling is opt-in: only suggest an overlap nudge for twins whose
+    // parents turned on sync. Yields to siblings/single-baby and to any baby's
+    // real needs (the builder's `blocked` flag). Suggestion-only.
+    overlapSuggestion:
+      twinMode && syncMode ? computeOverlapSuggestion(babies, now ?? Date.now()) : null,
     ...computeFamilyStatus(babies),
   };
   // Monotonic snapshot revision = the latest applied event id. A response

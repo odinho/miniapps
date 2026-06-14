@@ -36,7 +36,7 @@ function makeState(overrides: Partial<AppState> = {}): AppState {
 		offDays: [],
 		todayNightWakings: [],
 		babies: [],
-		family: { isTwinMode: false, modeOverride: null, bothAsleep: false, firstWake: null, syncMode: false },
+		family: { isTwinMode: false, modeOverride: null, bothAsleep: false, firstWake: null, syncMode: false, overlapSuggestion: null },
 		revision: 0,
 		...overrides,
 	};
@@ -67,7 +67,7 @@ function makeFamily(slices: BabyState[]): AppState {
 	return {
 		...slices[slices.length - 1],
 		babies: slices,
-		family: { isTwinMode: false, modeOverride: null, bothAsleep: false, firstWake: null, syncMode: false },
+		family: { isTwinMode: false, modeOverride: null, bothAsleep: false, firstWake: null, syncMode: false, overlapSuggestion: null },
 		revision: 0,
 	};
 }
