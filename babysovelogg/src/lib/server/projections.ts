@@ -12,7 +12,19 @@ export function applyEvent(event: AppEvent): void {
   const eventId = event.id;
 
   switch (type) {
-    case "baby.created":
+    case "baby.created": {
+      // Hard cap: a family is at most 2 children (the whole design assumes it —
+      // two lanes, "begge", combined status, no dropdown). The add-child UI
+      // already gates this, but guard the projection so a raw or duplicated
+      // event can't create a third that family roll-ups can't represent. No-op
+      // beyond 2; replay-safe (a valid log never has a third, so it never fires).
+      const count = (db.prepare("SELECT COUNT(*) AS n FROM baby").get() as { n: number }).n;
+      if (count >= 2) {
+        // Anomalous — the add-child UI prevents this, so a third only arrives
+        // via a raw/duplicated event. Surface it (error level) but don't insert.
+        console.error("[projections] baby.created ignored — family already has 2 children");
+        break;
+      }
       db.prepare(
         `INSERT INTO baby (name, birthdate, timezone, created_at, created_by_event_id) VALUES (?, ?, ?, datetime('now'), ?)`,
       ).run(payload.name, payload.birthdate, payload.timezone ?? null, eventId);
@@ -25,6 +37,7 @@ export function applyEvent(event: AppEvent): void {
         );
       }
       break;
+    }
 
     case "family.updated":
       // Only ever SET a zone, never clear it — there's no "unset household

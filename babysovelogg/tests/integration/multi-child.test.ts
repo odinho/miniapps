@@ -9,6 +9,7 @@ import {
   addCompletedSleep,
   generateSleepId,
   setupHarness,
+  expectConsoleError,
 } from "./harness.js";
 setupHarness();
 
@@ -145,6 +146,19 @@ test("snapshot revision is monotonic — bumps as events are applied (X-2 guard)
   ]);
   const r2 = await rev();
   expect(r2).toBeGreaterThan(r1);
+});
+
+test("max-2 cap: a 3rd baby.created is a no-op at the projection level (X-10)", async () => {
+  expectConsoleError(/baby\.created ignored/);
+  await postEvents([
+    makeEvent("baby.created", { name: "Ada", birthdate: "2025-06-12" }),
+    makeEvent("baby.created", { name: "Bo", birthdate: "2025-06-12" }),
+    makeEvent("baby.created", { name: "Cy", birthdate: "2025-06-12" }),
+  ]);
+  const names = (db.prepare("SELECT name FROM baby ORDER BY id").all() as { name: string }[]).map(
+    (b) => b.name,
+  );
+  expect(names).toEqual(["Ada", "Bo"]);
 });
 
 test("twin-mode is off for a single-baby family", async () => {
