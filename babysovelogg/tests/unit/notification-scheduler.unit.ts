@@ -4,6 +4,7 @@ import {
   reconcileNotifications,
   fireDueNotifications,
   planDueSends,
+  lookAheadPulls,
   type ReconcileInput,
 } from "$lib/server/notification-scheduler.js";
 import { setPrefs } from "$lib/server/notification-prefs.js";
@@ -763,5 +764,89 @@ describe("planDueSends – X-1 family notification de-noising", () => {
       "b1:nap_budget_cap(1)",
       "b1:nap_ending_soon(1)",
     ].toSorted());
+  });
+});
+
+describe("lookAheadPulls – X-14 anticipatory look-ahead coalescing", () => {
+  let nid = 0;
+  const row = (babyId: number, kind: string) => ({
+    id: ++nid,
+    baby_id: babyId,
+    kind,
+    fire_at: "2026-06-14T18:30:00.000Z",
+    dedupe_key: `b${babyId}:${kind}`,
+    attempts: 0,
+    payload_json: "{}",
+  });
+
+  it("pulls a sibling's upcoming bedtime_approaching when one is already due", () => {
+    const pulls = lookAheadPulls([row(1, "bedtime_approaching")], [row(2, "bedtime_approaching")]);
+    expect(pulls.map((r) => r.baby_id)).toEqual([2]);
+  });
+
+  it("does not pull when no same-kind sibling is already due", () => {
+    // baby1's DUE alert is a different (sleep-tied) kind, so baby2's upcoming
+    // bedtime alert has no due sibling to merge with → left alone.
+    expect(lookAheadPulls([row(1, "nap_overtime")], [row(2, "bedtime_approaching")])).toEqual([]);
+  });
+
+  it("never pulls sleep-tied kinds, even with a due sibling", () => {
+    expect(lookAheadPulls([row(1, "nap_ending_soon")], [row(2, "nap_ending_soon")])).toEqual([]);
+    expect(lookAheadPulls([row(1, "nap_overtime")], [row(2, "nap_overtime")])).toEqual([]);
+  });
+
+  it("does not pull the same baby (no self-merge)", () => {
+    expect(lookAheadPulls([row(1, "bedtime_approaching")], [row(1, "bedtime_approaching")])).toEqual([]);
+  });
+});
+
+describe("fireDueNotifications – X-14 early-fire merge", () => {
+  beforeEach(() => {
+    db.prepare("INSERT INTO baby (id, name, birthdate) VALUES (2, 'Bo', '2025-06-12')").run();
+  });
+
+  const insert = (babyId: number, kind: string, fireAt: string) =>
+    db
+      .prepare(
+        `INSERT INTO notification_schedule (baby_id, kind, fire_at, dedupe_key, payload_json)
+         VALUES (?, ?, ?, ?, '{"title":"x","body":"y"}')`,
+      )
+      .run(babyId, kind, fireAt, `b${babyId}:${kind}`);
+
+  const sentBabies = () =>
+    (
+      db
+        .prepare("SELECT baby_id FROM notification_schedule WHERE sent_at IS NOT NULL ORDER BY baby_id")
+        .all() as { baby_id: number }[]
+    ).map((r) => r.baby_id);
+
+  it("fires a sibling's bedtime alert early so it coalesces with the due one", async () => {
+    const now = new Date("2026-06-14T18:30:00.000Z");
+    insert(1, "bedtime_approaching", "2026-06-14T18:29:00.000Z"); // due
+    insert(2, "bedtime_approaching", "2026-06-14T18:40:00.000Z"); // +10 min, within look-ahead
+
+    await fireDueNotifications(now);
+
+    expect(sentBabies()).toEqual([1, 2]);
+  });
+
+  it("leaves a sibling beyond the look-ahead window untouched", async () => {
+    const now = new Date("2026-06-14T18:30:00.000Z");
+    insert(1, "bedtime_approaching", "2026-06-14T18:29:00.000Z"); // due
+    insert(2, "bedtime_approaching", "2026-06-14T18:50:00.000Z"); // +20 min, too far
+
+    await fireDueNotifications(now);
+
+    expect(sentBabies()).toEqual([1]);
+  });
+
+  it("never early-fires sleep-tied alerts", async () => {
+    const now = new Date("2026-06-14T18:30:00.000Z");
+    insert(1, "nap_overtime", "2026-06-14T18:29:00.000Z"); // due
+    insert(2, "nap_overtime", "2026-06-14T18:40:00.000Z"); // within window but sleep-tied
+
+    await fireDueNotifications(now);
+
+    expect(sentBabies()).toEqual([1]);
   });
 });

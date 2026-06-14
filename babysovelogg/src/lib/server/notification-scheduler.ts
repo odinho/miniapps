@@ -282,6 +282,47 @@ export function reconcileNotifications(state: ReconcileInput): void {
 // coalesced when both children's same-kind notifications are due together.
 const URGENT_KINDS = new Set<string>(["nap_budget_cap", "rescue_wake"]);
 
+// X-14 look-ahead coalescing. When one twin's notification is already due and
+// the sibling's same-kind one is only minutes away, pull the sibling in early so
+// the two merge into ONE "Begge: …" push instead of two alerts ~minutes apart.
+// Only ANTICIPATORY kinds are eligible (a small early-fire is harmless for a
+// "30 min before bedtime" heads-up); sleep-tied alerts — nap ending/overtime,
+// wake-caps — keep their exact timing and never shift. Cap the early-fire so we
+// never pull a notification meaningfully before its real moment.
+export const LOOKAHEAD_EARLY_MS = 15 * 60 * 1000;
+const LOOKAHEAD_KINDS = new Set<string>(["bedtime_approaching"]);
+
+/**
+ * Decide which not-yet-due rows to fire early so they coalesce with an
+ * already-due sibling. Pure: returns the subset of `upcoming` to pull into the
+ * batch. A row is pulled only when (a) its kind is look-ahead eligible and (b) a
+ * DIFFERENT baby already has the same kind due in this batch — so we never fire a
+ * notification early on its own, only to merge it with a real, already-due one.
+ */
+export function lookAheadPulls(
+  due: NotificationRow[],
+  upcoming: NotificationRow[],
+): NotificationRow[] {
+  const dueBabiesByKind = new Map<string, Set<number>>();
+  for (const row of due) {
+    if (!LOOKAHEAD_KINDS.has(row.kind)) continue;
+    let babies = dueBabiesByKind.get(row.kind);
+    if (!babies) {
+      babies = new Set();
+      dueBabiesByKind.set(row.kind, babies);
+    }
+    babies.add(row.baby_id);
+  }
+  const pulls: NotificationRow[] = [];
+  for (const row of upcoming) {
+    if (!LOOKAHEAD_KINDS.has(row.kind)) continue;
+    const dueBabies = dueBabiesByKind.get(row.kind);
+    if (!dueBabies) continue;
+    if ([...dueBabies].some((id) => id !== row.baby_id)) pulls.push(row);
+  }
+  return pulls;
+}
+
 /** Persist the send outcome (sent / retry / give-up) for each row in a group. */
 function settleRows(rows: NotificationRow[], failed: number, now: Date): void {
   for (const row of rows) {
@@ -371,7 +412,23 @@ export async function fireDueNotifications(now: Date = new Date()): Promise<numb
     )
     .all(nowIso) as NotificationRow[];
 
-  const groups = planDueSends(due);
+  // X-14: peek at anticipatory rows coming due within the look-ahead window and
+  // fire any whose same-kind sibling is already due, so they coalesce into one
+  // "Begge: …" push instead of two near-simultaneous alerts.
+  const lookAheadIso = new Date(now.getTime() + LOOKAHEAD_EARLY_MS).toISOString();
+  const upcoming =
+    LOOKAHEAD_KINDS.size === 0
+      ? []
+      : (db
+          .prepare(
+            `SELECT * FROM notification_schedule
+             WHERE fire_at > ? AND fire_at <= ? AND sent_at IS NULL AND cancelled_at IS NULL
+               AND kind IN (${[...LOOKAHEAD_KINDS].map(() => "?").join(",")})
+             ORDER BY fire_at ASC LIMIT 100`,
+          )
+          .all(nowIso, lookAheadIso, ...LOOKAHEAD_KINDS) as NotificationRow[]);
+
+  const groups = planDueSends([...due, ...lookAheadPulls(due, upcoming)]);
 
   const results = await Promise.all(
     groups.map(async (group) => {
