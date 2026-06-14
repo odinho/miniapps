@@ -181,7 +181,7 @@ HARD INVARIANTS for every unit here:
 Step 1 — behaviour-preserving refactor (single-baby unchanged):
 - [x] S1-0  Determinism (`now` param) + golden characterization snapshot
 - [x] S1-1  Extract pure primitives → `charts/scales.ts` (TS_CHART, tsX, rolling*, GANTT, getLocalHourFrac)
-- [ ] S1-2  `charts/paths.ts`: port the inline line/area/stacked/rolling/norm-band/step path generators as pure fns taking data + scales; refactor the stats-view-utils builders to call them. Golden byte-identical.
+- [x] S1-2  `charts/paths.ts`: pure `polyline`/`areaUnder`/`band`/`stepPath` generators taking pre-formatted point strings; the 5 builders (sleepVsNorm, stackedArea, nightStretch, bedtime, napCount) now call them. Golden byte-identical (mechanical extraction; no Codex needed). rollingAvgPath already lived in scales.ts.
 - [ ] S1-3  `charts/types.ts`: generic chart model (dims, axis ticks, legend items, reference bands, line/area series descriptors, gantt rows/blocks with childId). No behaviour change.
 - [ ] S1-4  `ChartFrame.svelte` + `ChartFullscreen.svelte`: card/title/legend slots + the outerHTML→{@html} fullscreen. Migrate the page's duplicated chart-wrapper + fullscreen to it (start one chart, then all). stats e2e green.
 - [ ] S1-5  `ChartLegend.svelte`: extract the legend; child-colour-first ordering ready for Step 2.

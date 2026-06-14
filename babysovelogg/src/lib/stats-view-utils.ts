@@ -24,6 +24,7 @@ import {
 	GANTT,
 	getLocalHourFrac,
 } from "$lib/charts/scales.js";
+import { polyline, areaUnder, band, stepPath } from "$lib/charts/paths.js";
 
 export { TS_CHART, GANTT } from "$lib/charts/scales.js";
 
@@ -114,16 +115,16 @@ function buildSleepVsNorm(
 	// Build actual sleep area path (area from baseline to data)
 	const baseY = yMap(minHours);
 	const actualPoints = points.map((p) => `${tsX(p.i, n)},${yMap(p.totalHours)}`);
-	const actualPath = `M${tsX(0, n)},${baseY} L${actualPoints.join(" L")} L${tsX(n - 1, n)},${baseY} Z`;
+	const actualPath = areaUnder(actualPoints, tsX(0, n), tsX(n - 1, n), baseY);
 
 	// Build norm band polygon (upper forward, lower backward)
 	const upperPoints = points.map((p) => `${tsX(p.i, n)},${yMap(p.norm.max)}`);
 	const lowerPoints = points.map((p) => `${tsX(p.i, n)},${yMap(p.norm.min)}`).toReversed();
-	const bandPath = `M${upperPoints.join(" L")} L${lowerPoints.join(" L")} Z`;
+	const bandPath = band(upperPoints, lowerPoints);
 
 	// Typical line
 	const typicalPoints = points.map((p) => `${tsX(p.i, n)},${yMap(p.norm.typical)}`);
-	const typicalPath = `M${typicalPoints.join(" L")}`;
+	const typicalPath = polyline(typicalPoints);
 
 	// Dots
 	const dots = points.map((p) => ({
@@ -194,11 +195,11 @@ function buildStackedArea(
 
 	// Night area: baseline → night values → baseline
 	const nightTopPoints = days.map((d, i) => `${tsX(i, n)},${yMap(d.nightMin)}`);
-	const nightPath = `M${tsX(0, n)},${baseY} L${nightTopPoints.join(" L")} L${tsX(n - 1, n)},${baseY} Z`;
+	const nightPath = areaUnder(nightTopPoints, tsX(0, n), tsX(n - 1, n), baseY);
 
 	// Nap area: night top → total top → night top (reversed)
 	const totalTopPoints = days.map((d, i) => `${tsX(i, n)},${yMap(d.nightMin + d.napMin)}`);
-	const napPath = `M${nightTopPoints.join(" L")} L${totalTopPoints.toReversed().join(" L")} Z`;
+	const napPath = band(nightTopPoints, totalTopPoints.toReversed());
 
 	// 7-day rolling average for total sleep
 	const totals = days.map((d) => d.napMin + d.nightMin);
@@ -268,8 +269,8 @@ function buildNightStretchChart(
 	const yMap = (min: number) => baseY - (min / maxMin) * plotH;
 
 	const linePoints = stretches.map((s, i) => `${tsX(i, n)},${yMap(s.minutes)}`);
-	const linePath = `M${linePoints.join(" L")}`;
-	const areaPath = `M${tsX(0, n)},${baseY} L${linePoints.join(" L")} L${tsX(n - 1, n)},${baseY} Z`;
+	const linePath = polyline(linePoints);
+	const areaPath = areaUnder(linePoints, tsX(0, n), tsX(n - 1, n), baseY);
 
 	// 7-day rolling average
 	const mins = stretches.map((s) => s.minutes);
@@ -349,7 +350,7 @@ function buildBedtimeChart(
 	const yMap = (h: number) => TS_CHART.PAD_T + ((h - minH) / range) * plotH;
 
 	const linePoints = bedtimes.map((b, i) => `${tsX(i, n)},${yMap(b.hour)}`);
-	const linePath = `M${linePoints.join(" L")}`;
+	const linePath = polyline(linePoints);
 
 	const dots = bedtimes.map((b, i) => ({
 		x: tsX(i, n),
@@ -414,18 +415,9 @@ function buildNapCountChart(
 	const yMap = (count: number) => baseY - (count / maxCount) * plotH;
 
 	// Step-style line: horizontal segments between points
-	const segments: string[] = [];
-	for (let i = 0; i < n; i++) {
-		const x = tsX(i, n);
-		const y = yMap(filtered[i].napCount);
-		if (i === 0) {
-			segments.push(`M${x},${y}`);
-		} else {
-			// Horizontal then vertical (step)
-			segments.push(`H${x} V${y}`);
-		}
-	}
-	const linePath = segments.join(" ");
+	const stepXs = filtered.map((_, i) => tsX(i, n));
+	const stepYs = filtered.map((d) => yMap(d.napCount));
+	const linePath = stepPath(stepXs, stepYs);
 
 	// Rolling average
 	const counts = filtered.map((d) => d.napCount);
