@@ -22,8 +22,10 @@
 	import ManualSleepModal from '$lib/components/ManualSleepModal.svelte';
 	import TodayCard from '$lib/components/TodayCard.svelte';
 	import FamilyHome from '$lib/components/FamilyHome.svelte';
+	import FamilyMorningPrompt from '$lib/components/FamilyMorningPrompt.svelte';
 	import UndoToast from '$lib/components/UndoToast.svelte';
 	import { isoToDateInTz } from '$lib/tz.js';
+	import { babyNeedsMorningWake } from '$lib/family-morning.js';
 
 	// --- modal state ---
 	let showTagSheet = $state(false);
@@ -618,6 +620,26 @@
 		showMorningManualSleep = false;
 	}
 
+	// Family-home combined morning prompt (2+ children). Same morning gate and
+	// per-day dismissal as the single-baby prompt, but household-wide: shows when
+	// ANY child still needs today's wake time.
+	let familyMorningDismissedDate = $state('');
+	const needsFamilyMorningPrompt = $derived.by(() => {
+		void now;
+		if (!showFamilyHome) return false;
+		if (!babies.some(babyNeedsMorningWake)) return false;
+		const tz = babies[0]?.baby?.timezone || 'UTC';
+		if (familyMorningDismissedDate === isoToDateInTz(new Date().toISOString(), tz)) return false;
+		if (babies.some((b) => b.staleActiveSleep?.staleStatus === 'abandoned')) return true;
+		const h = new Date().getHours();
+		return h >= 5 && h < 13;
+	});
+
+	function skipFamilyMorning() {
+		const tz = babies[0]?.baby?.timezone || 'UTC';
+		familyMorningDismissedDate = isoToDateInTz(new Date().toISOString(), tz);
+	}
+
 </script>
 
 {#if !loaded}
@@ -642,6 +664,9 @@
 				<span class="sync-badge sync-badge-offline" data-testid="sync-badge">offline</span>
 			{/if}
 		</div>
+		{#if needsFamilyMorningPrompt}
+			<FamilyMorningPrompt {babies} onSkip={skipFamilyMorning} />
+		{/if}
 		<FamilyHome {babies} {now} family={appState.state.family} onUndo={showUndoToast} onFocus={(id) => goto(`/?baby=${id}`)} />
 		{#if undoToast}
 			<UndoToast

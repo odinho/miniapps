@@ -421,7 +421,7 @@ Phase 2 — logging ergonomics + at-a-glance:
 - [x] P2-3  Richer lanes: elapsed, next nap/bedtime, stale warning
 - [x] P2-4  Combined status line ("Begge søv. Fyrste venta vakning: Ada om 18 min")
 - [x] P2-5  begge with immediate per-baby correction ("Berre Ada vakna" / "Bo søv vidare")
-- [~] P2-6  Morning prompt for both ("Når vakna dei?" same-time default + per-baby adjust) — PARKED (see local/loop-questions.md; awaiting Odin)
+- [x] P2-6  Morning prompt for both ("Når vakna dei?" same-time default + per-baby adjust). Combined family-home prompt (`FamilyMorningPrompt.svelte`): master time + "Ulik tid?" expander for per-child times, already-logged children shown dimmed, one `day.started` per pending child (+ stale-session discard). Any 2 children (not just twins). N=1 + focused per-baby view keep the original single prompt. Predicate extracted to `family-morning.ts:babyNeedsMorningWake` (keyed on `wake_time`, not the row — Codex caught a marker-only off-day row hiding the prompt) + unit-tested. e2e in `multi-child-morning.e2e.ts`. (Odin: go with all 4 recs.)
 - [x] P2-7  Sync vs individual mode toggle (stored family preference; real coupling stays Phase 4)
 - [x] P2-8  Night-waking flow: which baby + "Vekte den andre også?"
 - [x] P2-QA  Adversarial + QA + UX review run (dedicated oracle/subagent runs); fix findings
