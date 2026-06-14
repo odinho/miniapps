@@ -19,6 +19,7 @@
 	import ChartFrame from '$lib/components/charts/ChartFrame.svelte';
 	import ChartFullscreen from '$lib/components/charts/ChartFullscreen.svelte';
 	import ChartLegend from '$lib/components/charts/ChartLegend.svelte';
+	import TimeSeriesChart from '$lib/components/charts/TimeSeriesChart.svelte';
 
 	const s = $derived(appState.state);
 	const baby = $derived(s.baby);
@@ -254,22 +255,18 @@
 			<div class="stats-section">
 				<h3 class="stats-section-title">Søvntrend (30 dagar)</h3>
 				<ChartFrame title="Søvntrend" onExpand={expand}>
-					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
-						{#each activeStats.stackedArea.gridLines as y}
-							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
-						{/each}
-						{#each activeStats.stackedArea.yTicks as tick}
-							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
-						{/each}
-						<path d={activeStats.stackedArea.nightPath} fill="var(--moon)" opacity="0.7" />
-						<path d={activeStats.stackedArea.napPath} fill="var(--peach-dark)" opacity="0.7" />
-						{#if activeStats.stackedArea.rollingAvgPath}
-							<path d={activeStats.stackedArea.rollingAvgPath} fill="none" stroke="var(--danger-dark, #c0392b)" stroke-width="2.5" stroke-linecap="round" opacity="0.8" />
-						{/if}
-						{#each activeStats.stackedArea.xLabels as lbl}
-							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
-						{/each}
-					</svg>
+					<TimeSeriesChart
+						gridLines={activeStats.stackedArea.gridLines}
+						yTicks={activeStats.stackedArea.yTicks}
+						xLabels={activeStats.stackedArea.xLabels}
+						series={[
+							{ path: activeStats.stackedArea.nightPath, fill: 'var(--moon)', opacity: 0.7 },
+							{ path: activeStats.stackedArea.napPath, fill: 'var(--peach-dark)', opacity: 0.7 },
+							...(activeStats.stackedArea.rollingAvgPath
+								? [{ path: activeStats.stackedArea.rollingAvgPath, stroke: 'var(--danger-dark, #c0392b)', strokeWidth: 2.5, strokeLinecap: 'round', opacity: 0.8 }]
+								: []),
+						]}
+					/>
 					<ChartLegend items={[{ label: 'Lurar', colorVar: '--peach-dark' }, { label: 'Natt', colorVar: '--moon' }]} />
 				</ChartFrame>
 			</div>
@@ -280,24 +277,16 @@
 			<div class="stats-section">
 				<h3 class="stats-section-title">Total søvn vs. tilrådd</h3>
 				<ChartFrame title="Total søvn vs. tilrådd" onExpand={expand}>
-					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
-						{#each activeStats.sleepVsNorm.gridLines as y}
-							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
-						{/each}
-						{#each activeStats.sleepVsNorm.yTicks as tick}
-							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
-						{/each}
-						<!-- Norm band (recommended range) -->
-						<path d={activeStats.sleepVsNorm.bandPath} fill="var(--moon-glow)" opacity="0.5" />
-						<!-- Typical line (center of range) -->
-						<path d={activeStats.sleepVsNorm.typicalPath} fill="none" stroke="var(--text-light)" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6" />
-						<!-- Actual sleep area -->
-						<path d={activeStats.sleepVsNorm.actualPath} fill="var(--moon)" opacity="0.85" />
-						<!-- Data line (no dots — clean design) -->
-						{#each activeStats.sleepVsNorm.xLabels as lbl}
-							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
-						{/each}
-					</svg>
+					<TimeSeriesChart
+						gridLines={activeStats.sleepVsNorm.gridLines}
+						yTicks={activeStats.sleepVsNorm.yTicks}
+						xLabels={activeStats.sleepVsNorm.xLabels}
+						bands={[{ path: activeStats.sleepVsNorm.bandPath, fill: 'var(--moon-glow)', opacity: 0.5 }]}
+						series={[
+							{ path: activeStats.sleepVsNorm.typicalPath, stroke: 'var(--text-light)', strokeWidth: 1.5, strokeDasharray: '4,3', opacity: 0.6 },
+							{ path: activeStats.sleepVsNorm.actualPath, fill: 'var(--moon)', opacity: 0.85 },
+						]}
+					/>
 					<ChartLegend items={[{ label: 'Faktisk søvn', colorVar: '--moon' }, { label: 'Tilrådd', colorVar: '--moon-glow' }]} />
 				</ChartFrame>
 			</div>
@@ -308,26 +297,18 @@
 			<div class="stats-section">
 				<h3 class="stats-section-title">Lengste nattestrekk</h3>
 				<ChartFrame title="Lengste nattestrekk" onExpand={expand}>
-					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
-						{#each activeStats.nightStretchChart.gridLines as y}
-							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
-						{/each}
-						{#each activeStats.nightStretchChart.yTicks as tick}
-							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
-						{/each}
-						<!-- Area fill -->
-						<path d={activeStats.nightStretchChart.areaPath} fill="var(--moon-glow)" opacity="0.3" />
-						<!-- Rolling average -->
-						{#if activeStats.nightStretchChart.rollingAvgPath}
-							<path d={activeStats.nightStretchChart.rollingAvgPath} fill="none" stroke="var(--danger-dark, #c0392b)" stroke-width="2.5" stroke-linecap="round" opacity="0.8" />
-						{/if}
-						<!-- Line -->
-						<path d={activeStats.nightStretchChart.linePath} fill="none" stroke="var(--moon)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-						<!-- No dots — clean lines only -->
-						{#each activeStats.nightStretchChart.xLabels as lbl}
-							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
-						{/each}
-					</svg>
+					<TimeSeriesChart
+						gridLines={activeStats.nightStretchChart.gridLines}
+						yTicks={activeStats.nightStretchChart.yTicks}
+						xLabels={activeStats.nightStretchChart.xLabels}
+						series={[
+							{ path: activeStats.nightStretchChart.areaPath, fill: 'var(--moon-glow)', opacity: 0.3 },
+							...(activeStats.nightStretchChart.rollingAvgPath
+								? [{ path: activeStats.nightStretchChart.rollingAvgPath, stroke: 'var(--danger-dark, #c0392b)', strokeWidth: 2.5, strokeLinecap: 'round', opacity: 0.8 }]
+								: []),
+							{ path: activeStats.nightStretchChart.linePath, stroke: 'var(--moon)', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round' },
+						]}
+					/>
 				</ChartFrame>
 			</div>
 		{/if}
@@ -361,22 +342,17 @@
 			<div class="stats-section">
 				<h3 class="stats-section-title">Lurar per dag</h3>
 				<ChartFrame title="Lurar per dag" onExpand={expand}>
-					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
-						{#each activeStats.napCountChart.gridLines as y}
-							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
-						{/each}
-						{#each activeStats.napCountChart.yTicks as tick}
-							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
-						{/each}
-						{#if activeStats.napCountChart.rollingAvgPath}
-							<path d={activeStats.napCountChart.rollingAvgPath} fill="none" stroke="var(--danger-dark, #c0392b)" stroke-width="2.5" stroke-linecap="round" opacity="0.8" />
-						{/if}
-						<path d={activeStats.napCountChart.linePath} fill="none" stroke="var(--peach-dark)" stroke-width="2.5" stroke-linecap="round" />
-						<!-- No dots — clean lines only -->
-						{#each activeStats.napCountChart.xLabels as lbl}
-							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
-						{/each}
-					</svg>
+					<TimeSeriesChart
+						gridLines={activeStats.napCountChart.gridLines}
+						yTicks={activeStats.napCountChart.yTicks}
+						xLabels={activeStats.napCountChart.xLabels}
+						series={[
+							...(activeStats.napCountChart.rollingAvgPath
+								? [{ path: activeStats.napCountChart.rollingAvgPath, stroke: 'var(--danger-dark, #c0392b)', strokeWidth: 2.5, strokeLinecap: 'round', opacity: 0.8 }]
+								: []),
+							{ path: activeStats.napCountChart.linePath, stroke: 'var(--peach-dark)', strokeWidth: 2.5, strokeLinecap: 'round' },
+						]}
+					/>
 				</ChartFrame>
 			</div>
 		{/if}
