@@ -14,12 +14,12 @@
 	// To regenerate baselines after an intentional visual change:
 	//   bunx playwright test arc-scenes --update-snapshots
 
-	// Anchor everything to a fixed local date (midnight today) and pick an
-	// explicit hour-of-day per scene. We can't hard-code an absolute Date
-	// because the night arc uses local-hour wrapping; "today midnight + Nh"
-	// keeps everything in the server TZ.
-	const today = new Date();
-	today.setHours(0, 0, 0, 0);
+	// Anchor everything to a FIXED local date at midnight, then pick an explicit
+	// hour-of-day per scene. Each scene also passes an explicit `nowMs`, so the
+	// rendered arcs are fully deterministic — independent of the real wall clock
+	// (X-3). A fixed local-midnight date keeps the night arc's local-hour
+	// wrapping correct in the server TZ while never drifting between runs.
+	const today = new Date(2026, 5, 14, 0, 0, 0, 0); // 2026-06-14 local midnight
 	const baseMs = today.getTime();
 	const iso = (h: number, m = 0) => new Date(baseMs + h * 3600_000 + m * 60_000).toISOString();
 	const hm = (h: number, m = 0) => formatTime(iso(h, m));
