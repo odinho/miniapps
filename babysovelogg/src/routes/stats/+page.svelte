@@ -2,7 +2,6 @@
 	import { formatDuration } from '$lib/utils.js';
 	import {
 		TS_CHART,
-		GANTT,
 		fetchStatsData,
 		fetchFullHistory,
 		computeAllStats,
@@ -20,6 +19,7 @@
 	import ChartFullscreen from '$lib/components/charts/ChartFullscreen.svelte';
 	import ChartLegend from '$lib/components/charts/ChartLegend.svelte';
 	import TimeSeriesChart from '$lib/components/charts/TimeSeriesChart.svelte';
+	import SleepTimelineChart from '$lib/components/charts/SleepTimelineChart.svelte';
 
 	const s = $derived(appState.state);
 	const baby = $derived(s.baby);
@@ -416,29 +416,11 @@
 				<div class="stats-section">
 					<h3 class="stats-section-title">Døgnrytme (30 dagar)</h3>
 					<ChartFrame title="Døgnrytme" landscape={false} wrapStyle="overflow-x: auto;" onExpand={expand}>
-						<svg viewBox="0 0 {GANTT.W} {activeStats.gantt.height}" width="100%" class="stats-chart" shape-rendering="crispEdges">
-							<!-- Hour labels -->
-							{#each activeStats.gantt.hourLabels as lbl}
-								<text x={lbl.x} y={14} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)" shape-rendering="auto">{lbl.label}</text>
-							{/each}
-							<!-- Rows -->
-							{#each activeStats.gantt.rows as row}
-								<!-- Date label -->
-								<text x={GANTT.PAD_L - 4} y={row.y + GANTT.ROW_H / 2 + 3} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)" shape-rendering="auto">{row.dateLabel}</text>
-								<!-- Row background -->
-								<rect x={GANTT.PAD_L} y={row.y} width={GANTT.W - GANTT.PAD_L - GANTT.PAD_R} height={GANTT.ROW_H - 2} fill="var(--cream-dark)" opacity="0.3" />
-								<!-- Sleep blocks -->
-								{#each row.blocks as block}
-									<rect
-										x={block.x}
-										y={block.y}
-										width={block.w}
-										height={GANTT.ROW_H - 6}
-										fill={block.type === 'nap' ? 'var(--peach-dark)' : 'var(--moon)'}
-									/>
-								{/each}
-							{/each}
-						</svg>
+						<SleepTimelineChart
+							rows={activeStats.gantt.rows}
+							hourLabels={activeStats.gantt.hourLabels}
+							height={activeStats.gantt.height}
+						/>
 						<ChartLegend items={[{ label: 'Lurar', colorVar: '--peach-dark' }, { label: 'Natt', colorVar: '--moon' }]} />
 					</ChartFrame>
 				</div>
