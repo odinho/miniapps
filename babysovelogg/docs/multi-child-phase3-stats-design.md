@@ -159,6 +159,46 @@ later.
   route mode (single|twinOverlay|siblingTwoUp) + N-series overlay + gantt
   child-lanes + P3-2 overlap viz + P3-3 comparison stats + visual snapshots.
 
+## Execution loop + unit queue (for the autonomous /loop)
+
+Follow the generic loop spec in [`multi-child-support.md`](./multi-child-support.md)
+"## Execution loop" EXACTLY (branch off main → test-first per docs/testing.md →
+validate unit/integration/lint/typecheck + build/e2e for UI → **Codex oracle
+review** for non-trivial units → update followups → commit why-focused →
+`git checkout main` → `git merge --ff-only` → `git push` → **NO deploy**).
+
+HARD INVARIANTS for every unit here:
+- **Keep `tests/unit/stats-golden.unit.ts` byte-identical** through all of Step 1.
+  A geometry change is only allowed when a unit deliberately changes output
+  (e.g. adopting d3 in S1-5/S1-6) — then regenerate with `--update-snapshots`
+  and eyeball the diff + note it in the commit. Never let it drift silently.
+- **Single-baby /stats stays visually + behaviourally identical** until Step 2
+  intentionally adds the multi-child modes (and even then N=1 is unchanged).
+- Genuine product/UX choices → park in `local/loop-questions.md` (don't guess).
+- Subagents: tell them to be thorough and to READ `docs/testing.md` first.
+
+### Unit queue
+Step 1 — behaviour-preserving refactor (single-baby unchanged):
+- [x] S1-0  Determinism (`now` param) + golden characterization snapshot
+- [x] S1-1  Extract pure primitives → `charts/scales.ts` (TS_CHART, tsX, rolling*, GANTT, getLocalHourFrac)
+- [ ] S1-2  `charts/paths.ts`: port the inline line/area/stacked/rolling/norm-band/step path generators as pure fns taking data + scales; refactor the stats-view-utils builders to call them. Golden byte-identical.
+- [ ] S1-3  `charts/types.ts`: generic chart model (dims, axis ticks, legend items, reference bands, line/area series descriptors, gantt rows/blocks with childId). No behaviour change.
+- [ ] S1-4  `ChartFrame.svelte` + `ChartFullscreen.svelte`: card/title/legend slots + the outerHTML→{@html} fullscreen. Migrate the page's duplicated chart-wrapper + fullscreen to it (start one chart, then all). stats e2e green.
+- [ ] S1-5  `ChartLegend.svelte`: extract the legend; child-colour-first ordering ready for Step 2.
+- [ ] S1-6  `TimeSeriesChart.svelte`: generic N-series axes/grid/labels/areas/lines (+ optional ref bands), no dots by default. Migrate the time-series charts (stacked-area, norm, night-stretch, bedtime, nap-count, wake-scatter) one at a time. d3-scale/shape/array may land here (deliberate geometry change → regen golden + review). Single-baby visuals preserved (visual e2e snapshot).
+- [ ] S1-7  `SleepTimelineChart.svelte`: gantt component (rows-by-date + blocks). Migrate the gantt; preserve cross-midnight duplication EXACTLY.
+- [ ] S1-QA  Adversarial + visual review of Step 1 (single-baby unchanged); fix findings.
+
+Step 2 — twin overlay + sibling two-up (P3-1 = B), then P3-2/P3-3:
+- [ ] S2-1  `stats/multi-child-stats.ts` + per-child `/api/sleeps?baby=`/`/api/diapers?baby=` fetch + route `mode = single|twinOverlay|siblingTwoUp` from `appState.babies` + `family.isTwinMode`. N=1 output identical.
+- [ ] S2-2  TimeSeriesChart N-series overlay for twins (shared x/y domain across children); sibling two-up panels (no shared age-norm band across ages).
+- [ ] S2-3  SleepTimelineChart twin child-lanes per date row; two instances for siblings.
+- [ ] S2-4 (P3-2)  Overlap visualisation: both-asleep windows = parent downtime.
+- [ ] S2-5 (P3-3)  Comparison stats: total sleep, nap count, longest stretch, divergence.
+- [ ] S2-QA (P3-QA)  Adversarial + QA + UX + visual review of twin/sibling views; fix findings.
+
+When every unit is `[x]` or parked `[~]`: stop, push-notify a one-line summary.
+
 ## Execution notes
 - This is a large multi-commit refactor; ship Step 1 (behavior-preserving) and
   Step 2 (overlay) as separate units, each: test-first, single-baby snapshot
