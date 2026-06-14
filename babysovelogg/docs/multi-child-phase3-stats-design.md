@@ -191,8 +191,8 @@ Step 1 — behaviour-preserving refactor (single-baby unchanged):
 - [x] S1-QA  Adversarial Codex review of all of Step 1 — NO must-fix; single-baby /stats confirmed behaviour-preserving. Folded in the cheap wins: extracted `HeatmapChart.svelte` (the last inline chart) so every chart now renders through a component, and dropped the dead `GANTT` re-export. Logged the rest to followups (wake-window band branch unreachable — pre-existing; no DOM-level chart-render test; charts/types.ts partly speculative → wire/trim in Step 2).
 
 Step 2 — twin overlay + sibling two-up (P3-1 = B), then P3-2/P3-3:
-- [ ] S2-1  `stats/multi-child-stats.ts` + per-child `/api/sleeps?baby=`/`/api/diapers?baby=` fetch + route `mode = single|twinOverlay|siblingTwoUp` from `appState.babies` + `family.isTwinMode`. N=1 output identical.
-- [ ] S2-2  TimeSeriesChart N-series overlay for twins (shared x/y domain across children); sibling two-up panels (no shared age-norm band across ages).
+- [x] S2-1  `stats/multi-child-stats.ts` DATA LAYER (no page change yet): `statsMode(count, isTwin) → single|twinOverlay|siblingTwoUp`; `computeChildrenStats` (pure, one independent ComputedStats per child); `fetchChildrenRawData`/`fetchChildrenStats` (per-child `?baby=<id>` fetch, 44d or full). Unit-tested incl. N=1 == direct computeAllStats. Page untouched → golden/e2e unaffected. (Page wiring + mode rendering moved to S2-2.)
+- [ ] S2-2  WIRE the page: `children = appState.babies`, `mode = statsMode(...)`, fetch via `fetchChildrenStats`; render single (N=1 identical — golden/e2e green) and the sibling two-up (stacked per-child panels, no shared age-norm band). TimeSeriesChart N-series overlay for twins needs shared x/y domain across children — may split to S2-2b if the shared-scale work is large.
 - [ ] S2-3  SleepTimelineChart twin child-lanes per date row; two instances for siblings.
 - [ ] S2-4 (P3-2)  Overlap visualisation: both-asleep windows = parent downtime.
 - [ ] S2-5 (P3-3)  Comparison stats: total sleep, nap count, longest stretch, divergence.
