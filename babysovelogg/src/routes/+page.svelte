@@ -199,7 +199,10 @@
 						[{ type: 'night_waking.deleted', payload: { wakingDomainId } }],
 						[
 							{
-								label: `Vekte ${other.baby.name} også?`,
+								// Affirmative + additive label, deliberately NOT a question and
+								// distinct from "Angre" — a mis-tap at 3am would log a waking on
+								// the wrong twin (the cardinal invariant). The "+" signals "add".
+								label: `+ ${other.baby.name} vakna òg`,
 								events: [
 									{
 										type: 'night_waking.started',

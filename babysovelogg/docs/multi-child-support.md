@@ -273,7 +273,7 @@ CORE (Codex-ranked):
 - **Morning prompt for both**: "Når vakna dei?" with a same-time default
   and per-baby adjust (today's prompt asks one baby,
   `+page.svelte:580`).
-- **Combined status line**: "Begge søv. Første venta vakning: Ada om
+- **Combined status line**: "Begge søv. Fyrste venta vakning: Ada om
   18 min." — matters more than two pretty arcs.
 - **Sync mode vs individual mode** toggle: "Samkøyr dagen" vs "Følg kvar
   rytme".
@@ -419,12 +419,12 @@ Phase 2 — logging ergonomics + at-a-glance:
 - [x] P2-1  `isTwinMode` (age-gap ±21d) + settings override; gate begge/sync on it
 - [x] P2-2  `getFamilyState().family` aggregate (bothAsleep, firstWake, nextAction, overlapWindows) — backend, if not already present
 - [x] P2-3  Richer lanes: elapsed, next nap/bedtime, stale warning
-- [x] P2-4  Combined status line ("Begge søv. Første venta vakning: Ada om 18 min")
+- [x] P2-4  Combined status line ("Begge søv. Fyrste venta vakning: Ada om 18 min")
 - [x] P2-5  begge with immediate per-baby correction ("Berre Ada vakna" / "Bo søv vidare")
 - [~] P2-6  Morning prompt for both ("Når vakna dei?" same-time default + per-baby adjust) — PARKED (see local/loop-questions.md; awaiting Odin)
 - [x] P2-7  Sync vs individual mode toggle (stored family preference; real coupling stays Phase 4)
 - [x] P2-8  Night-waking flow: which baby + "Vekte den andre også?"
-- [ ] P2-QA  Adversarial + QA + UX review run (dedicated oracle/subagent runs); fix findings
+- [x] P2-QA  Adversarial + QA + UX review run (dedicated oracle/subagent runs); fix findings
 
 Phase 3 — twin views: combined graphs, comparison, overlap:
 - [ ] P3-1  Stats show both by default (twins overlaid; siblings two-up/segmented)
@@ -451,3 +451,4 @@ Cross-cutting follow-on (do as they surface or after Phase 4):
 - [ ] X-10  Enforce the max-2-children cap at the event/projection level. Today only the add-child UI gates it (`canAddChild = babies.length < 2`); `baby.created` schema/projection has no guard, and several family roll-ups assumed exactly 2. `getCombinedStatus` now requires exactly 2 defensively, but a 3rd child via a raw event would still half-work elsewhere. Add a projection-time guard (reject/ignore `baby.created` beyond 2) + a test. (Codex, P2-4)
 - [ ] X-11  Fold the two duplicate undo-toast render blocks in `+page.svelte` (family-home branch + general branch) into one `<UndoToast>` component now that it carries corrections. Pre-existing duplication; low risk (mutually exclusive branches). (Codex, P2-5)
 - [ ] X-12  Phase 4 must gate any sync coupling on `isTwinMode && syncMode` (or clear `sync_mode` when the family switches to sibling mode) — `modeOverride` and `syncMode` are independent writes, so a stale `syncMode=true` can persist after switching to siblings. Harmless now (nothing reads it); load-bearing once Phase 4 acts. (Codex, P2-7)
+- [ ] X-13  Undo-toast additive vs corrective chips share one ghost style. The night-waking "+ <name> vakna òg" (additive) sits beside "Angre" (undo) styled identically. Relabel landed (P2-QA) to disambiguate by copy; consider also visually distinguishing additive actions from undo when the toast is folded into a component (ties into X-11). (P2-QA UX review)

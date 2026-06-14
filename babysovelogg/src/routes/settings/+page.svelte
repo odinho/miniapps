@@ -462,7 +462,8 @@
 						<h3 style="font-size: 0.95rem; margin: 0 0 4px;">Dagsrytme</h3>
 						<div style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 10px;">
 							Korleis vil du køyra dagen? «Samkøyr» siktar mot overlappande søvn (so
-							de får pause samtidig). Føresetnad — verkar frå seinare oppdatering.
+							de får pause samtidig). Verkar frå ei seinare oppdatering — vi lagrar
+							valet ditt no.
 						</div>
 						<div class="type-pills" data-testid="sync-mode-pills">
 							<button

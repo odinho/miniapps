@@ -240,7 +240,7 @@ test("twin co-sleep: logging a night waking offers to wake the other twin too", 
   await page.getByTestId("night-waking-btn").click();
 
   // One waking woke both — take the offer to log Bo's too.
-  await page.getByRole("button", { name: "Vekte Bo også?" }).click();
+  await page.getByRole("button", { name: "+ Bo vakna òg" }).click();
 
   await expect
     .poll(async () => {
@@ -280,7 +280,7 @@ test("no co-sleep offer when the other twin is already mid-waking (no duplicate)
       return { ada: by("Ada"), bo: by("Bo") };
     })
     .toEqual({ ada: 1, bo: 1 });
-  await expect(page.getByRole("button", { name: "Vekte Bo også?" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "+ Bo vakna òg" })).toHaveCount(0);
 });
 
 test("combined status line: both awake, then both asleep", async ({ page }) => {
