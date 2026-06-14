@@ -16,6 +16,8 @@
 		getNextSleepMilestone,
 		formatAge,
 	} from '$lib/settings-utils.js';
+	import ChartFrame from '$lib/components/charts/ChartFrame.svelte';
+	import ChartFullscreen from '$lib/components/charts/ChartFullscreen.svelte';
 
 	const s = $derived(appState.state);
 	const baby = $derived(s.baby);
@@ -78,21 +80,14 @@
 	let fullscreenTitle = $state('');
 	let fullscreenLandscape = $state(true);
 
-	function openFullscreen(svgEl: SVGSVGElement | null, title: string, landscape = true) {
-		if (!svgEl) return;
-		fullscreenSvg = svgEl.outerHTML;
+	function expand(svgHtml: string, title: string, landscape: boolean) {
+		fullscreenSvg = svgHtml;
 		fullscreenTitle = title;
 		fullscreenLandscape = landscape;
 	}
 
 	function closeFullscreen() {
 		fullscreenSvg = null;
-	}
-
-	function handleChartClick(e: MouseEvent, title: string, landscape = true) {
-		const wrap = (e.currentTarget as HTMLElement);
-		const svg = wrap.querySelector('svg');
-		openFullscreen(svg, title, landscape);
 	}
 
 	async function loadFullHistory() {
@@ -257,9 +252,7 @@
 		{#if activeStats.stackedArea.nightPath}
 			<div class="stats-section">
 				<h3 class="stats-section-title">Søvntrend (30 dagar)</h3>
-				<!-- svelte-ignore a11y_click_events_have_key_events -->
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div class="stats-chart-wrap" onclick={(e) => handleChartClick(e, 'Søvntrend')}>
+				<ChartFrame title="Søvntrend" onExpand={expand}>
 					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
 						{#each activeStats.stackedArea.gridLines as y}
 							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
@@ -280,7 +273,7 @@
 						<span class="stats-legend-item"><span class="stats-dot" style="background: var(--peach-dark)"></span> Lurar</span>
 						<span class="stats-legend-item"><span class="stats-dot" style="background: var(--moon)"></span> Natt</span>
 					</div>
-				</div>
+				</ChartFrame>
 			</div>
 		{/if}
 
@@ -288,9 +281,7 @@
 		{#if activeStats.sleepVsNorm && activeStats.sleepVsNorm.actualPath}
 			<div class="stats-section">
 				<h3 class="stats-section-title">Total søvn vs. tilrådd</h3>
-				<!-- svelte-ignore a11y_click_events_have_key_events -->
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div class="stats-chart-wrap" onclick={(e) => handleChartClick(e, 'Total søvn vs. tilrådd')}>
+				<ChartFrame title="Total søvn vs. tilrådd" onExpand={expand}>
 					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
 						{#each activeStats.sleepVsNorm.gridLines as y}
 							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
@@ -313,7 +304,7 @@
 						<span class="stats-legend-item"><span class="stats-dot" style="background: var(--moon)"></span> Faktisk søvn</span>
 						<span class="stats-legend-item"><span class="stats-dot" style="background: var(--moon-glow)"></span> Tilrådd</span>
 					</div>
-				</div>
+				</ChartFrame>
 			</div>
 		{/if}
 
@@ -321,9 +312,7 @@
 		{#if activeStats.nightStretchChart.linePath}
 			<div class="stats-section">
 				<h3 class="stats-section-title">Lengste nattestrekk</h3>
-				<!-- svelte-ignore a11y_click_events_have_key_events -->
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div class="stats-chart-wrap" onclick={(e) => handleChartClick(e, 'Lengste nattestrekk')}>
+				<ChartFrame title="Lengste nattestrekk" onExpand={expand}>
 					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
 						{#each activeStats.nightStretchChart.gridLines as y}
 							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
@@ -344,7 +333,7 @@
 							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
 						{/each}
 					</svg>
-				</div>
+				</ChartFrame>
 			</div>
 		{/if}
 
@@ -352,9 +341,7 @@
 		{#if activeStats.bedtimeChart.linePath}
 			<div class="stats-section">
 				<h3 class="stats-section-title">Leggetid</h3>
-				<!-- svelte-ignore a11y_click_events_have_key_events -->
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div class="stats-chart-wrap" onclick={(e) => handleChartClick(e, 'Leggetid')}>
+				<ChartFrame title="Leggetid" onExpand={expand}>
 					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
 						{#each activeStats.bedtimeChart.gridLines as y}
 							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
@@ -370,7 +357,7 @@
 							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
 						{/each}
 					</svg>
-				</div>
+				</ChartFrame>
 			</div>
 		{/if}
 
@@ -378,9 +365,7 @@
 		{#if activeStats.napCountChart.linePath}
 			<div class="stats-section">
 				<h3 class="stats-section-title">Lurar per dag</h3>
-				<!-- svelte-ignore a11y_click_events_have_key_events -->
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div class="stats-chart-wrap" onclick={(e) => handleChartClick(e, 'Lurar per dag')}>
+				<ChartFrame title="Lurar per dag" onExpand={expand}>
 					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
 						{#each activeStats.napCountChart.gridLines as y}
 							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
@@ -397,7 +382,7 @@
 							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
 						{/each}
 					</svg>
-				</div>
+				</ChartFrame>
 			</div>
 		{/if}
 
@@ -461,9 +446,7 @@
 			{#if activeStats.gantt.rows.length > 0}
 				<div class="stats-section">
 					<h3 class="stats-section-title">Døgnrytme (30 dagar)</h3>
-					<!-- svelte-ignore a11y_click_events_have_key_events -->
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="stats-chart-wrap" style="overflow-x: auto;" onclick={(e) => handleChartClick(e, 'Døgnrytme', false)}>
+					<ChartFrame title="Døgnrytme" landscape={false} wrapStyle="overflow-x: auto;" onExpand={expand}>
 						<svg viewBox="0 0 {GANTT.W} {activeStats.gantt.height}" width="100%" class="stats-chart" shape-rendering="crispEdges">
 							<!-- Hour labels -->
 							{#each activeStats.gantt.hourLabels as lbl}
@@ -491,7 +474,7 @@
 							<span class="stats-legend-item"><span class="stats-dot" style="background: var(--peach-dark)"></span> Lurar</span>
 							<span class="stats-legend-item"><span class="stats-dot" style="background: var(--moon)"></span> Natt</span>
 						</div>
-					</div>
+					</ChartFrame>
 				</div>
 			{/if}
 
@@ -500,9 +483,7 @@
 				{@const hm = activeStats.heatmapChart}
 				<div class="stats-section">
 					<h3 class="stats-section-title">Søvnkart</h3>
-					<!-- svelte-ignore a11y_click_events_have_key_events -->
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="stats-chart-wrap" style="overflow-y: auto; max-height: 70vh;" onclick={(e) => handleChartClick(e, 'Søvnkart', false)}>
+					<ChartFrame title="Søvnkart" landscape={false} wrapStyle="overflow-y: auto; max-height: 70vh;" onExpand={expand}>
 						<svg viewBox="0 0 {hm.width} {hm.height}" width="100%" class="stats-chart" shape-rendering="crispEdges" style="height: {hm.height}px; width: 100%;">
 							{#each hm.hourLabels as lbl}
 								<text x={lbl.x} y={12} text-anchor="middle" fill="var(--text-light)" font-size="9" font-family="var(--font)" shape-rendering="auto">{lbl.label}</text>
@@ -521,7 +502,7 @@
 								/>
 							{/each}
 						</svg>
-					</div>
+					</ChartFrame>
 				</div>
 			{/if}
 
@@ -550,9 +531,7 @@
 							Det skraverte feltet viser tilrådd område.
 						{/if}
 					</p>
-					<!-- svelte-ignore a11y_click_events_have_key_events -->
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="stats-chart-wrap" onclick={(e) => handleChartClick(e, 'Vakevindu')}>
+					<ChartFrame title="Vakevindu" onExpand={expand}>
 						<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
 							{#each activeStats.wakeScatter.gridLines as y}
 								<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
@@ -576,7 +555,7 @@
 								<text x={dot.x} y={dot.y - 8} text-anchor="middle" fill="var(--text-light)" font-size="8" font-family="var(--font)">{formatDuration(dot.minutes * 60000)}</text>
 							{/each}
 						</svg>
-					</div>
+					</ChartFrame>
 				</div>
 			{/if}
 
@@ -607,86 +586,9 @@
 </div>
 
 <!-- Fullscreen chart overlay -->
-{#if fullscreenSvg}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="chart-fullscreen-overlay {fullscreenLandscape ? 'landscape' : ''}" onclick={(e) => { if (e.target === e.currentTarget) closeFullscreen(); }} onkeydown={(e) => { if (e.key === 'Escape') closeFullscreen(); }} tabindex="-1">
-		<div class="chart-fullscreen-header">
-			<span>{fullscreenTitle}</span>
-			<button class="chart-fullscreen-close" onclick={closeFullscreen}>✕</button>
-		</div>
-		<div class="chart-fullscreen-body" onclick={closeFullscreen}>
-			{@html fullscreenSvg}
-		</div>
-	</div>
-{/if}
+<ChartFullscreen svg={fullscreenSvg} title={fullscreenTitle} landscape={fullscreenLandscape} onClose={closeFullscreen} />
 
 <style>
-	.chart-fullscreen-overlay {
-		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		background: var(--cream);
-		z-index: 1000;
-		display: flex;
-		flex-direction: column;
-		padding: 12px 16px;
-	}
-
-	.chart-fullscreen-overlay.landscape {
-		width: 100vh;
-		height: 100vw;
-		right: auto;
-		bottom: auto;
-		transform: rotate(90deg);
-		transform-origin: top left;
-		translate: 100vw 0;
-	}
-
-	.chart-fullscreen-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		font-weight: 600;
-		font-size: 0.9rem;
-		margin-bottom: 8px;
-		flex-shrink: 0;
-	}
-
-	.chart-fullscreen-close {
-		background: var(--lavender);
-		border: none;
-		border-radius: 50%;
-		width: 32px;
-		height: 32px;
-		font-size: 1rem;
-		cursor: pointer;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: var(--text);
-	}
-
-	.chart-fullscreen-body {
-		flex: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		overflow: auto;
-	}
-
-	.chart-fullscreen-body :global(svg) {
-		width: 100%;
-		height: auto;
-		max-height: 100%;
-	}
-
-	.stats-chart-wrap {
-		cursor: pointer;
-	}
-
 	/* --- comparison: norm vs baby, card-list (mobile-first, no overflow) --- */
 	.comparison-panel {
 		padding: 4px 4px 0;

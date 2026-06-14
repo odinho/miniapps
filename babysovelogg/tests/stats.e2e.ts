@@ -54,6 +54,45 @@ test("Stats page renders bar chart", async ({ page }) => {
   await expect(bars.first()).toBeVisible();
 });
 
+test("Tapping a chart opens it fullscreen and it closes again", async ({ page }) => {
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId);
+  const now = new Date();
+  addCompletedSleep(
+    babyId,
+    new Date(now.getTime() - 4 * 3600000).toISOString(),
+    new Date(now.getTime() - 3 * 3600000).toISOString(),
+    "nap",
+  );
+  const yesterday = new Date(now.getTime() - 24 * 3600000);
+  addCompletedSleep(
+    babyId,
+    new Date(yesterday.getTime() - 8 * 3600000).toISOString(),
+    new Date(yesterday.getTime()).toISOString(),
+    "night",
+  );
+
+  await page.goto("/stats");
+  const wrap = page.locator(".stats-chart-wrap").first();
+  await expect(wrap).toBeVisible({ timeout: 5000 });
+
+  await wrap.click();
+  const overlay = page.locator(".chart-fullscreen-overlay");
+  await expect(overlay).toBeVisible();
+  // The cloned chart SVG is injected into the overlay.
+  await expect(overlay.locator("svg").first()).toBeVisible();
+
+  // Close via the ✕ button.
+  await page.locator(".chart-fullscreen-close").click();
+  await expect(overlay).not.toBeVisible();
+
+  // Re-open, then close by tapping the chart body.
+  await wrap.click();
+  await expect(overlay).toBeVisible();
+  await page.locator(".chart-fullscreen-body").click();
+  await expect(overlay).not.toBeVisible();
+});
+
 test("Stats subtracts night_waking duration from night sleep totals", async ({ page }) => {
   const babyId = createBaby("Testa");
   setWakeUpTime(babyId);
