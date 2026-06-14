@@ -318,21 +318,19 @@
 			<div class="stats-section">
 				<h3 class="stats-section-title">Leggetid</h3>
 				<ChartFrame title="Leggetid" onExpand={expand}>
-					<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
-						{#each activeStats.bedtimeChart.gridLines as y}
-							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
-						{/each}
-						{#each activeStats.bedtimeChart.yTicks as tick}
-							<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
-						{/each}
-						<!-- Average line -->
-						<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={activeStats.bedtimeChart.avgY} y2={activeStats.bedtimeChart.avgY} stroke="var(--lavender-dark)" stroke-width="1" stroke-dasharray="4,3" />
-						<text x={TS_CHART.W - TS_CHART.PAD_R} y={activeStats.bedtimeChart.avgY - 4} text-anchor="end" fill="var(--lavender-dark)" font-size="10" font-family="var(--font)">snitt {activeStats.bedtimeChart.avgLabel}</text>
-						<path d={activeStats.bedtimeChart.linePath} fill="none" stroke="var(--moon)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-						{#each activeStats.bedtimeChart.xLabels as lbl}
-							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
-						{/each}
-					</svg>
+					<TimeSeriesChart
+						gridLines={activeStats.bedtimeChart.gridLines}
+						yTicks={activeStats.bedtimeChart.yTicks}
+						xLabels={activeStats.bedtimeChart.xLabels}
+						series={[
+							{ path: activeStats.bedtimeChart.linePath, stroke: 'var(--moon)', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round' },
+						]}
+					>
+						{#snippet underlay()}
+							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={activeStats.bedtimeChart.avgY} y2={activeStats.bedtimeChart.avgY} stroke="var(--lavender-dark)" stroke-width="1" stroke-dasharray="4,3" />
+							<text x={TS_CHART.W - TS_CHART.PAD_R} y={activeStats.bedtimeChart.avgY - 4} text-anchor="end" fill="var(--lavender-dark)" font-size="10" font-family="var(--font)">snitt {activeStats.bedtimeChart.avgLabel}</text>
+						{/snippet}
+					</TimeSeriesChart>
 				</ChartFrame>
 			</div>
 		{/if}
@@ -500,29 +498,32 @@
 						{/if}
 					</p>
 					<ChartFrame title="Vakevindu" onExpand={expand}>
-						<svg viewBox="0 0 {TS_CHART.W} {TS_CHART.H}" width="100%" class="stats-chart">
-							{#each activeStats.wakeScatter.gridLines as y}
-								<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={y} y2={y} stroke="var(--cream-dark)" stroke-width="1" />
-							{/each}
-							{#each activeStats.wakeScatter.yTicks as tick}
-								<text x={TS_CHART.PAD_L - 4} y={tick.y + 4} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)">{tick.label}</text>
-							{/each}
-							{#if activeStats.wakeScatter.bandY}
-								<rect
-									x={TS_CHART.PAD_L}
-									y={activeStats.wakeScatter.bandY.top}
-									width={TS_CHART.W - TS_CHART.PAD_L - TS_CHART.PAD_R}
-									height={activeStats.wakeScatter.bandY.bottom - activeStats.wakeScatter.bandY.top}
-									fill="var(--lavender)"
-									opacity="0.25"
-									rx="4"
-								/>
-							{/if}
-							{#each activeStats.wakeScatter.dots as dot}
-								<circle cx={dot.x} cy={dot.y} r="5" fill="var(--peach-dark)" stroke="var(--white)" stroke-width="1" opacity="0.7" />
-								<text x={dot.x} y={dot.y - 8} text-anchor="middle" fill="var(--text-light)" font-size="8" font-family="var(--font)">{formatDuration(dot.minutes * 60000)}</text>
-							{/each}
-						</svg>
+						<TimeSeriesChart
+							gridLines={activeStats.wakeScatter.gridLines}
+							yTicks={activeStats.wakeScatter.yTicks}
+							xLabels={[]}
+							series={[]}
+						>
+							{#snippet underlay()}
+								{#if activeStats.wakeScatter.bandY}
+									<rect
+										x={TS_CHART.PAD_L}
+										y={activeStats.wakeScatter.bandY.top}
+										width={TS_CHART.W - TS_CHART.PAD_L - TS_CHART.PAD_R}
+										height={activeStats.wakeScatter.bandY.bottom - activeStats.wakeScatter.bandY.top}
+										fill="var(--lavender)"
+										opacity="0.25"
+										rx="4"
+									/>
+								{/if}
+							{/snippet}
+							{#snippet overlay()}
+								{#each activeStats.wakeScatter.dots as dot}
+									<circle cx={dot.x} cy={dot.y} r="5" fill="var(--peach-dark)" stroke="var(--white)" stroke-width="1" opacity="0.7" />
+									<text x={dot.x} y={dot.y - 8} text-anchor="middle" fill="var(--text-light)" font-size="8" font-family="var(--font)">{formatDuration(dot.minutes * 60000)}</text>
+								{/each}
+							{/snippet}
+						</TimeSeriesChart>
 					</ChartFrame>
 				</div>
 			{/if}
