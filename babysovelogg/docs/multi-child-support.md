@@ -427,9 +427,9 @@ Phase 2 — logging ergonomics + at-a-glance:
 - [x] P2-QA  Adversarial + QA + UX review run (dedicated oracle/subagent runs); fix findings
 
 Phase 3 — twin views: combined graphs, comparison, overlap:
-- [ ] P3-1  Stats show both by default (twins overlaid; siblings two-up/segmented)
-- [ ] P3-2  Overlap visualisation (both-asleep windows = parent downtime)
-- [ ] P3-3  Comparison stats (total sleep, nap count, longest stretch, divergence)
+- [~] P3-1  Stats show both by default (twins overlaid; siblings two-up/segmented) — PARKED (local/loop-questions.md; gates P3-2/P3-3)
+- [~] P3-2  Overlap visualisation (both-asleep windows = parent downtime) — PARKED (gated on P3-1 stats decision)
+- [~] P3-3  Comparison stats (total sleep, nap count, longest stretch, divergence) — PARKED (gated on P3-1 stats decision)
 - [ ] P3-4  Family handoff "siste 6 timar" timeline
 - [ ] P3-QA  Adversarial + QA + UX review run; fix findings
 
