@@ -423,7 +423,7 @@ Phase 2 — logging ergonomics + at-a-glance:
 - [x] P2-5  begge with immediate per-baby correction ("Berre Ada vakna" / "Bo søv vidare")
 - [~] P2-6  Morning prompt for both ("Når vakna dei?" same-time default + per-baby adjust) — PARKED (see local/loop-questions.md; awaiting Odin)
 - [x] P2-7  Sync vs individual mode toggle (stored family preference; real coupling stays Phase 4)
-- [ ] P2-8  Night-waking flow: which baby + "Vekte den andre også?"
+- [x] P2-8  Night-waking flow: which baby + "Vekte den andre også?"
 - [ ] P2-QA  Adversarial + QA + UX review run (dedicated oracle/subagent runs); fix findings
 
 Phase 3 — twin views: combined graphs, comparison, overlap:

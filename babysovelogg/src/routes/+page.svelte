@@ -172,16 +172,44 @@
 					},
 				]);
 			} else {
+				const startTime = new Date().toISOString();
+				const wakingDomainId = generateNightWakingId();
 				await sync.sendEvents([
-					{
-						type: 'night_waking.started',
-						payload: {
-							babyId: baby.id,
-							startTime: new Date().toISOString(),
-							wakingDomainId: generateNightWakingId(),
-						},
-					},
+					{ type: 'night_waking.started', payload: { babyId: baby.id, startTime, wakingDomainId } },
 				]);
+				// Twin co-sleep: if the OTHER twin is also mid-night, one waking often
+				// wakes them both. Offer a one-tap "Vekte den andre også?". Only in
+				// twin-mode with the sibling actually asleep — single-baby is untouched.
+				const other = appState.state.family.isTwinMode
+					? appState.state.babies.find(
+							(b) =>
+								b.baby &&
+								b.baby.id !== baby.id &&
+								b.activeSleep &&
+								!b.activeSleep.end_time &&
+								b.activeSleep.type === 'night' &&
+								// Don't offer if they're already mid-waking — a second concurrent
+								// open waking would double-count their awake time.
+								!b.todayNightWakings?.some((w) => !w.end_time),
+						)
+					: undefined;
+				if (other?.baby) {
+					showUndoToast(
+						`Nattvaking: ${baby.name}`,
+						[{ type: 'night_waking.deleted', payload: { wakingDomainId } }],
+						[
+							{
+								label: `Vekte ${other.baby.name} også?`,
+								events: [
+									{
+										type: 'night_waking.started',
+										payload: { babyId: other.baby.id, startTime, wakingDomainId: generateNightWakingId() },
+									},
+								],
+							},
+						],
+					);
+				}
 			}
 		} finally {
 			nightWakingBusy = false;

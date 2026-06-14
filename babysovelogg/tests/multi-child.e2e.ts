@@ -225,6 +225,64 @@ test("'Sove begge' does not start a fresh sleep for a child with a forgotten (st
     .toEqual({ adaAsleep: true, boActive: false, boStale: true });
 });
 
+test("twin co-sleep: logging a night waking offers to wake the other twin too", async ({
+  page,
+  request,
+}) => {
+  const ada = createBaby("Ada", "2025-06-12");
+  const bo = createBaby("Bo", "2025-06-12");
+  const midNight = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  addActiveSleep(ada, midNight, "night");
+  addActiveSleep(bo, midNight, "night");
+
+  // Focus Ada, log her night waking.
+  await page.goto("/?baby=1");
+  await page.getByTestId("night-waking-btn").click();
+
+  // One waking woke both — take the offer to log Bo's too.
+  await page.getByRole("button", { name: "Vekte Bo også?" }).click();
+
+  await expect
+    .poll(async () => {
+      const state = (await (await request.get("/api/state")).json()) as {
+        babies: { baby: { name: string }; todayNightWakings: unknown[] }[];
+      };
+      return state.babies.find((b) => b.baby.name === "Bo")!.todayNightWakings.length;
+    })
+    .toBeGreaterThan(0);
+});
+
+test("no co-sleep offer when the other twin is already mid-waking (no duplicate)", async ({
+  page,
+  request,
+}) => {
+  createBaby("Ada", "2025-06-12"); // id 1
+  createBaby("Bo", "2025-06-12"); // id 2
+  const midNight = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  addActiveSleep(1, midNight, "night");
+  addActiveSleep(2, midNight, "night");
+
+  // Bo already has an open night waking.
+  await page.goto("/?baby=2");
+  await page.getByTestId("night-waking-btn").click();
+
+  // Full reload clears the prior toast; now log Ada's waking.
+  await page.goto("/?baby=1");
+  await page.getByTestId("night-waking-btn").click();
+
+  // Ada's waking lands, but Bo is NOT offered/duplicated — still exactly one.
+  await expect
+    .poll(async () => {
+      const state = (await (await request.get("/api/state")).json()) as {
+        babies: { baby: { name: string }; todayNightWakings: unknown[] }[];
+      };
+      const by = (n: string) => state.babies.find((b) => b.baby.name === n)!.todayNightWakings.length;
+      return { ada: by("Ada"), bo: by("Bo") };
+    })
+    .toEqual({ ada: 1, bo: 1 });
+  await expect(page.getByRole("button", { name: "Vekte Bo også?" })).toHaveCount(0);
+});
+
 test("combined status line: both awake, then both asleep", async ({ page }) => {
   createBaby("Ada", "2025-06-12");
   createBaby("Bo", "2025-06-12");
