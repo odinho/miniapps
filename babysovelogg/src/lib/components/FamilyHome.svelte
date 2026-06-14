@@ -6,6 +6,7 @@
 	import { formatTime, formatDurationCompact, formatDuration } from '$lib/utils.js';
 	import { getLaneStatus } from '$lib/lane-status.js';
 	import { getCombinedStatus } from '$lib/family.js';
+	import FamilyHandoff from './FamilyHandoff.svelte';
 
 	type DomainEvent = { type: string; payload: Record<string, unknown> };
 	/** A one-tap correction after a bulk action: revert just one child. */
@@ -167,6 +168,8 @@
 			{/if}
 		</div>
 	{/if}
+
+	<FamilyHandoff {babies} {now} />
 </div>
 
 <style>

@@ -10,6 +10,16 @@ multi-day testing, the unit-of-work flow — live in
 [`workflow.md`](./workflow.md). Don't put process in this file; this
 is for tracked product/engine/test work.
 
+## Handoff timeline: pre-midnight non-overnight blocks dropped (P3-4)
+
+The family handoff (`src/lib/handoff.ts`) builds its 6h window from the
+client-side `BabyState` (priorOvernightSleep + todaySleeps + activeSleep).
+A discrete sleep that both started AND ended before midnight (a 21:00–22:00
+nap, say) is in none of those once the date rolls, so a handoff opened in the
+small hours (e.g. 03:00) silently omits it. The dominant overnight block still
+shows. Low priority (handoffs are mostly daytime/evening). Fix would need a
+dedicated last-6h fetch or threading recent pre-midnight sleeps into BabyState.
+
 ## Engine deep review — 2026-06-12 (Claude full read + Codex pair-review)
 
 Source: full end-to-end read of `src/lib/engine/` plus an independent

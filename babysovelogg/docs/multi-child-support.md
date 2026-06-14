@@ -430,7 +430,7 @@ Phase 3 — twin views: combined graphs, comparison, overlap:
 - [~] P3-1  Stats show both by default (twins overlaid; siblings two-up/segmented) — PARKED (local/loop-questions.md; gates P3-2/P3-3)
 - [~] P3-2  Overlap visualisation (both-asleep windows = parent downtime) — PARKED (gated on P3-1 stats decision)
 - [~] P3-3  Comparison stats (total sleep, nap count, longest stretch, divergence) — PARKED (gated on P3-1 stats decision)
-- [~] P3-4  Family handoff "siste 6 timar" timeline — PARKED (local/loop-questions.md; placement+scope UX call)
+- [x] P3-4  Family handoff "siste 6 timar" timeline. Collapsible "Overlevering · siste 6 timar" section on the family home (`FamilyHandoff.svelte`, collapsed by default, any 2 children). Per child: a proportional 6h bar of sleep blocks (nap/night, ongoing highlighted) + night-waking marks, hour gridlines, and current "Søv/Vaken sidan" status (reuses `getLaneStatus`). Diapers excluded per Odin. Pure `handoff.ts` (`handoffSegments`/`handoffWakings`, window-clipped, domain_id-deduped) unit-tested; e2e in `multi-child-handoff.e2e.ts`. (Odin: home section, sleep+wakings, any 2.) KNOWN EDGE → followups: a discrete pre-midnight nap within 6h of a small-hours handoff isn't carried in BabyState, so it's dropped (overnight block still shows).
 - [~] P3-QA  Adversarial + QA + UX review run; fix findings — PARKED (nothing to QA until Phase 3 is built; un-park after P3-1..P3-4 land)
 
 Phase 4 — twin scheduling intelligence (coupling, experimental):
