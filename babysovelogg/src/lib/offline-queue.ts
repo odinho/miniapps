@@ -107,9 +107,11 @@ export function applyOptimisticEvent(
 	const idx = findSliceIndex(babies, payload);
 	babies[idx] = applyEventToSlice(babies[idx], type, payload);
 	const primary = babies[babies.length - 1];
-	// `family` is household-level — carry it through unchanged (the flat alias
-	// is rebuilt from `primary`, which is a per-baby slice without it).
-	return { ...primary, babies, family: full.family };
+	// `family` + `revision` are snapshot-level — carry them through unchanged
+	// (the flat alias is rebuilt from `primary`, a per-baby slice without them).
+	// Keeping `revision` means an optimistic update stays at its base revision,
+	// so it isn't dropped by the stale-apply guard.
+	return { ...primary, babies, family: full.family, revision: full.revision };
 }
 
 /** Which baby slice an event belongs to (see applyOptimisticEvent). */

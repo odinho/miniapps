@@ -133,6 +133,20 @@ test("sync-mode is a stored family preference, replayed deterministically on reb
   expect(await syncMode()).toBe(true);
 });
 
+test("snapshot revision is monotonic — bumps as events are applied (X-2 guard)", async () => {
+  createBaby("Ada", "2025-06-12");
+  const rev = async () => ((await (await get("/api/state")).json()) as { revision: number }).revision;
+
+  const r1 = await rev();
+  expect(typeof r1).toBe("number");
+
+  await postEvents([
+    makeEvent("sleep.started", { babyId: 1, startTime: "2026-06-14T09:30:00.000Z", type: "nap", sleepDomainId: generateSleepId() }),
+  ]);
+  const r2 = await rev();
+  expect(r2).toBeGreaterThan(r1);
+});
+
 test("twin-mode is off for a single-baby family", async () => {
   createBaby("Ada", "2025-06-12");
   expect(await familyMode()).toBe("twin=false override=null");

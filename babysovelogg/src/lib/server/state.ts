@@ -282,7 +282,11 @@ export function getFamilyState(now?: number) {
     syncMode: getFamilySyncMode(),
     ...computeFamilyStatus(babies),
   };
-  return { ...primary, babies, family };
+  // Monotonic snapshot revision = the latest applied event id. A response
+  // computed before a newer event carries a lower revision, so the client can
+  // drop it if a fresher one already landed (last-writer-wins guard, X-2).
+  const rev = db.prepare("SELECT MAX(id) AS m FROM events").get() as { m: number | null };
+  return { ...primary, babies, family, revision: rev.m ?? 0 };
 }
 
 /** Legacy single-baby entry point. Now an alias for the family snapshot so

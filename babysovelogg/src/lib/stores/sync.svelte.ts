@@ -55,6 +55,7 @@ function normalizeState(raw: AppStateResponse): AppState {
 				: [];
 	// Flat alias = the primary (newest = last) baby, matching the server.
 	const primary = babies.length ? babies[babies.length - 1] : normalizeSlice(raw);
+	const revision = typeof raw.revision === "number" ? raw.revision : 0;
 	const family = raw.family
 		? {
 				isTwinMode: !!raw.family.isTwinMode,
@@ -64,7 +65,7 @@ function normalizeState(raw: AppStateResponse): AppState {
 				syncMode: !!raw.family.syncMode,
 			}
 		: emptyFamily;
-	return { ...primary, babies, family };
+	return { ...primary, babies, family, revision };
 }
 
 function createSync() {

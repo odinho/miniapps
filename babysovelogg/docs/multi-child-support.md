@@ -440,7 +440,7 @@ Phase 4 — twin scheduling intelligence (coupling, experimental):
 
 Cross-cutting follow-on (do as they surface or after Phase 4):
 - [x] X-1  Notification de-noising: same-batch coalescing of same-kind NON-URGENT pushes into one "Begge: …" send landed (planDueSends). LOOK-AHEAD refinement (merge near-but-not-yet-due within 10–15 min) deferred → X-14 (needs a product call: early-fire vs delay, which kinds).
-- [ ] X-2  AppState revision field → kill last-writer-wins races (from Phase-1-polish followup)
+- [x] X-2  AppState revision field → kill last-writer-wins races (from Phase-1-polish followup)
 - [ ] X-3  arc-scenes + B18 e2e wall-clock determinism (thread fixed `now`) — unblocks a clean full e2e
 - [ ] X-4  Mixed-age/older-child mode simplicity pass (does a 5yo need naps/strategy, or just bedtime+duration?)
 - [ ] X-5  Offline optimistic `family.updated` is a no-op (`offline-queue.ts`); once `family` carries derived aggregates (bothAsleep/firstWake), re-derive the family summary client-side after queued baby events so it doesn't go stale offline (Codex, P2-1)

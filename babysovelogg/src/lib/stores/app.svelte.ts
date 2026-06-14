@@ -1,5 +1,6 @@
 import type { Baby, SleepLogRow, DayStartRow, NightWakingRow } from "$lib/types.js";
 import type { FamilyModeOverride, FirstWake } from "$lib/family.js";
+import { shouldApplyRevision } from "$lib/revision.js";
 import type { StaleStatus } from "$lib/stale-sleep.js";
 import type { DayStats, SleepDayTotals } from "$lib/engine/stats.js";
 import type { PredictedNap } from "$lib/engine/schedule.js";
@@ -295,6 +296,10 @@ export interface FamilySummary {
 export interface AppState extends BabyState {
 	babies: BabyState[];
 	family: FamilySummary;
+	/** Monotonic server revision (max applied event id) — drops stale applies
+	 *  in `appState.set` so a slow response can't clobber a newer one. 0 when
+	 *  unknown (empty state / a per-baby slice that carries no family revision). */
+	revision: number;
 }
 
 export const emptyFamily: FamilySummary = {
@@ -322,6 +327,7 @@ const emptyState: AppState = {
 	todayNightWakings: [],
 	babies: [],
 	family: emptyFamily,
+	revision: 0,
 };
 
 /** Reactive app state — the single source of truth for the UI. */
@@ -329,6 +335,9 @@ function createAppState() {
 	let state = $state<AppState>({ ...emptyState });
 	let loaded = $state(false);
 	let error = $state<string | null>(null);
+	// Highest server revision applied so far — guards against a stale response
+	// (lower revision) overwriting a newer one. Not reactive; ordering only.
+	let appliedRevision = 0;
 
 	return {
 		/** The current app state. Reactive. */
@@ -360,11 +369,14 @@ function createAppState() {
 			return error;
 		},
 
-		/** Replace the entire state (used on initial load and SSE updates). */
+		/** Replace the entire state (used on initial load and SSE updates).
+		 *  Drops a strictly-older server revision (stale-response race). */
 		set(newState: AppState) {
+			if (!shouldApplyRevision(newState.revision, appliedRevision)) return;
 			state = newState;
 			loaded = true;
 			error = null;
+			if (newState.revision) appliedRevision = newState.revision;
 		},
 
 		/** Set an error message. */
@@ -377,6 +389,7 @@ function createAppState() {
 			state = { ...emptyState };
 			loaded = false;
 			error = null;
+			appliedRevision = 0;
 		},
 	};
 }
