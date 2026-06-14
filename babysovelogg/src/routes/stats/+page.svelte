@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { formatDuration } from '$lib/utils.js';
+	import { TS_CHART } from '$lib/stats-view-utils.js';
 	import {
-		TS_CHART,
-		fetchStatsData,
-		fetchFullHistory,
-		computeAllStats,
-		type ComputedStats,
-	} from '$lib/stats-view-utils.js';
+		computeChildrenStats,
+		fetchChildrenRawData,
+		statsMode,
+		type ChildStats,
+		type StatsChild,
+	} from '$lib/stats/multi-child-stats.js';
 	import { appState } from '$lib/stores/app.svelte.js';
 	import { calculateAgeMonths } from '$lib/engine/schedule.js';
 	import {
@@ -27,7 +28,21 @@
 	const ageMonths = $derived(baby ? calculateAgeMonths(baby.birthdate) : 0);
 	const nextMilestone = $derived(baby ? getNextSleepMilestone(ageMonths) : null);
 	const selectedNapCount = $derived(baby?.custom_nap_count ?? null);
-	const pottyMode = $derived(baby?.potty_mode === 1);
+	const statsChildren = $derived<StatsChild[]>(
+		appState.babies.flatMap((child) =>
+			child.baby
+				? [
+						{
+							id: child.baby.id,
+							name: child.baby.name,
+							timezone: child.baby.timezone ?? undefined,
+							birthdate: child.baby.birthdate,
+						},
+					]
+				: [],
+		),
+	);
+	const mode = $derived(statsMode(appState.babies.length, appState.state.family.isTwinMode));
 	const completedNapCount = $derived(
 		s.todaySleeps.filter((sl) => sl.type === 'nap' && sl.end_time).length,
 	);
@@ -73,10 +88,10 @@
 	let loading = $state(true);
 	let error = $state(false);
 	let empty = $state(false);
-	let stats = $state<ComputedStats | null>(null);
+	let childrenStats = $state<ChildStats[] | null>(null);
 	let showFullHistory = $state(false);
 	let loadingFullHistory = $state(false);
-	let fullStats = $state<ComputedStats | null>(null);
+	let fullChildrenStats = $state<ChildStats[] | null>(null);
 
 	// Fullscreen chart overlay
 	let fullscreenSvg = $state<string | null>(null);
@@ -94,30 +109,45 @@
 	}
 
 	async function loadFullHistory() {
+		const children = statsChildren;
+		if (children.length === 0) return;
+
 		loadingFullHistory = true;
 		try {
-			const allData = await fetchFullHistory();
-			fullStats = computeAllStats(allData.sleeps, allData.diapers, baby?.timezone ?? undefined, baby?.birthdate ?? undefined);
+			const raw = await fetchChildrenRawData(children, true);
+			fullChildrenStats = computeChildrenStats(raw);
 			showFullHistory = true;
 		} finally {
 			loadingFullHistory = false;
 		}
 	}
 
-	/** Active stats: full history if loaded, otherwise 30-day */
-	const activeStats = $derived(showFullHistory && fullStats ? fullStats : stats);
+	/** Active stats: full history if loaded, otherwise 30-day. */
+	const activeChildren = $derived(
+		showFullHistory && fullChildrenStats ? fullChildrenStats : childrenStats,
+	);
+
+	function childPottyMode(babyId: number): boolean {
+		return appState.babyById(babyId)?.baby?.potty_mode === 1;
+	}
 
 	async function load() {
+		const children = statsChildren;
 		loading = true;
 		error = false;
+		if (children.length === 0) {
+			childrenStats = null;
+			fullChildrenStats = null;
+			empty = appState.loaded;
+			loading = !appState.loaded;
+			return;
+		}
+
 		try {
-			const data = await fetchStatsData();
-			if (data.sleeps.length === 0 && data.diapers.length === 0) {
-				empty = true;
-			} else {
-				empty = false;
-				stats = computeAllStats(data.sleeps, data.diapers, baby?.timezone ?? undefined, baby?.birthdate ?? undefined);
-			}
+			const raw = await fetchChildrenRawData(children, false);
+			const hasAnyData = raw.some((child) => child.sleeps.length > 0 || child.diapers.length > 0);
+			empty = !hasAnyData;
+			childrenStats = hasAnyData ? computeChildrenStats(raw) : null;
 		} catch {
 			error = true;
 		} finally {
@@ -238,7 +268,7 @@
 				Start med å spora søvn for å sjå diagram og trendar her
 			</div>
 		</div>
-	{:else if activeStats}
+	{:else if activeChildren && activeChildren.length > 0}
 		<!-- Full history toggle -->
 		<div class="stats-section" style="text-align: center;">
 			{#if showFullHistory}
@@ -251,20 +281,22 @@
 				</button>
 			{/if}
 		</div>
+
+		{#snippet childPanel(cs: ChildStats['stats'], pottyMode: boolean)}
 		<!-- Chart A: 30-Day Stacked Area Trend -->
-		{#if activeStats.stackedArea.nightPath}
+		{#if cs.stackedArea.nightPath}
 			<div class="stats-section">
 				<h3 class="stats-section-title">Søvntrend (30 dagar)</h3>
 				<ChartFrame title="Søvntrend" onExpand={expand}>
 					<TimeSeriesChart
-						gridLines={activeStats.stackedArea.gridLines}
-						yTicks={activeStats.stackedArea.yTicks}
-						xLabels={activeStats.stackedArea.xLabels}
+						gridLines={cs.stackedArea.gridLines}
+						yTicks={cs.stackedArea.yTicks}
+						xLabels={cs.stackedArea.xLabels}
 						series={[
-							{ path: activeStats.stackedArea.nightPath, fill: 'var(--moon)', opacity: 0.7 },
-							{ path: activeStats.stackedArea.napPath, fill: 'var(--peach-dark)', opacity: 0.7 },
-							...(activeStats.stackedArea.rollingAvgPath
-								? [{ path: activeStats.stackedArea.rollingAvgPath, stroke: 'var(--danger-dark, #c0392b)', strokeWidth: 2.5, strokeLinecap: 'round', opacity: 0.8 }]
+							{ path: cs.stackedArea.nightPath, fill: 'var(--moon)', opacity: 0.7 },
+							{ path: cs.stackedArea.napPath, fill: 'var(--peach-dark)', opacity: 0.7 },
+							...(cs.stackedArea.rollingAvgPath
+								? [{ path: cs.stackedArea.rollingAvgPath, stroke: 'var(--danger-dark, #c0392b)', strokeWidth: 2.5, strokeLinecap: 'round', opacity: 0.8 }]
 								: []),
 						]}
 					/>
@@ -274,18 +306,18 @@
 		{/if}
 
 		<!-- Chart B: Total Sleep vs Age Norms (hero chart) -->
-		{#if activeStats.sleepVsNorm && activeStats.sleepVsNorm.actualPath}
+		{#if cs.sleepVsNorm && cs.sleepVsNorm.actualPath}
 			<div class="stats-section">
 				<h3 class="stats-section-title">Total søvn vs. tilrådd</h3>
 				<ChartFrame title="Total søvn vs. tilrådd" onExpand={expand}>
 					<TimeSeriesChart
-						gridLines={activeStats.sleepVsNorm.gridLines}
-						yTicks={activeStats.sleepVsNorm.yTicks}
-						xLabels={activeStats.sleepVsNorm.xLabels}
-						bands={[{ path: activeStats.sleepVsNorm.bandPath, fill: 'var(--moon-glow)', opacity: 0.5 }]}
+						gridLines={cs.sleepVsNorm.gridLines}
+						yTicks={cs.sleepVsNorm.yTicks}
+						xLabels={cs.sleepVsNorm.xLabels}
+						bands={[{ path: cs.sleepVsNorm.bandPath, fill: 'var(--moon-glow)', opacity: 0.5 }]}
 						series={[
-							{ path: activeStats.sleepVsNorm.typicalPath, stroke: 'var(--text-light)', strokeWidth: 1.5, strokeDasharray: '4,3', opacity: 0.6 },
-							{ path: activeStats.sleepVsNorm.actualPath, fill: 'var(--moon)', opacity: 0.85 },
+							{ path: cs.sleepVsNorm.typicalPath, stroke: 'var(--text-light)', strokeWidth: 1.5, strokeDasharray: '4,3', opacity: 0.6 },
+							{ path: cs.sleepVsNorm.actualPath, fill: 'var(--moon)', opacity: 0.85 },
 						]}
 					/>
 					<ChartLegend items={[{ label: 'Faktisk søvn', colorVar: '--moon' }, { label: 'Tilrådd', colorVar: '--moon-glow' }]} />
@@ -294,20 +326,20 @@
 		{/if}
 
 		<!-- Chart C: Night Stretch Growth -->
-		{#if activeStats.nightStretchChart.linePath}
+		{#if cs.nightStretchChart.linePath}
 			<div class="stats-section">
 				<h3 class="stats-section-title">Lengste nattestrekk</h3>
 				<ChartFrame title="Lengste nattestrekk" onExpand={expand}>
 					<TimeSeriesChart
-						gridLines={activeStats.nightStretchChart.gridLines}
-						yTicks={activeStats.nightStretchChart.yTicks}
-						xLabels={activeStats.nightStretchChart.xLabels}
+						gridLines={cs.nightStretchChart.gridLines}
+						yTicks={cs.nightStretchChart.yTicks}
+						xLabels={cs.nightStretchChart.xLabels}
 						series={[
-							{ path: activeStats.nightStretchChart.areaPath, fill: 'var(--moon-glow)', opacity: 0.3 },
-							...(activeStats.nightStretchChart.rollingAvgPath
-								? [{ path: activeStats.nightStretchChart.rollingAvgPath, stroke: 'var(--danger-dark, #c0392b)', strokeWidth: 2.5, strokeLinecap: 'round', opacity: 0.8 }]
+							{ path: cs.nightStretchChart.areaPath, fill: 'var(--moon-glow)', opacity: 0.3 },
+							...(cs.nightStretchChart.rollingAvgPath
+								? [{ path: cs.nightStretchChart.rollingAvgPath, stroke: 'var(--danger-dark, #c0392b)', strokeWidth: 2.5, strokeLinecap: 'round', opacity: 0.8 }]
 								: []),
-							{ path: activeStats.nightStretchChart.linePath, stroke: 'var(--moon)', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round' },
+							{ path: cs.nightStretchChart.linePath, stroke: 'var(--moon)', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round' },
 						]}
 					/>
 				</ChartFrame>
@@ -315,21 +347,21 @@
 		{/if}
 
 		<!-- Chart: Bedtime Consistency -->
-		{#if activeStats.bedtimeChart.linePath}
+		{#if cs.bedtimeChart.linePath}
 			<div class="stats-section">
 				<h3 class="stats-section-title">Leggetid</h3>
 				<ChartFrame title="Leggetid" onExpand={expand}>
 					<TimeSeriesChart
-						gridLines={activeStats.bedtimeChart.gridLines}
-						yTicks={activeStats.bedtimeChart.yTicks}
-						xLabels={activeStats.bedtimeChart.xLabels}
+						gridLines={cs.bedtimeChart.gridLines}
+						yTicks={cs.bedtimeChart.yTicks}
+						xLabels={cs.bedtimeChart.xLabels}
 						series={[
-							{ path: activeStats.bedtimeChart.linePath, stroke: 'var(--moon)', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round' },
+							{ path: cs.bedtimeChart.linePath, stroke: 'var(--moon)', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round' },
 						]}
 					>
 						{#snippet underlay()}
-							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={activeStats.bedtimeChart.avgY} y2={activeStats.bedtimeChart.avgY} stroke="var(--lavender-dark)" stroke-width="1" stroke-dasharray="4,3" />
-							<text x={TS_CHART.W - TS_CHART.PAD_R} y={activeStats.bedtimeChart.avgY - 4} text-anchor="end" fill="var(--lavender-dark)" font-size="10" font-family="var(--font)">snitt {activeStats.bedtimeChart.avgLabel}</text>
+							<line x1={TS_CHART.PAD_L} x2={TS_CHART.W - TS_CHART.PAD_R} y1={cs.bedtimeChart.avgY} y2={cs.bedtimeChart.avgY} stroke="var(--lavender-dark)" stroke-width="1" stroke-dasharray="4,3" />
+							<text x={TS_CHART.W - TS_CHART.PAD_R} y={cs.bedtimeChart.avgY - 4} text-anchor="end" fill="var(--lavender-dark)" font-size="10" font-family="var(--font)">snitt {cs.bedtimeChart.avgLabel}</text>
 						{/snippet}
 					</TimeSeriesChart>
 				</ChartFrame>
@@ -337,19 +369,19 @@
 		{/if}
 
 		<!-- Nap Count Trend -->
-		{#if activeStats.napCountChart.linePath}
+		{#if cs.napCountChart.linePath}
 			<div class="stats-section">
 				<h3 class="stats-section-title">Lurar per dag</h3>
 				<ChartFrame title="Lurar per dag" onExpand={expand}>
 					<TimeSeriesChart
-						gridLines={activeStats.napCountChart.gridLines}
-						yTicks={activeStats.napCountChart.yTicks}
-						xLabels={activeStats.napCountChart.xLabels}
+						gridLines={cs.napCountChart.gridLines}
+						yTicks={cs.napCountChart.yTicks}
+						xLabels={cs.napCountChart.xLabels}
 						series={[
-							...(activeStats.napCountChart.rollingAvgPath
-								? [{ path: activeStats.napCountChart.rollingAvgPath, stroke: 'var(--danger-dark, #c0392b)', strokeWidth: 2.5, strokeLinecap: 'round', opacity: 0.8 }]
+							...(cs.napCountChart.rollingAvgPath
+								? [{ path: cs.napCountChart.rollingAvgPath, stroke: 'var(--danger-dark, #c0392b)', strokeWidth: 2.5, strokeLinecap: 'round', opacity: 0.8 }]
 								: []),
-							{ path: activeStats.napCountChart.linePath, stroke: 'var(--peach-dark)', strokeWidth: 2.5, strokeLinecap: 'round' },
+							{ path: cs.napCountChart.linePath, stroke: 'var(--peach-dark)', strokeWidth: 2.5, strokeLinecap: 'round' },
 						]}
 					/>
 				</ChartFrame>
@@ -361,7 +393,7 @@
 		<div class="stats-section">
 			<h3 class="stats-section-title">Søvntrendar</h3>
 			<div class="stats-trends-table">
-				{#each activeStats.trendRows as row}
+				{#each cs.trendRows as row}
 					<div class="stats-trend-row" class:stats-trend-header={row.isHeader}>
 						<div class="stats-trend-label">{row.label}</div>
 						<div class="stats-trend-val">{row.val7}</div>
@@ -372,38 +404,38 @@
 		</div>
 
 		<!-- Best/worst days -->
-		{#if activeStats.bestWorst}
+		{#if cs.bestWorst}
 			<div class="stats-section">
 				<h3 class="stats-section-title">Best og verst</h3>
 				<div class="stats-row">
 					<div class="stats-card">
-						<div class="stat-value">{activeStats.bestWorst.best.label}</div>
-						<div class="stat-label">Mest søvn: {activeStats.bestWorst.best.duration}</div>
+						<div class="stat-value">{cs.bestWorst.best.label}</div>
+						<div class="stat-label">Mest søvn: {cs.bestWorst.best.duration}</div>
 					</div>
 					<div class="stats-card">
-						<div class="stat-value">{activeStats.bestWorst.worst.label}</div>
-						<div class="stat-label">Minst søvn: {activeStats.bestWorst.worst.duration}</div>
+						<div class="stat-value">{cs.bestWorst.worst.label}</div>
+						<div class="stat-label">Minst søvn: {cs.bestWorst.worst.duration}</div>
 					</div>
 				</div>
 			</div>
 		{/if}
 
 		<!-- Diaper stats -->
-		{#if activeStats.diaperStats7}
+		{#if cs.diaperStats7}
 			<div class="stats-section">
 				<h3 class="stats-section-title">Bleie/Do</h3>
 				<div class="stats-row">
 					<div class="stats-card">
-						<div class="stat-value">{activeStats.diaperStats7.perDay}</div>
+						<div class="stat-value">{cs.diaperStats7.perDay}</div>
 						<div class="stat-label">Bleier/dag (7d)</div>
 					</div>
 					<div class="stats-card">
-						<div class="stat-value">{activeStats.diaperStats7.wetCount}/{activeStats.diaperStats7.dirtyCount}/{activeStats.diaperStats7.bothCount}</div>
+						<div class="stat-value">{cs.diaperStats7.wetCount}/{cs.diaperStats7.dirtyCount}/{cs.diaperStats7.bothCount}</div>
 						<div class="stat-label">{pottyMode ? 'Tiss/Bæsj/Begge' : 'Våt/Skitten/Begge'}</div>
 					</div>
-					{#if activeStats.diaperStats30 && activeStats.diaperStats30.pottyCount > 0 && activeStats.diaperStats30.pottySuccessRate != null}
+					{#if cs.diaperStats30 && cs.diaperStats30.pottyCount > 0 && cs.diaperStats30.pottySuccessRate != null}
 						<div class="stats-card">
-							<div class="stat-value">{activeStats.diaperStats30.pottySuccessRate}%</div>
+							<div class="stat-value">{cs.diaperStats30.pottySuccessRate}%</div>
 							<div class="stat-label">Suksessrate do</div>
 						</div>
 					{/if}
@@ -413,14 +445,14 @@
 
 		<!-- Tier 2: Additional charts -->
 			<!-- Chart D: Sleep Timeline (Gantt) -->
-			{#if activeStats.gantt.rows.length > 0}
+			{#if cs.gantt.rows.length > 0}
 				<div class="stats-section">
 					<h3 class="stats-section-title">Døgnrytme (30 dagar)</h3>
 					<ChartFrame title="Døgnrytme" landscape={false} wrapStyle="overflow-x: auto;" onExpand={expand}>
 						<SleepTimelineChart
-							rows={activeStats.gantt.rows}
-							hourLabels={activeStats.gantt.hourLabels}
-							height={activeStats.gantt.height}
+							rows={cs.gantt.rows}
+							hourLabels={cs.gantt.hourLabels}
+							height={cs.gantt.height}
 						/>
 						<ChartLegend items={[{ label: 'Lurar', colorVar: '--peach-dark' }, { label: 'Natt', colorVar: '--moon' }]} />
 					</ChartFrame>
@@ -428,8 +460,8 @@
 			{/if}
 
 			<!-- Chart E: 24h Sleep Heatmap -->
-			{#if activeStats.heatmapChart.cells.length > 0}
-				{@const hm = activeStats.heatmapChart}
+			{#if cs.heatmapChart.cells.length > 0}
+				{@const hm = cs.heatmapChart}
 				<div class="stats-section">
 					<h3 class="stats-section-title">Søvnkart</h3>
 					<ChartFrame title="Søvnkart" landscape={false} wrapStyle="overflow-y: auto; max-height: 70vh;" onExpand={expand}>
@@ -439,44 +471,44 @@
 			{/if}
 
 			<!-- Wake window chart with context -->
-			{#if activeStats.wakeScatter.dots.length > 0}
+			{#if cs.wakeScatter.dots.length > 0}
 				<div class="stats-section">
 					<h3 class="stats-section-title">Vakevindu siste 7 dagar</h3>
 					<div class="stats-row" style="margin-bottom: 12px;">
 						<div class="stats-card">
-							<div class="stat-value">{activeStats.wakeAvg ? formatDuration(activeStats.wakeAvg * 60000) : '—'}</div>
+							<div class="stat-value">{cs.wakeAvg ? formatDuration(cs.wakeAvg * 60000) : '—'}</div>
 							<div class="stat-label">Snitt</div>
 						</div>
 						<div class="stats-card">
-							<div class="stat-value">{formatDuration(Math.min(...activeStats.wakeScatter.dots.map(d => d.minutes)) * 60000)}</div>
+							<div class="stat-value">{formatDuration(Math.min(...cs.wakeScatter.dots.map(d => d.minutes)) * 60000)}</div>
 							<div class="stat-label">Kortast</div>
 						</div>
 						<div class="stats-card">
-							<div class="stat-value">{formatDuration(Math.max(...activeStats.wakeScatter.dots.map(d => d.minutes)) * 60000)}</div>
+							<div class="stat-value">{formatDuration(Math.max(...cs.wakeScatter.dots.map(d => d.minutes)) * 60000)}</div>
 							<div class="stat-label">Lengst</div>
 						</div>
 					</div>
 					<p style="font-size: 0.8rem; color: var(--text-light); margin: 0 0 8px; line-height: 1.3;">
 						Kvart punkt er eitt vakevindu — tida mellom to søvnperiodar.
 						Fyrste vakevindu (etter morgon) er ofte kortast, siste (før leggetid) er lengst.
-						{#if activeStats.wakeScatter.bandY}
+						{#if cs.wakeScatter.bandY}
 							Det skraverte feltet viser tilrådd område.
 						{/if}
 					</p>
 					<ChartFrame title="Vakevindu" onExpand={expand}>
 						<TimeSeriesChart
-							gridLines={activeStats.wakeScatter.gridLines}
-							yTicks={activeStats.wakeScatter.yTicks}
+							gridLines={cs.wakeScatter.gridLines}
+							yTicks={cs.wakeScatter.yTicks}
 							xLabels={[]}
 							series={[]}
 						>
 							{#snippet underlay()}
-								{#if activeStats.wakeScatter.bandY}
+								{#if cs.wakeScatter.bandY}
 									<rect
 										x={TS_CHART.PAD_L}
-										y={activeStats.wakeScatter.bandY.top}
+										y={cs.wakeScatter.bandY.top}
 										width={TS_CHART.W - TS_CHART.PAD_L - TS_CHART.PAD_R}
-										height={activeStats.wakeScatter.bandY.bottom - activeStats.wakeScatter.bandY.top}
+										height={cs.wakeScatter.bandY.bottom - cs.wakeScatter.bandY.top}
 										fill="var(--lavender)"
 										opacity="0.25"
 										rx="4"
@@ -484,7 +516,7 @@
 								{/if}
 							{/snippet}
 							{#snippet overlay()}
-								{#each activeStats.wakeScatter.dots as dot}
+								{#each cs.wakeScatter.dots as dot}
 									<circle cx={dot.x} cy={dot.y} r="5" fill="var(--peach-dark)" stroke="var(--white)" stroke-width="1" opacity="0.7" />
 									<text x={dot.x} y={dot.y - 8} text-anchor="middle" fill="var(--text-light)" font-size="8" font-family="var(--font)">{formatDuration(dot.minutes * 60000)}</text>
 								{/each}
@@ -493,6 +525,21 @@
 					</ChartFrame>
 				</div>
 			{/if}
+		{/snippet}
+
+		{#if mode === 'single' && activeChildren.length === 1}
+			{@render childPanel(activeChildren[0]!.stats, childPottyMode(activeChildren[0]!.babyId))}
+		{:else}
+			{#each activeChildren as child, index (child.babyId)}
+				<section class="stats-child-panel" data-testid="stats-child-panel">
+					<h2 class="stats-child-name">{child.name}</h2>
+					{@render childPanel(child.stats, childPottyMode(child.babyId))}
+				</section>
+				{#if index < activeChildren.length - 1}
+					<div class="stats-child-divider" aria-hidden="true"></div>
+				{/if}
+			{/each}
+		{/if}
 
 		<!-- Export -->
 		<div class="stats-section">
@@ -525,6 +572,23 @@
 
 <style>
 	/* --- comparison: norm vs baby, card-list (mobile-first, no overflow) --- */
+	.stats-child-panel {
+		margin: 0;
+	}
+
+	.stats-child-name {
+		margin: 20px 4px 12px;
+		font-size: 1.05rem;
+		font-weight: 600;
+		color: var(--text);
+	}
+
+	.stats-child-divider {
+		height: 1px;
+		margin: 24px 0;
+		background: var(--cream-dark);
+	}
+
 	.comparison-panel {
 		padding: 4px 4px 0;
 	}

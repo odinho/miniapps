@@ -150,3 +150,31 @@ test("Stats legends show Norwegian labels", async ({ page }) => {
   await expect(trendLegend).toContainText("Lurar");
   await expect(trendLegend).toContainText("Natt");
 });
+
+test("two children each get a stats panel with a name header", async ({ page }) => {
+  const ada = createBaby("Ada", "2025-06-12");
+  const bo = createBaby("Bo", "2025-06-12"); // twins (same birthdate)
+  const now = new Date();
+  for (const id of [ada, bo]) {
+    setWakeUpTime(id);
+    const yest = new Date(now.getTime() - 24 * 3600000);
+    addCompletedSleep(id, new Date(yest.getTime() - 8 * 3600000).toISOString(), yest.toISOString(), "night");
+    addCompletedSleep(id, new Date(now.getTime() - 4 * 3600000).toISOString(), new Date(now.getTime() - 3 * 3600000).toISOString(), "nap");
+  }
+
+  await page.goto("/stats");
+  await expect(page.getByTestId("stats-child-panel")).toHaveCount(2, { timeout: 5000 });
+  // Per-child name headers, in creation order.
+  await expect(page.locator(".stats-child-name")).toHaveText(["Ada", "Bo"]);
+});
+
+test("a single child renders no per-child panel wrapper", async ({ page }) => {
+  const ada = createBaby("Testa");
+  setWakeUpTime(ada);
+  const now = new Date();
+  addCompletedSleep(ada, new Date(now.getTime() - 4 * 3600000).toISOString(), new Date(now.getTime() - 3 * 3600000).toISOString(), "nap");
+
+  await page.goto("/stats");
+  await expect(page.locator(".stats-chart").first()).toBeVisible({ timeout: 5000 });
+  await expect(page.getByTestId("stats-child-panel")).toHaveCount(0);
+});
