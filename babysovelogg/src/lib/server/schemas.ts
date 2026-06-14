@@ -80,6 +80,9 @@ const payloadSchemas = {
     startTime: isoDateTime,
     type: v.nullish(v.picklist(["nap", "night"])),
     sleepDomainId: domainId,
+    /** True when this onset was a parent-accepted Phase-4 overlap nudge —
+     *  tagged so WW learning excludes it (policy, not natural rhythm). */
+    synced: v.nullish(v.boolean()),
   }),
   "sleep.ended": v.object({
     sleepDomainId: domainId,

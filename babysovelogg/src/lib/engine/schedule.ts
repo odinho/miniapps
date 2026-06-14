@@ -31,6 +31,11 @@ interface CachedSleep {
   localDate: string;
   /** Captured wake reason (or null). Drives right-censoring of cut-short naps. */
   wokeBy: "self" | "woken" | null;
+  /** True when the START was a parent-accepted Phase-4 overlap nudge — its
+   *  wake-window is policy, not the baby's natural rhythm, so WW learning skips
+   *  it. Duration learning keeps it: a nudged start doesn't change how long the
+   *  baby actually slept. */
+  synced: boolean;
 }
 
 interface SleepCache {
@@ -63,6 +68,7 @@ function buildCache(ctx: BabyContext): SleepCache {
       type: s.type,
       localDate: localDate(s.start_time, ctx.tz),
       wokeBy: s.woke_by ?? null,
+      synced: !!s.synced,
     });
   }
 
@@ -691,6 +697,12 @@ function getPositionalWakeWindows(ctx: BabyContext): number[] {
     let napPosition = 0;
     for (let i = 0; i < daySleeps.length; i++) {
       if (daySleeps[i].type !== "nap") continue; // skip gaps before night sleep
+      // A synced (nudge-accepted) start is policy — keep the position counter
+      // advancing, but don't learn its wake window.
+      if (daySleeps[i].synced) {
+        napPosition++;
+        continue;
+      }
       const prevEndMs = i === 0 ? priorEndMs : daySleeps[i - 1].endMs;
       if (prevEndMs == null) {
         napPosition++;
@@ -768,6 +780,11 @@ function getPositionalDataForNapCount(
     let napPos = 0;
     for (let i = 0; i < daySleeps.length; i++) {
       if (daySleeps[i].type !== "nap") continue;
+      // Synced (nudge-accepted) start → policy, not a natural wake-window sample.
+      if (daySleeps[i].synced) {
+        napPos++;
+        continue;
+      }
       const prevEndMs = i === 0 ? priorEndMs : daySleeps[i - 1].endMs;
       if (prevEndMs == null) {
         napPos++;
@@ -1355,6 +1372,9 @@ function computeAvgNapWakeWindow(cache: SleepCache): number | null {
   const gaps: number[] = [];
   for (let i = 1; i < cache.sorted.length; i++) {
     if (cache.sorted[i].type !== "nap") continue;
+    // A synced (nudge-accepted) start is policy, not natural rhythm — the gap
+    // leading to it isn't a sample of the baby's wake window.
+    if (cache.sorted[i].synced) continue;
     // Skip if either sleep's day is incomplete — the gap could span a missing night
     if (!cache.daysWithNight.has(cache.sorted[i].localDate)) continue;
     if (!cache.daysWithNight.has(cache.sorted[i - 1].localDate)) continue;

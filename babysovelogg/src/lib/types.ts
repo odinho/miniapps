@@ -28,6 +28,12 @@ export interface SleepLogRow {
   woke_by: string | null;
   wake_notes: string | null;
   wake_mood: string | null;
+  /** 1 when this sleep's START was a parent-accepted Phase-4 overlap nudge
+   *  (policy, not the baby's natural rhythm) — excluded from wake-window
+   *  learning so the nudge can't teach a false rhythm. 0/absent otherwise.
+   *  Optional so the many partial-row test fixtures don't all need it; the DB
+   *  always returns it (DEFAULT 0) and the engine reads it as `!!s.synced`. */
+  synced?: number;
   deleted: number;
   domain_id: string;
   created_by_event_id: number | null;
@@ -101,6 +107,9 @@ export interface SleepEntry {
    * not a sample of it. Optional: not all rows have this populated.
    */
   woke_by?: "self" | "woken" | null;
+  /** 1 when the START was a parent-accepted overlap nudge (Phase 4) — its
+   *  wake-window is policy, not natural rhythm, so it's skipped by WW learning. */
+  synced?: number;
 }
 
 export interface SleepPause {

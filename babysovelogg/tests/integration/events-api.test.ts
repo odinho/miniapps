@@ -83,3 +83,32 @@ test("GET /api/events with pagination returns correct total", async () => {
   // Total includes baby.created from fixture + 5 diapers
   expect(data.total).toBeGreaterThanOrEqual(6);
 });
+
+test("sleep.started persists the synced (overlap-nudge) flag; defaults to 0", async () => {
+  const { db } = await import("$lib/server/db.js");
+  const babyId = createBaby("Testa");
+  const syncedId = generateSleepId();
+  const plainId = generateSleepId();
+
+  await postEvents([
+    makeEvent("sleep.started", {
+      babyId,
+      startTime: new Date().toISOString(),
+      sleepDomainId: syncedId,
+      synced: true,
+    }),
+    makeEvent("sleep.started", {
+      babyId,
+      startTime: new Date().toISOString(),
+      sleepDomainId: plainId,
+    }),
+  ]);
+
+  const rows = Object.fromEntries(
+    (db.prepare("SELECT domain_id, synced FROM sleep_log").all() as { domain_id: string; synced: number }[]).map(
+      (r) => [r.domain_id, r.synced],
+    ),
+  );
+  expect(rows[syncedId]).toBe(1);
+  expect(rows[plainId]).toBe(0);
+});

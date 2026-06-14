@@ -93,6 +93,7 @@ function initSchema(database: SqliteDb) {
       fall_asleep_time TEXT,
       woke_by TEXT,
       wake_notes TEXT,
+      synced INTEGER NOT NULL DEFAULT 0,
       deleted INTEGER NOT NULL DEFAULT 0,
       domain_id TEXT NOT NULL,
       created_by_event_id INTEGER,
@@ -151,6 +152,7 @@ function initSchema(database: SqliteDb) {
   tryAddColumn(database, "baby", "target_bedtime", "TEXT");
   tryAddColumn(database, "sleep_log", "onset_note", "TEXT");
   tryAddColumn(database, "sleep_log", "wake_mood", "TEXT");
+  tryAddColumn(database, "sleep_log", "synced", "INTEGER NOT NULL DEFAULT 0");
 
   // track_diaper gates the diaper/potty UI. New babies created after this
   // column exists default to 0 (off) at the event layer; existing rows get

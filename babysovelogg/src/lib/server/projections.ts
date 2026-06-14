@@ -122,12 +122,13 @@ export function applyEvent(event: AppEvent): void {
 
     case "sleep.started":
       db.prepare(
-        "INSERT INTO sleep_log (baby_id, start_time, type, domain_id, created_by_event_id) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO sleep_log (baby_id, start_time, type, domain_id, synced, created_by_event_id) VALUES (?, ?, ?, ?, ?, ?)",
       ).run(
         payload.babyId,
         payload.startTime,
         payload.type || "nap",
         payload.sleepDomainId,
+        payload.synced ? 1 : 0,
         eventId,
       );
       break;
