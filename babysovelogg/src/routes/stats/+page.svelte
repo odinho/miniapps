@@ -138,6 +138,8 @@
 			fullChildrenStats = computeChildrenStats(raw);
 			fullSharedSleepDays = sharedSleepFor(raw);
 			showFullHistory = true;
+		} catch {
+			error = true;
 		} finally {
 			loadingFullHistory = false;
 		}

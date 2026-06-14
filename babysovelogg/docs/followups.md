@@ -33,6 +33,33 @@ regression (both pre-date the refactor); both are low priority.
   Step 2's multi-child data-shaper should either wire the abstract model types or
   they should be trimmed.
 
+## Stats charts — Step-2 QA leftovers (P3 / S2-QA, 2026-06-14)
+
+Surfaced by the S2-QA adversarial Codex review of all of Step 2 (per-child
+panels, twin overlay + shared scales, gantt child-lanes, shared-sleep /
+parent-downtime, cross-child comparison). The DST midnight-split bug and the
+missing full-history error path were fixed in-unit; these three are logged as
+follow-ups (consistent-with-existing-convention or pre-existing, none a
+multi-child regression).
+
+- **The whole /stats page uses GROSS sleep spans, not net-of-wakings.** Every
+  chart (single + multi-child) sums wall-clock span, so a night with 60 min of
+  logged wakings reads at full duration. This is *consistent* across the page and
+  mirrors the engine's deliberate "gross for SPAN predictions" convention
+  (commit `6ef1081` / the engine net-vs-gross followup above), so it's not a
+  multi-child bug — but if /stats ever wants to show *sleep amount* it should net
+  wakings like the engine's amount-comparisons do. Cross-cutting; bigger than S2.
+- **Full-history fetch silently caps per child.** `loadFullHistory()` requests
+  `limit=10000` but the API clamps to 1000 rows/child, so a very long-lived baby
+  (or a backfilled import) silently loses the oldest rows from the charts. Pre-
+  existing (single-baby had the same cap); becomes slightly more visible with two
+  children. Fix: paginate, or raise the API cap for the stats read.
+- **Zero-overlap shared-sleep is hidden, not shown as 0.** When two children
+  never sleep at the same time, the "Felles søvn" / parent-downtime section is
+  omitted entirely (matching the other charts' zero-day filtering) rather than
+  rendering an explicit "0 / no shared sleep" state. Defensible, but a parent
+  might read absence-of-section as a bug. Low priority; revisit if asked.
+
 ## Handoff timeline: pre-midnight non-overnight blocks dropped (P3-4)
 
 The family handoff (`src/lib/handoff.ts`) builds its 6h window from the

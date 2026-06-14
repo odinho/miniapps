@@ -1,4 +1,4 @@
-import { isoToDateInTz, getMinuteOfDayInTz } from "$lib/tz.js";
+import { isoToDateInTz, setHourInTz } from "$lib/tz.js";
 import { TS_CHART, tsX, tsPlotH } from "$lib/charts/scales.js";
 import { areaUnder } from "$lib/charts/paths.js";
 import type { SleepEntry } from "$lib/types.js";
@@ -68,8 +68,11 @@ export function computeSharedSleepByDay(
     let s = iv.start;
     while (s < iv.end) {
       const date = isoToDateInTz(new Date(s).toISOString(), tz);
-      const msToMidnight = (1440 - getMinuteOfDayInTz(new Date(s), tz)) * 60_000;
-      const chunkEnd = Math.min(iv.end, s + msToMidnight);
+      // Next local midnight as a real instant (handles DST — a spring-forward
+      // day is 23h, not 1440 min), so an overlap crossing midnight splits at the
+      // true boundary. +24h reliably lands in the next calendar day.
+      const nextMidnight = setHourInTz(new Date(s + 24 * 3_600_000), 0, 0, tz).getTime();
+      const chunkEnd = Math.min(iv.end, nextMidnight);
       byDay.set(date, (byDay.get(date) ?? 0) + (chunkEnd - s) / 60_000);
       s = chunkEnd;
     }
