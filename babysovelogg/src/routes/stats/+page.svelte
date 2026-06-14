@@ -13,6 +13,12 @@
 		buildTwinTimeline,
 		type TwinOverlayChart,
 	} from '$lib/stats/twin-overlay-charts.js';
+	import {
+		computeSharedSleepByDay,
+		buildSharedSleepChart,
+		type SharedSleepDay,
+	} from '$lib/stats/shared-sleep.js';
+	import type { ChildRawData } from '$lib/stats/multi-child-stats.js';
 	import { appState } from '$lib/stores/app.svelte.js';
 	import { calculateAgeMonths } from '$lib/engine/schedule.js';
 	import {
@@ -97,6 +103,14 @@
 	let showFullHistory = $state(false);
 	let loadingFullHistory = $state(false);
 	let fullChildrenStats = $state<ChildStats[] | null>(null);
+	let sharedSleepDays = $state<SharedSleepDay[] | null>(null);
+	let fullSharedSleepDays = $state<SharedSleepDay[] | null>(null);
+
+	/** Both-asleep minutes per day for exactly two children (parent downtime). */
+	function sharedSleepFor(raw: ChildRawData[]): SharedSleepDay[] | null {
+		if (raw.length !== 2) return null;
+		return computeSharedSleepByDay(raw[0].sleeps, raw[1].sleeps, raw[0].baby.timezone ?? 'UTC');
+	}
 
 	// Fullscreen chart overlay
 	let fullscreenSvg = $state<string | null>(null);
@@ -121,6 +135,7 @@
 		try {
 			const raw = await fetchChildrenRawData(children, true);
 			fullChildrenStats = computeChildrenStats(raw);
+			fullSharedSleepDays = sharedSleepFor(raw);
 			showFullHistory = true;
 		} finally {
 			loadingFullHistory = false;
@@ -131,6 +146,10 @@
 	const activeChildren = $derived(
 		showFullHistory && fullChildrenStats ? fullChildrenStats : childrenStats,
 	);
+	const activeSharedSleep = $derived(
+		showFullHistory && fullSharedSleepDays ? fullSharedSleepDays : sharedSleepDays,
+	);
+	const sharedSleepChart = $derived(activeSharedSleep ? buildSharedSleepChart(activeSharedSleep) : null);
 	const twinOverlayCharts = $derived(
 		mode === 'twinOverlay' && activeChildren && activeChildren.length > 1
 			? buildTwinOverlayCharts(activeChildren)
@@ -173,6 +192,8 @@
 		if (children.length === 0) {
 			childrenStats = null;
 			fullChildrenStats = null;
+			sharedSleepDays = null;
+			fullSharedSleepDays = null;
 			empty = appState.loaded;
 			loading = !appState.loaded;
 			return;
@@ -183,6 +204,7 @@
 			const hasAnyData = raw.some((child) => child.sleeps.length > 0 || child.diapers.length > 0);
 			empty = !hasAnyData;
 			childrenStats = hasAnyData ? computeChildrenStats(raw) : null;
+			sharedSleepDays = hasAnyData ? sharedSleepFor(raw) : null;
 		} catch {
 			error = true;
 		} finally {
@@ -686,6 +708,26 @@
 				</div>
 			{/if}
 		{/snippet}
+
+		{#if sharedSleepChart}
+			<div class="stats-section" data-testid="shared-sleep">
+				<h3 class="stats-section-title">Felles søvn (foreldrekvile)</h3>
+				<div class="stats-row" style="margin-bottom: 12px;">
+					<div class="stats-card">
+						<div class="stat-value">{formatDuration(sharedSleepChart.avgMinutes * 60000)}</div>
+						<div class="stat-label">Snitt/dag begge søv</div>
+					</div>
+				</div>
+				<ChartFrame title="Felles søvn" onExpand={expand}>
+					<TimeSeriesChart
+						gridLines={sharedSleepChart.gridLines}
+						yTicks={sharedSleepChart.yTicks}
+						xLabels={sharedSleepChart.xLabels}
+						series={[{ path: sharedSleepChart.areaPath, fill: 'var(--lavender)', opacity: 0.5 }]}
+					/>
+				</ChartFrame>
+			</div>
+		{/if}
 
 		{#if mode === 'single' && activeChildren.length === 1}
 			{@render childPanel(activeChildren[0]!.stats, childPottyMode(activeChildren[0]!.babyId))}

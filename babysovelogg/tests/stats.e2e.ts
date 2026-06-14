@@ -167,6 +167,8 @@ test("siblings with different birthdates each get a two-up stats panel", async (
   // Per-child name headers, in creation order.
   await expect(page.locator(".stats-child-name")).toHaveText(["Ada", "Bo"]);
   await expect(page.getByTestId("twin-overlay-sleep-trend")).toHaveCount(0);
+  // Both shared the overnight → a parent-downtime ("Felles søvn") section shows.
+  await expect(page.getByTestId("shared-sleep")).toBeVisible();
 });
 
 test("twins share an overlaid sleep-trend chart with child-first series and legend", async ({ page }) => {
@@ -196,6 +198,7 @@ test("twins share an overlaid sleep-trend chart with child-first series and lege
   await expect(trend.locator(`[data-series-id="${ada}"]`)).toBeVisible();
   await expect(trend.locator(`[data-series-id="${bo}"]`)).toBeVisible();
   await expect(trend.locator(".stats-legend-item")).toHaveText(["Ada", "Bo"]);
+  await expect(page.getByTestId("shared-sleep")).toBeVisible();
 });
 
 test("a single child renders no per-child panel wrapper", async ({ page }) => {
@@ -207,4 +210,5 @@ test("a single child renders no per-child panel wrapper", async ({ page }) => {
   await page.goto("/stats");
   await expect(page.locator(".stats-chart").first()).toBeVisible({ timeout: 5000 });
   await expect(page.getByTestId("stats-child-panel")).toHaveCount(0);
+  await expect(page.getByTestId("shared-sleep")).toHaveCount(0);
 });
