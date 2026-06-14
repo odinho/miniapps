@@ -18,6 +18,7 @@
 	} from '$lib/settings-utils.js';
 	import ChartFrame from '$lib/components/charts/ChartFrame.svelte';
 	import ChartFullscreen from '$lib/components/charts/ChartFullscreen.svelte';
+	import ChartLegend from '$lib/components/charts/ChartLegend.svelte';
 
 	const s = $derived(appState.state);
 	const baby = $derived(s.baby);
@@ -269,10 +270,7 @@
 							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
 						{/each}
 					</svg>
-					<div class="stats-legend">
-						<span class="stats-legend-item"><span class="stats-dot" style="background: var(--peach-dark)"></span> Lurar</span>
-						<span class="stats-legend-item"><span class="stats-dot" style="background: var(--moon)"></span> Natt</span>
-					</div>
+					<ChartLegend items={[{ label: 'Lurar', colorVar: '--peach-dark' }, { label: 'Natt', colorVar: '--moon' }]} />
 				</ChartFrame>
 			</div>
 		{/if}
@@ -300,10 +298,7 @@
 							<text x={lbl.x} y={TS_CHART.H - 6} text-anchor="middle" fill="var(--text-light)" font-size="10" font-family="var(--font)">{lbl.label}</text>
 						{/each}
 					</svg>
-					<div class="stats-legend">
-						<span class="stats-legend-item"><span class="stats-dot" style="background: var(--moon)"></span> Faktisk søvn</span>
-						<span class="stats-legend-item"><span class="stats-dot" style="background: var(--moon-glow)"></span> Tilrådd</span>
-					</div>
+					<ChartLegend items={[{ label: 'Faktisk søvn', colorVar: '--moon' }, { label: 'Tilrådd', colorVar: '--moon-glow' }]} />
 				</ChartFrame>
 			</div>
 		{/if}
@@ -470,10 +465,7 @@
 								{/each}
 							{/each}
 						</svg>
-						<div class="stats-legend">
-							<span class="stats-legend-item"><span class="stats-dot" style="background: var(--peach-dark)"></span> Lurar</span>
-							<span class="stats-legend-item"><span class="stats-dot" style="background: var(--moon)"></span> Natt</span>
-						</div>
+						<ChartLegend items={[{ label: 'Lurar', colorVar: '--peach-dark' }, { label: 'Natt', colorVar: '--moon' }]} />
 					</ChartFrame>
 				</div>
 			{/if}
