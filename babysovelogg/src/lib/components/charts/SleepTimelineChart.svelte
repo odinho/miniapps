@@ -8,6 +8,9 @@
 		y: number;
 		type: 'nap' | 'night';
 		colorVar?: string;
+		/** Block height; defaults to the full single-baby row height. Twin lanes
+		 *  set a shorter height so two children share a date row. */
+		h?: number;
 	}
 	export interface TimelineRowRender {
 		date: string;
@@ -39,7 +42,7 @@
 		<text x={GANTT.PAD_L - 4} y={row.y + GANTT.ROW_H / 2 + 3} text-anchor="end" fill="var(--text-light)" font-size="10" font-family="var(--font)" shape-rendering="auto">{row.dateLabel}</text>
 		<rect x={GANTT.PAD_L} y={row.y} width={GANTT.W - GANTT.PAD_L - GANTT.PAD_R} height={GANTT.ROW_H - 2} fill="var(--cream-dark)" opacity="0.3" />
 		{#each row.blocks as block}
-			<rect x={block.x} y={block.y} width={block.w} height={GANTT.ROW_H - 6} fill={blockFill(block)} />
+			<rect x={block.x} y={block.y} width={block.w} height={block.h ?? GANTT.ROW_H - 6} fill={blockFill(block)} />
 		{/each}
 	{/each}
 </svg>

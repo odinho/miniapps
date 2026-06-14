@@ -2,8 +2,50 @@ import { TS_CHART, tsPlotH, tsXByDate } from "$lib/charts/scales.js";
 import { band, nullablePolyline } from "$lib/charts/paths.js";
 import { regressionEquations, sleepDuration } from "$lib/data/galland2012.js";
 import type { ChildStats } from "$lib/stats/multi-child-stats.js";
+import type { TimelineRowRender, TimelineBlockRender } from "$lib/components/charts/SleepTimelineChart.svelte";
 
 const CHILD_COLOR_VARS = ["--moon", "--peach-dark"] as const;
+
+/** Per-child lane geometry inside a gantt date row (ROW_H=20). Two lanes of
+ *  LANE_H stacked with a 1px gap, starting 2px below the row top. */
+const LANE_H = 6;
+const LANE_GAP = 1;
+
+export interface TwinTimeline {
+  rows: TimelineRowRender[];
+  hourLabels: { x: number; label: string }[];
+  height: number;
+}
+
+/**
+ * Merge each twin's gantt into ONE timeline where every date row carries both
+ * children's blocks in stacked per-child lanes (top = child 0, below = child 1),
+ * coloured per child. Block x/w are already in the shared fixed gantt scale and
+ * all children share the same 30-day calendar rows, so only y + colour differ.
+ * Returns null when no child has timeline data.
+ */
+export function buildTwinTimeline(children: ChildStats[]): TwinTimeline | null {
+  const withData = children.filter((c) => c.stats.gantt.rows.length > 0);
+  if (withData.length === 0) return null;
+  const base = withData[0].stats.gantt;
+  const byDate = children.map((c) => {
+    const m = new Map<string, ChildStats["stats"]["gantt"]["rows"][number]["blocks"]>();
+    for (const row of c.stats.gantt.rows) m.set(row.date, row.blocks);
+    return m;
+  });
+  const rows: TimelineRowRender[] = base.rows.map((row) => {
+    const blocks: TimelineBlockRender[] = [];
+    children.forEach((_child, ci) => {
+      const laneY = row.y + 2 + ci * (LANE_H + LANE_GAP);
+      const colorVar = CHILD_COLOR_VARS[ci] ?? "--text-light";
+      for (const b of byDate[ci].get(row.date) ?? []) {
+        blocks.push({ x: b.x, w: b.w, y: laneY, h: LANE_H, type: b.type, colorVar });
+      }
+    });
+    return { date: row.date, dateLabel: row.dateLabel, y: row.y, blocks };
+  });
+  return { rows, hourLabels: base.hourLabels, height: base.height };
+}
 
 export interface TwinOverlayPoint {
   date: string;

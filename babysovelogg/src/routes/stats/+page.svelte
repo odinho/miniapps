@@ -10,6 +10,7 @@
 	} from '$lib/stats/multi-child-stats.js';
 	import {
 		buildTwinOverlayCharts,
+		buildTwinTimeline,
 		type TwinOverlayChart,
 	} from '$lib/stats/twin-overlay-charts.js';
 	import { appState } from '$lib/stores/app.svelte.js';
@@ -133,6 +134,11 @@
 	const twinOverlayCharts = $derived(
 		mode === 'twinOverlay' && activeChildren && activeChildren.length > 1
 			? buildTwinOverlayCharts(activeChildren)
+			: null,
+	);
+	const twinTimeline = $derived(
+		mode === 'twinOverlay' && activeChildren && activeChildren.length > 1
+			? buildTwinTimeline(activeChildren)
 			: null,
 	);
 	const twinChildLegend = $derived(
@@ -611,21 +617,7 @@
 			</div>
 		{/if}
 
-		<!-- Tier 2: Additional charts -->
-			<!-- Chart D: Sleep Timeline (Gantt) -->
-			{#if cs.gantt.rows.length > 0}
-				<div class="stats-section">
-					<h3 class="stats-section-title">Døgnrytme (30 dagar)</h3>
-					<ChartFrame title="Døgnrytme" landscape={false} wrapStyle="overflow-x: auto;" onExpand={expand}>
-						<SleepTimelineChart
-							rows={cs.gantt.rows}
-							hourLabels={cs.gantt.hourLabels}
-							height={cs.gantt.height}
-						/>
-						<ChartLegend items={[{ label: 'Lurar', colorVar: '--peach-dark' }, { label: 'Natt', colorVar: '--moon' }]} />
-					</ChartFrame>
-				</div>
-			{/if}
+		<!-- Tier 2 (twin two-up): gantt is a shared combined chart above; here just heatmap + wake window -->
 
 			<!-- Chart E: 24h Sleep Heatmap -->
 			{#if cs.heatmapChart.cells.length > 0}
@@ -769,6 +761,16 @@
 							xLabels={twinOverlayCharts.napCount.xLabels}
 							series={twinLineSeries(twinOverlayCharts.napCount)}
 						/>
+						<ChartLegend items={twinChildLegend} />
+					</ChartFrame>
+				</div>
+			{/if}
+
+			{#if twinTimeline}
+				<div class="stats-section" data-testid="twin-overlay-gantt">
+					<h3 class="stats-section-title">Døgnrytme (30 dagar)</h3>
+					<ChartFrame title="Døgnrytme" landscape={false} wrapStyle="overflow-x: auto;" onExpand={expand}>
+						<SleepTimelineChart rows={twinTimeline.rows} hourLabels={twinTimeline.hourLabels} height={twinTimeline.height} />
 						<ChartLegend items={twinChildLegend} />
 					</ChartFrame>
 				</div>

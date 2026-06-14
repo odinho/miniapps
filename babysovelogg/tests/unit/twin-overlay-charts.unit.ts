@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { computeChildrenStats, type ChildRawData } from "$lib/stats/multi-child-stats.js";
-import { buildTwinOverlayCharts } from "$lib/stats/twin-overlay-charts.js";
+import { buildTwinOverlayCharts, buildTwinTimeline } from "$lib/stats/twin-overlay-charts.js";
 import type { SleepEntry } from "$lib/types.js";
 
 const NOW = new Date("2026-03-26T12:00:00.000Z").getTime();
@@ -86,5 +86,40 @@ describe("buildTwinOverlayCharts", () => {
     expect(charts.nightStretch!.series).toHaveLength(2);
     expect(charts.bedtime!.series).toHaveLength(2);
     expect(charts.napCount!.series).toHaveLength(2);
+  });
+});
+
+const ganttRow = (date: string, blocks: { x: number; w: number; y: number; type: "nap" | "night" }[]) => ({
+  date,
+  dateLabel: date.slice(5),
+  y: 24,
+  blocks,
+});
+const childWithGantt = (babyId: number, name: string, rows: ReturnType<typeof ganttRow>[]) =>
+  ({
+    babyId,
+    name,
+    stats: { gantt: { rows, hourLabels: [{ x: 56, label: "00" }], height: 100 } },
+  }) as unknown as import("$lib/stats/multi-child-stats.js").ChildStats;
+
+describe("buildTwinTimeline", () => {
+  it("stacks both children's blocks into per-child lanes on the shared date row", () => {
+    const a = childWithGantt(1, "Ada", [ganttRow("2026-03-20", [{ x: 100, w: 20, y: 26, type: "night" }])]);
+    const b = childWithGantt(2, "Bo", [ganttRow("2026-03-20", [{ x: 140, w: 10, y: 26, type: "nap" }])]);
+
+    const out = buildTwinTimeline([a, b])!;
+    expect(out.rows).toHaveLength(1);
+    const blocks = out.rows[0].blocks;
+    // One block per child, each in its own lane (different y), child-coloured.
+    expect(blocks.map((bl) => [bl.x, bl.colorVar, bl.h])).toEqual([
+      [100, "--moon", 6],
+      [140, "--peach-dark", 6],
+    ]);
+    // Lanes are stacked, not overlapping.
+    expect(blocks[0].y).toBeLessThan(blocks[1].y);
+  });
+
+  it("returns null when neither child has timeline rows", () => {
+    expect(buildTwinTimeline([childWithGantt(1, "Ada", []), childWithGantt(2, "Bo", [])])).toBeNull();
   });
 });
