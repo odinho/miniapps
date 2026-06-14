@@ -434,9 +434,9 @@ Phase 3 — twin views: combined graphs, comparison, overlap:
 - [~] P3-QA  Adversarial + QA + UX review run; fix findings — PARKED (nothing to QA until Phase 3 is built; un-park after P3-1..P3-4 land)
 
 Phase 4 — twin scheduling intelligence (coupling, experimental):
-- [ ] P4-0  Design pass + multi-day simulation test design (oracle-heavy; likely surfaces user questions → park them)
-- [ ] P4-1  What-if overlap planner (suggestion-only, opt-in, inside each baby's window; parent policy not evidence)
-- [ ] P4-QA  Adversarial + multi-day simulation review; fix findings
+- [x] P4-0  Design pass + multi-day simulation test design (oracle-heavy; likely surfaces user questions → park them)
+- [~] P4-1  What-if overlap planner (suggestion-only, opt-in, inside each baby's window; parent policy not evidence) — PARKED (pending Odin design approval + P4-0 decisions; see docs/multi-child-phase4-design.md)
+- [~] P4-QA  Adversarial + multi-day simulation review; fix findings — PARKED (nothing to QA until P4-1 lands)
 
 Cross-cutting follow-on (do as they surface or after Phase 4):
 - [ ] X-1  Notification de-noising (merge same-kind non-urgent within 10–15 min; never merge urgent; co-sleep "wake other" stays in-app)
