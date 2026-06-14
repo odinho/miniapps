@@ -10,6 +10,29 @@ multi-day testing, the unit-of-work flow — live in
 [`workflow.md`](./workflow.md). Don't put process in this file; this
 is for tracked product/engine/test work.
 
+## Stats charts — Step-1 QA leftovers (P3 / S1-QA, 2026-06-14)
+
+Surfaced by the S1-QA adversarial review of the charting refactor. Neither is a
+regression (both pre-date the refactor); both are low priority.
+
+- **Wake-window recommended-range band is unreachable.** `computeAllStats` calls
+  `buildWakeScatter(wakeGaps)` with no `recommendedRange`
+  (`src/lib/stats-view-utils.ts` ~L988), so the band branch the Vakevindu chart
+  renders (`+page.svelte` Vakevindu `underlay`) never draws for single-baby. Either
+  pass a real age-based range (the engine has wake-window ranges) or drop the dead
+  branch. Predates the refactor.
+- **No DOM-level chart-render test.** The golden snapshot pins computeAllStats
+  *geometry* (data), and stats e2e asserts presence (`.stats-chart rect`) +
+  fullscreen open/close — but nothing pins the *rendered SVG* per chart, so a
+  future component edit could drift a chart visually without a red test. Consider a
+  Playwright DOM/attribute snapshot per chart on a seeded fixture, or accept the
+  golden+presence bar. (Visual pixel snapshots are environmentally fragile here —
+  see the arc-scenes note.)
+- **charts/types.ts is partly speculative.** Only `LegendItem` is consumed; the
+  components use their own inline prop types (`TsSeries`, `TimelineBlockRender`).
+  Step 2's multi-child data-shaper should either wire the abstract model types or
+  they should be trimmed.
+
 ## Handoff timeline: pre-midnight non-overnight blocks dropped (P3-4)
 
 The family handoff (`src/lib/handoff.ts`) builds its 6h window from the

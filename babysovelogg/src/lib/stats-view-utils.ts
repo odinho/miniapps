@@ -26,7 +26,7 @@ import {
 } from "$lib/charts/scales.js";
 import { polyline, areaUnder, band, stepPath } from "$lib/charts/paths.js";
 
-export { TS_CHART, GANTT } from "$lib/charts/scales.js";
+export { TS_CHART } from "$lib/charts/scales.js";
 
 export function dayLabel(dateStr: string): string {
 	const d = new Date(dateStr + "T12:00:00");

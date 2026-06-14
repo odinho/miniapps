@@ -20,6 +20,7 @@
 	import ChartLegend from '$lib/components/charts/ChartLegend.svelte';
 	import TimeSeriesChart from '$lib/components/charts/TimeSeriesChart.svelte';
 	import SleepTimelineChart from '$lib/components/charts/SleepTimelineChart.svelte';
+	import HeatmapChart from '$lib/components/charts/HeatmapChart.svelte';
 
 	const s = $derived(appState.state);
 	const baby = $derived(s.baby);
@@ -432,24 +433,7 @@
 				<div class="stats-section">
 					<h3 class="stats-section-title">Søvnkart</h3>
 					<ChartFrame title="Søvnkart" landscape={false} wrapStyle="overflow-y: auto; max-height: 70vh;" onExpand={expand}>
-						<svg viewBox="0 0 {hm.width} {hm.height}" width="100%" class="stats-chart" shape-rendering="crispEdges" style="height: {hm.height}px; width: 100%;">
-							{#each hm.hourLabels as lbl}
-								<text x={lbl.x} y={12} text-anchor="middle" fill="var(--text-light)" font-size="9" font-family="var(--font)" shape-rendering="auto">{lbl.label}</text>
-							{/each}
-							{#each hm.dateLabels as lbl}
-								<text x={lbl.x} y={lbl.y} text-anchor="end" fill="var(--text-light)" font-size="8" font-family="var(--font)" shape-rendering="auto">{lbl.label}</text>
-							{/each}
-							{#each hm.cells as cell}
-								<rect
-									x={cell.x}
-									y={cell.y}
-									width={cell.w}
-									height={cell.h}
-									fill="var(--moon)"
-									opacity={Math.max(0.05, cell.opacity)}
-								/>
-							{/each}
-						</svg>
+						<HeatmapChart width={hm.width} height={hm.height} cells={hm.cells} hourLabels={hm.hourLabels} dateLabels={hm.dateLabels} />
 					</ChartFrame>
 				</div>
 			{/if}
