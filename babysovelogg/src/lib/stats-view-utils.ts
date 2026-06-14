@@ -15,6 +15,17 @@ import {
 import { formatDuration } from "$lib/utils.js";
 import { isoToDateInTz } from "$lib/tz.js";
 import { regressionEquations, sleepDuration } from "$lib/data/galland2012.js";
+import {
+	TS_CHART,
+	tsPlotH,
+	tsX,
+	rollingAvg,
+	rollingAvgPath,
+	GANTT,
+	getLocalHourFrac,
+} from "$lib/charts/scales.js";
+
+export { TS_CHART, GANTT } from "$lib/charts/scales.js";
 
 export function dayLabel(dateStr: string): string {
 	const d = new Date(dateStr + "T12:00:00");
@@ -27,48 +38,6 @@ export function fmtDate(d: string): string {
 		month: "short",
 		day: "numeric",
 	});
-}
-
-// ── Time-series chart shared config ────────────────────────────
-
-export const TS_CHART = {
-	W: 360,
-	H: 200,
-	PAD_L: 40,
-	PAD_R: 12,
-	PAD_T: 16,
-	PAD_B: 32,
-} as const;
-
-function tsPlotW(): number { return TS_CHART.W - TS_CHART.PAD_L - TS_CHART.PAD_R; }
-function tsPlotH(): number { return TS_CHART.H - TS_CHART.PAD_T - TS_CHART.PAD_B; }
-
-/** Compute a rolling average over an array of values. Returns same-length array with nulls where window is incomplete. */
-function rollingAvg(values: number[], window: number): (number | null)[] {
-	return values.map((_, i) => {
-		if (i < window - 1) return null;
-		let sum = 0;
-		for (let j = i - window + 1; j <= i; j++) sum += values[j];
-		return sum / window;
-	});
-}
-
-/** Build an SVG path from points, skipping nulls. */
-function rollingAvgPath(xs: number[], ys: (number | null)[]): string {
-	const segments: string[] = [];
-	let inSegment = false;
-	for (let i = 0; i < xs.length; i++) {
-		if (ys[i] == null) { inSegment = false; continue; }
-		segments.push(`${inSegment ? "L" : "M"}${xs[i]},${ys[i]}`);
-		inSegment = true;
-	}
-	return segments.join(" ");
-}
-
-/** Map a day index to X coordinate within the time-series plot area. */
-function tsX(index: number, total: number): number {
-	if (total <= 1) return TS_CHART.PAD_L + tsPlotW() / 2;
-	return TS_CHART.PAD_L + (index / (total - 1)) * tsPlotW();
 }
 
 // ── Chart B: Total Sleep vs Age Norms ─────────────────────────
@@ -496,15 +465,6 @@ function buildNapCountChart(
 
 // ── Chart D: Sleep Timeline (Gantt) ───────────────────────────
 
-export const GANTT = {
-	W: 360,
-	ROW_H: 20,
-	PAD_L: 56,
-	PAD_R: 8,
-	PAD_T: 24,
-	HOUR_START: 0, // 00:00 left edge — night sleep in the middle
-} as const;
-
 export interface GanttBlock {
 	x: number;
 	w: number;
@@ -635,15 +595,6 @@ function buildGanttChart(
 	const height = GANTT.PAD_T + calendarDates.length * GANTT.ROW_H + 8;
 
 	return { rows, hourLabels, height };
-}
-
-function getLocalHourFrac(date: Date, tz: string): number {
-	const parts = new Intl.DateTimeFormat("en-GB", {
-		timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false,
-	}).formatToParts(date);
-	const h = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
-	const m = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
-	return (h % 24) + m / 60;
 }
 
 // ── Chart E: Heatmap geometry ─────────────────────────────────

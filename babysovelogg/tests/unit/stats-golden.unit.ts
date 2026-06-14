@@ -27,11 +27,12 @@ function fixtureSleeps(): SleepEntry[] {
   return out;
 }
 
+const mk = (time: string, type: string): DiaperLogRow => ({
+  id: 1, baby_id: 1, time, type, amount: null, note: null, deleted: 0,
+  domain_id: "d", created_by_event_id: null, updated_by_event_id: null,
+});
+
 function fixtureDiapers(): DiaperLogRow[] {
-  const mk = (time: string, type: string): DiaperLogRow => ({
-    id: 1, baby_id: 1, time, type, amount: null, note: null, deleted: 0,
-    domain_id: "d", created_by_event_id: null, updated_by_event_id: null,
-  });
   return [
     mk(at(24, 8, 0), "wet"),
     mk(at(24, 12, 0), "dirty"),
