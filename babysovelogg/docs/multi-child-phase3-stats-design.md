@@ -138,6 +138,27 @@ scales / paths / reusable SVG / legend / fullscreen — then Step 2 is "provide 
 series, choose overlay vs two-up," which is the architecture twins need now and N
 later.
 
+## Progress (2026-06-14, branch feat/p3-stats-charts → main)
+
+- **DONE — determinism + golden safety net:** `computeAllStats` now takes an
+  optional `now` (default Date.now(); prod unchanged), threaded into
+  `buildGanttChart` + `getBestWorst`. A golden characterization snapshot
+  (`tests/unit/stats-golden.unit.ts`, ~3.4k lines) pins the full single-baby
+  chart geometry for a fixed fixture + pinned now. **This is the regression net
+  for the whole refactor** — keep it byte-identical through Step 1; any change is
+  a deliberate `--update-snapshots` with review.
+- **DONE — primitives extracted:** `src/lib/charts/scales.ts` holds TS_CHART,
+  tsX/tsPlotW/H, rollingAvg/rollingAvgPath, GANTT, getLocalHourFrac (pure move;
+  golden green). The shared-scale home for overlay.
+- **NEXT (task 8, Step 1 remainder):** `charts/paths.ts` (port the inline path
+  builders), then the chart components (ChartFrame/ChartFullscreen/ChartLegend/
+  TimeSeriesChart/SleepTimelineChart), then migrate `/stats` inline SVG to them
+  one chart at a time — golden snapshot + stats e2e green throughout. Add d3
+  modules HERE (they change float output deliberately → regen golden with review).
+- **THEN (task 9, Step 2):** `stats/multi-child-stats.ts` + per-child fetch +
+  route mode (single|twinOverlay|siblingTwoUp) + N-series overlay + gantt
+  child-lanes + P3-2 overlap viz + P3-3 comparison stats + visual snapshots.
+
 ## Execution notes
 - This is a large multi-commit refactor; ship Step 1 (behavior-preserving) and
   Step 2 (overlay) as separate units, each: test-first, single-baby snapshot
