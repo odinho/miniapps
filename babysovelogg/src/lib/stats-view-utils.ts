@@ -529,6 +529,7 @@ function buildGanttChart(
 	sleeps: SleepEntry[],
 	days: number,
 	tz?: string,
+	now: number = Date.now(),
 ): GanttChartData {
 	const completed = sleeps.filter((s) => s.end_time);
 	if (completed.length === 0) return { rows: [], hourLabels: [], height: 0 };
@@ -562,8 +563,8 @@ function buildGanttChart(
 
 	// Build continuous calendar date range for last N days, anchored to today
 	const nowDate = tz
-		? new Date().toLocaleDateString("en-CA", { timeZone: tz })
-		: new Date().toISOString().slice(0, 10);
+		? new Date(now).toLocaleDateString("en-CA", { timeZone: tz })
+		: new Date(now).toISOString().slice(0, 10);
 	const calendarDates: string[] = [];
 	const end = new Date(nowDate + "T12:00:00");
 	for (let i = days - 1; i >= 0; i--) {
@@ -911,10 +912,10 @@ export interface BestWorst {
 	worst: { date: string; label: string; duration: string };
 }
 
-export function getBestWorst(weekStats: WeekStats, tz?: string): BestWorst | null {
+export function getBestWorst(weekStats: WeekStats, tz?: string, now: number = Date.now()): BestWorst | null {
 	const today = tz
-		? new Date().toLocaleDateString("en-CA", { timeZone: tz })
-		: new Date().toISOString().slice(0, 10);
+		? new Date(now).toLocaleDateString("en-CA", { timeZone: tz })
+		: new Date(now).toISOString().slice(0, 10);
 	const daysWithTotal = weekStats.days
 		.filter((d) => d.date !== today) // exclude incomplete current day
 		.map((d) => ({
@@ -973,6 +974,7 @@ export function computeAllStats(
 	diapers: DiaperLogRow[],
 	tz?: string,
 	birthdate?: string,
+	now: number = Date.now(),
 ): ComputedStats {
 	const mapped: SleepEntry[] = sleeps.map((s) => ({
 		start_time: s.start_time,
@@ -980,7 +982,7 @@ export function computeAllStats(
 		type: s.type,
 	}));
 
-	const sevenDaysAgo = new Date();
+	const sevenDaysAgo = new Date(now);
 	sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 	sevenDaysAgo.setHours(0, 0, 0, 0);
 	const week7 = mapped.filter(
@@ -991,18 +993,18 @@ export function computeAllStats(
 
 	const wakeAvg = getAverageWakeWindow(week7);
 	const trendRows = buildTrendRows(weekStats, allStats);
-	const bestWorst = getBestWorst(weekStats, tz);
+	const bestWorst = getBestWorst(weekStats, tz, now);
 
 	const week7Diapers = diapers.filter(
-		(d) => new Date(d.time).getTime() > Date.now() - 7 * 86400000,
+		(d) => new Date(d.time).getTime() > now - 7 * 86400000,
 	);
 	const diaperStats7 = diapers.length > 0 ? computeDiaperStats(week7Diapers, tz) : null;
 	const diaperStats30 = diapers.length > 0 ? computeDiaperStats(diapers, tz) : null;
 
 	// Exclude today's incomplete data from charts
 	const today = tz
-		? new Date().toLocaleDateString("en-CA", { timeZone: tz })
-		: new Date().toISOString().slice(0, 10);
+		? new Date(now).toLocaleDateString("en-CA", { timeZone: tz })
+		: new Date(now).toISOString().slice(0, 10);
 	const completeDays = allStats.days.filter((d) => d.date !== today);
 
 	// New charts: stacked area from completed days
@@ -1038,7 +1040,7 @@ export function computeAllStats(
 	// Tier 2: advanced charts
 	const wakeGaps = getWakeWindowGaps(week7);
 	const heatmap = buildSleepHeatmap(mapped, tz);
-	const gantt = buildGanttChart(mapped, 30, tz);
+	const gantt = buildGanttChart(mapped, 30, tz, now);
 	const heatmapChart = buildHeatmapChart(heatmap, heatmap.length);
 	const wakeScatter = buildWakeScatter(wakeGaps);
 
