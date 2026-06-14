@@ -43,10 +43,26 @@
 		if (s.kind === 'asleep') return `Søv ${formatDurationCompact(s.sinceMs)}`;
 		return s.sinceMs ? `Vaken ${formatDurationCompact(s.sinceMs)}` : 'Vaken';
 	}
+
+	const hhmm = (ms: number) => formatTime(new Date(ms).toISOString());
+
+	// Accessible text equivalent of the decorative bar — AT users get the same
+	// blocks + wakings the sighted bar shows.
+	function rowSummary(r: (typeof rows)[number]): string {
+		const blocks = r.segments.length
+			? r.segments
+					.map((s) => `${s.type === 'night' ? 'natt' : 'lur'} ${hhmm(s.startMs)}–${s.ongoing ? 'pågår' : hhmm(s.endMs)}`)
+					.join(', ')
+			: 'ingen søvn';
+		const wakings = r.wakings.length
+			? ` Vakningar: ${r.wakings.map((w) => `${hhmm(w.startMs)}–${w.endMs ? hhmm(w.endMs) : 'pågår'}`).join(', ')}.`
+			: '';
+		return `${r.baby.name}: ${statusText(r.status)}. Siste 6 timar: ${blocks}.${wakings}`;
+	}
 </script>
 
 <details class="handoff" data-testid="handoff">
-	<summary>Overlevering · siste 6 timar</summary>
+	<summary><span class="handoff-caret" aria-hidden="true"></span>Overlevering · siste 6 timar</summary>
 	<div class="handoff-body">
 		{#each rows as r (r.baby.id)}
 			<div class="handoff-row" data-testid="handoff-row">
@@ -54,6 +70,7 @@
 					<span class="handoff-name">{r.baby.name}</span>
 					<span class="handoff-status" class:stale={r.status.kind === 'stale'}>{statusText(r.status)}</span>
 				</div>
+				<span class="sr-only">{rowSummary(r)}</span>
 				<div class="handoff-bar" aria-hidden="true">
 					{#each hourMarks as m}
 						<span class="handoff-grid" style="left: {m.left}%"></span>
@@ -92,9 +109,34 @@
 		font-weight: 600;
 		color: var(--text-light);
 		list-style: none;
+		display: flex;
+		align-items: center;
+		gap: 6px;
 	}
 	.handoff summary::-webkit-details-marker {
 		display: none;
+	}
+	.handoff-caret {
+		display: inline-block;
+		border: solid var(--text-light);
+		border-width: 0 2px 2px 0;
+		padding: 2.5px;
+		transform: rotate(45deg);
+		transition: transform 0.15s;
+	}
+	.handoff[open] .handoff-caret {
+		transform: rotate(-135deg);
+	}
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 	.handoff-body {
 		display: flex;

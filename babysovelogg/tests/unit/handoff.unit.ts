@@ -38,6 +38,22 @@ describe("handoffSegments", () => {
     expect(segs[0]).toEqual({ startMs: new Date(at(14, 30)).getTime(), endMs: NOW, type: "nap", ongoing: true });
   });
 
+  it("keeps a split overnight (straddling fragment + post-midnight fragment) as distinct blocks", () => {
+    // Mirrors state.ts: priorOvernightSleep is the midnight-straddling fragment;
+    // a later fragment lives in todaySleeps. Distinct domain_ids → not deduped.
+    const segs = handoffSegments(
+      {
+        priorOvernightSleep: sleep(at(11), at(12, 30), "night"),
+        todaySleeps: [sleep(at(13), at(14), "night")],
+      },
+      NOW,
+    );
+    expect(segs.map((s) => [s.startMs, s.endMs])).toEqual([
+      [new Date(at(11)).getTime(), new Date(at(12, 30)).getTime()],
+      [new Date(at(13)).getTime(), new Date(at(14)).getTime()],
+    ]);
+  });
+
   it("drops blocks entirely before the window and deleted rows", () => {
     expect(handoffSegments({ todaySleeps: [sleep(at(2), at(3))] }, NOW)).toEqual([]);
     expect(handoffSegments({ todaySleeps: [sleep(at(13), at(14), "nap", { deleted: 1 })] }, NOW)).toEqual([]);
