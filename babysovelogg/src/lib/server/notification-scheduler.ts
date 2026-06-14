@@ -1,6 +1,7 @@
 import { db } from "./db.js";
 import { sendPushToFamily } from "./webpush.js";
 import { getPrefs, type NotificationKind } from "./notification-prefs.js";
+import { TRIGGER_LABELS } from "$lib/notifications.js";
 import { isoToDateInTz } from "$lib/tz.js";
 import type { Baby, SleepLogRow } from "$lib/types.js";
 import type { Prediction } from "$lib/stores/app.svelte.js";
@@ -276,6 +277,90 @@ export function reconcileNotifications(state: ReconcileInput): void {
  * Find notifications whose fire_at has passed and send them.
  * Returns the number of notifications actually sent.
  */
+// Wake-now caps — never merged across babies (each demands a distinct,
+// baby-specific action right now). Everything else is "non-urgent" and may be
+// coalesced when both children's same-kind notifications are due together.
+const URGENT_KINDS = new Set<string>(["nap_budget_cap", "rescue_wake"]);
+
+/** Persist the send outcome (sent / retry / give-up) for each row in a group. */
+function settleRows(rows: NotificationRow[], failed: number, now: Date): void {
+  for (const row of rows) {
+    const attempts = (row.attempts ?? 0) + 1;
+    if (failed === 0) {
+      db.prepare(
+        "UPDATE notification_schedule SET sent_at = datetime('now'), attempts = ? WHERE id = ?",
+      ).run(attempts, row.id);
+    } else {
+      const tooStale = now.getTime() - new Date(row.fire_at).getTime() > SEND_MAX_AGE_MS;
+      const exhausted = attempts >= SEND_MAX_ATTEMPTS;
+      if (exhausted || tooStale) {
+        db.prepare(
+          "UPDATE notification_schedule SET cancelled_at = datetime('now'), attempts = ? WHERE id = ?",
+        ).run(attempts, row.id);
+      } else {
+        db.prepare("UPDATE notification_schedule SET attempts = ? WHERE id = ?").run(attempts, row.id);
+      }
+    }
+  }
+}
+
+/** One "Begge: …" push standing in for two children's same-kind notification. */
+function mergedPayload(kind: string, rows: NotificationRow[]): {
+  title: string;
+  body: string;
+  tag: string;
+  data: Record<string, unknown>;
+} {
+  const base = TRIGGER_LABELS[kind as keyof typeof TRIGGER_LABELS]?.title ?? kind;
+  return {
+    title: `Begge: ${base}`,
+    body: "Gjeld begge barna.",
+    // Family-scoped tag so the device collapses it (and replaces any per-baby one).
+    tag: `family:${kind}`,
+    data: { kind, merged: true, babyIds: rows.map((r) => r.baby_id) },
+  };
+}
+
+export interface SendGroup {
+  rows: NotificationRow[];
+  payload: unknown;
+}
+
+/**
+ * Decide how to dispatch a batch of due notifications. De-noising (X-1): when
+ * BOTH children have the same NON-URGENT kind due in this batch, coalesce them
+ * into ONE "Begge: …" send; every other row sends on its own. Pure — only
+ * groups what's already due (no timing change), so it's always safe. Urgent
+ * wake-caps are never merged. (Look-ahead coalescing of near-but-not-yet-due
+ * notifications is a followup — needs a product call on early-fire vs delay.)
+ */
+export function planDueSends(due: NotificationRow[]): SendGroup[] {
+  const byKind = new Map<string, NotificationRow[]>();
+  for (const row of due) {
+    if (URGENT_KINDS.has(row.kind)) continue;
+    const list = byKind.get(row.kind);
+    if (list) list.push(row);
+    else byKind.set(row.kind, [row]);
+  }
+  const merged = new Set<number>();
+  const groups: SendGroup[] = [];
+  for (const [kind, rows] of byKind) {
+    if (new Set(rows.map((r) => r.baby_id)).size >= 2) {
+      groups.push({ rows, payload: mergedPayload(kind, rows) });
+      for (const r of rows) merged.add(r.id);
+    }
+  }
+  for (const row of due) {
+    if (merged.has(row.id)) continue;
+    groups.push({ rows: [row], payload: JSON.parse(row.payload_json) });
+  }
+  return groups;
+}
+
+/**
+ * Fire all due notifications, coalescing same-kind non-urgent ones across both
+ * children into one "Begge: …" push (see planDueSends). Urgent caps never merge.
+ */
 export async function fireDueNotifications(now: Date = new Date()): Promise<number> {
   const nowIso = now.toISOString();
   const due = db
@@ -286,42 +371,25 @@ export async function fireDueNotifications(now: Date = new Date()): Promise<numb
     )
     .all(nowIso) as NotificationRow[];
 
+  const groups = planDueSends(due);
+
   const results = await Promise.all(
-    due.map(async (row) => {
+    groups.map(async (group) => {
       try {
-        const payload = JSON.parse(row.payload_json);
-        const result = await sendPushToFamily(payload);
-        const attempts = (row.attempts ?? 0) + 1;
-        // Terminal: every send either succeeded or removed a dead subscription.
-        if (result.failed === 0) {
-          db.prepare(
-            "UPDATE notification_schedule SET sent_at = datetime('now'), attempts = ? WHERE id = ?",
-          ).run(attempts, row.id);
-        } else {
-          // Transient failure. Give up if we've tried too many times or the
-          // fire_at is past its staleness window — otherwise leave for retry.
-          const tooStale = now.getTime() - new Date(row.fire_at).getTime() > SEND_MAX_AGE_MS;
-          const exhausted = attempts >= SEND_MAX_ATTEMPTS;
-          if (exhausted || tooStale) {
-            db.prepare(
-              "UPDATE notification_schedule SET cancelled_at = datetime('now'), attempts = ? WHERE id = ?",
-            ).run(attempts, row.id);
-          } else {
-            db.prepare("UPDATE notification_schedule SET attempts = ? WHERE id = ?").run(
-              attempts,
-              row.id,
-            );
-          }
-        }
-        return result.sent > 0;
+        const result = await sendPushToFamily(group.payload as Parameters<typeof sendPushToFamily>[0]);
+        settleRows(group.rows, result.failed, now);
+        return result.sent > 0 ? group.rows.length : 0;
       } catch (err) {
         // eslint-disable-next-line no-console
-        console.error("[notification-scheduler] send failed", { id: row.id, err });
-        return false;
+        console.error("[notification-scheduler] send failed", {
+          ids: group.rows.map((r) => r.id),
+          err,
+        });
+        return 0;
       }
     }),
   );
-  return results.filter(Boolean).length;
+  return results.reduce((a, b) => a + b, 0);
 }
 
 let loopHandle: ReturnType<typeof setInterval> | null = null;

@@ -3,6 +3,7 @@ import { initDb, db } from "$lib/server/db.js";
 import {
   reconcileNotifications,
   fireDueNotifications,
+  planDueSends,
   type ReconcileInput,
 } from "$lib/server/notification-scheduler.js";
 import { setPrefs } from "$lib/server/notification-prefs.js";
@@ -701,5 +702,66 @@ describe("reconcileNotifications – multi-baby", () => {
       "Ada: Leggetid snart",
       "Bo: Leggetid snart",
     ]);
+  });
+});
+
+// Render each planned send group as "<who>:<kind>(<n>)" for a readable assert.
+function renderSends(groups: ReturnType<typeof planDueSends>): string[] {
+  return groups.map((g) => {
+    const p = g.payload as { title: string; data?: { merged?: boolean } };
+    const who = p.data?.merged ? "Begge" : `b${g.rows[0].baby_id}`;
+    return `${who}:${g.rows[0].kind}(${g.rows.length})`;
+  });
+}
+
+describe("planDueSends – X-1 family notification de-noising", () => {
+  let nid = 0;
+  const row = (babyId: number, kind: string, title: string) => ({
+    id: ++nid,
+    baby_id: babyId,
+    kind,
+    fire_at: "2026-06-14T13:00:00.000Z",
+    dedupe_key: `b${babyId}:${kind}`,
+    attempts: 0,
+    payload_json: JSON.stringify({ title: `Baby${babyId}: ${title}`, body: "x", tag: `b${babyId}:${kind}` }),
+  });
+  const render = renderSends;
+
+  it("merges both children's same-kind NON-URGENT notifications into one 'Begge' send", () => {
+    const groups = planDueSends([
+      row(1, "bedtime_approaching", "Leggetid snart"),
+      row(2, "bedtime_approaching", "Leggetid snart"),
+    ]);
+    expect(render(groups)).toEqual(["Begge:bedtime_approaching(2)"]);
+    expect((groups[0].payload as { title: string }).title).toBe("Begge: Leggetid snart");
+  });
+
+  it("never merges urgent wake-caps — each child gets its own send", () => {
+    expect(
+      render(planDueSends([row(1, "nap_budget_cap", "Tidleg vekking"), row(2, "nap_budget_cap", "Tidleg vekking")])),
+    ).toEqual(["b1:nap_budget_cap(1)", "b2:nap_budget_cap(1)"]);
+    expect(
+      render(planDueSends([row(1, "rescue_wake", "Vekk"), row(2, "rescue_wake", "Vekk")])),
+    ).toEqual(["b1:rescue_wake(1)", "b2:rescue_wake(1)"]);
+  });
+
+  it("a single child's notification is not merged (uses its own payload)", () => {
+    const groups = planDueSends([row(1, "bedtime_approaching", "Leggetid snart")]);
+    expect(render(groups)).toEqual(["b1:bedtime_approaching(1)"]);
+    expect((groups[0].payload as { title: string }).title).toBe("Baby1: Leggetid snart");
+  });
+
+  it("mixed batch: merge the shared non-urgent kind, keep urgent + unmatched as singletons", () => {
+    const groups = planDueSends([
+      row(1, "bedtime_approaching", "Leggetid snart"),
+      row(2, "bedtime_approaching", "Leggetid snart"),
+      row(1, "nap_budget_cap", "Tidleg vekking"),
+      row(1, "nap_ending_soon", "Luren sluttar snart"),
+    ]);
+    expect(render(groups).toSorted()).toEqual([
+      "Begge:bedtime_approaching(2)",
+      "b1:nap_budget_cap(1)",
+      "b1:nap_ending_soon(1)",
+    ].toSorted());
   });
 });

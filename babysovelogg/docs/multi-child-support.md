@@ -439,7 +439,7 @@ Phase 4 — twin scheduling intelligence (coupling, experimental):
 - [~] P4-QA  Adversarial + multi-day simulation review; fix findings — PARKED (nothing to QA until P4-1 lands)
 
 Cross-cutting follow-on (do as they surface or after Phase 4):
-- [ ] X-1  Notification de-noising (merge same-kind non-urgent within 10–15 min; never merge urgent; co-sleep "wake other" stays in-app)
+- [x] X-1  Notification de-noising: same-batch coalescing of same-kind NON-URGENT pushes into one "Begge: …" send landed (planDueSends). LOOK-AHEAD refinement (merge near-but-not-yet-due within 10–15 min) deferred → X-14 (needs a product call: early-fire vs delay, which kinds).
 - [ ] X-2  AppState revision field → kill last-writer-wins races (from Phase-1-polish followup)
 - [ ] X-3  arc-scenes + B18 e2e wall-clock determinism (thread fixed `now`) — unblocks a clean full e2e
 - [ ] X-4  Mixed-age/older-child mode simplicity pass (does a 5yo need naps/strategy, or just bedtime+duration?)
@@ -452,3 +452,4 @@ Cross-cutting follow-on (do as they surface or after Phase 4):
 - [ ] X-11  Fold the two duplicate undo-toast render blocks in `+page.svelte` (family-home branch + general branch) into one `<UndoToast>` component now that it carries corrections. Pre-existing duplication; low risk (mutually exclusive branches). (Codex, P2-5)
 - [ ] X-12  Phase 4 must gate any sync coupling on `isTwinMode && syncMode` (or clear `sync_mode` when the family switches to sibling mode) — `modeOverride` and `syncMode` are independent writes, so a stale `syncMode=true` can persist after switching to siblings. Harmless now (nothing reads it); load-bearing once Phase 4 acts. (Codex, P2-7)
 - [ ] X-13  Undo-toast additive vs corrective chips share one ghost style. The night-waking "+ <name> vakna òg" (additive) sits beside "Angre" (undo) styled identically. Relabel landed (P2-QA) to disambiguate by copy; consider also visually distinguishing additive actions from undo when the toast is folded into a component (ties into X-11). (P2-QA UX review)
+- [ ] X-14  Notification de-noising LOOK-AHEAD (follow-on to X-1). X-1 merges same-kind non-urgent pushes only when BOTH are already due in the same dispatch batch (safe, no timing change). To also merge twins' close-but-not-simultaneous notifications ("within 10–15 min" per plan), add coalescing of a not-yet-due sibling — but that means firing it early OR delaying the first. Product call (early-fire vs delay; which kinds are eligible to shift) → loop-questions when picked up.
