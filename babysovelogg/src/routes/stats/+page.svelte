@@ -18,6 +18,7 @@
 		buildSharedSleepChart,
 		type SharedSleepDay,
 	} from '$lib/stats/shared-sleep.js';
+	import { buildComparisonRows } from '$lib/stats/child-comparison.js';
 	import type { ChildRawData } from '$lib/stats/multi-child-stats.js';
 	import { appState } from '$lib/stores/app.svelte.js';
 	import { calculateAgeMonths } from '$lib/engine/schedule.js';
@@ -150,6 +151,9 @@
 		showFullHistory && fullSharedSleepDays ? fullSharedSleepDays : sharedSleepDays,
 	);
 	const sharedSleepChart = $derived(activeSharedSleep ? buildSharedSleepChart(activeSharedSleep) : null);
+	const childComparisonRows = $derived(
+		activeChildren && activeChildren.length >= 2 ? buildComparisonRows(activeChildren) : [],
+	);
 	const twinOverlayCharts = $derived(
 		mode === 'twinOverlay' && activeChildren && activeChildren.length > 1
 			? buildTwinOverlayCharts(activeChildren)
@@ -729,6 +733,26 @@
 			</div>
 		{/if}
 
+		{#if childComparisonRows.length > 0 && activeChildren}
+			<div class="stats-section" data-testid="child-comparison">
+				<h3 class="stats-section-title">Samanlikning</h3>
+				<div class="stats-compare">
+					<div class="stats-compare-row stats-compare-head">
+						<span></span>
+						{#each activeChildren as c (c.babyId)}<span>{c.name}</span>{/each}
+						<span>Skilnad</span>
+					</div>
+					{#each childComparisonRows as row}
+						<div class="stats-compare-row">
+							<span class="stats-compare-label">{row.label}</span>
+							{#each row.values as v}<span>{v}</span>{/each}
+							<span class="stats-compare-div">{row.divergence}</span>
+						</div>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
 		{#if mode === 'single' && activeChildren.length === 1}
 			{@render childPanel(activeChildren[0]!.stats, childPottyMode(activeChildren[0]!.babyId))}
 		{:else if mode === 'twinOverlay' && twinOverlayCharts}
@@ -885,6 +909,34 @@
 		height: 1px;
 		margin: 24px 0;
 		background: var(--cream-dark);
+	}
+
+	.stats-compare {
+		display: flex;
+		flex-direction: column;
+	}
+	.stats-compare-row {
+		display: grid;
+		grid-template-columns: 1.4fr 1fr 1fr 1fr;
+		gap: 8px;
+		padding: 6px 4px;
+		align-items: baseline;
+		font-variant-numeric: tabular-nums;
+	}
+	.stats-compare-row span:not(.stats-compare-label) {
+		text-align: right;
+	}
+	.stats-compare-head {
+		font-size: 0.8rem;
+		color: var(--text-light);
+		font-weight: 600;
+		border-bottom: 1px solid var(--cream-dark);
+	}
+	.stats-compare-label {
+		font-size: 0.85rem;
+	}
+	.stats-compare-div {
+		color: var(--text-light);
 	}
 
 	.comparison-panel {

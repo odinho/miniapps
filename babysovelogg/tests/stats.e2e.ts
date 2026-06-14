@@ -169,6 +169,11 @@ test("siblings with different birthdates each get a two-up stats panel", async (
   await expect(page.getByTestId("twin-overlay-sleep-trend")).toHaveCount(0);
   // Both shared the overnight → a parent-downtime ("Felles søvn") section shows.
   await expect(page.getByTestId("shared-sleep")).toBeVisible();
+  // Cross-child comparison table with both names + a divergence column.
+  const compare = page.getByTestId("child-comparison");
+  await expect(compare).toBeVisible();
+  await expect(compare).toContainText("Skilnad");
+  await expect(compare).toContainText("Total søvn/dag");
 });
 
 test("twins share an overlaid sleep-trend chart with child-first series and legend", async ({ page }) => {
@@ -211,4 +216,5 @@ test("a single child renders no per-child panel wrapper", async ({ page }) => {
   await expect(page.locator(".stats-chart").first()).toBeVisible({ timeout: 5000 });
   await expect(page.getByTestId("stats-child-panel")).toHaveCount(0);
   await expect(page.getByTestId("shared-sleep")).toHaveCount(0);
+  await expect(page.getByTestId("child-comparison")).toHaveCount(0);
 });
