@@ -151,9 +151,9 @@ test("Stats legends show Norwegian labels", async ({ page }) => {
   await expect(trendLegend).toContainText("Natt");
 });
 
-test("two children each get a stats panel with a name header", async ({ page }) => {
+test("siblings with different birthdates each get a two-up stats panel", async ({ page }) => {
   const ada = createBaby("Ada", "2025-06-12");
-  const bo = createBaby("Bo", "2025-06-12"); // twins (same birthdate)
+  const bo = createBaby("Bo", "2024-06-12");
   const now = new Date();
   for (const id of [ada, bo]) {
     setWakeUpTime(id);
@@ -166,6 +166,36 @@ test("two children each get a stats panel with a name header", async ({ page }) 
   await expect(page.getByTestId("stats-child-panel")).toHaveCount(2, { timeout: 5000 });
   // Per-child name headers, in creation order.
   await expect(page.locator(".stats-child-name")).toHaveText(["Ada", "Bo"]);
+  await expect(page.getByTestId("twin-overlay-sleep-trend")).toHaveCount(0);
+});
+
+test("twins share an overlaid sleep-trend chart with child-first series and legend", async ({ page }) => {
+  const ada = createBaby("Ada", "2025-06-12");
+  const bo = createBaby("Bo", "2025-06-12");
+  const now = new Date();
+  for (const id of [ada, bo]) {
+    setWakeUpTime(id);
+    const prev = new Date(now.getTime() - 48 * 3600000);
+    const prevNightStart = new Date(prev);
+    prevNightStart.setHours(20, 0, 0, 0);
+    addCompletedSleep(id, prevNightStart.toISOString(), new Date(prevNightStart.getTime() + 10 * 3600000).toISOString(), "night");
+    const prevNapStart = new Date(prev);
+    prevNapStart.setHours(12, 0, 0, 0);
+    addCompletedSleep(id, prevNapStart.toISOString(), new Date(prevNapStart.getTime() + 45 * 60000).toISOString(), "nap");
+    const yest = new Date(now.getTime() - 24 * 3600000);
+    const napStart = new Date(yest);
+    napStart.setHours(12, 0, 0, 0);
+    const napEnd = new Date(napStart.getTime() + 3600000);
+    addCompletedSleep(id, napStart.toISOString(), napEnd.toISOString(), "nap");
+  }
+
+  await page.goto("/stats");
+  const trend = page.getByTestId("twin-overlay-sleep-trend");
+  await expect(trend).toBeVisible({ timeout: 5000 });
+  await expect(trend.locator("[data-series-id]")).toHaveCount(2);
+  await expect(trend.locator(`[data-series-id="${ada}"]`)).toBeVisible();
+  await expect(trend.locator(`[data-series-id="${bo}"]`)).toBeVisible();
+  await expect(trend.locator(".stats-legend-item")).toHaveText(["Ada", "Bo"]);
 });
 
 test("a single child renders no per-child panel wrapper", async ({ page }) => {

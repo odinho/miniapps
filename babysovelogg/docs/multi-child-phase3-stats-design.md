@@ -195,13 +195,35 @@ Step 1 — behaviour-preserving refactor (single-baby unchanged):
 Step 2 — twin overlay + sibling two-up (P3-1 = B), then P3-2/P3-3:
 - [x] S2-1  `stats/multi-child-stats.ts` DATA LAYER (no page change yet): `statsMode(count, isTwin) → single|twinOverlay|siblingTwoUp`; `computeChildrenStats` (pure, one independent ComputedStats per child); `fetchChildrenRawData`/`fetchChildrenStats` (per-child `?baby=<id>` fetch, 44d or full). Unit-tested incl. N=1 == direct computeAllStats. Page untouched → golden/e2e unaffected. (Page wiring + mode rendering moved to S2-2.)
 - [x] S2-2  WIRED the page: charts body extracted to a `{#snippet childPanel(cs, pottyMode)}`; per-child fetch via `fetchChildrenRawData`+`computeChildrenStats`; `mode`/`activeChildren` derived. Single child → one panel, NO header (N=1 byte-identical). 2+ → stacked `.stats-child-panel` (data-testid) each under a `.stats-child-name` header + divider, creation order. Top vs-norm/prediction cards + toggle + Export stay once/primary. Per-child `potty_mode` threaded. Implemented by Codex to spec; verified here (golden byte-identical, lint/typecheck/build green, stats e2e 10/10 incl. 2 new multi-child tests). Twins are two-up for now; real overlay = S2-2b.
-- [ ] S2-2b  Twin true overlay: TimeSeriesChart N-series in ONE chart with a shared x/y domain across the two children (per-child colour). Only for `twinOverlay` mode; siblings stay two-up.
+- [x] S2-2b  Twin true overlay. New pure `stats/twin-overlay-charts.ts` (`buildTwinOverlayCharts`) overlays sleep-trend(total)/sleep-vs-norm/night-stretch/bedtime/nap-count in ONE chart each, two child series sharing a y-domain and a UNION-of-dates x (via `tsXByDate`, never index — proven by a unit test: same date → same x, missing → null gap). Shared norm band only when birthdates match (else that chart falls back to two-up). Child-first colour (--moon/--peach-dark) + legend. `TsSeries` gained id/label/colorVar (+ data-series-id); `ChildStats` carries birthdate/timezone; `bedtimes` exposed additively on ComputedStats (golden byte-identical). wakeScatter/heatmap/gantt stay two-up in twin mode (gantt → S2-3). single + siblingTwoUp untouched. Implemented by Codex to the design above; verified here (golden byte-identical, lint/typecheck/build, unit 1025, stats e2e 11 incl. twin-overlay + sibling-two-up, integration 124).
 - [ ] S2-3  SleepTimelineChart twin child-lanes per date row; two instances for siblings.
 - [ ] S2-4 (P3-2)  Overlap visualisation: both-asleep windows = parent downtime.
 - [ ] S2-5 (P3-3)  Comparison stats: total sleep, nap count, longest stretch, divergence.
 - [ ] S2-QA (P3-QA)  Adversarial + QA + UX + visual review of twin/sibling views; fix findings.
 
 When every unit is `[x]` or parked `[~]`: stop, push-notify a one-line summary.
+
+## S2-2b twin-overlay design (Codex, 2026-06-14)
+
+New `src/lib/stats/twin-overlay-charts.ts`: `buildTwinOverlayCharts(children)` —
+a multi-series shaper; do NOT extend the existing single-child builders (keeps
+golden byte-identical). Overlay these in `twinOverlay` mode only: sleep-trend
+(as per-child TOTAL sleep, not nap/night stacks — child-colour conflicts with
+nap/night colours), sleep-vs-norm (one shared age-norm band + 2 actual series),
+night-stretch, bedtime, nap-count. Keep wakeScatter + heatmap + gantt TWO-UP for
+now (wakeScatter needs a shared chronological-time x — deferred; gantt child-lanes
+= S2-3; heatmap can't overlay). **X-alignment = union of calendar dates →
+`xByDate` map, NEVER index-based** (the single biggest risk: equal x must mean
+equal date; current builders filter zero-days then `tsX(i,n)`, so indices differ
+across children). Missing child data stays null, never zero-filled. Shared norm
+band only when birthdates truly match (else fall back to two-up for that chart).
+Child-first colour: child1 `--moon`, child2 `--peach-dark`, applied to every
+series/mark; legend child-first. Carry `birthdate`/`timezone` through
+`ChildStats`; extend `TsSeries` with optional `id`/`label`/`colorVar`. Tests: a
+pure shaper unit (two children, different missing dates + maxes → shared
+xLabels/yTicks, two series, no zero-fill, one band, same-date→same-x) + a twin
+e2e (one overlay chart, two child series, child-first legend). Single + sibling
+two-up paths untouched.
 
 ## Execution notes
 - This is a large multi-commit refactor; ship Step 1 (behavior-preserving) and

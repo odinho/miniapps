@@ -8,6 +8,10 @@
 		type ChildStats,
 		type StatsChild,
 	} from '$lib/stats/multi-child-stats.js';
+	import {
+		buildTwinOverlayCharts,
+		type TwinOverlayChart,
+	} from '$lib/stats/twin-overlay-charts.js';
 	import { appState } from '$lib/stores/app.svelte.js';
 	import { calculateAgeMonths } from '$lib/engine/schedule.js';
 	import {
@@ -126,6 +130,31 @@
 	const activeChildren = $derived(
 		showFullHistory && fullChildrenStats ? fullChildrenStats : childrenStats,
 	);
+	const twinOverlayCharts = $derived(
+		mode === 'twinOverlay' && activeChildren && activeChildren.length > 1
+			? buildTwinOverlayCharts(activeChildren)
+			: null,
+	);
+	const twinChildLegend = $derived(
+		activeChildren
+			? activeChildren.map((child, i) => ({
+					label: child.name,
+					colorVar: i === 0 ? '--moon' : i === 1 ? '--peach-dark' : '--text-light',
+				}))
+			: [],
+	);
+
+	function twinLineSeries(chart: TwinOverlayChart) {
+		return chart.series.map((series) => ({
+			id: series.id,
+			label: series.label,
+			colorVar: series.colorVar,
+			path: series.path,
+			strokeWidth: 2.5,
+			strokeLinecap: 'round',
+			strokeLinejoin: 'round',
+		}));
+	}
 
 	function childPottyMode(babyId: number): boolean {
 		return appState.babyById(babyId)?.baby?.potty_mode === 1;
@@ -527,8 +556,233 @@
 			{/if}
 		{/snippet}
 
+		{#snippet twinChildPanel(cs: ChildStats['stats'], pottyMode: boolean)}
+		<!-- Sleep trends 7d vs 30d -->
+		<div class="stats-section">
+			<h3 class="stats-section-title">Søvntrendar</h3>
+			<div class="stats-trends-table">
+				{#each cs.trendRows as row}
+					<div class="stats-trend-row" class:stats-trend-header={row.isHeader}>
+						<div class="stats-trend-label">{row.label}</div>
+						<div class="stats-trend-val">{row.val7}</div>
+						<div class="stats-trend-val">{row.val30}</div>
+					</div>
+				{/each}
+			</div>
+		</div>
+
+		<!-- Best/worst days -->
+		{#if cs.bestWorst}
+			<div class="stats-section">
+				<h3 class="stats-section-title">Best og verst</h3>
+				<div class="stats-row">
+					<div class="stats-card">
+						<div class="stat-value">{cs.bestWorst.best.label}</div>
+						<div class="stat-label">Mest søvn: {cs.bestWorst.best.duration}</div>
+					</div>
+					<div class="stats-card">
+						<div class="stat-value">{cs.bestWorst.worst.label}</div>
+						<div class="stat-label">Minst søvn: {cs.bestWorst.worst.duration}</div>
+					</div>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Diaper stats -->
+		{#if cs.diaperStats7}
+			<div class="stats-section">
+				<h3 class="stats-section-title">Bleie/Do</h3>
+				<div class="stats-row">
+					<div class="stats-card">
+						<div class="stat-value">{cs.diaperStats7.perDay}</div>
+						<div class="stat-label">Bleier/dag (7d)</div>
+					</div>
+					<div class="stats-card">
+						<div class="stat-value">{cs.diaperStats7.wetCount}/{cs.diaperStats7.dirtyCount}/{cs.diaperStats7.bothCount}</div>
+						<div class="stat-label">{pottyMode ? 'Tiss/Bæsj/Begge' : 'Våt/Skitten/Begge'}</div>
+					</div>
+					{#if cs.diaperStats30 && cs.diaperStats30.pottyCount > 0 && cs.diaperStats30.pottySuccessRate != null}
+						<div class="stats-card">
+							<div class="stat-value">{cs.diaperStats30.pottySuccessRate}%</div>
+							<div class="stat-label">Suksessrate do</div>
+						</div>
+					{/if}
+				</div>
+			</div>
+		{/if}
+
+		<!-- Tier 2: Additional charts -->
+			<!-- Chart D: Sleep Timeline (Gantt) -->
+			{#if cs.gantt.rows.length > 0}
+				<div class="stats-section">
+					<h3 class="stats-section-title">Døgnrytme (30 dagar)</h3>
+					<ChartFrame title="Døgnrytme" landscape={false} wrapStyle="overflow-x: auto;" onExpand={expand}>
+						<SleepTimelineChart
+							rows={cs.gantt.rows}
+							hourLabels={cs.gantt.hourLabels}
+							height={cs.gantt.height}
+						/>
+						<ChartLegend items={[{ label: 'Lurar', colorVar: '--peach-dark' }, { label: 'Natt', colorVar: '--moon' }]} />
+					</ChartFrame>
+				</div>
+			{/if}
+
+			<!-- Chart E: 24h Sleep Heatmap -->
+			{#if cs.heatmapChart.cells.length > 0}
+				{@const hm = cs.heatmapChart}
+				<div class="stats-section">
+					<h3 class="stats-section-title">Søvnkart</h3>
+					<ChartFrame title="Søvnkart" landscape={false} wrapStyle="overflow-y: auto; max-height: 70vh;" onExpand={expand}>
+						<HeatmapChart width={hm.width} height={hm.height} cells={hm.cells} hourLabels={hm.hourLabels} dateLabels={hm.dateLabels} />
+					</ChartFrame>
+				</div>
+			{/if}
+
+			<!-- Wake window chart with context -->
+			{#if cs.wakeScatter.dots.length > 0}
+				<div class="stats-section">
+					<h3 class="stats-section-title">Vakevindu siste 7 dagar</h3>
+					<div class="stats-row" style="margin-bottom: 12px;">
+						<div class="stats-card">
+							<div class="stat-value">{cs.wakeAvg ? formatDuration(cs.wakeAvg * 60000) : '—'}</div>
+							<div class="stat-label">Snitt</div>
+						</div>
+						<div class="stats-card">
+							<div class="stat-value">{formatDuration(Math.min(...cs.wakeScatter.dots.map(d => d.minutes)) * 60000)}</div>
+							<div class="stat-label">Kortast</div>
+						</div>
+						<div class="stats-card">
+							<div class="stat-value">{formatDuration(Math.max(...cs.wakeScatter.dots.map(d => d.minutes)) * 60000)}</div>
+							<div class="stat-label">Lengst</div>
+						</div>
+					</div>
+					<p style="font-size: 0.8rem; color: var(--text-light); margin: 0 0 8px; line-height: 1.3;">
+						Kvart punkt er eitt vakevindu — tida mellom to søvnperiodar.
+						Fyrste vakevindu (etter morgon) er ofte kortast, siste (før leggetid) er lengst.
+						{#if cs.wakeScatter.bandY}
+							Det skraverte feltet viser tilrådd område.
+						{/if}
+					</p>
+					<ChartFrame title="Vakevindu" onExpand={expand}>
+						<TimeSeriesChart
+							gridLines={cs.wakeScatter.gridLines}
+							yTicks={cs.wakeScatter.yTicks}
+							xLabels={[]}
+							series={[]}
+						>
+							{#snippet underlay()}
+								{#if cs.wakeScatter.bandY}
+									<rect
+										x={TS_CHART.PAD_L}
+										y={cs.wakeScatter.bandY.top}
+										width={TS_CHART.W - TS_CHART.PAD_L - TS_CHART.PAD_R}
+										height={cs.wakeScatter.bandY.bottom - cs.wakeScatter.bandY.top}
+										fill="var(--lavender)"
+										opacity="0.25"
+										rx="4"
+									/>
+								{/if}
+							{/snippet}
+							{#snippet overlay()}
+								{#each cs.wakeScatter.dots as dot}
+									<circle cx={dot.x} cy={dot.y} r="5" fill="var(--peach-dark)" stroke="var(--white)" stroke-width="1" opacity="0.7" />
+									<text x={dot.x} y={dot.y - 8} text-anchor="middle" fill="var(--text-light)" font-size="8" font-family="var(--font)">{formatDuration(dot.minutes * 60000)}</text>
+								{/each}
+							{/snippet}
+						</TimeSeriesChart>
+					</ChartFrame>
+				</div>
+			{/if}
+		{/snippet}
+
 		{#if mode === 'single' && activeChildren.length === 1}
 			{@render childPanel(activeChildren[0]!.stats, childPottyMode(activeChildren[0]!.babyId))}
+		{:else if mode === 'twinOverlay' && twinOverlayCharts}
+			{#if twinOverlayCharts.sleepTrend}
+				<div class="stats-section" data-testid="twin-overlay-sleep-trend">
+					<h3 class="stats-section-title">Søvntrend (30 dagar)</h3>
+					<ChartFrame title="Søvntrend" onExpand={expand}>
+						<TimeSeriesChart
+							gridLines={twinOverlayCharts.sleepTrend.gridLines}
+							yTicks={twinOverlayCharts.sleepTrend.yTicks}
+							xLabels={twinOverlayCharts.sleepTrend.xLabels}
+							series={twinLineSeries(twinOverlayCharts.sleepTrend)}
+						/>
+						<ChartLegend items={twinChildLegend} />
+					</ChartFrame>
+				</div>
+			{/if}
+
+			{#if twinOverlayCharts.sleepVsNorm}
+				<div class="stats-section" data-testid="twin-overlay-sleep-vs-norm">
+					<h3 class="stats-section-title">Total søvn vs. tilrådd</h3>
+					<ChartFrame title="Total søvn vs. tilrådd" onExpand={expand}>
+						<TimeSeriesChart
+							gridLines={twinOverlayCharts.sleepVsNorm.gridLines}
+							yTicks={twinOverlayCharts.sleepVsNorm.yTicks}
+							xLabels={twinOverlayCharts.sleepVsNorm.xLabels}
+							bands={twinOverlayCharts.sleepVsNorm.bands.map((b) => ({ path: b.path, fill: `var(${b.colorVar})`, opacity: b.opacity }))}
+							series={twinLineSeries(twinOverlayCharts.sleepVsNorm)}
+						/>
+						<ChartLegend items={[...twinChildLegend, { label: 'Tilrådd', colorVar: '--moon-glow' }]} />
+					</ChartFrame>
+				</div>
+			{/if}
+
+			{#if twinOverlayCharts.nightStretch}
+				<div class="stats-section" data-testid="twin-overlay-night-stretch">
+					<h3 class="stats-section-title">Lengste nattestrekk</h3>
+					<ChartFrame title="Lengste nattestrekk" onExpand={expand}>
+						<TimeSeriesChart
+							gridLines={twinOverlayCharts.nightStretch.gridLines}
+							yTicks={twinOverlayCharts.nightStretch.yTicks}
+							xLabels={twinOverlayCharts.nightStretch.xLabels}
+							series={twinLineSeries(twinOverlayCharts.nightStretch)}
+						/>
+						<ChartLegend items={twinChildLegend} />
+					</ChartFrame>
+				</div>
+			{/if}
+
+			{#if twinOverlayCharts.bedtime}
+				<div class="stats-section" data-testid="twin-overlay-bedtime">
+					<h3 class="stats-section-title">Leggetid</h3>
+					<ChartFrame title="Leggetid" onExpand={expand}>
+						<TimeSeriesChart
+							gridLines={twinOverlayCharts.bedtime.gridLines}
+							yTicks={twinOverlayCharts.bedtime.yTicks}
+							xLabels={twinOverlayCharts.bedtime.xLabels}
+							series={twinLineSeries(twinOverlayCharts.bedtime)}
+						/>
+						<ChartLegend items={twinChildLegend} />
+					</ChartFrame>
+				</div>
+			{/if}
+
+			{#if twinOverlayCharts.napCount}
+				<div class="stats-section" data-testid="twin-overlay-nap-count">
+					<h3 class="stats-section-title">Lurar per dag</h3>
+					<ChartFrame title="Lurar per dag" onExpand={expand}>
+						<TimeSeriesChart
+							gridLines={twinOverlayCharts.napCount.gridLines}
+							yTicks={twinOverlayCharts.napCount.yTicks}
+							xLabels={twinOverlayCharts.napCount.xLabels}
+							series={twinLineSeries(twinOverlayCharts.napCount)}
+						/>
+						<ChartLegend items={twinChildLegend} />
+					</ChartFrame>
+				</div>
+			{/if}
+
+			{#each activeChildren as child, index (child.babyId)}
+				<section class="stats-child-panel" data-testid="stats-child-panel">
+					<h2 class="stats-child-name">{child.name}</h2>
+					{@render twinChildPanel(child.stats, childPottyMode(child.babyId))}
+				</section>
+				{#if index < activeChildren.length - 1}
+					<div class="stats-child-divider" aria-hidden="true"></div>
+				{/if}
+			{/each}
 		{:else}
 			{#each activeChildren as child, index (child.babyId)}
 				<section class="stats-child-panel" data-testid="stats-child-panel">

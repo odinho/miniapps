@@ -4,6 +4,9 @@
 	 *  (fill 'none') and an area (fill set) render exactly as before. N series
 	 *  overlay by passing more entries (twins use one per child). */
 	export interface TsSeries {
+		id?: string;
+		label?: string;
+		colorVar?: string;
 		path: string;
 		fill?: string;
 		stroke?: string;
@@ -53,12 +56,13 @@
 		<path
 			d={s.path}
 			fill={s.fill ?? 'none'}
-			stroke={s.stroke}
+			stroke={s.stroke ?? (s.colorVar ? `var(${s.colorVar})` : undefined)}
 			stroke-width={s.strokeWidth}
 			stroke-dasharray={s.strokeDasharray}
 			stroke-linecap={s.strokeLinecap as 'inherit' | 'round' | 'butt' | 'square' | undefined}
 			stroke-linejoin={s.strokeLinejoin as 'inherit' | 'round' | 'arcs' | 'miter-clip' | 'miter' | 'bevel' | undefined}
 			opacity={s.opacity}
+			data-series-id={s.id}
 		/>
 	{/each}
 	{@render overlay?.()}

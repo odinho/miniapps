@@ -25,6 +25,11 @@ export function tsX(index: number, total: number): number {
   return TS_CHART.PAD_L + (index / (total - 1)) * tsPlotW();
 }
 
+/** Calendar-date x lookup for shared-domain overlays. Equal date => equal x. */
+export function tsXByDate(dates: string[]): Map<string, number> {
+  return new Map(dates.map((date, i) => [date, tsX(i, dates.length)]));
+}
+
 /** Rolling average over values; nulls where the window is incomplete. */
 export function rollingAvg(values: number[], window: number): (number | null)[] {
   return values.map((_, i) => {

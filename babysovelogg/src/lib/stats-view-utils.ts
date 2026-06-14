@@ -908,6 +908,7 @@ export interface ComputedStats {
 	heatmapChart: HeatmapChartData;
 	wakeScatter: WakeScatterData;
 	nightStretches: NightStretch[];
+	bedtimes: BedtimePoint[];
 	wakeGaps: WakeWindowGap[];
 	heatmap: HeatmapRow[];
 }
@@ -1004,6 +1005,7 @@ export function computeAllStats(
 		heatmapChart,
 		wakeScatter,
 		nightStretches,
+		bedtimes,
 		wakeGaps,
 		heatmap,
 	};

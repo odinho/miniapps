@@ -8,6 +8,21 @@ export function polyline(pts: string[]): string {
   return `M${pts.join(" L")}`;
 }
 
+/** A polyline that breaks across missing points instead of connecting or zero-filling them. */
+export function nullablePolyline(xs: number[], ys: (number | null)[]): string {
+  const segments: string[] = [];
+  let inSegment = false;
+  for (let i = 0; i < xs.length; i++) {
+    if (ys[i] == null) {
+      inSegment = false;
+      continue;
+    }
+    segments.push(`${inSegment ? "L" : "M"}${xs[i]},${ys[i]}`);
+    inSegment = true;
+  }
+  return segments.join(" ");
+}
+
 /** A filled area under a polyline, closed down to `baseY` between `x0` and `xN`. */
 export function areaUnder(pts: string[], x0: number, xN: number, baseY: number): string {
   return `M${x0},${baseY} L${pts.join(" L")} L${xN},${baseY} Z`;

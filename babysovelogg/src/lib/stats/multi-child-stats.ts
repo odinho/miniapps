@@ -23,6 +23,8 @@ export interface StatsChild {
 export interface ChildStats {
   babyId: number;
   name: string;
+  timezone?: string;
+  birthdate?: string;
   stats: ComputedStats;
 }
 
@@ -39,6 +41,8 @@ export function computeChildrenStats(inputs: ChildRawData[], now?: number): Chil
   return inputs.map((i) => ({
     babyId: i.baby.id,
     name: i.baby.name,
+    timezone: i.baby.timezone,
+    birthdate: i.baby.birthdate,
     stats: computeAllStats(i.sleeps, i.diapers, i.baby.timezone, i.baby.birthdate, now),
   }));
 }
