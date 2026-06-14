@@ -45,7 +45,9 @@ test("B11: shows overtime when predicted nap time has passed", async ({ page }) 
   const babyId = createBaby("Testa", birthdate.toISOString().slice(0, 10));
   const db = getDb();
 
-  // Set custom_nap_count = 1 so prediction expects exactly 1 nap
+  // Set custom_nap_count = 1 so prediction expects exactly 1 nap.
+  // Verified engine output for this config: nextNap = 10:00 (wake 07:00 +
+  // default 9-mo 180-min WW), so at the pinned now=10:30 it's 30 min overdue.
   db.prepare("UPDATE baby SET custom_nap_count = 1 WHERE id = ?").run(babyId);
 
   const nightStart = new Date(wakeTime);
@@ -66,7 +68,16 @@ test("B11: shows overtime when predicted nap time has passed", async ({ page }) 
     await route.continue({ url: url.toString() });
   });
 
-  await forceHour(page, 10);
+  // Pin the CLIENT clock to the same instant as the server. Timer.svelte is
+  // not passed an explicit `nowMs`, so its `getTimerMode` derives "now" from
+  // the live browser clock (`Date.now()`) and compares it against the
+  // server-predicted nextNap (10:00) — without this the test only passes when
+  // it happens to run after 10:00 local. (The old `forceHour`, which patches
+  // only `getHours()`, never fixed this.) Overriding `Date.now` is enough:
+  // the Timer reads the clock through it and derives the hour from that value.
+  await page.addInitScript((ms: number) => {
+    Date.now = () => ms;
+  }, nowMs);
 
   await page.goto("/");
   await expect(page.getByTestId("dashboard")).toBeVisible({ timeout: 5000 });

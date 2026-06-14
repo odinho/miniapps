@@ -269,6 +269,15 @@ instant) so the snapshots are deterministic, and pin B18's clock. Until then a
 clean `bun run test:e2e` is only reliable near the baseline-capture time. NOT a
 product bug — pure test-infra fragility.
 
+**RESOLVED 2026-06-14.** arc-scenes was fixed under X-3 (dev page now anchors
+`baseMs` to a fixed date; baselines regenerated). B18 turned out to already be
+passing. The lone residual red was **B11**, fixed under X-15: it wasn't B18 and
+wasn't stale — `Timer.svelte` receives no explicit `nowMs`, so its getTimerMode
+read the *live* browser `Date.now()` while comparing against a server-pinned
+`?now=`; `forceHour` only patches `getHours()`, leaving the clock live. Pinned
+the client clock via `addInitScript(() => { Date.now = () => ms })`. Full
+`bun run test:e2e` is now deterministic at 157/157 regardless of run time.
+
 ## Stale active sleep — shipped, minor edges parked
 
 Source: 2026-06-10 phone-bug report (timer at 466:34:51 — a forgotten
