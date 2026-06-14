@@ -427,9 +427,9 @@ Phase 2 — logging ergonomics + at-a-glance:
 - [x] P2-QA  Adversarial + QA + UX review run (dedicated oracle/subagent runs); fix findings
 
 Phase 3 — twin views: combined graphs, comparison, overlap:
-- [~] P3-1  Stats show both by default (twins overlaid; siblings two-up/segmented) — PARKED (local/loop-questions.md; gates P3-2/P3-3)
-- [~] P3-2  Overlap visualisation (both-asleep windows = parent downtime) — PARKED (gated on P3-1 stats decision)
-- [~] P3-3  Comparison stats (total sleep, nap count, longest stretch, divergence) — PARKED (gated on P3-1 stats decision)
+- [~] P3-1  Stats show both by default — DECIDED + DEFERRED to a dedicated session (Odin 2026-06-14). Decision: **B (full twin overlay)**, but **refactor the charting FIRST** so multi-series is easy, then overlay as step 2. Open-ended Codex design captured in [`multi-child-phase3-stats-design.md`](./multi-child-phase3-stats-design.md): data-shaping layer + shared scales/paths (add d3-scale/shape/array) + reusable chart components, with single|twinOverlay|siblingTwoUp decided in the route. Step 1 MUST keep single-baby /stats byte-identical (top regression risk). Gates P3-2/P3-3. NOT started in code (too large for the multi-unit session; its own focused session per Odin).
+- [~] P3-2  Overlap visualisation (both-asleep windows = parent downtime) — DEFERRED with P3-1 (build after the Step-1 refactor lands).
+- [~] P3-3  Comparison stats (total sleep, nap count, longest stretch, divergence) — DEFERRED with P3-1.
 - [x] P3-4  Family handoff "siste 6 timar" timeline. Collapsible "Overlevering · siste 6 timar" section on the family home (`FamilyHandoff.svelte`, collapsed by default, any 2 children). Per child: a proportional 6h bar of sleep blocks (nap/night, ongoing highlighted) + night-waking marks, hour gridlines, and current "Søv/Vaken sidan" status (reuses `getLaneStatus`). Diapers excluded per Odin. Pure `handoff.ts` (`handoffSegments`/`handoffWakings`, window-clipped, domain_id-deduped) unit-tested; e2e in `multi-child-handoff.e2e.ts`. (Odin: home section, sleep+wakings, any 2.) KNOWN EDGE → followups: a discrete pre-midnight nap within 6h of a small-hours handoff isn't carried in BabyState, so it's dropped (overnight block still shows).
 - [~] P3-QA  Adversarial + QA + UX review run; fix findings — PARKED (nothing to QA until Phase 3 is built; un-park after P3-1..P3-4 land)
 
