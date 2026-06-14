@@ -174,7 +174,9 @@ HARD INVARIANTS for every unit here:
   and eyeball the diff + note it in the commit. Never let it drift silently.
 - **Single-baby /stats stays visually + behaviourally identical** until Step 2
   intentionally adds the multi-child modes (and even then N=1 is unchanged).
-- Genuine product/UX choices → park in `local/loop-questions.md` (don't guess).
+- Genuine product/UX choices → DON'T stop (Odin 2026-06-14): consult Codex as a
+  "fake product manager" (context + options → decision + rationale), record it in
+  `local/loop-questions.md`, and keep going.
 - Subagents: tell them to be thorough and to READ `docs/testing.md` first.
 
 ### Unit queue
@@ -192,7 +194,8 @@ Step 1 — behaviour-preserving refactor (single-baby unchanged):
 
 Step 2 — twin overlay + sibling two-up (P3-1 = B), then P3-2/P3-3:
 - [x] S2-1  `stats/multi-child-stats.ts` DATA LAYER (no page change yet): `statsMode(count, isTwin) → single|twinOverlay|siblingTwoUp`; `computeChildrenStats` (pure, one independent ComputedStats per child); `fetchChildrenRawData`/`fetchChildrenStats` (per-child `?baby=<id>` fetch, 44d or full). Unit-tested incl. N=1 == direct computeAllStats. Page untouched → golden/e2e unaffected. (Page wiring + mode rendering moved to S2-2.)
-- [~] S2-2  WIRE the page + render multi-child. PARKED 2026-06-14 — needs a page-LAYOUT product call (which sections go per-child; two-up-for-twins interim vs direct overlay; panel chrome). Options + recs in `local/loop-questions.md` "S2-2 /stats multi-child page LAYOUT". Blocks S2-3..S2-QA (all depend on the chosen layout). Data layer (S2-1) + the whole Step-1 refactor are done and on main; single-baby /stats unchanged.
+- [ ] S2-2  WIRE the page (layout DECIDED — see local/loop-questions.md): extract the whole `{:else if activeStats}` body into a `childPanel(cs, {pottyMode})` snippet; fetch per child via `fetchChildrenStats`; `mode = statsMode(...)`. Render: single → one panel, NO header (N=1 byte-identical, golden/e2e green); twin+sibling → stacked per-child panels each under a child-name header + divider, creation order. Top vs-norm/prediction cards stay PRIMARY. Thread each child's `potty_mode` for the diaper label. (Twins use two-up here; real overlay = S2-2b.)
+- [ ] S2-2b  Twin true overlay: TimeSeriesChart N-series in ONE chart with a shared x/y domain across the two children (per-child colour). Only for `twinOverlay` mode; siblings stay two-up.
 - [ ] S2-3  SleepTimelineChart twin child-lanes per date row; two instances for siblings.
 - [ ] S2-4 (P3-2)  Overlap visualisation: both-asleep windows = parent downtime.
 - [ ] S2-5 (P3-3)  Comparison stats: total sleep, nap count, longest stretch, divergence.
