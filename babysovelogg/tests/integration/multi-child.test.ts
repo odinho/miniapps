@@ -134,6 +134,28 @@ test("sync-mode is a stored family preference, replayed deterministically on reb
   expect(await syncMode()).toBe(true);
 });
 
+test("overlap suggestion is gated on twin-mode AND syncMode (P4-1)", async () => {
+  createBaby("Ada", "2025-06-12");
+  createBaby("Bo", "2025-06-20"); // twins (age gap < 21d)
+
+  const overlap = async () =>
+    ((await (await get("/api/state")).json()) as {
+      family: { overlapSuggestion: unknown };
+    }).family.overlapSuggestion;
+
+  // Twins but sync off → no coupling, field present and null.
+  expect(await overlap()).toBeNull();
+
+  // Sync on: the gate opens. (No history here, so the engine still returns
+  // null — but the suggestion is now computed rather than short-circuited.)
+  await postEvents([makeEvent("family.updated", { syncMode: true })]);
+  expect(await overlap()).toBeNull();
+
+  // Switch to siblings: coupling must never apply regardless of syncMode.
+  await postEvents([makeEvent("family.updated", { modeOverride: "sibling" })]);
+  expect(await overlap()).toBeNull();
+});
+
 test("snapshot revision is monotonic — bumps as events are applied (X-2 guard)", async () => {
   createBaby("Ada", "2025-06-12");
   const rev = async () => ((await (await get("/api/state")).json()) as { revision: number }).revision;

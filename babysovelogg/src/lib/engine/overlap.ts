@@ -43,6 +43,8 @@ export interface BabyWindow {
 export interface OverlapSuggestion {
   /** The baby to nudge (the more-flexible one). */
   babyId: number;
+  /** Which sleep is being nudged — drives the logged sleep type on accept. */
+  kind: "nap" | "bedtime";
   from: string;
   to: string;
   /** Signed nudge in minutes (within `window`). */
@@ -138,6 +140,7 @@ export function suggestOverlap(
 
   return {
     babyId: pick.w.babyId,
+    kind: pick.w.next!.kind,
     from: pick.w.next!.plannedStart,
     to: new Date(pick.res.start).toISOString(),
     deltaMin,

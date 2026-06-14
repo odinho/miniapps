@@ -13,7 +13,7 @@
 	import EditSleepModal from '$lib/components/EditSleepModal.svelte';
 	import NightWakingEditSheet from '$lib/components/NightWakingEditSheet.svelte';
 	import { formatDuration, formatTime, formatTimeWindow } from '$lib/utils.js';
-	import { generateNightWakingId } from '$lib/identity.js';
+	import { generateNightWakingId, generateSleepId } from '$lib/identity.js';
 	import { buildSleepInfoRows } from '$lib/settings-utils.js';
 	import TimeInput from '$lib/components/TimeInput.svelte';
 	import DateInput from '$lib/components/DateInput.svelte';
@@ -23,6 +23,7 @@
 	import TodayCard from '$lib/components/TodayCard.svelte';
 	import FamilyHome from '$lib/components/FamilyHome.svelte';
 	import FamilyMorningPrompt from '$lib/components/FamilyMorningPrompt.svelte';
+	import FamilyOverlapCard from '$lib/components/FamilyOverlapCard.svelte';
 	import UndoToast from '$lib/components/UndoToast.svelte';
 	import { isoToDateInTz } from '$lib/tz.js';
 	import { babyNeedsMorningWake } from '$lib/family-morning.js';
@@ -640,6 +641,39 @@
 		familyMorningDismissedDate = isoToDateInTz(new Date().toISOString(), tz);
 	}
 
+	// Phase-4 twin overlap what-if card (suggestion-only). Dismissable per
+	// suggestion-window; keyed on baby + target time so a fresh suggestion shows
+	// again. Accept logs a synced-tagged sleep (excluded from WW learning).
+	type OverlapSuggestion = NonNullable<typeof appState.state.family.overlapSuggestion>;
+	const overlapKey = (sug: OverlapSuggestion) => `${sug.babyId}:${sug.to}`;
+	let dismissedOverlapKey = $state('');
+	const overlapSuggestion = $derived(showFamilyHome ? appState.state.family.overlapSuggestion : null);
+	const showOverlap = $derived(
+		!!overlapSuggestion && overlapKey(overlapSuggestion) !== dismissedOverlapKey,
+	);
+
+	async function acceptOverlap(sug: OverlapSuggestion) {
+		const sleepDomainId = generateSleepId();
+		const result = await sync.sendEvents([
+			{
+				type: 'sleep.started',
+				payload: {
+					babyId: sug.babyId,
+					startTime: new Date().toISOString(),
+					type: sug.kind === 'bedtime' ? 'night' : 'nap',
+					sleepDomainId,
+					synced: true,
+				},
+			},
+		]);
+		if (result == null) return;
+		showUndoToast('Søvn starta', [{ type: 'sleep.deleted', payload: { sleepDomainId } }]);
+	}
+
+	function dismissOverlap(sug: OverlapSuggestion) {
+		dismissedOverlapKey = overlapKey(sug);
+	}
+
 </script>
 
 {#if !loaded}
@@ -666,6 +700,9 @@
 		</div>
 		{#if needsFamilyMorningPrompt}
 			<FamilyMorningPrompt {babies} onSkip={skipFamilyMorning} />
+		{/if}
+		{#if showOverlap && overlapSuggestion}
+			<FamilyOverlapCard suggestion={overlapSuggestion} {babies} onAccept={acceptOverlap} onDismiss={dismissOverlap} />
 		{/if}
 		<FamilyHome {babies} {now} family={appState.state.family} onUndo={showUndoToast} onFocus={(id) => goto(`/?baby=${id}`)} />
 		{#if undoToast}

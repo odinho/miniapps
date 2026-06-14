@@ -76,4 +76,33 @@ describe("computeOverlapSuggestion", () => {
     expect(computeOverlapSuggestion([], NOW)).toBeNull();
     expect(computeOverlapSuggestion([baby({})], NOW)).toBeNull();
   });
+
+  it("suggests nudging the awake twin to overlap the sleeping one (builder + suggest end-to-end)", () => {
+    const asleep = baby({
+      baby: { id: 1, name: "Ada", timezone: "UTC" } as OverlapBabyInput["baby"],
+      activeSleep: { end_time: null } as OverlapBabyInput["activeSleep"],
+      prediction: pred({
+        expectedWakeRange: range(at(13, 30), at(13, 15), at(13, 45)),
+        confidence: { level: "high", dataPoints: 7, napRanges: [], bedtimeRange: range(at(19), at(18), at(20)) },
+      }),
+    });
+    const awake = baby({
+      baby: { id: 2, name: "Bo", timezone: "UTC" } as OverlapBabyInput["baby"],
+      prediction: pred({
+        nextNap: at(13, 30),
+        napsAllDone: false,
+        predictedNaps: [{ startTime: at(13, 30), endTime: at(15) }],
+        confidence: {
+          level: "high",
+          dataPoints: 7,
+          napRanges: [{ startTime: at(13, 30), endTime: at(15), startRange: range(at(13, 30), at(11, 30), at(13, 30)) }],
+          bedtimeRange: range(at(19), at(18, 40), at(19, 20)),
+        },
+      }),
+    });
+    const s = computeOverlapSuggestion([asleep, awake], NOW);
+    expect(s?.babyId).toBe(2);
+    expect(s!.deltaMin).toBeLessThan(0);
+    expect(s!.projectedOverlapMin).toBeGreaterThanOrEqual(30);
+  });
 });
