@@ -22,6 +22,7 @@
 	import ManualSleepModal from '$lib/components/ManualSleepModal.svelte';
 	import TodayCard from '$lib/components/TodayCard.svelte';
 	import FamilyHome from '$lib/components/FamilyHome.svelte';
+	import UndoToast from '$lib/components/UndoToast.svelte';
 	import { isoToDateInTz } from '$lib/tz.js';
 
 	// --- modal state ---
@@ -72,7 +73,7 @@
 	type ToastEvent = { type: string; payload: Record<string, unknown> };
 	/** Optional per-baby corrections shown alongside "Angre" after a bulk
 	 *  "begge" action — e.g. "Bo søv vidare" reverts just Bo (see FamilyHome). */
-	type ToastCorrection = { label: string; events: ToastEvent[] };
+	type ToastCorrection = { label: string; events: ToastEvent[]; kind?: 'additive' | 'revert' };
 	let undoToast = $state<{ message: string; undoEvents: ToastEvent[]; corrections?: ToastCorrection[] } | null>(null);
 	let undoTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -201,7 +202,9 @@
 							{
 								// Affirmative + additive label, deliberately NOT a question and
 								// distinct from "Angre" — a mis-tap at 3am would log a waking on
-								// the wrong twin (the cardinal invariant). The "+" signals "add".
+								// the wrong twin (the cardinal invariant). The "+" signals "add",
+								// and `kind: additive` gives it a distinct filled-chip style.
+								kind: 'additive',
 								label: `+ ${other.baby.name} vakna òg`,
 								events: [
 									{
@@ -641,15 +644,12 @@
 		</div>
 		<FamilyHome {babies} {now} family={appState.state.family} onUndo={showUndoToast} onFocus={(id) => goto(`/?baby=${id}`)} />
 		{#if undoToast}
-			<div class="undo-toast">
-				<span>{undoToast.message}</span>
-				{#if undoToast.corrections}
-					{#each undoToast.corrections as c}
-						<button class="btn btn-ghost" onclick={() => handleCorrection(c.events)}>{c.label}</button>
-					{/each}
-				{/if}
-				<button class="btn btn-ghost" onclick={handleUndo}>Angre</button>
-			</div>
+			<UndoToast
+				message={undoToast.message}
+				corrections={undoToast.corrections}
+				onCorrection={handleCorrection}
+				onUndo={handleUndo}
+			/>
 		{/if}
 	</div>
 {:else}
@@ -1055,14 +1055,11 @@
 
 	<!-- Undo toast -->
 	{#if undoToast}
-		<div class="undo-toast">
-			<span>{undoToast.message}</span>
-			{#if undoToast.corrections}
-				{#each undoToast.corrections as c}
-					<button class="btn btn-ghost" onclick={() => handleCorrection(c.events)}>{c.label}</button>
-				{/each}
-			{/if}
-			<button class="btn btn-ghost" onclick={handleUndo}>Angre</button>
-		</div>
+		<UndoToast
+			message={undoToast.message}
+			corrections={undoToast.corrections}
+			onCorrection={handleCorrection}
+			onUndo={handleUndo}
+		/>
 	{/if}
 {/if}

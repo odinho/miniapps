@@ -1553,3 +1553,12 @@ html, body {
   font-weight: 600;
   padding: 4px 8px;
 }
+
+/* Additive correction (e.g. "+ Bo vakna òg") — a filled chip, visually distinct
+   from the text-link undo/revert actions so it doesn't read as an undo. */
+.undo-toast .btn-additive {
+  background: var(--sun);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+}

@@ -239,8 +239,10 @@ test("twin co-sleep: logging a night waking offers to wake the other twin too", 
   await page.goto("/?baby=1");
   await page.getByTestId("night-waking-btn").click();
 
-  // One waking woke both — take the offer to log Bo's too.
-  await page.getByRole("button", { name: "+ Bo vakna òg" }).click();
+  // One waking woke both — the offer is a distinct ADDITIVE chip (not styled
+  // like the "Angre" undo), and tapping it logs Bo's waking too.
+  await expect(page.getByTestId("toast-additive")).toHaveText("+ Bo vakna òg");
+  await page.getByTestId("toast-additive").click();
 
   await expect
     .poll(async () => {
