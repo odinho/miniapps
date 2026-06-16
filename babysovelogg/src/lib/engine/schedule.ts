@@ -697,9 +697,10 @@ function getPositionalWakeWindows(ctx: BabyContext): number[] {
     let napPosition = 0;
     for (let i = 0; i < daySleeps.length; i++) {
       if (daySleeps[i].type !== "nap") continue; // skip gaps before night sleep
-      // A synced (nudge-accepted) start is policy — keep the position counter
-      // advancing, but don't learn its wake window.
-      if (daySleeps[i].synced) {
+      // A synced (nudge-accepted) start is policy, not natural rhythm — keep the
+      // position counter advancing but don't learn its wake window. Also skip the
+      // gap OUT of a synced previous sleep: its end is policy-shifted too.
+      if (daySleeps[i].synced || (i > 0 && daySleeps[i - 1].synced)) {
         napPosition++;
         continue;
       }
@@ -780,8 +781,9 @@ function getPositionalDataForNapCount(
     let napPos = 0;
     for (let i = 0; i < daySleeps.length; i++) {
       if (daySleeps[i].type !== "nap") continue;
-      // Synced (nudge-accepted) start → policy, not a natural wake-window sample.
-      if (daySleeps[i].synced) {
+      // Synced (nudge-accepted) start → policy, not a natural wake-window sample;
+      // likewise skip the gap OUT of a synced previous sleep (policy-shifted end).
+      if (daySleeps[i].synced || (i > 0 && daySleeps[i - 1].synced)) {
         napPos++;
         continue;
       }
@@ -949,6 +951,9 @@ export function getLearnedBedtimeWakeWindow(ctx: BabyContext): number {
   for (let i = 1; i < cache.sorted.length; i++) {
     if (cache.sorted[i].type !== "night") continue;
     if (cache.sorted[i - 1].type !== "nap") continue;
+    // A synced (nudge-accepted) last nap was moved by parent policy, so the gap
+    // from its (shifted) end to bedtime isn't a natural bedtime-wake-window sample.
+    if (cache.sorted[i - 1].synced) continue;
     const gapMin = (cache.sorted[i].startMs - cache.sorted[i - 1].endMs) / 60000;
     if (gapMin >= 60 && gapMin <= 600) {
       gaps.push(gapMin);
@@ -1373,8 +1378,9 @@ function computeAvgNapWakeWindow(cache: SleepCache): number | null {
   for (let i = 1; i < cache.sorted.length; i++) {
     if (cache.sorted[i].type !== "nap") continue;
     // A synced (nudge-accepted) start is policy, not natural rhythm — the gap
-    // leading to it isn't a sample of the baby's wake window.
-    if (cache.sorted[i].synced) continue;
+    // leading to it isn't a sample of the baby's wake window. Same for the gap
+    // OUT of a synced previous sleep (its end is policy-shifted too).
+    if (cache.sorted[i].synced || cache.sorted[i - 1].synced) continue;
     // Skip if either sleep's day is incomplete — the gap could span a missing night
     if (!cache.daysWithNight.has(cache.sorted[i].localDate)) continue;
     if (!cache.daysWithNight.has(cache.sorted[i - 1].localDate)) continue;
@@ -2003,7 +2009,9 @@ function collectHabitualNapData(
     let napPos = 0;
     for (let i = 0; i < daySleeps.length; i++) {
       if (daySleeps[i].type !== "nap") continue;
-      if (daySleeps[i].synced) {
+      // Synced start (or a gap out of a synced previous sleep) is policy, not a
+      // natural wake-window sample.
+      if (daySleeps[i].synced || (i > 0 && daySleeps[i - 1].synced)) {
         napPos++;
         continue;
       }

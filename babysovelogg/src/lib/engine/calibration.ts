@@ -164,6 +164,9 @@ function calibrateWakeWindows(
   let gapCount = 0;
   for (let i = 1; i < sorted.length; i++) {
     if (sorted[i].type !== "nap") continue;
+    // Don't count policy-timed (synced) gaps — keep the trust sample count aligned
+    // with what the wake-window learners actually learn from.
+    if (sorted[i].synced || sorted[i - 1].synced) continue;
     const gapMin = (new Date(sorted[i].start_time).getTime() - new Date(sorted[i - 1].end_time!).getTime()) / 60_000;
     if (gapMin >= 10 && gapMin <= 480) gapCount++;
   }
@@ -186,6 +189,7 @@ function calibrateBedtimeWW(recentSleeps: SleepEntry[] | undefined): DataSource 
   let gapCount = 0;
   for (let i = 1; i < sorted.length; i++) {
     if (sorted[i].type !== "night" || sorted[i - 1].type !== "nap") continue;
+    if (sorted[i - 1].synced) continue; // policy-timed last nap → not a trust sample
     const gapMin = (new Date(sorted[i].start_time).getTime() - new Date(sorted[i - 1].end_time!).getTime()) / 60_000;
     if (gapMin >= 60 && gapMin <= 600) gapCount++;
   }

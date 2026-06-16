@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { getWakeWindow } from "$lib/engine/schedule.js";
+import { getWakeWindow, getLearnedBedtimeWakeWindow } from "$lib/engine/schedule.js";
 import type { SleepEntry, BabyContext } from "$lib/types.js";
 
 // Parent-policy-not-evidence (Phase 4, guardrail 5): a parent-accepted overlap
@@ -15,6 +15,10 @@ import type { SleepEntry, BabyContext } from "$lib/types.js";
 
 const T = (h: number, m = 0) =>
   `2026-03-26T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00.000Z`;
+
+// Distinct-date variant for multi-day fixtures (each day a separate complete day).
+const Td = (day: number, h: number) =>
+  `2026-03-${String(day).padStart(2, "0")}T${String(h).padStart(2, "0")}:00:00.000Z`;
 
 const ctx = (recentSleeps: SleepEntry[]): BabyContext => ({
   birthdate: "2025-07-26",
@@ -55,5 +59,34 @@ describe("synced nudges are excluded from wake-window learning", () => {
 
   it("the same nap WITHOUT the synced tag DOES drag it down (proves the tag is load-bearing)", () => {
     expect(getWakeWindow(ctx([...naturalDay, nudgedNap(false)]))).toBeLessThan(wwNatural);
+  });
+});
+
+describe("synced nudges are excluded from bedtime-wake-window learning", () => {
+  // A synced LAST nap was moved by policy, so its (shifted) end → bedtime gap is
+  // not a natural bedtime-wake-window sample. Days carry distinct dates so the
+  // learner sees them as separate complete days.
+  const lastNapDay = (day: number, napStart: number, synced: boolean): SleepEntry[] => [
+    { start_time: Td(day, napStart), end_time: Td(day, napStart + 1), type: "nap", ...(synced ? { synced: 1 } : {}) },
+    { start_time: Td(day, 19), end_time: Td(day + 1, 7), type: "night" },
+  ];
+
+  // Baseline: last nap 16:00–17:00, bedtime 19:00 → a steady 120-min gap.
+  const baseline = [10, 11, 12].flatMap((d) => lastNapDay(d, 16, false));
+  const wwBaseline = getLearnedBedtimeWakeWindow(ctx(baseline));
+  // An extra day whose last nap was pulled to 13:00–14:00 (a 300-min gap) — what
+  // an accepted overlap nudge looks like.
+  const withAnomaly = (synced: boolean) => [...baseline, ...lastNapDay(13, 13, synced)];
+
+  it("learns the natural bedtime wake window from un-nudged days", () => {
+    expect(wwBaseline).toBe(120);
+  });
+
+  it("a synced last nap does NOT pull the learned bedtime wake window", () => {
+    expect(getLearnedBedtimeWakeWindow(ctx(withAnomaly(true)))).toBe(wwBaseline);
+  });
+
+  it("the same nap WITHOUT the tag DOES inflate it (proves the tag is load-bearing)", () => {
+    expect(getLearnedBedtimeWakeWindow(ctx(withAnomaly(false)))).toBeGreaterThan(wwBaseline);
   });
 });

@@ -229,15 +229,15 @@ describe("multi-day twin overlap simulation (assemble → suggest → accept →
 
     expect(renderSim(days)).toMatchInlineSnapshot(`
       "day 0: Bo-nat=12:05 sug=-34m accept=Y overlap base=44 real=78 | nap Ada=110m Bo=110m
-      day 1: Bo-nat=12:05 sug=-35m accept=· overlap base=44 real=68 | nap Ada=110m Bo=110m
-      day 2: Bo-nat=11:51 sug=-33m accept=Y overlap base=58 real=91 | nap Ada=110m Bo=110m
+      day 1: Bo-nat=12:05 sug=-34m accept=· overlap base=44 real=68 | nap Ada=110m Bo=110m
+      day 2: Bo-nat=11:51 sug=-31m accept=Y overlap base=58 real=89 | nap Ada=110m Bo=110m
       day 3: Bo-nat=11:54 sug=— accept=· overlap base=55 real=31 | nap Ada=110m Bo=110m
       day 4: Bo-nat=12:04 sug=— accept=· overlap base=45 real=0 | nap Ada=110m Bo=110m
-      day 5: Bo-nat=12:08 sug=-36m accept=· overlap base=42 real=78 | nap Ada=110m Bo=110m
-      day 6: Bo-nat=11:54 sug=-38m accept=Y overlap base=55 real=93 | nap Ada=110m Bo=110m
-      day 7: Bo-nat=12:04 sug=— accept=· overlap base=46 real=58 | nap Ada=110m Bo=110m
-      day 8: Bo-nat=11:56 sug=— accept=· overlap base=54 real=42 | nap Ada=110m Bo=110m
-      day 9: Bo-nat=12:03 sug=-38m accept=· overlap base=46 real=94 | nap Ada=110m Bo=110m"
+      day 5: Bo-nat=12:08 sug=-39m accept=· overlap base=42 real=78 | nap Ada=110m Bo=110m
+      day 6: Bo-nat=11:54 sug=— accept=· overlap base=55 real=19 | nap Ada=110m Bo=110m
+      day 7: Bo-nat=12:07 sug=-37m accept=· overlap base=43 real=55 | nap Ada=110m Bo=110m
+      day 8: Bo-nat=11:56 sug=-33m accept=Y overlap base=53 real=86 | nap Ada=110m Bo=110m
+      day 9: Bo-nat=12:08 sug=-33m accept=· overlap base=42 real=90 | nap Ada=110m Bo=110m"
     `);
 
     const acceptDays = days.filter((d) => d.accepted);
@@ -268,7 +268,7 @@ describe("multi-day twin overlap simulation (assemble → suggest → accept →
 
     expect({ clean: clean.finalMovableNatural, dirty: dirty.finalMovableNatural }).toMatchInlineSnapshot(`
       {
-        "clean": "12:03",
+        "clean": "12:08",
         "dirty": "11:26",
       }
     `);

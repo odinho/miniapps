@@ -179,6 +179,12 @@ function getNapWakeWindowStats(
     let napPos = 0;
     for (let i = 0; i < daySleeps.length; i++) {
       if (daySleeps[i].type !== "nap") continue;
+      // A synced (nudge-accepted) start — and the gap out of a synced previous
+      // sleep — is parent policy, not a natural wake-window variance sample.
+      if (daySleeps[i].synced || (i > 0 && daySleeps[i - 1].synced)) {
+        napPos++;
+        continue;
+      }
       const prevEndMs = i === 0 ? priorEndMs : new Date(daySleeps[i - 1].end_time!).getTime();
       if (prevEndMs == null) {
         napPos++;
@@ -222,6 +228,9 @@ function getBedtimeWakeWindowStats(
   const gaps: number[] = [];
   for (let i = 1; i < sorted.length; i++) {
     if (sorted[i].type !== "night" || sorted[i - 1].type !== "nap") continue;
+    // A synced (nudge-accepted) last nap was moved by policy — its gap to bedtime
+    // isn't a natural bedtime-wake-window variance sample.
+    if (sorted[i - 1].synced) continue;
     const gapMin = (new Date(sorted[i].start_time).getTime() - new Date(sorted[i - 1].end_time!).getTime()) / 60_000;
     if (gapMin >= 60 && gapMin <= 600) {
       gaps.push(gapMin);

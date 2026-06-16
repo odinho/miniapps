@@ -68,6 +68,8 @@ interface ParsedSleep {
   type: "nap" | "night";
   localDate: string;
   startMinuteOfDay: number;
+  /** 1 when the START was a parent-accepted overlap nudge (policy, not rhythm). */
+  synced?: number;
 }
 
 function parseSleeps(sleeps: SleepEntry[], tz: string): ParsedSleep[] {
@@ -86,6 +88,7 @@ function parseSleeps(sleeps: SleepEntry[], tz: string): ParsedSleep[] {
       type: s.type,
       localDate: isoToDateInTz(s.start_time, tz),
       startMinuteOfDay: getMinuteOfDayInTz(new Date(startMs), tz),
+      synced: s.synced,
     });
   }
   result.sort((a, b) => a.startMs - b.startMs);
@@ -292,13 +295,18 @@ export function computeStrategySignals(
   }
   const longestStretchConsistency = sd(longestStretchStarts);
 
-  // First nap consistency: SD of first nap start time across days
+  // First nap consistency: SD of first nap start time across days. A synced
+  // (nudge-accepted) first nap was timed by parent policy, so it isn't a sample
+  // of the baby's natural first-nap rhythm.
   const firstNapStarts: number[] = [];
   for (const daySleeps of byDay.values()) {
     const firstNap = daySleeps.find((s) => s.type === "nap");
-    if (firstNap) firstNapStarts.push(firstNap.startMinuteOfDay);
+    if (firstNap && !firstNap.synced) firstNapStarts.push(firstNap.startMinuteOfDay);
   }
-  const firstNapConsistency = sd(firstNapStarts);
+  // < 2 natural samples → unknown, not "perfectly consistent" (sd() returns 0 for
+  // < 2). Matters once synced first naps are excluded above; Infinity matches the
+  // insufficient-data default and keeps the baby out of a false routine graduation.
+  const firstNapConsistency = firstNapStarts.length >= 2 ? sd(firstNapStarts) : Infinity;
 
   // Nap count SD
   const napCounts: number[] = [];
@@ -307,13 +315,15 @@ export function computeStrategySignals(
   }
   const napCountSD = sd(napCounts);
 
-  // Wake window SD: gaps between consecutive sleeps
+  // Wake window SD: gaps between consecutive sleeps. Skip gaps into a synced nap
+  // or out of a synced previous sleep — those starts are policy, not rhythm.
   const wakeWindows: number[] = [];
   for (let i = 1; i < parsed.length; i++) {
+    if (parsed[i].synced || parsed[i - 1].synced) continue;
     const gapMin = (parsed[i].startMs - parsed[i - 1].endMs) / 60_000;
     if (gapMin >= 5 && gapMin <= 480) wakeWindows.push(gapMin);
   }
-  const wakeWindowSD = sd(wakeWindows);
+  const wakeWindowSD = wakeWindows.length >= 2 ? sd(wakeWindows) : Infinity;
 
   // Logging completeness: fraction of calendar days in the data range that have entries
   const sortedDates = [...byDay.keys()].toSorted();
@@ -647,11 +657,13 @@ export function computeSleepWindow(
 export function extractWakeWindows(sleeps: SleepEntry[]): number[] {
   const completed = sleeps
     .filter((s) => s.end_time)
-    .map((s) => ({ startMs: new Date(s.start_time).getTime(), endMs: new Date(s.end_time!).getTime() }))
+    .map((s) => ({ startMs: new Date(s.start_time).getTime(), endMs: new Date(s.end_time!).getTime(), synced: s.synced }))
     .toSorted((a, b) => a.startMs - b.startMs);
 
   const gaps: number[] = [];
   for (let i = 1; i < completed.length; i++) {
+    // A synced (nudge-accepted) start — or a gap out of one — is policy, not rhythm.
+    if (completed[i].synced || completed[i - 1].synced) continue;
     const gapMin = (completed[i].startMs - completed[i - 1].endMs) / 60_000;
     if (gapMin >= 5 && gapMin <= 480) gaps.push(gapMin);
   }

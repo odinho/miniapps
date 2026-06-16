@@ -60,27 +60,23 @@ multi-child regression).
   rendering an explicit "0 / no shared sleep" state. Defensible, but a parent
   might read absence-of-section as a bug. Low priority; revisit if asked.
 
-## Phase-4 overlap: synced-exclusion coverage + e2e (P4-QA leftovers, 2026-06-16)
+## Phase-4 overlap: synced-exclusion — backtest paths + e2e (P4-QA leftovers)
 
 The P4-QA multi-day simulation (`tests/unit/overlap-simulation.unit.ts`) surfaced
-that the whole synced-exclusion feature was DEAD in prod — `toSleepEntry` dropped
-the flag (now fixed) — and that the habitual nap-start learner lacked the skip
-(also fixed). Remaining, lower-priority:
+that the whole synced-exclusion feature was DEAD in prod (`toSleepEntry` dropped
+the flag) and that several learners lacked the skip. Fixed + Codex-reviewed
+(2026-06-17): `toSleepEntry` propagates `synced`; the nap-start + wake-gap learners
+skip both gaps INTO a synced nap and OUT of a synced previous sleep across
+`schedule.ts` (positional/avg WW, habitual start+gap, `getLearnedBedtimeWakeWindow`),
+`confidence.ts` (nap-WW + bedtime-WW variance), `calibration.ts` (trust sample
+counts), and `features.ts` (`ParsedSleep.synced` + first-nap consistency, wake-window
+SD, `extractWakeWindows`). Duration learners deliberately keep synced naps (real
+sleep). Remaining, lower-priority:
 
-- **2nd-order synced-gap coverage.** A synced (nudge-accepted) nap moves a START
-  but keeps duration, so its END also shifts. Two gaps computed from that end are
-  still learned as natural: (1) **bedtime WW** — `getLearnedBedtimeWakeWindow`
-  (`schedule.ts` ~L949) uses the last-nap→night gap with no synced check, so a
-  synced last nap inflates the learned bedtime wake window; (2) **next-nap WW** —
-  the positional/avg WW loops skip a nap when *it* is synced, but a non-synced nap
-  *following* a synced one still measures its gap from the synced nap's shifted
-  end. Both are second-order (one nap nudged per day, usually the relevant one).
-  A one-liner reverted from the P4-QA unit (excluding synced from
-  `getLearnedBedtimeWakeWindow`) cascaded into bedtime predictions, so this wants
-  a deliberate pass + Codex review, not a blind skip. Do a full audit of every
-  nap-start/gap reader (incl. trend.ts, cycle `collectCycleNapSamples` — likely
-  fine since cycle is duration-based) and decide each. Duration learning must NOT
-  skip synced (a nudged nap is still real sleep of its true length).
+- **Backtest/diagnostic gap learners** `weighted.ts` (~L72/100/145) and
+  `baselines.ts` (~L56/97/154) still ignore `synced`. Codex confirmed both are
+  backtest-only (not the production prediction path), so this only matters if a
+  synced-bearing fixture ever enters a backtest comparison. Low priority.
 - **Live-suggestion e2e.** Still want a Playwright e2e for the `FamilyOverlapCard`
   what-if flow ([Gjer det] logs a synced sleep / [Ikkje no] dismisses). Gated on
   being able to deterministically seed a live overlap suggestion in the browser
