@@ -60,6 +60,45 @@ multi-child regression).
   rendering an explicit "0 / no shared sleep" state. Defensible, but a parent
   might read absence-of-section as a bug. Low priority; revisit if asked.
 
+## Phase-4 overlap: synced-exclusion coverage + e2e (P4-QA leftovers, 2026-06-16)
+
+The P4-QA multi-day simulation (`tests/unit/overlap-simulation.unit.ts`) surfaced
+that the whole synced-exclusion feature was DEAD in prod — `toSleepEntry` dropped
+the flag (now fixed) — and that the habitual nap-start learner lacked the skip
+(also fixed). Remaining, lower-priority:
+
+- **2nd-order synced-gap coverage.** A synced (nudge-accepted) nap moves a START
+  but keeps duration, so its END also shifts. Two gaps computed from that end are
+  still learned as natural: (1) **bedtime WW** — `getLearnedBedtimeWakeWindow`
+  (`schedule.ts` ~L949) uses the last-nap→night gap with no synced check, so a
+  synced last nap inflates the learned bedtime wake window; (2) **next-nap WW** —
+  the positional/avg WW loops skip a nap when *it* is synced, but a non-synced nap
+  *following* a synced one still measures its gap from the synced nap's shifted
+  end. Both are second-order (one nap nudged per day, usually the relevant one).
+  A one-liner reverted from the P4-QA unit (excluding synced from
+  `getLearnedBedtimeWakeWindow`) cascaded into bedtime predictions, so this wants
+  a deliberate pass + Codex review, not a blind skip. Do a full audit of every
+  nap-start/gap reader (incl. trend.ts, cycle `collectCycleNapSamples` — likely
+  fine since cycle is duration-based) and decide each. Duration learning must NOT
+  skip synced (a nudged nap is still real sleep of its true length).
+- **Live-suggestion e2e.** Still want a Playwright e2e for the `FamilyOverlapCard`
+  what-if flow ([Gjer det] logs a synced sleep / [Ikkje no] dismisses). Gated on
+  being able to deterministically seed a live overlap suggestion in the browser
+  (two twins, awake, overlapping-but-not-aligned predictions, medium+ confidence)
+  — the unit sim shows the fixture is fiddly (SD must land ~30-39 for a usable
+  ±1σ window that isn't low-confidence-blocked).
+
+## E2E/integration: multi-child `bothAsleep` roll-up is wall-clock-fragile
+
+`tests/integration/multi-child.test.ts` "family roll-up: bothAsleep needs both
+children down" posts active sleeps at hard-coded `2026-06-14T09:30/09:40Z` with no
+end, then asserts `bothAsleep=true`. Once the real clock is >24h past those starts
+(i.e. from 2026-06-15 on) the engine classifies them as stale and hides them, so
+`bothAsleep` reads false and the test fails — independent of any code change
+(verified failing on clean `main`). Same class as the arc-scenes/B18 fragility.
+Fix: thread a pinned `now` into the family roll-up path under test (or use
+relative-to-now start times) so it's clock-independent.
+
 ## Handoff timeline: pre-midnight non-overnight blocks dropped (P3-4)
 
 The family handoff (`src/lib/handoff.ts`) builds its 6h window from the
@@ -314,29 +353,6 @@ Deferred from the backend unit's Codex review (2026-06-12):
 - **SSE/state payload duplicates the primary baby** inside `babies[0]` plus
   the top-level alias. Acceptable at N≤2; slim to a summary if SSE size
   ever matters (and once the client reads `babies[]` natively).
-
-## E2E: arc-scenes + B18 are wall-clock-fragile
-
-Surfaced 2026-06-12 (during Phase-1 polish). `arc-scenes.e2e.ts` (9 visual
-snapshots) and `bugs.e2e.ts` B18 pass or fail depending on the real time of day:
-the same `main` commit passed all of them at ~17:00 UTC and failed 10 at ~21:00
-UTC with no code change. Root cause: `src/routes/dev/arc-scenes/+page.svelte:21`
-builds every scene from `const today = new Date()` (real wall clock), so the
-active-sleep scenes' elapsed fill / now-marker drift away from the committed
-baselines as the day advances; B18 uses `new Date()` day-offsets + `forceHour`.
-Fix: thread a FIXED `now` into the arc-scenes dev page (query param or hardcoded
-instant) so the snapshots are deterministic, and pin B18's clock. Until then a
-clean `bun run test:e2e` is only reliable near the baseline-capture time. NOT a
-product bug — pure test-infra fragility.
-
-**RESOLVED 2026-06-14.** arc-scenes was fixed under X-3 (dev page now anchors
-`baseMs` to a fixed date; baselines regenerated). B18 turned out to already be
-passing. The lone residual red was **B11**, fixed under X-15: it wasn't B18 and
-wasn't stale — `Timer.svelte` receives no explicit `nowMs`, so its getTimerMode
-read the *live* browser `Date.now()` while comparing against a server-pinned
-`?now=`; `forceHour` only patches `getHours()`, leaving the clock live. Pinned
-the client clock via `addInitScript(() => { Date.now = () => ms })`. Full
-`bun run test:e2e` is now deterministic at 157/157 regardless of run time.
 
 ## Stale active sleep — shipped, minor edges parked
 

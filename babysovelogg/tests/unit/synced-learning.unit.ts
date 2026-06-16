@@ -7,6 +7,11 @@ import type { SleepEntry, BabyContext } from "$lib/types.js";
 // natural rhythm, so WW learning must ignore it — otherwise a week of accepted
 // nudges would teach a false wake window. This is the highest-value Phase-4
 // correctness test.
+//
+// NOTE: these exercise the schedule HELPERS with hand-built SleepEntry. The flag
+// only protects production if it survives the SleepLogRow→SleepEntry mapper
+// (`toSleepEntry`) — which it once didn't, silently killing the whole feature.
+// The end-to-end pin through assembleState lives in overlap-simulation.unit.ts.
 
 const T = (h: number, m = 0) =>
   `2026-03-26T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00.000Z`;

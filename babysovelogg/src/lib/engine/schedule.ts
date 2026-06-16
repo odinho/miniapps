@@ -1976,6 +1976,13 @@ function collectHabitualNapData(
     let pos = 0;
     for (const s of daySleeps) {
       if (s.type !== "nap") continue;
+      // A synced (nudge-accepted) start is parent policy, not the baby's natural
+      // rhythm — keep the position counter advancing but don't learn its habitual
+      // clock time, mirroring the wake-window learners (guardrail 5).
+      if (s.synced) {
+        pos++;
+        continue;
+      }
       const minuteOfDay = getMinuteOfDayInTz(new Date(s.startMs), ctx.tz);
       if (!startSamples.has(pos)) startSamples.set(pos, []);
       startSamples.get(pos)!.push({ value: minuteOfDay, weight: recencyWeight });
@@ -1996,6 +2003,10 @@ function collectHabitualNapData(
     let napPos = 0;
     for (let i = 0; i < daySleeps.length; i++) {
       if (daySleeps[i].type !== "nap") continue;
+      if (daySleeps[i].synced) {
+        napPos++;
+        continue;
+      }
       const prevEndMs = i > 0 ? daySleeps[i - 1].endMs : prevSleepEndMs;
       if (prevEndMs !== undefined) {
         const gapMin = (daySleeps[i].startMs - prevEndMs) / 60000;

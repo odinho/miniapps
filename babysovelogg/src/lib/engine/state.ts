@@ -96,6 +96,7 @@ function toSleepEntry(s: SleepLogRow): SleepEntry {
     end_time: s.end_time,
     type: s.type as SleepEntry["type"],
     woke_by: wokeBy,
+    synced: s.synced,
   };
 }
 
