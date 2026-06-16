@@ -88,17 +88,6 @@ the flag (now fixed) — and that the habitual nap-start learner lacked the skip
   — the unit sim shows the fixture is fiddly (SD must land ~30-39 for a usable
   ±1σ window that isn't low-confidence-blocked).
 
-## E2E/integration: multi-child `bothAsleep` roll-up is wall-clock-fragile
-
-`tests/integration/multi-child.test.ts` "family roll-up: bothAsleep needs both
-children down" posts active sleeps at hard-coded `2026-06-14T09:30/09:40Z` with no
-end, then asserts `bothAsleep=true`. Once the real clock is >24h past those starts
-(i.e. from 2026-06-15 on) the engine classifies them as stale and hides them, so
-`bothAsleep` reads false and the test fails — independent of any code change
-(verified failing on clean `main`). Same class as the arc-scenes/B18 fragility.
-Fix: thread a pinned `now` into the family roll-up path under test (or use
-relative-to-now start times) so it's clock-independent.
-
 ## Handoff timeline: pre-midnight non-overnight blocks dropped (P3-4)
 
 The family handoff (`src/lib/handoff.ts`) builds its 6h window from the

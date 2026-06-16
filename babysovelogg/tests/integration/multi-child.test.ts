@@ -207,15 +207,20 @@ test("family roll-up: bothAsleep needs both children down", async () => {
   const ada = createBaby("Ada", "2025-06-12");
   const bo = createBaby("Bo", "2025-06-12");
 
+  // Anchor the active sleeps to NOW (a forgotten >24h-old open sleep is hidden
+  // as stale) so the assertion is clock-independent rather than going red once
+  // the real date passes a hard-coded start by a day.
+  const now = Date.now();
+
   expect(await renderFamily()).toBe("twin=true override=null bothAsleep=false firstWake=none");
 
   await postEvents([
-    makeEvent("sleep.started", { babyId: ada, startTime: "2026-06-14T09:30:00.000Z", type: "nap", sleepDomainId: generateSleepId() }),
+    makeEvent("sleep.started", { babyId: ada, startTime: new Date(now - 40 * 60_000).toISOString(), type: "nap", sleepDomainId: generateSleepId() }),
   ]);
   expect(await renderFamily()).toContain("bothAsleep=false");
 
   await postEvents([
-    makeEvent("sleep.started", { babyId: bo, startTime: "2026-06-14T09:40:00.000Z", type: "nap", sleepDomainId: generateSleepId() }),
+    makeEvent("sleep.started", { babyId: bo, startTime: new Date(now - 30 * 60_000).toISOString(), type: "nap", sleepDomainId: generateSleepId() }),
   ]);
   expect(await renderFamily()).toContain("bothAsleep=true");
 });
