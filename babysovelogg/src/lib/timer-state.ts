@@ -122,7 +122,8 @@ export function getTimerMode(input: TimerInput): TimerMode {
 			: null;
 
 		// Sleep cycle phase (only for naps — night cycles are different)
-		const cycleMin = prediction?.learnedSchedule?.sleepCycleMin ?? 45;
+		const ls = prediction?.learnedSchedule;
+		const cycleMin = ls?.sleepCycle?.minutes ?? ls?.sleepCycleMin ?? 45;
 		const cyclePhase = activeSleep.type === 'nap' ? computeCyclePhase(elapsed, cycleMin) : null;
 
 		return { kind: 'sleeping', label, elapsed, startTime: activeSleep.start_time, expectedWake, expectedWakeCountdown, cyclePhase };
@@ -148,7 +149,8 @@ export function getTimerMode(input: TimerInput): TimerMode {
 	// nap that would START 90 min before bedtime would also END too
 	// close, so we treat that whole window as bedtime territory.
 	const closeToBedtime = bedtimeMs != null && bedtimeMs - now < 90 * 60_000;
-	const cycleMin = prediction?.learnedSchedule?.sleepCycleMin ?? 45;
+	const lsCycle = prediction?.learnedSchedule;
+	const cycleMin = lsCycle?.sleepCycle?.minutes ?? lsCycle?.sleepCycleMin ?? 45;
 
 	// Newborn: always use sleep window mode.
 	// Emerging: use sleep window when schedule has no nextNap AND bedtime

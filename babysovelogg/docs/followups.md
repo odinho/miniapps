@@ -83,8 +83,6 @@ is for tracked product/engine/test work.
 - **Stats full-history fetch silently caps per child.** `loadFullHistory()`
   requests `limit=10000` but the API clamps to 1000 rows/child. Paginate or
   raise the stats-read cap.
-- **`charts/types.ts` partly speculative.** Only `LegendItem` is consumed;
-  components use inline prop types. Trim the unused abstract model types.
 - **Server-TZ leaks in sibling helpers.** Thread baby/family tz into
   `classifySleepType`/`classifySleepTypeByHour`, `calculateAgeMonths`, and
   `computeStrategySignals` (still use process/client-local calendar fields).
@@ -95,9 +93,6 @@ is for tracked product/engine/test work.
   `stores/app.svelte.ts`.
 - **Low-confidence firm caps.** Optionally cap low-confidence napBudget
   urgency at `advisory` in `engine/nap-budget.ts`.
-- **Legacy `sleepCycleMin` scalar.** Migrate `timer-state.ts:117,143` to
-  `sleepCycle?.minutes ?? sleepCycleMin ?? 45`, then drop the scalar after a
-  cache-compat window.
 - **Rescue vs napBudget arbitration.** `state.ts:377` nulls `rescueNap`
   unconditionally when `napBudget` exists. Compare wake targets, prefer the
   earlier/safer action, surface the reason.
