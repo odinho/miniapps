@@ -422,12 +422,12 @@ describe('buildComparisonTable', () => {
 		expect(night?.today).toBe('12t50');
 		const total = rows.find(r => r.label === 'Søvn totalt');
 		expect(total?.today).toBe('14t43');
-		const trend = rows.find(r => r.label === 'Trendmål (7d/30d)');
+		const trend = rows.find(r => r.label === 'Snitt siste 7d/30d');
 		expect(trend?.today).toBe('13t');
 		expect(trend?.learned).toBe('—');
 	});
 
-	it('omits Trendmål row when trend is null (sparse data)', () => {
+	it('omits the 7d/30d average row when trend is null (sparse data)', () => {
 		const rows = buildComparisonTable(
 			9,
 			{
@@ -445,6 +445,6 @@ describe('buildComparisonTable', () => {
 				dailyTrendTotalMin: null,
 			},
 		);
-		expect(rows.some(r => r.label === 'Trendmål (7d/30d)')).toBe(false);
+		expect(rows.some(r => r.label === 'Snitt siste 7d/30d')).toBe(false);
 	});
 });

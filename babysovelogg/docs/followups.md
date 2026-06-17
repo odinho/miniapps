@@ -87,10 +87,6 @@ is for tracked product/engine/test work.
   `classifySleepType`/`classifySleepTypeByHour`, `calculateAgeMonths`, and
   `computeStrategySignals` (still use process/client-local calendar fields).
   See [[feedback_server_tz]].
-- **"Trendmål" copy audit.** Make "Trendmål" mean the intervention target
-  everywhere it's a target, and "Snitt siste 7d/30d" where it's a stat.
-  Sweep `routes/+page.svelte`, `routes/stats/+page.svelte`,
-  `stores/app.svelte.ts`.
 - **Low-confidence firm caps.** Optionally cap low-confidence napBudget
   urgency at `advisory` in `engine/nap-budget.ts`.
 - **Rescue vs napBudget arbitration.** `state.ts:377` nulls `rescueNap`

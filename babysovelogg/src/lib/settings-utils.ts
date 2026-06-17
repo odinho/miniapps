@@ -345,12 +345,13 @@ export function buildComparisonTable(
 	});
 
 	if (today?.dailyTrendTotalMin != null) {
-		// Trendmål has no per-day "today" value — the trend IS the multi-day
-		// number. Surface it as the punchline in the today slot so the row
-		// reads naturally against the others, with the label carrying the
-		// time-window framing.
+		// Observed multi-day average (not a target) — there's no per-day "today"
+		// value, the average IS the multi-day number. Surfaced in the today slot
+		// so the row reads naturally against the others. Labelled as a stat
+		// ("Snitt siste 7d/30d"); the engine's "Trendmål" (intervention target)
+		// is the napBudget banner copy, not this descriptive average.
 		pushRow({
-			label: 'Trendmål (7d/30d)',
+			label: 'Snitt siste 7d/30d',
 			today: fc(today.dailyTrendTotalMin),
 			learned: '—',
 			norm: '—',

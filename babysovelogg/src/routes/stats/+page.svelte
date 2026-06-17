@@ -241,7 +241,7 @@
 						«Lærd typisk» er det appen har lært frå dei siste 7 dagane.
 						«Norm» er publiserte aldersnormer (Galland 2012, AAP). Når barnet har eit anna
 						lurmønster enn alderssnittet, viser me begge normsetta inline.
-						{#if hasTodayColumn}Trendmål er glidande snitt over 7d/30d som engine brukar som «dagsmål».{/if}
+						{#if hasTodayColumn}«Snitt siste 7d/30d» er det glidande gjennomsnittet av faktisk søvn — eit mål på kor barnet ligg, ikkje eit dagsmål.{/if}
 					</p>
 				</details>
 			</div>

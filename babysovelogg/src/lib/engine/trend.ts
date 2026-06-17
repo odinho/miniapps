@@ -97,7 +97,7 @@ export function computeBlendedTrend(
 
 /**
  * The blended 7d / 30d trend total (minutes), age-norm clamped. Exposed
- * so UI surfaces (the stats comparison table's Trendmål row) and consumers
+ * so UI surfaces (the stats comparison table's "Snitt siste 7d/30d" row) and consumers
  * like the cut-short censor can compare a day's total against the *actual*
  * daily target — not the conservative age-band floor.
  *

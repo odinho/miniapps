@@ -107,8 +107,8 @@ export interface Prediction {
 	/**
 	 * Blended 7d/30d daily-total trend (minutes), age-norm clamped. Same
 	 * number the napBudget feature uses to decide whether to cap. Surfaced
-	 * to UI for the stats comparison table's "Trendmål" row so parents see
-	 * the engine's real target alongside age-norm and learned-typical
+	 * to UI for the stats comparison table's "Snitt siste 7d/30d" row so
+	 * parents see the observed average alongside age-norm and learned-typical
 	 * totals. Null when trend data is too sparse (<7 complete days) or too
 	 * noisy (stdev/mean above threshold).
 	 */
