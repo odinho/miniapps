@@ -89,8 +89,6 @@ is for tracked product/engine/test work.
   anomalies. Original repro in `archive/BUGS-2026-04.md` (row id=245,
   `slp_import_613`).
 
-## Quick wins
-
 ## Parked (keep — has a concrete future trigger)
 
 - **`getLearnedBedtimeWakeWindow` robustness — DO NOT re-ship blind.** The
