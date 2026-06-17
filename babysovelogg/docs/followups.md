@@ -90,9 +90,6 @@ is for tracked product/engine/test work.
   reads `todayWakeUp.wake_time` from the pre-midnight overnight, but
   `todaySleeps` only has `start_time >= midnight` (`server/state.ts:57-75`,
   handler `+page.svelte:318`). Tap misses / opens wrong dialog.
-- **`isLastNapOfDay` derived after UI filtering.** `state.ts:458-547` computes
-  it against the display-filtered set, so a not-actually-last nap can become
-  "last". Compute before filtering.
 - **Arc time math uses browser-local TZ.** `arc-utils.ts` `hourOfDay`/configs
   use `Date.getHours()`; travel/remote-browser shifts arc geometry while
   predictions stay baby-tz. Use baby/family tz.

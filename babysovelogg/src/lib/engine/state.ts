@@ -616,8 +616,13 @@ function derivePostPlanFields(input: PostPlanInput): PostPlanOutput {
     : null;
 
   // ── napBudget + arbitration ──
+  // "Last nap of the day" keys off the planner's *unfiltered* remaining naps
+  // (`remaining` = naps after the active one, since consumedNaps counts the
+  // active nap), NOT the display-filtered `predictedNaps`. A genuine later nap
+  // that's dropped from display for landing within 60 min of bedtime must not
+  // falsely promote the active nap to "last" — that would mis-gate napBudget.
   const isActiveNap = activeSleep?.type === "nap" && !activeSleep.end_time;
-  const isLastNapOfDay = isActiveNap && (!predictedNaps || predictedNaps.length === 0);
+  const isLastNapOfDay = isActiveNap && remaining.length === 0;
   const napBudget = isActiveNap && isLastNapOfDay && bedtime
     ? computeNapBudget({
         activeNap: activeSleep,
