@@ -272,13 +272,41 @@ describe("computeNapBudget — emits a cap when over trend", () => {
     expect(out!.recommendedDurationMin).toBeGreaterThanOrEqual(floorMin);
   });
 
-  it("urgency is `firm` when projected overshoot exceeds tolerance", () => {
+  it("urgency is `firm` when projected overshoot exceeds tolerance (confident target)", () => {
     // Banked night 12h → projection if uncapped at 90 min nap = 13.5h. Trend
-    // ~13h → overshoot ~30 min > 20 (TOLERANCE_MIN) → firm.
+    // ~13h → overshoot ~30 min > 20 (TOLERANCE_MIN). With a medium-confidence
+    // held target this promotes to firm; a low-confidence target would not
+    // (see the advisory-on-low-confidence pin below).
+    const s = halldisScenario({ bankedNightMin: 720 });
+    const mediumTrend = {
+      observedRecentMin: 780,
+      interventionTargetMin: 780,
+      interventionConfidence: "medium" as const,
+      observedSourceLabel: "stub",
+      interventionSourceLabel: "stub",
+      mean7: 780,
+      mean30: 780,
+      diagnostics: {} as unknown as TrendTargets["diagnostics"],
+      state: {} as unknown as TrendTargets["state"],
+    };
+    const out = computeNapBudget({
+      ...s,
+      ctx: ctx({ trendSleeps: s.trendSleeps, trendTargets: mediumTrend }),
+      isLastNapOfDay: true,
+      optedIn: true,
+    });
+    expect(out).not.toBeNull();
+    expect(out!.urgency).toBe("firm");
+  });
+
+  it("urgency stays `advisory` on a low-confidence held target despite overshoot", () => {
+    // Same overshoot as above, but a freshly-seeded (no prior state) target is
+    // low-confidence — we don't fire a push ("wake the baby") off a shaky
+    // number, so urgency is held at advisory.
     const s = halldisScenario({ bankedNightMin: 720 });
     const out = computeNapBudget({ ...s, isLastNapOfDay: true, optedIn: true });
     expect(out).not.toBeNull();
-    expect(out!.urgency).toBe("firm");
+    expect(out!.urgency).toBe("advisory");
   });
 
   it("urgency is `advisory` when overshoot is within tolerance", () => {
@@ -811,11 +839,11 @@ describe("computeNapBudget — multi-day simulation", () => {
     }
 
     expect(trail.join("\n")).toMatchInlineSnapshot(`
-      "day 0: night=732m wakeBy=09:28Z cap=58m mode=first-contact urgency=firm trend=778
-      day 1: night=732m wakeBy=09:28Z cap=58m mode=first-contact urgency=firm trend=778
-      day 2: night=732m wakeBy=09:28Z cap=58m mode=first-contact urgency=firm trend=778
-      day 3: night=732m wakeBy=09:28Z cap=58m mode=first-contact urgency=firm trend=778
-      day 4: night=732m wakeBy=09:28Z cap=58m mode=first-contact urgency=firm trend=779"
+      "day 0: night=732m wakeBy=09:28Z cap=58m mode=first-contact urgency=advisory trend=778
+      day 1: night=732m wakeBy=09:28Z cap=58m mode=first-contact urgency=advisory trend=778
+      day 2: night=732m wakeBy=09:28Z cap=58m mode=first-contact urgency=advisory trend=778
+      day 3: night=732m wakeBy=09:28Z cap=58m mode=first-contact urgency=advisory trend=778
+      day 4: night=732m wakeBy=09:28Z cap=58m mode=first-contact urgency=advisory trend=779"
     `);
 
     // Dimensional invariant: across all 5 days × 3 evaluations per day,
@@ -878,9 +906,11 @@ describe("computeNapBudget — real Halldis data (regression net)", () => {
     expect(out!.recommendedDurationMin).toBe(55);
     expect(out!.mode).toBe("first-contact");
     expect(out!.reason).toBe("over_trend");
-    // Urgency is firm because the uncapped projection (banked + 90 min
-    // typical-full-nap remaining) overshoots trend by > TOLERANCE_MIN.
-    expect(out!.urgency).toBe("firm");
+    // The uncapped projection (banked + 90 min typical-full-nap remaining)
+    // overshoots trend by > TOLERANCE_MIN, but this fixture has no persisted
+    // trend-target state, so the held target is low-confidence — we hold at
+    // advisory (no push) rather than fire a notification off a shaky target.
+    expect(out!.urgency).toBe("advisory");
     expect(out!.cycleNudge).not.toBeNull();
     expect(out!.cycleNudge!.boundaryAtMin).toBe(55);
     // Context: blended trend ~13h, banked = 746 night + 25 elapsed = 771.

@@ -91,8 +91,6 @@ is for tracked product/engine/test work.
 
 ## Quick wins
 
-- **Low-confidence firm caps.** Optionally cap low-confidence napBudget
-  urgency at `advisory` in `engine/nap-budget.ts`.
 ## Parked (keep — has a concrete future trigger)
 
 - **`getLearnedBedtimeWakeWindow` robustness — DO NOT re-ship blind.** The

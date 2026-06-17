@@ -233,9 +233,17 @@ export function computeNapBudget(input: ComputeNapBudgetInput): NapBudget | null
   //    > TOLERANCE_MIN beyond trend. The cap may bring today close to
   //    target, but the parent needs to act on it; firm reflects the
   //    severity of the would-be miss. Advisory otherwise.
+  //    A low-confidence held target can't justify a push ("wake the baby"):
+  //    if we're not sure the target is right, stay in-app advisory rather than
+  //    firing a notification off a shaky number. `medium` is reachable for a
+  //    well-logged baby (self-woke evidence / natural-days), so firm still
+  //    fires when it matters.
   const overshootIfUncapped = projectedIfRunsFull - trend.blendedTrendMin;
   const urgency: NapBudget["urgency"] =
-    overshootIfUncapped > NAP_BUDGET.TOLERANCE_MIN ? "firm" : "advisory";
+    overshootIfUncapped > NAP_BUDGET.TOLERANCE_MIN &&
+    trendTargets.interventionConfidence !== "low"
+      ? "firm"
+      : "advisory";
 
   const wakeByMs = napStartMs + cappedDurationMin * 60_000;
   return {
