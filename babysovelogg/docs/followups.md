@@ -93,10 +93,6 @@ is for tracked product/engine/test work.
 
 - **Low-confidence firm caps.** Optionally cap low-confidence napBudget
   urgency at `advisory` in `engine/nap-budget.ts`.
-- **"Give up and try later" guidance.** When `awakeMs > nextNap + ~20min` and
-  no active sleep, surface a directive "vurder å gi seg og prøv igjen om ~20
-  min" banner. Ties into existing overdue logic; consider a per-baby latency
-  threshold.
 ## Parked (keep — has a concrete future trigger)
 
 - **`getLearnedBedtimeWakeWindow` robustness — DO NOT re-ship blind.** The

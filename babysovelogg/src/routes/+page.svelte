@@ -868,6 +868,22 @@
 			</div>
 		{/if}
 
+		{#if displayPrediction?.nextNap
+			&& !activeSleep
+			&& !displayPrediction.skippedNap
+			&& !displayPrediction.napsAllDone
+			&& displayPrediction.nextNap !== displayPrediction.bedtime}
+			{@const overdueMs = now - new Date(displayPrediction.nextNap).getTime()}
+			{#if overdueMs > 20 * 60_000}
+				<div class="give-up-banner" data-testid="give-up-banner">
+					<div class="give-up-title">😮‍💨 Vurder å gi deg</div>
+					<div class="give-up-body">
+						Det er {formatDuration(overdueMs)} sidan det planlagde luretidspunktet og ho har ikkje sovna. Blir de begge slitne, gi deg og prøv igjen om ~20 min — fortsett ikkje for kvar pris.
+					</div>
+				</div>
+			{/if}
+		{/if}
+
 		{#if showContextCard && prediction}
 			<ContextCard {prediction} {ageMonths} birthdate={baby.birthdate} />
 		{/if}

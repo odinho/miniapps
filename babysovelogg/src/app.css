@@ -1120,6 +1120,28 @@ html, body {
   line-height: 1.3;
 }
 
+/* Soft "you've been trying too long" nudge for the 20–60 min overdue window
+   (before the skipped-nap surface takes over at 60 min). Advisory tone. */
+.give-up-banner {
+  background: var(--lavender);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin: 8px 0 4px;
+}
+
+.give-up-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.give-up-body {
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--text-light);
+}
+
 /* --- Off-day toggle (sick/travel/spurt/DST — skipped from trend) --- */
 .off-day-btn {
   width: 100%;
