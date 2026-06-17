@@ -526,7 +526,7 @@
 			>
 				<h2 style="font-size: 1.1rem; margin-bottom: 8px;">Tvillingar eller søsken</h2>
 				<div style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 12px;">
-					Tvillingmodus viser «Sove/Vakne begge» og samkøyring. Auto gjettar ut frå
+					Tvillingmodus viser «Både sove / Både vakna» og samkøyring. Auto gjettar ut frå
 					alder; overstyr om gjettet er feil.
 				</div>
 				<div class="type-pills" data-testid="family-mode-pills">

@@ -267,7 +267,7 @@
 						</div>
 						<div class="comparison-row-norm">
 							{#if row.today != null && row.learned !== '—'}
-								Lærd typisk {row.learned}{#if normLine} · {normLine}{/if}
+								Lærd typisk {row.learned}{#if normLine}{' '}· {normLine}{/if}
 							{:else if normLine}
 								{normLine}
 							{/if}

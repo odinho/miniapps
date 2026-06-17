@@ -3,8 +3,10 @@
 	import { sync } from '$lib/stores/sync.svelte.js';
 	import { buildStartSleep, buildEndSleep } from '$lib/sleep-actions.js';
 	import SleepButton from './SleepButton.svelte';
+	import Arc from './Arc.svelte';
 	import { formatTime, formatDurationCompact, formatDuration } from '$lib/utils.js';
 	import { getLaneStatus } from '$lib/lane-status.js';
+	import { buildArcProps } from '$lib/arc-props.js';
 	import { getCombinedStatus } from '$lib/family.js';
 	import FamilyHandoff from './FamilyHandoff.svelte';
 
@@ -65,7 +67,7 @@
 			}
 			if (events.length) {
 				await sync.sendEvents(events);
-				onUndo('Sove begge', undo, corrections.length > 1 ? corrections : undefined);
+				onUndo('Begge sovna', undo, corrections.length > 1 ? corrections : undefined);
 			}
 		} finally {
 			busy = false;
@@ -90,7 +92,7 @@
 			}
 			if (events.length) {
 				await sync.sendEvents(events);
-				onUndo('Vakne begge', undo, corrections.length > 1 ? corrections : undefined);
+				onUndo('Begge vakna', undo, corrections.length > 1 ? corrections : undefined);
 			}
 		} finally {
 			busy = false;
@@ -102,7 +104,7 @@
 	{#if combined}
 		<p class="family-status" data-testid="combined-status">
 			{#if combined.kind === 'both-asleep'}
-				Begge søv.{#if combined.firstWake} Fyrste venta vakning: {combined.firstWake.name} {combined.firstWake.inMs >= 60_000 ? `om ${formatDuration(combined.firstWake.inMs)}` : 'når som helst'}.{/if}
+				Begge søv.{#if combined.firstWake}{' '}Fyrste venta vakning: {combined.firstWake.name} {combined.firstWake.inMs >= 60_000 ? `om ${formatDuration(combined.firstWake.inMs)}` : 'når som helst'}.{/if}
 			{:else if combined.kind === 'both-awake'}
 				Begge vakne.
 			{:else}
@@ -110,45 +112,51 @@
 			{/if}
 		</p>
 	{/if}
-	<div class="family-lanes">
+	<div class="family-cards">
 		{#each babies as b (b.baby?.id)}
 			{#if b.baby}
 				{@const baby = b.baby}
 				{@const status = getLaneStatus(b, now)}
-				<div class="lane" data-testid="baby-lane">
-					<button class="lane-info" onclick={() => onFocus(baby.id)} data-testid="lane-focus">
-						<span class="lane-name" data-testid="lane-name">{baby.name}</span>
-						<span
-							class="lane-status"
-							class:lane-status-stale={status.kind === 'stale'}
-							data-testid="lane-status"
-						>
+				{@const arc = buildArcProps(b, now)}
+				<div class="fam-card" data-testid="baby-lane">
+					<div class="fam-card-head">
+						<button class="fam-name-btn" onclick={() => onFocus(baby.id)} data-testid="lane-focus">
+							<span class="fam-name" data-testid="lane-name">{baby.name}</span>
+							<span class="fam-go" aria-hidden="true">›</span>
+						</button>
+						<SleepButton
+							activeSleep={b.activeSleep}
+							todaySleeps={b.todaySleeps}
+							ageMonths={b.ageMonths}
+							{baby}
+							napsAllDone={b.prediction?.napsAllDone && b.prediction?.postSkipPlan?.kind !== 'rescue'}
+							wakeCapActive={!!(
+								b.activeSleep &&
+								!b.activeSleep.end_time &&
+								b.activeSleep.type === 'nap' &&
+								(b.prediction?.napBudget || b.prediction?.rescueNap)
+							)}
+							onSleepStarted={(id) =>
+								onUndo('Søvn starta', [{ type: 'sleep.deleted', payload: { sleepDomainId: id } }])}
+							onSleepEnded={(id) =>
+								onUndo('Søvn avslutta', [{ type: 'sleep.restarted', payload: { sleepDomainId: id } }])}
+						/>
+					</div>
+
+					<button class="fam-arc-wrap" onclick={() => onFocus(baby.id)} aria-label="Opne {baby.name}" data-testid="lane-arc">
+						<Arc {...arc} nowMs={now} />
+						<span class="fam-arc-center" data-testid="lane-status" class:stale={status.kind === 'stale'}>
 							{#if status.kind === 'stale'}
-								⚠️ Sjekk vaknetid
+								<span class="fam-arc-main">⚠️ Sjekk vaknetid</span>
 							{:else if status.kind === 'asleep'}
-								Søv {formatDurationCompact(status.sinceMs)}{#if status.expectedWake} · vaknar ~{formatTime(status.expectedWake)}{/if}
+								<span class="fam-arc-main">Søv {formatDurationCompact(status.sinceMs)}</span>
+								{#if status.expectedWake}<span class="fam-arc-sub">vaknar ~{formatTime(status.expectedWake)}</span>{/if}
 							{:else}
-								Vaken{#if status.sinceMs} {formatDurationCompact(status.sinceMs)}{/if}{#if status.next} · {status.next.kind === 'nap' ? 'lur' : 'leggetid'} ~{formatTime(status.next.at)}{/if}
+								<span class="fam-arc-main">Vaken{#if status.sinceMs}{' '}{formatDurationCompact(status.sinceMs)}{/if}</span>
+								{#if status.next}<span class="fam-arc-sub">{status.next.kind === 'nap' ? 'lur' : 'leggetid'} ~{formatTime(status.next.at)}</span>{/if}
 							{/if}
 						</span>
 					</button>
-					<SleepButton
-						activeSleep={b.activeSleep}
-						todaySleeps={b.todaySleeps}
-						ageMonths={b.ageMonths}
-						{baby}
-						napsAllDone={b.prediction?.napsAllDone && b.prediction?.postSkipPlan?.kind !== 'rescue'}
-						wakeCapActive={!!(
-							b.activeSleep &&
-							!b.activeSleep.end_time &&
-							b.activeSleep.type === 'nap' &&
-							(b.prediction?.napBudget || b.prediction?.rescueNap)
-						)}
-						onSleepStarted={(id) =>
-							onUndo('Søvn starta', [{ type: 'sleep.deleted', payload: { sleepDomainId: id } }])}
-						onSleepEnded={(id) =>
-							onUndo('Søvn avslutta', [{ type: 'sleep.restarted', payload: { sleepDomainId: id } }])}
-					/>
 				</div>
 			{/if}
 		{/each}
@@ -158,12 +166,12 @@
 		<div class="family-bulk" data-testid="family-bulk">
 			{#if anyAwake}
 				<button class="btn btn-primary" data-testid="sleep-both" onclick={sleepBoth} disabled={busy}>
-					🌙 Sove begge
+					🌙 Både sove
 				</button>
 			{/if}
 			{#if anyAsleep}
 				<button class="btn btn-primary" data-testid="wake-both" onclick={wakeBoth} disabled={busy}>
-					☀️ Vakne begge
+					☀️ Både vakna
 				</button>
 			{/if}
 		</div>
@@ -185,45 +193,88 @@
 		font-size: 0.95rem;
 		color: var(--text);
 	}
-	.family-lanes {
+	.family-cards {
 		display: flex;
 		flex-direction: column;
-		gap: 12px;
+		gap: 16px;
 	}
-	.lane {
+	.fam-card {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 16px 16px 20px;
+		background: var(--cream);
+		border: 1px solid var(--cream-dark);
+		border-radius: 20px;
+		box-shadow: var(--shadow);
+	}
+	.fam-card-head {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: 12px;
-		padding: 16px;
-		background: var(--cream);
-		border: 1px solid var(--cream-dark);
-		border-radius: 16px;
 	}
-	.lane-info {
+	.fam-name-btn {
 		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 2px;
+		align-items: center;
+		gap: 4px;
+		background: none;
+		border: none;
+		padding: 4px 0;
+		font: inherit;
+		color: var(--text);
+		cursor: pointer;
+		flex: 1;
+		min-width: 0;
+	}
+	.fam-name {
+		font-size: 1.35rem;
+		font-weight: 600;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.fam-go {
+		font-size: 1.2rem;
+		color: var(--text-light);
+		line-height: 1;
+	}
+	/* The round graph, with the live status floated in its hollow centre —
+	   mirrors the single-baby dashboard's arc + timer. */
+	.fam-arc-wrap {
+		position: relative;
+		width: 100%;
+		max-width: 300px;
+		margin: 0 auto;
+		aspect-ratio: 1;
 		background: none;
 		border: none;
 		padding: 0;
-		font: inherit;
-		text-align: left;
 		cursor: pointer;
-		flex: 1;
+		display: block;
 	}
-	.lane-name {
-		font-size: 1.25rem;
+	.fam-arc-center {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 2px;
+		pointer-events: none;
+		text-align: center;
+	}
+	.fam-arc-main {
+		font-size: 1.05rem;
 		font-weight: 600;
+		color: var(--text);
 	}
-	.lane-status {
-		font-size: 0.85rem;
+	.fam-arc-sub {
+		font-size: 0.8rem;
 		color: var(--text-light);
 	}
-	.lane-status-stale {
+	.fam-arc-center.stale .fam-arc-main {
 		color: var(--danger, #c0392b);
-		font-weight: 600;
 	}
 	.family-bulk {
 		display: flex;

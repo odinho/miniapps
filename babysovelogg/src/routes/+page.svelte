@@ -5,6 +5,7 @@
 	import { appState } from '$lib/stores/app.svelte.js';
 	import { sync } from '$lib/stores/sync.svelte.js';
 	import Arc from '$lib/components/Arc.svelte';
+	import { buildArcProps } from '$lib/arc-props.js';
 	import Timer from '$lib/components/Timer.svelte';
 	import SleepButton from '$lib/components/SleepButton.svelte';
 	import TagSheet from '$lib/components/TagSheet.svelte';
@@ -292,133 +293,8 @@
 		return () => clearInterval(iv);
 	});
 
-	// Adapt types for Arc.svelte which expects narrower types than AppState provides
-	const arcSleeps = $derived(
-		todaySleeps.map((sl) => ({
-			start_time: sl.start_time,
-			end_time: sl.end_time,
-			type: sl.type as 'nap' | 'night',
-		})),
-	);
-	const arcActiveSleep = $derived(
-		activeSleep && !activeSleep.end_time
-			? {
-					start_time: activeSleep.start_time,
-					type: activeSleep.type as 'nap' | 'night',
-				}
-			: null,
-	);
-	const arcPrediction = $derived(
-		prediction?.nextNap
-			? {
-					nextNap: prediction.nextNap,
-					bedtime: prediction.bedtime ?? undefined,
-					predictedNaps: prediction.predictedNaps ?? undefined,
-				}
-			: null,
-	);
-	const arcNapConfidenceBands = $derived(
-		prediction?.confidence?.napRanges.map((nr) => ({
-			lo: nr.startRange.lo,
-			hi: nr.startRange.hi,
-		})) ?? [],
-	);
-	const arcNightWakings = $derived(
-		todayNightWakings.map((w) => ({
-			startTime: w.start_time,
-			endTime: w.end_time,
-			domainId: w.domain_id,
-		})),
-	);
-
-	// Active-sleep progress meter: predicted wake + ±1 SD band.
-	//
-	// When the engine has emitted an actionable wake recommendation
-	// (napBudget cap for over-trend days, rescueNap cap for short-prior /
-	// extra naps) we point the arc at *that* deadline instead of the
-	// natural expected wake — otherwise the marker on the arc tells the
-	// parent one time and the banner tells them another. The natural
-	// expected wake is only used when no cap is in play.
-	//
-	// Band: a ±1 SD natural-wake band makes sense around a *predicted*
-	// wake. A cap is a deadline, not a range; we hide the band when a cap
-	// overrides so the arc stops painting a phantom natural window past
-	// the actionable target.
-	const arcActiveWakeOverride = $derived.by(() => {
-		if (!arcActiveSleep || !displayPrediction) return null;
-		if (arcActiveSleep.type === 'nap' && displayPrediction.napBudget?.wakeBy) {
-			return displayPrediction.napBudget.wakeBy;
-		}
-		if (displayPrediction.rescueNap?.recommendedWakeTime) {
-			return displayPrediction.rescueNap.recommendedWakeTime;
-		}
-		return null;
-	});
-	const arcActiveWakeAt = $derived.by(() => {
-		if (!arcActiveSleep || !prediction) return null;
-		if (arcActiveWakeOverride) return arcActiveWakeOverride;
-		if (prediction.expectedWakeRange) return prediction.expectedWakeRange.point;
-		return arcActiveSleep.type === 'night'
-			? prediction.expectedNightEnd
-			: prediction.expectedNapEnd;
-	});
-	const arcActiveWakeBand = $derived(
-		arcActiveSleep && prediction?.expectedWakeRange && !arcActiveWakeOverride
-			? { lo: prediction.expectedWakeRange.lo, hi: prediction.expectedWakeRange.hi }
-			: null,
-	);
-
-	// Skipped-nap visuals: keep the missed slot on the arc + render the rescue
-	// window when the engine suggests one. Earlier-bedtime suggestions live in
-	// the Timer, not the arc (they're a time shift, not a new blob).
-	const arcSkippedNap = $derived(displayPrediction?.skippedNap ?? null);
-	// Arc rescue blob spans the recommended start → wake-by cap, mirroring the
-	// "put down kl. X, vekk innan Y" Timer copy.
-	const arcRescueWindow = $derived(
-		displayPrediction?.postSkipPlan?.kind === 'rescue'
-			? { earliest: displayPrediction.postSkipPlan.recommendedStart, latest: displayPrediction.postSkipPlan.wakeBy }
-			: null,
-	);
-
-	// Arc endpoint ISO anchors. The Arc uses these BOTH as displayed labels and
-	// as the time-window the time→fraction math runs in — so an active sleep
-	// starting at the bedtime label sits at the start endpoint instead of
-	// floating up the arc (2026-05-21 bug). Day arcs use bedtime on the end.
-	const arcBedtimeIso = $derived.by(() => {
-		if (isNightMode) {
-			const nightSleep = activeSleep?.type === 'night' ? activeSleep :
-				todaySleeps.toReversed().find(sl => sl.type === 'night');
-			if (nightSleep) return nightSleep.start_time;
-			// No logged night yet: predicted bedtime is the next-best anchor.
-			return prediction?.bedtime ?? null;
-		}
-		// Day arc end = predicted bedtime (when available).
-		return isNewborn ? null : prediction?.bedtime ?? null;
-	});
-	const arcNightEndIso = $derived(
-		isNightMode ? prediction?.expectedNightEnd ?? null : null,
-	);
-
-	const arcStartLabel = $derived.by(() => {
-		if (isNightMode) {
-			// Night: only show a label when we have a logged sleep — predicted bedtimes
-			// shouldn't impersonate "this is when she went to bed".
-			const nightSleep = activeSleep?.type === 'night' ? activeSleep :
-				todaySleeps.toReversed().find(sl => sl.type === 'night');
-			return nightSleep ? formatTime(nightSleep.start_time) : null;
-		}
-		// Day: start = wake-up time
-		return todayWakeUp?.wake_time ? formatTime(todayWakeUp.wake_time) : null;
-	});
-
-	const arcEndLabel = $derived.by(() => {
-		if (isNightMode) {
-			if (prediction?.expectedNightEnd) return formatTime(prediction.expectedNightEnd);
-			return null;
-		}
-		if (isNewborn) return null;
-		return prediction?.bedtime ? formatTime(prediction.bedtime) : null;
-	});
+	// Arc graph props come from the shared builder (buildArcProps) so the
+	// multi-baby family lanes render an identical graph. Defined after `now`.
 
 	// --- live stats (includes active sleep contribution) ---
 	let now = $state(Date.now());
@@ -427,6 +303,9 @@
 		const iv = setInterval(() => { now = Date.now(); }, ms);
 		return () => clearInterval(iv);
 	});
+
+	// Single source of truth for the arc graph, shared with the family lanes.
+	const arc = $derived(buildArcProps(s, now));
 
 	const liveNapCount = $derived.by(() => {
 		const base = stats?.napCount ?? 0;
@@ -859,21 +738,8 @@
 		<!-- Arc + Timer -->
 		<div class="arc-container">
 			<Arc
-				todaySleeps={arcSleeps}
-				activeSleep={arcActiveSleep}
-				prediction={arcPrediction}
-				isNightMode={isNightMode}
-				wakeUpTime={todayWakeUp?.wake_time}
-				bedtime={arcBedtimeIso}
-				nightEnd={arcNightEndIso}
-				startTimeLabel={arcStartLabel}
-				endTimeLabel={arcEndLabel}
-				napConfidenceBands={arcNapConfidenceBands}
-				activeWakeAt={arcActiveWakeAt}
-				activeWakeBand={arcActiveWakeBand}
-				skippedNap={arcSkippedNap}
-				rescueWindow={arcRescueWindow}
-				nightWakings={arcNightWakings}
+				{...arc}
+				nowMs={now}
 				onSleepClick={onArcBubbleClick}
 				onStartClick={onArcStartClick}
 				onNightWakingClick={onArcNightWakingClick}
@@ -946,9 +812,9 @@
 						Vekk no — kappet er over.
 					{/if}
 					{#if nb.mode === 'established'}
-						<span class="nap-budget-mode">· presis modus</span>
+						<span class="nap-budget-mode">presis modus</span>
 					{:else}
-						<span class="nap-budget-mode">· éin syklus</span>
+						<span class="nap-budget-mode">éin syklus</span>
 					{/if}
 				</div>
 				{#if showNapBudgetExplain}

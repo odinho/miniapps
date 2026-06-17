@@ -62,7 +62,7 @@
 </script>
 
 <details class="handoff" data-testid="handoff">
-	<summary><span class="handoff-caret" aria-hidden="true"></span>Overlevering · siste 6 timar</summary>
+	<summary><span class="handoff-caret" aria-hidden="true"></span>Siste 6 timar</summary>
 	<div class="handoff-body">
 		{#each rows as r (r.baby.id)}
 			<div class="handoff-row" data-testid="handoff-row">

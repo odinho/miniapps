@@ -59,5 +59,5 @@
 	disabled={busy}
 >
 	<span class="icon">{isSleeping ? '☀️' : '🌙'}</span>
-	<span class="label">{isSleeping ? 'Vakne' : 'Sove'}</span>
+	<span class="label">{isSleeping ? 'Vakna' : 'Sove'}</span>
 </button>

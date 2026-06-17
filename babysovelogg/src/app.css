@@ -1064,6 +1064,13 @@ html, body {
   font-weight: 400;
 }
 
+/* Separator + guaranteed gap via CSS — robust against Svelte trimming the
+   leading space when the span follows a conditional text fragment. */
+.nap-budget-mode::before {
+  content: '·';
+  margin: 0 0.4em;
+}
+
 .nap-budget-explain {
   font-size: 0.75rem;
   color: var(--text);
