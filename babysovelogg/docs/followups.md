@@ -71,6 +71,17 @@ is for tracked product/engine/test work.
   on calibration trust / a reliability threshold, ideally in the engine so
   arc/Timer/banners agree by construction.
 
+- **Fragmented-night display/totals ignore wakings (one unit).** Three coupled
+  gaps, all rooted in stats/server surfaces not netting `night_waking`:
+  (a) `getSleepDayTotals`/`server/state.ts` only count the single overnight
+  fragment that straddles midnight, so a wake-up right at midnight (no
+  straddling fragment) drops the pre-midnight stretch from "Søvn i dag";
+  (b) `stats-view-utils.ts` (`mapped` at ~923, and ~784/977) strip `pauses`
+  and there's no night-waking fetch in `fetchFullHistory`, so historical charts
+  ignore wakings; (c) `features.ts` and `stats.ts:getLongestNightStretches`
+  keep two parallel pause/segment impls that can drift. Do together: a
+  night-waking read for stats + one shared pause/segment helper + fragment-aware
+  overnight totals. Pairs with the emerging/schedule learning unit above.
 - **Napper import overlapping/open sleeps (B30).** Importing Napper CSV
   doesn't check existing babysovelogg data in the same range, so an open
   native night can collide with an imported open night → multi-hundred-hour
@@ -93,15 +104,6 @@ is for tracked product/engine/test work.
   no active sleep, surface a directive "vurder å gi seg og prøv igjen om ~20
   min" banner. Ties into existing overdue logic; consider a per-baby latency
   threshold.
-- **`priorOvernightSleep` undercounts fragmented mornings.**
-  `server/state.ts:85` (`ORDER BY end_time DESC LIMIT 1`) picks one fragment →
-  home "Søvn i dag" undercounts.
-- **Stats charts drop wakings.** `stats-view-utils.ts:784,977` map `pauses`
-  away, so historical charts ignore night wakings. Extend now that the engine
-  pause-handling has landed.
-- **Shared pause/segment helper.** Extract one helper for `features.ts` +
-  `stats.ts:getLongestNightStretches` (two parallel impls can drift) once
-  null-resume/overlap semantics are locked.
 - **Cross-midnight end-sleep date (B31).** End-sleep modal uses HH:MM only and
   infers the date; for a sleep started one day and ended the next the
   inference can pick the wrong day. Derive from the previous wake anchor or add
