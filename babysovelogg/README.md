@@ -56,10 +56,11 @@ Reads/writes the SQLite database directly — no server required.
 - **Auto dark/light theme** — switches by time of day, stars at night
 
 > **Schedule assumption:** predictions assume a conventional day/night rhythm
-> (daytime naps, one long night). A baby on an unusual or inverted schedule
-> (e.g. bedtime after midnight, sleeping through the morning) may be
-> mis-typed by the time-of-day auto-detection — set the sleep strategy
-> manually in settings if predictions look off.
+> (daytime naps, one long night). The app auto-detects nap vs. night by time
+> of day and the baby's learned pattern, so a baby on an unusual or inverted
+> schedule (e.g. bedtime after midnight, sleeping through the morning) may be
+> mis-typed — correct individual sleeps from the log/wake-up sheet if a
+> classification looks wrong.
 
 ## Tech Stack
 
