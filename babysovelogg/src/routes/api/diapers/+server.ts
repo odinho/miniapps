@@ -9,7 +9,8 @@ export const GET: RequestHandler = ({ url }) => {
   if (!allBabies && !baby) return json([]);
 
   const from = url.searchParams.get("from");
-  const limit = parseIntParam(url, "limit", { default: 50, min: 1, max: 1000 }) ?? 50;
+  // See /api/sleeps: high cap so full-history stats reads aren't truncated.
+  const limit = parseIntParam(url, "limit", { default: 50, min: 1, max: 100000 }) ?? 50;
   let sql = "SELECT * FROM diaper_log WHERE deleted = 0";
   const params: (string | number)[] = [];
   if (!allBabies) {

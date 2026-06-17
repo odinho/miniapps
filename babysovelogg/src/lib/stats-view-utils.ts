@@ -742,8 +742,8 @@ export async function fetchStatsData(): Promise<StatsData> {
 /** Fetch all sleep + diaper data (no time limit) for full-history views. */
 export async function fetchFullHistory(): Promise<StatsData> {
 	const [sleepRes, diaperRes] = await Promise.all([
-		fetch("/api/sleeps?limit=10000"),
-		fetch("/api/diapers?limit=10000"),
+		fetch("/api/sleeps?limit=100000"),
+		fetch("/api/diapers?limit=100000"),
 	]);
 	const [sleeps, diapers] = await Promise.all([
 		fetchOrThrow(sleepRes, "/api/sleeps") as Promise<SleepEntry[]>,

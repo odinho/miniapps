@@ -55,6 +55,12 @@ Reads/writes the SQLite database directly — no server required.
 - **PWA** — installable, service worker caches app shell
 - **Auto dark/light theme** — switches by time of day, stars at night
 
+> **Schedule assumption:** predictions assume a conventional day/night rhythm
+> (daytime naps, one long night). A baby on an unusual or inverted schedule
+> (e.g. bedtime after midnight, sleeping through the morning) may be
+> mis-typed by the time-of-day auto-detection — set the sleep strategy
+> manually in settings if predictions look off.
+
 ## Tech Stack
 
 - **Framework:** SvelteKit 5 with `adapter-node`

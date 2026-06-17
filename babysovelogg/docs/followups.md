@@ -80,9 +80,6 @@ is for tracked product/engine/test work.
 
 ## Quick wins
 
-- **Stats full-history fetch silently caps per child.** `loadFullHistory()`
-  requests `limit=10000` but the API clamps to 1000 rows/child. Paginate or
-  raise the stats-read cap.
 - **Server-TZ leaks in sibling helpers.** Thread baby/family tz into
   `classifySleepType`/`classifySleepTypeByHour`, `calculateAgeMonths`, and
   `computeStrategySignals` (still use process/client-local calendar fields).
@@ -108,8 +105,6 @@ is for tracked product/engine/test work.
   no active sleep, surface a directive "vurder å gi seg og prøv igjen om ~20
   min" banner. Ties into existing overdue logic; consider a per-baby latency
   threshold.
-- **User-facing schedule caveat.** Short README/settings note that unusual
-  (inverted) schedules may need the strategy set manually.
 - **`priorOvernightSleep` undercounts fragmented mornings.**
   `server/state.ts:85` (`ORDER BY end_time DESC LIMIT 1`) picks one fragment →
   home "Søvn i dag" undercounts.

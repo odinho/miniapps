@@ -13,7 +13,10 @@ export const GET: RequestHandler = ({ url }) => {
 
   const from = url.searchParams.get("from");
   const to = url.searchParams.get("to");
-  const limit = parseIntParam(url, "limit", { default: 50, min: 1, max: 1000 }) ?? 50;
+  // Cap high enough that full-history stats reads (fetchFullHistory) never
+  // silently lose the oldest rows — a few years of two babies is well under
+  // 100k rows. Default stays small for the common recent-window reads.
+  const limit = parseIntParam(url, "limit", { default: 50, min: 1, max: 100000 }) ?? 50;
   let sql = "SELECT * FROM sleep_log WHERE deleted = 0";
   const params: (string | number)[] = [];
   if (!allBabies) {
