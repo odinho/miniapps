@@ -86,9 +86,6 @@ is for tracked product/engine/test work.
   See [[feedback_server_tz]].
 - **Low-confidence firm caps.** Optionally cap low-confidence napBudget
   urgency at `advisory` in `engine/nap-budget.ts`.
-- **Rescue vs napBudget arbitration.** `state.ts:377` nulls `rescueNap`
-  unconditionally when `napBudget` exists. Compare wake targets, prefer the
-  earlier/safer action, surface the reason.
 - **Day-arc start-click can't reach the overnight it labels.** `arcStartLabel`
   reads `todayWakeUp.wake_time` from the pre-midnight overnight, but
   `todaySleeps` only has `start_time >= midnight` (`server/state.ts:57-75`,
