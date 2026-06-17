@@ -424,11 +424,19 @@
 
 	/** Arc start endpoint click: open night sleep or morning dialog */
 	function onArcStartClick() {
+		// The day-start endpoint marks the morning wake = the END of the prior
+		// overnight. That overnight usually started before midnight, so it's not
+		// in `todaySleeps` (start_time >= midnight) — fall back to
+		// `priorOvernightSleep` so the tap edits the real night instead of
+		// missing it (and, in day mode, wrongly opening the morning dialog).
 		if (isNightMode) {
-			const target = activeSleep ?? todaySleeps.toReversed().find(sl => sl.type === 'night');
+			const target = activeSleep
+				?? todaySleeps.toReversed().find(sl => sl.type === 'night')
+				?? s.priorOvernightSleep;
 			if (target) editingSleep = target;
 		} else {
-			const nightSleep = todaySleeps.toReversed().find(sl => sl.type === 'night');
+			const nightSleep = todaySleeps.toReversed().find(sl => sl.type === 'night')
+				?? s.priorOvernightSleep;
 			if (nightSleep) {
 				editingSleep = nightSleep;
 			} else {

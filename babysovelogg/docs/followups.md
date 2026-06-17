@@ -86,10 +86,6 @@ is for tracked product/engine/test work.
   See [[feedback_server_tz]].
 - **Low-confidence firm caps.** Optionally cap low-confidence napBudget
   urgency at `advisory` in `engine/nap-budget.ts`.
-- **Day-arc start-click can't reach the overnight it labels.** `arcStartLabel`
-  reads `todayWakeUp.wake_time` from the pre-midnight overnight, but
-  `todaySleeps` only has `start_time >= midnight` (`server/state.ts:57-75`,
-  handler `+page.svelte:318`). Tap misses / opens wrong dialog.
 - **Arc time math uses browser-local TZ.** `arc-utils.ts` `hourOfDay`/configs
   use `Date.getHours()`; travel/remote-browser shifts arc geometry while
   predictions stay baby-tz. Use baby/family tz.
