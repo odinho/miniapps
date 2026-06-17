@@ -108,10 +108,6 @@ is for tracked product/engine/test work.
   infers the date; for a sleep started one day and ended the next the
   inference can pick the wrong day. Derive from the previous wake anchor or add
   an optional date override.
-### Test coverage / infra quick wins
-
-- E2E for the create-mode `NightWakingEditSheet` "Legg til nattvaking" button.
-
 ## Parked (keep — has a concrete future trigger)
 
 - **`getLearnedBedtimeWakeWindow` robustness — DO NOT re-ship blind.** The

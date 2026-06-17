@@ -159,7 +159,7 @@
 			<span class="form-label">Vakna</span>
 			<div class="datetime-row">
 				<DateInput bind:value={startDate} />
-				<TimeInput bind:value={startTime} />
+				<TimeInput bind:value={startTime} data-testid="waking-start-time" />
 			</div>
 		</div>
 
@@ -169,7 +169,7 @@
 				<span class="form-label">Sov att</span>
 				<div class="datetime-row">
 					<DateInput bind:value={endDate} />
-					<TimeInput bind:value={endTime} />
+					<TimeInput bind:value={endTime} data-testid="waking-end-time" />
 				</div>
 			</div>
 		{/if}

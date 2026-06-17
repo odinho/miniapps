@@ -8,6 +8,7 @@ import {
   addCompletedSleep,
   getDb,
   generateId,
+  fillTimeInput,
 } from "./fixtures";
 
 test("History page shows logged sleeps", async ({ page }) => {
@@ -128,4 +129,39 @@ test("multi-baby log labels each entry and filters by child", async ({ page }) =
   // Back to everyone.
   await page.getByTestId("log-baby-filter").getByRole("button", { name: "Alle" }).click();
   await expect(page.locator(".sleep-log-item")).toHaveCount(2);
+});
+
+test("add a night waking to a completed night via the log", async ({ page }) => {
+  const babyId = createBaby("Testa");
+  setWakeUpTime(babyId); // seeds a completed night 19:00 (prev day) → 07:00
+  const db = getDb();
+
+  await page.goto("/history");
+  const nightItem = page
+    .locator(".sleep-log-item:not(.wakeup-log-item):not(.diaper-log-item)")
+    .filter({ hasText: "Nattesøvn" });
+  await expect(nightItem).toHaveCount(1, { timeout: 5000 });
+  await nightItem.click();
+  await expect(page.getByRole("heading", { name: "Endra søvn" })).toBeVisible();
+
+  // Open the create-mode night-waking sheet from the night's edit modal.
+  await page.getByTestId("add-night-waking").click();
+  await expect(page.getByTestId("night-waking-edit-sheet")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ny nattvaking" })).toBeVisible();
+
+  // Dates default to the night's start date; set a valid interval within it.
+  await fillTimeInput(page.getByTestId("waking-start-time"), "22:00");
+  await fillTimeInput(page.getByTestId("waking-end-time"), "22:30");
+  await page.getByTestId("waking-save").click();
+
+  await expect(page.getByTestId("night-waking-edit-sheet")).not.toBeVisible({ timeout: 3000 });
+  await expect
+    .poll(() =>
+      (
+        db
+          .prepare("SELECT COUNT(*) as n FROM night_waking WHERE baby_id = ? AND deleted = 0")
+          .get(babyId) as { n: number }
+      ).n,
+    )
+    .toBe(1);
 });
