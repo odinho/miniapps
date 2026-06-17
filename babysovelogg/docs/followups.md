@@ -99,8 +99,6 @@ is for tracked product/engine/test work.
 - **Arc time math uses browser-local TZ.** `arc-utils.ts` `hourOfDay`/configs
   use `Date.getHours()`; travel/remote-browser shifts arc geometry while
   predictions stay baby-tz. Use baby/family tz.
-- **Arc red sub-band dark-mode contrast.** Visual pass on the night-waking
-  overlay in dark mode if it still lacks contrast.
 - **"Give up and try later" guidance.** When `awakeMs > nextNap + ~20min` and
   no active sleep, surface a directive "vurder å gi seg og prøv igjen om ~20
   min" banner. Ties into existing overdue logic; consider a per-baby latency

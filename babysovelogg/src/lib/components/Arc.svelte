@@ -296,13 +296,17 @@
 				onclick={() => onNightWakingClick?.(overlay.domainId)}
 			/>
 		{/if}
+		<!-- Deep saturated red: the night band is light lavender (--moon) in
+			 both themes, so the old salmon (231,110,110) sat at ~1.5:1 contrast
+			 against it. This brick red is ~3:1 — readable in night mode without
+			 reading as an alarm. -->
 		<path
 			d={overlay.d}
 			fill="none"
-			stroke="rgba(231, 110, 110, 0.9)"
+			stroke="rgba(192, 57, 43, 0.95)"
 			stroke-width={G.trackWidth - 2}
 			stroke-linecap="round"
-			opacity={overlay.active ? 1 : 0.85}
+			opacity={overlay.active ? 1 : 0.9}
 			class:arc-active-pulse={overlay.active}
 		/>
 	{/each}
