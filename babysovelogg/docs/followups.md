@@ -82,12 +82,6 @@ is for tracked product/engine/test work.
   keep two parallel pause/segment impls that can drift. Do together: a
   night-waking read for stats + one shared pause/segment helper + fragment-aware
   overnight totals. Pairs with the emerging/schedule learning unit above.
-- **Napper import overlapping/open sleeps (B30).** Importing Napper CSV
-  doesn't check existing babysovelogg data in the same range, so an open
-  native night can collide with an imported open night → multi-hundred-hour
-  ghost sleep. Native data should win; cap open sleeps at 24h and flag
-  anomalies. Original repro in `archive/BUGS-2026-04.md` (row id=245,
-  `slp_import_613`).
 
 ## Parked (keep — has a concrete future trigger)
 

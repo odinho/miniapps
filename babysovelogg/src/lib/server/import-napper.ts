@@ -94,29 +94,27 @@ export function mapNapperToEvents(
         sleepDomainId,
       });
     } else {
-      // No explicit wake-up. If the night is older than 24h, auto-close
-      // with a 06:00 next-morning estimate to prevent ghost active sleeps.
-      // 06:00 is baby-local clock time; thread baby.timezone through so
-      // we pick the right UTC instant rather than the server's clock.
+      // No explicit wake-up. Imported data is historical, so NEVER leave a
+      // sleep open: an open `sleep.started` counts up to "now" and can collide
+      // with a live native night → a multi-hundred-hour ghost sleep (B30).
+      // Always close at a 06:00 next-morning estimate (baby-local clock, so we
+      // thread babyTz), capped at `now` so a recent night neither runs into the
+      // future nor stays open. For a night >24h old this is unchanged (the
+      // next-morning estimate is already in the past). A degenerate future
+      // start falls back to a 1-min bounded close so end > start.
       const startMs = new Date(startUtc).getTime();
-      const ageMs = Date.now() - startMs;
-      if (ageMs > 24 * 60 * 60 * 1000) {
-        const nextMorning = setHourInTz(new Date(startMs + 24 * 60 * 60 * 1000), 6, 0, babyTz);
-        emit("sleep.manual", {
-          babyId,
-          startTime: startUtc,
-          endTime: nextMorning.toISOString(),
-          type: "night",
-          sleepDomainId,
-        });
-      } else {
-        emit("sleep.started", {
-          babyId,
-          startTime: startUtc,
-          type: "night",
-          sleepDomainId,
-        });
-      }
+      const nextMorningMs = setHourInTz(
+        new Date(startMs + 24 * 60 * 60 * 1000), 6, 0, babyTz,
+      ).getTime();
+      const endMs = Math.min(nextMorningMs, Date.now());
+      const safeEndMs = endMs > startMs ? endMs : startMs + 60_000;
+      emit("sleep.manual", {
+        babyId,
+        startTime: startUtc,
+        endTime: new Date(safeEndMs).toISOString(),
+        type: "night",
+        sleepDomainId,
+      });
     }
 
     // Tag with BED_TIME comment and/or WOKE_UP mood

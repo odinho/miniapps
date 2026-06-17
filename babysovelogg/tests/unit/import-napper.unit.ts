@@ -278,6 +278,23 @@ describe("mapNapperToEvents", () => {
     expect(events[0].payload.endTime).toBe("2026-01-07T06:00:00.000Z");
   });
 
+  it("closes a recent (<24h) trailing night instead of leaving it open (B30)", () => {
+    // An open imported night counts up to "now" and can collide with a live
+    // native night → multi-hundred-hour ghost sleep. Recent imported nights
+    // must be closed (capped at now), never emitted as an open sleep.started.
+    const startIso = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString();
+    const events = map(bedTime(startIso));
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe("sleep.manual"); // closed, not sleep.started
+    const { startTime, endTime } = events[0].payload as {
+      startTime: string;
+      endTime: string;
+    };
+    expect(endTime).toBeTruthy();
+    expect(new Date(endTime).getTime()).toBeGreaterThan(new Date(startTime).getTime());
+    expect(new Date(endTime).getTime()).toBeLessThanOrEqual(Date.now());
+  });
+
   it("uses 06:00 *in the baby's tz* for auto-close, not server clock", () => {
     // Pass an explicit tz so 06:00 Europe/Oslo (CET in January = UTC+1)
     // resolves to 05:00 UTC.
