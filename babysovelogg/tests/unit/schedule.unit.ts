@@ -18,6 +18,7 @@ import {
 } from "$lib/engine/schedule.js";
 import type { SleepEntry, BabyContext } from "$lib/types.js";
 import { DEFAULT_FEATURES } from "$lib/types.js";
+import { expectTimeNear } from "../helpers/time.js";
 
 // --- helpers ---
 
@@ -193,8 +194,9 @@ describe("predictDayNaps", () => {
     const naps = predictDayNaps(t(7, 0), ctx(14)); // 14 months -> 1 nap
     expect(naps).toHaveLength(1);
     const nap = naps[0];
-    expect(new Date(nap.startTime).getTime()).toBeGreaterThan(new Date(t(7, 0)).getTime());
-    expect(new Date(nap.endTime).getTime()).toBeGreaterThan(new Date(nap.startTime).getTime());
+    // 14mo, no data: ww-default lands the single nap mid-morning, ~2h nap.
+    expectTimeNear(nap.startTime, t(11, 15));
+    expectTimeNear(nap.endTime, t(13, 20));
   });
 });
 
@@ -208,14 +210,14 @@ describe("recommendBedtime", () => {
 
   it("clamps bedtime to no earlier than 16:00", () => {
     const bt = recommendBedtime([sleep(t(6, 0), t(6, 30))], ctx(9));
-    const hour = new Date(bt).getHours();
-    expect(hour).toBeGreaterThanOrEqual(16);
+    expect(new Date(bt).getHours()).toBeGreaterThanOrEqual(16);
+    expectTimeNear(bt, t(17, 0)); // tiny day -> clamp floor near 17:00
   });
 
   it("clamps bedtime to no later than 23:00", () => {
     const bt = recommendBedtime([sleep(t(17, 0), t(18, 0))], ctx(9));
-    const d = new Date(bt);
-    expect(d.getHours()).toBeLessThanOrEqual(23);
+    expect(new Date(bt).getHours()).toBeLessThanOrEqual(23);
+    expectTimeNear(bt, t(20, 56)); // late lone nap -> pushed bedtime ~20:56
   });
 });
 
@@ -685,7 +687,8 @@ describe("getLearnedNapDuration: nap-count-aware default", () => {
     halldisCtx.customNapCount = 1;
 
     const learned = getLearnedNapDuration(halldisCtx);
-    expect(learned).toBeGreaterThan(95);
+    expect(learned).toBeGreaterThan(95); // the original regression guard
+    expect(Math.abs(learned - 106)).toBeLessThanOrEqual(5); // ±5 min pin (was 106)
   });
 });
 

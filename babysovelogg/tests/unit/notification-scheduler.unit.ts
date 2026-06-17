@@ -10,6 +10,7 @@ import {
 import { setPrefs } from "$lib/server/notification-prefs.js";
 import type { SleepLogRow, Baby } from "$lib/types.js";
 import type { Prediction } from "$lib/stores/app.svelte.js";
+import { renderSchedule } from "../helpers/render-state.js";
 
 beforeEach(() => {
   initDb(":memory:");
@@ -195,8 +196,10 @@ describe("reconcileNotifications – nap_overtime", () => {
       activeSleep: active,
       prediction: makePrediction({ expectedNapEnd: "2026-04-13T13:30:00.000Z" }),
     });
-    expect(rowsOf("nap_ending_soon")).toHaveLength(1);
-    expect(rowsOf("nap_overtime")).toHaveLength(1);
+    expect(renderSchedule(db)).toMatchInlineSnapshot(`
+"nap_ending_soon @ 2026-04-13T13:28:00.000Z baby:1 key:b1:nap_ending_soon:slp_test "Luren sluttar snart"
+nap_overtime @ 2026-04-13T13:50:00.000Z baby:1 key:b1:nap_overtime:slp_test "Luren er over forventa""
+`);
   });
 
   it("respects prefs.nap_overtime = false", () => {
@@ -317,11 +320,7 @@ describe("reconcileNotifications – nap_approaching", () => {
         napsAllDone: false,
       }),
     });
-    const rows = rowsOf("nap_approaching");
-    expect(rows).toHaveLength(1);
-    expect(new Date(rows[0].fire_at).toISOString()).toBe("2026-04-13T10:30:00.000Z");
-    const payload = JSON.parse(rows[0].payload_json);
-    expect(payload.title).toBe("Snart lurtid");
+    expect(renderSchedule(db, "nap_approaching")).toMatchInlineSnapshot(`"nap_approaching @ 2026-04-13T10:30:00.000Z baby:1 key:b1:nap_approaching:2026-04-13T11:00:00.000Z "Snart lurtid""`);
   });
 
   it("dedupes by nextNap so re-anchor overwrites, doesn't double-fire", () => {

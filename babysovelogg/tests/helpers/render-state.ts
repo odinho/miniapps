@@ -52,6 +52,54 @@ export function renderDayState(db: SqliteDb, babyId: number): string {
   return lines.join("\n");
 }
 
+interface NotificationScheduleRow {
+  baby_id: number;
+  kind: string;
+  fire_at: string;
+  dedupe_key: string;
+  payload_json: string | null;
+  sent_at: string | null;
+  cancelled_at: string | null;
+  attempts: number;
+}
+
+/**
+ * Render the notification_schedule table as a deterministic, readable block.
+ * One line per row, sorted by (kind, fire_at, dedupe_key). Status and attempts
+ * are only shown when non-default so the common "pending, 0 attempts" case
+ * stays compact. Pass `kind` to scope to a single notification type.
+ */
+export function renderSchedule(db: SqliteDb, kind?: string): string {
+  const rows = (
+    kind
+      ? db.prepare("SELECT * FROM notification_schedule WHERE kind = ?").all(kind)
+      : db.prepare("SELECT * FROM notification_schedule").all()
+  ) as NotificationScheduleRow[];
+
+  if (rows.length === 0) return "(ingen)";
+
+  rows.sort(
+    (a, b) =>
+      a.kind.localeCompare(b.kind) ||
+      a.fire_at.localeCompare(b.fire_at) ||
+      a.dedupe_key.localeCompare(b.dedupe_key),
+  );
+
+  return rows
+    .map((r) => {
+      const parts = [`${r.kind} @ ${r.fire_at}`, `baby:${r.baby_id}`, `key:${r.dedupe_key}`];
+      const status = r.cancelled_at ? "cancelled" : r.sent_at ? "sent" : "pending";
+      if (status !== "pending") parts.push(status);
+      if (r.attempts) parts.push(`attempts:${r.attempts}`);
+      if (r.payload_json) {
+        const title = (JSON.parse(r.payload_json) as { title?: string }).title;
+        if (title) parts.push(`"${title}"`);
+      }
+      return parts.join(" ");
+    })
+    .join("\n");
+}
+
 /** Render projection row counts — useful for rebuild tests. */
 export function renderCounts(db: SqliteDb): string {
   const counts = {

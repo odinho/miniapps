@@ -122,26 +122,16 @@ is for tracked product/engine/test work.
 
 ### Test coverage / infra quick wins
 
-- Add a tolerant `expectTimeNear(actual, expected, withinMin=5)` matcher.
-- Add a `renderSchedule(db)` helper for `notification-scheduler.unit.ts` /
-  `notifications.test.ts` (currently re-query inline).
-- Make `dismissSheet()` strict (`tests/fixtures.ts:301-310` swallows failures).
-- One canonical `cleanAll(db)` for `tests/integration/harness.ts:225` +
-  `tests/fixtures.ts:109`.
-- Aggregate snapshots hide per-day regressions: pair `backtest.unit.ts` /
-  `baselines.unit.ts` totals with ≥1 per-day expected behavior.
-- Tighten direction-only assertions in `schedule.unit.ts:159/176/182/638` with
-  tolerant expected times.
-- Cycle-estimator boundary cases: duration 19/20/181, `woke_by==="self"`.
-- Cycle-estimator source-precedence test (`cycleSleeps → trendSleeps →
-  extendedSleeps → recentSleeps`).
-- Delete/fold `state.unit.ts:75-244` smoke tests + `:304-792` duplicated bug
-  pins into `engine-scenarios.unit.ts`.
-- DST through full `assembleState` (Oslo spring/fall) — `dst.unit.ts` only
-  covers helpers.
-- `custom_nap_count` settings sweep (3→2, 2→1 across morning/post-nap/skipped).
-- `StrategyOverride` through `assembleState`.
+- Make `dismissSheet()` strict (`tests/fixtures.ts` swallows failures). Pair
+  with the e2e snapshot refresh — both need an e2e run to validate.
 - E2E for the create-mode `NightWakingEditSheet` "Legg til nattvaking" button.
+- **`StrategyOverride` is unwired through `assembleState`.** Surfaced while
+  trying to add coverage: `assembleState` calls `determineStrategy(...)` with
+  no `override` arg (`engine/state.ts:831`) and `server/state.ts` supplies
+  none, so the override only takes effect at the `selectStrategy`/
+  `determineStrategy` level, not through the assembly path the app uses. Either
+  thread the override through `DayData` → `assembleState`, or confirm it's
+  intentionally helper-only and drop the notion of an assembly-level override.
 
 ## Parked (keep — has a concrete future trigger)
 

@@ -146,24 +146,11 @@ describe("assembleState", () => {
     expect(result.stats.totalNapMinutes).toBe(60);
   });
 
-  it("keeps prediction during active nap sleep (bedtime estimate)", () => {
-    const wakeUp: DayStartRow = {
-      id: 1, baby_id: 1, date: "2026-03-26",
-      wake_time: "2026-03-26T07:00:00.000Z",
-      created_at: "2026-03-26T07:00:00.000Z",
-      created_by_event_id: null,
-    };
-    const result = assembleState(
-      dayData({
-        activeSleep: sleepRow({ end_time: null, start_time: "2026-03-26T09:30:00.000Z" }),
-        todayWakeUp: wakeUp,
-        now: new Date("2026-03-26T10:00:00.000Z").getTime(),
-      }),
-    );
-    expect(result.prediction).not.toBeNull();
-    expect(result.prediction!.bedtime).toBeDefined();
-  });
-
+  // NOTE: smoke tests "keeps prediction during active nap sleep" and
+  // "generates prediction when wake set" were removed — fully covered by
+  // engine-scenarios.unit.ts active/morning snapshot rows + assertInvariants
+  // (I-active-nap-end, I-7). Kept here is only the unique active-sleep +
+  // no-wake null-prediction branch.
   it("no prediction when there is no wake time reference", () => {
     const result = assembleState(
       dayData({
@@ -172,25 +159,6 @@ describe("assembleState", () => {
       }),
     );
     expect(result.prediction).toBeNull();
-  });
-
-  it("generates prediction when no active sleep and wake-up time set", () => {
-    const wakeUp: DayStartRow = {
-      id: 1, baby_id: 1, date: "2026-03-26",
-      wake_time: "2026-03-26T07:00:00.000Z",
-      created_at: "2026-03-26T07:00:00.000Z",
-      created_by_event_id: null,
-    };
-    const result = assembleState(
-      dayData({
-        todayWakeUp: wakeUp,
-        now: new Date("2026-03-26T08:00:00.000Z").getTime(),
-      }),
-    );
-    expect(result.prediction).not.toBeNull();
-    expect(result.prediction!.nextNap).toBeDefined();
-    expect(result.prediction!.bedtime).toBeDefined();
-    expect(result.prediction!.predictedNaps).not.toBeNull();
   });
 
   it("bedtime prediction at day start respects wake-window pressure", () => {
@@ -248,23 +216,9 @@ describe("assembleState", () => {
     expect(bedtimeUtcHour).toBeLessThanOrEqual(19);
   });
 
-  it("prediction uses last completed sleep end time", () => {
-    const completedSleep = sleepRow({
-      start_time: "2026-03-26T09:00:00.000Z",
-      end_time: "2026-03-26T10:00:00.000Z",
-    });
-    const result = assembleState(
-      dayData({
-        todaySleeps: [completedSleep],
-      }),
-    );
-    expect(result.prediction).not.toBeNull();
-    // Next nap should be after the completed sleep's end time
-    expect(new Date(result.prediction!.nextNap!).getTime()).toBeGreaterThan(
-      new Date("2026-03-26T10:00:00.000Z").getTime(),
-    );
-  });
-
+  // NOTE: "prediction uses last completed sleep end time" removed — covered
+  // by engine-scenarios post-nap snapshot rows + I-stale (nextNap can't be
+  // stale relative to the last completed sleep).
   it("passes through diaper counts", () => {
     const result = assembleState(
       dayData({
@@ -333,6 +287,80 @@ describe("assembleState", () => {
     expect(nextNapTime.getTime()).toBeGreaterThanOrEqual(
       new Date("2026-03-26T09:00:00.000Z").getTime(),
     );
+  });
+
+  it("custom_nap_count sweep 3→2→1 across morning / post-nap / skipped states", () => {
+    const wakeUp: DayStartRow = {
+      id: 1, baby_id: 1, date: "2026-03-26",
+      wake_time: "2026-03-26T07:00:00.000Z",
+      created_at: "2026-03-26T07:00:00.000Z",
+      created_by_event_id: null,
+    };
+    const nap1 = sleepRow({
+      id: 900, start_time: "2026-03-26T09:30:00Z", end_time: "2026-03-26T11:00:00Z",
+      type: "nap", woke_by: "self", domain_id: "slp_t1",
+    });
+
+    const line = (count: number, state: string, todaySleeps: SleepLogRow[], nowIso: string) => {
+      const p = assembleState(
+        dayData({
+          baby: { ...baseBaby, custom_nap_count: count },
+          todaySleeps,
+          todayWakeUp: wakeUp,
+          now: new Date(nowIso).getTime(),
+        }),
+      ).prediction!;
+      const next = p.nextNap ? new Date(p.nextNap).toISOString().slice(11, 16) : "none";
+      return `count=${count} ${state.padEnd(12)} expN=${p.expectedNapCount} next=${next} allDone=${p.napsAllDone} skip=${!!p.skippedNap}`;
+    };
+
+    const lines: string[] = [];
+    for (const c of [3, 2, 1]) {
+      lines.push(line(c, "morning", [], "2026-03-26T07:30:00Z"));
+      lines.push(line(c, "post-nap1", [nap1], "2026-03-26T11:30:00Z"));
+      lines.push(line(c, "late/skip", [], "2026-03-26T16:30:00Z"));
+    }
+
+    expect(lines.join("\n")).toMatchInlineSnapshot(`
+      "count=3 morning      expN=3 next=09:40 allDone=false skip=false
+      count=3 post-nap1    expN=3 next=14:08 allDone=false skip=false
+      count=3 late/skip    expN=3 next=19:00 allDone=true skip=true
+      count=2 morning      expN=2 next=09:40 allDone=false skip=false
+      count=2 post-nap1    expN=2 next=14:08 allDone=false skip=false
+      count=2 late/skip    expN=2 next=19:00 allDone=true skip=true
+      count=1 morning      expN=1 next=09:40 allDone=false skip=false
+      count=1 post-nap1    expN=1 next=18:49 allDone=true skip=false
+      count=1 late/skip    expN=1 next=19:00 allDone=true skip=true"
+    `);
+
+    // Invariants the snapshot can't be auto-updated past: the custom count
+    // must propagate to expectedNapCount at every state, and lowering the
+    // count must reduce remaining naps (1-nap baby is already done after its
+    // single nap, while 2/3-nap babies still have a next nap pending).
+    const expN = (count: number) =>
+      assembleState(
+        dayData({
+          baby: { ...baseBaby, custom_nap_count: count },
+          todayWakeUp: wakeUp,
+          now: new Date("2026-03-26T07:30:00Z").getTime(),
+        }),
+      ).prediction!.expectedNapCount;
+    expect(expN(3)).toBe(3);
+    expect(expN(2)).toBe(2);
+    expect(expN(1)).toBe(1);
+
+    const postNap1 = (count: number) =>
+      assembleState(
+        dayData({
+          baby: { ...baseBaby, custom_nap_count: count },
+          todaySleeps: [nap1],
+          todayWakeUp: wakeUp,
+          now: new Date("2026-03-26T11:30:00Z").getTime(),
+        }),
+      ).prediction!;
+    expect(postNap1(1).napsAllDone).toBe(true); // only nap consumed
+    expect(postNap1(2).napsAllDone).toBe(false); // nap 2 still pending
+    expect(postNap1(3).napsAllDone).toBe(false); // naps 2 & 3 still pending
   });
 
   // Helper: build a 10-day 1-nap rested-baby history with a ~4h morning WW so
@@ -959,39 +987,10 @@ describe("assembleState", () => {
     expect(result.prediction!.nextNap).toBe(result.prediction!.bedtime);
   });
 
-  it("B8: no nap suggested within 60 min of bedtime", () => {
-    // Set up: 9mo baby, wake at 06:00, 1 nap already done ending at 11:00
-    // At 16:51 bedtime should be ~18:00, no nap should be suggested
-    const baby9mo: Baby = { ...baseBaby, birthdate: "2025-06-12", custom_nap_count: 1 };
-    const wakeUp: DayStartRow = {
-      id: 1,
-      baby_id: 1,
-      date: "2026-03-26",
-      wake_time: "2026-03-26T06:00:00.000Z",
-      created_at: "2026-03-26T06:00:00.000Z",
-      created_by_event_id: null,
-    };
-    const completedNap = sleepRow({
-      start_time: "2026-03-26T09:30:00.000Z",
-      end_time: "2026-03-26T11:00:00.000Z",
-      type: "nap",
-    });
-
-    const result = assembleState(
-      dayData({
-        baby: baby9mo,
-        todaySleeps: [completedNap],
-        todayWakeUp: wakeUp,
-        now: new Date("2026-03-26T16:51:00.000Z").getTime(),
-      }),
-    );
-
-    // With 1 custom nap and 1 completed, napsAllDone should be true
-    expect(result.prediction!.napsAllDone).toBe(true);
-    // nextNap should be bedtime, not a new nap
-    expect(result.prediction!.nextNap).toBe(result.prediction!.bedtime);
-  });
-
+  // NOTE: "B8: no nap suggested within 60 min of bedtime" removed — the
+  // I-B8 invariant in engine-scenarios.unit.ts checks every visible
+  // predictedNap (start AND end) is &gt;60 min before bedtime on every
+  // scenario, strictly stronger than this single-case napsAllDone check.
   it("does not surface a doomed comeback nap after a soft-short single nap", () => {
     const baby11mo: Baby = {
       ...baseBaby,
@@ -1168,47 +1167,11 @@ describe("assembleState", () => {
     }
   });
 
-  it("B11: napsAllDone flag set when all expected naps are completed", () => {
-    // 9mo with 2 expected naps (default), both completed.
-    // Use 90-min naps so they exceed the engine's short-nap threshold
-    // (max(20, learned 90 - cycle 22.5) ≈ 68 min). 60-min naps would be
-    // classified as cut-shorts, leaving the day's budget unfulfilled.
-    const wakeUp: DayStartRow = {
-      id: 1,
-      baby_id: 1,
-      date: "2026-03-26",
-      wake_time: "2026-03-26T06:00:00.000Z",
-      created_at: "2026-03-26T06:00:00.000Z",
-      created_by_event_id: null,
-    };
-    const nap1 = sleepRow({
-      id: 1,
-      start_time: "2026-03-26T08:30:00.000Z",
-      end_time: "2026-03-26T10:00:00.000Z",
-      type: "nap",
-      domain_id: "slp_1",
-    });
-    const nap2 = sleepRow({
-      id: 2,
-      start_time: "2026-03-26T12:00:00.000Z",
-      end_time: "2026-03-26T13:30:00.000Z",
-      type: "nap",
-      domain_id: "slp_2",
-    });
-
-    const result = assembleState(
-      dayData({
-        todaySleeps: [nap1, nap2],
-        todayWakeUp: wakeUp,
-        now: new Date("2026-03-26T15:00:00.000Z").getTime(),
-      }),
-    );
-
-    expect(result.prediction!.napsAllDone).toBe(true);
-    // Should show bedtime, not next nap
-    expect(result.prediction!.nextNap).toBe(result.prediction!.bedtime);
-  });
-
+  // NOTE: "B11: napsAllDone flag set when all expected naps are completed"
+  // removed — the I-7 invariant in engine-scenarios.unit.ts (napsAllDone →
+  // nextNap == bedtime AND predictedNaps null) plus the napsAllDone snapshot
+  // rows cover this exact behavior. The learned-60min phantom-skip
+  // regression ("B11 regression" above) is a DIFFERENT case and is kept.
   it("confidence.napRanges aligns with the visible predictedNaps list", () => {
     // After 1 nap is done, Timer reads napRanges[0] for the *next* nap's ±N min.
     // Under the buggy from-morning-wake list, napRanges[0] was for nap-1

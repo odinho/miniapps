@@ -7,6 +7,7 @@ import {
   renderSummary,
 } from "$lib/engine/backtest.js";
 import type { DayRecord, BacktestResult } from "$lib/engine/backtest.js";
+import { expectTimeNear } from "../helpers/time.js";
 
 import halldisData from "../fixtures/halldis-sleep.json";
 
@@ -121,6 +122,18 @@ describe("baseline", () => {
       day 8-14: 7 days, count 86% (6/7), naps 2.0p/1.9a, nap MAE 66.5, dur MAE 20.8, bed MAE 13.5, wake MAE 23.9, nap bias -40.4, count bias +0.14, cycle 7/0/0 (l/m/h), cut-short 0
       day 15+: 124 days, count 88% (109/124), naps 1.4p/1.4a, nap MAE 35.3, dur MAE 24.5, bed MAE 21.5, wake MAE 26.4, nap bias -1.1, count bias +0.02, cycle 124/0/0 (l/m/h), cut-short 8"
     `);
+  });
+
+  // ── Per-day pin ──
+  // The aggregate MAEs above can hide a single-day regression. Pin one
+  // canonical day (a clean, well-predicted 8mo day) at the level the
+  // parent actually sees: first nap and bedtime within a tolerance of the
+  // baby's real sleep that day. A 30-min drift here fails even if the
+  // monthly average stays flat.
+  it("canonical day 2026-02-17: first nap + bedtime track actuals", () => {
+    const day = auto.days.find((d) => d.date === "2026-02-17")!;
+    expectTimeNear(day.predictedNaps[0].startTime, day.actualNaps[0].start_time, 15);
+    expectTimeNear(day.predictedBedtime, day.actualBedtime!, 15);
   });
 
   // ── Regression guards ──

@@ -20,6 +20,7 @@ import {
   weightedBedtime,
 } from "$lib/engine/weighted.js";
 import type { DayRecord } from "$lib/engine/backtest.js";
+import { expectTimeNear } from "../helpers/time.js";
 
 import halldisData from "../fixtures/halldis-sleep.json";
 
@@ -68,6 +69,14 @@ describe("baseline comparison", () => {
       3d-avg: 138 days, count 83% (114/138), naps 1.5p/1.5a, nap MAE 43.7, dur MAE 27.3, bed MAE 45.2, wake MAE 24.2, nap bias +1.9, count bias +0.03, cycle 138/0/0 (l/m/h), cut-short 8
       weighted: 138 days, count 85% (117/138), naps 1.5p/1.5a, nap MAE 48.8, dur MAE 25.3, bed MAE 54.9, wake MAE 26.4, nap bias -13, count bias +0.02, cycle 138/0/0 (l/m/h), cut-short 8"
     `);
+  });
+
+  // Aggregate MAEs can mask a single-day regression. Pin one canonical
+  // engine day at the parent-visible level alongside the rollups.
+  it("engine canonical day 2026-02-17: first nap + bedtime track actuals", () => {
+    const day = engine.result.days.find((d) => d.date === "2026-02-17")!;
+    expectTimeNear(day.predictedNaps[0].startTime, day.actualNaps[0].start_time, 15);
+    expectTimeNear(day.predictedBedtime, day.actualBedtime!, 15);
   });
 
   it("per-month breakdown — engine vs baselines", () => {

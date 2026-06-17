@@ -1,6 +1,7 @@
 import { test as base, expect, type Page } from "@playwright/test";
 import { spawn, type ChildProcess } from "child_process";
 import type { SqliteDb } from "$lib/server/db.js";
+import { cleanAll } from "./helpers/clean.js";
 
 // Playwright runs under Node.js, not Bun — use node:sqlite there
 const Database: { new (path: string): SqliteDb } = (globalThis as Record<string, unknown>).Bun
@@ -115,26 +116,7 @@ export function getDb() {
 }
 
 function resetDb() {
-  // Disable FK checks so we can delete in any order without constraint errors.
-  // The silent try/catch pattern masked a bug: notification_* tables reference
-  // baby(id), so DELETE FROM baby failed whenever those rows existed.
-  _db.exec("PRAGMA foreign_keys = OFF");
-  _db.prepare("DELETE FROM notification_schedule").run();
-  _db.prepare("DELETE FROM notification_subscriptions").run();
-  _db.prepare("DELETE FROM notification_preferences").run();
-  _db.prepare("DELETE FROM night_waking").run();
-  _db.prepare("DELETE FROM diaper_log").run();
-  _db.prepare("DELETE FROM sleep_log").run();
-  _db.prepare("DELETE FROM day_start").run();
-  _db.prepare("DELETE FROM baby").run();
-  _db.prepare("DELETE FROM events").run();
-  _db.prepare("DELETE FROM sqlite_sequence").run();
-  // Reset the singleton family row too — timezone / mode_override / sync_mode
-  // would otherwise leak between e2e tests (e.g. a set sync preference).
-  _db.prepare(
-    "UPDATE family SET timezone = NULL, mode_override = NULL, sync_mode = NULL, updated_by_event_id = NULL WHERE id = 1",
-  ).run();
-  _db.exec("PRAGMA foreign_keys = ON");
+  cleanAll(_db);
 }
 
 // --- ID generation ---

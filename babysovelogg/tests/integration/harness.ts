@@ -1,6 +1,7 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "http";
 import { beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
 import { db, initDb, closeDb } from "$lib/server/db.js";
+import { cleanAll } from "../helpers/clean.js";
 
 // ── Console guard ──────────────────────────────────────────────────────
 // All console methods are captured during tests. Any call that doesn't
@@ -216,22 +217,7 @@ export function setupHarness() {
   });
 
   beforeEach(() => {
-    // The night-waking migration test re-creates sleep_pauses inline;
-    // drop it here defensively so leftovers don't bleed across tests.
-    db.exec("DROP TABLE IF EXISTS sleep_pauses");
-    db.prepare("DELETE FROM night_waking").run();
-    db.prepare("DELETE FROM diaper_log").run();
-    db.prepare("DELETE FROM sleep_log").run();
-    db.prepare("DELETE FROM day_start").run();
-    db.prepare("DELETE FROM notification_schedule").run();
-    db.prepare("DELETE FROM notification_subscriptions").run();
-    db.prepare("DELETE FROM notification_preferences").run();
-    db.prepare("DELETE FROM baby").run();
-    db.prepare("DELETE FROM events").run();
-    db.prepare("UPDATE family SET timezone = NULL, mode_override = NULL, sync_mode = NULL, updated_by_event_id = NULL WHERE id = 1").run();
-    try {
-      db.prepare("DELETE FROM sqlite_sequence").run();
-    } catch {}
+    cleanAll(db);
   });
 }
 

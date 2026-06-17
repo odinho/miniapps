@@ -319,6 +319,106 @@ describe("cycle estimator v2: scenario table", () => {
   });
 });
 
+// ─── Nap-sample filter boundaries & source precedence ───────────────────────
+
+describe("cycle estimator v2: nap-sample filter boundaries", () => {
+  // One clean self-wake nap on a complete (has-night) day either becomes a
+  // sample (effectiveN = 1 at regime-0 / recency-1) or it doesn't.
+  // `collectCycleNapSamples` keeps 20 ≤ dur ≤ 180 only.
+  const oneNap = (durMin: number, wokeBy: "self" | "woken" | null = "self"): BabyContext =>
+    ctxOf({ ageMonths: 11, customNapCount: 1, naps: [{ d: 1, h: 10, durMin, wokeBy }] });
+
+  it("excludes naps shorter than 20 min (19 out, 20 in)", () => {
+    expect(estimateSleepCycleDetails(oneNap(19)).sampleCount).toBe(0);
+    expect(estimateSleepCycleDetails(oneNap(20)).sampleCount).toBe(1);
+  });
+
+  it("excludes naps longer than 180 min (180 in, 181 out)", () => {
+    expect(estimateSleepCycleDetails(oneNap(180)).sampleCount).toBe(1);
+    expect(estimateSleepCycleDetails(oneNap(181)).sampleCount).toBe(0);
+  });
+
+  it("keeps only woke_by === self (woken and null excluded)", () => {
+    expect(estimateSleepCycleDetails(oneNap(110, "self")).sampleCount).toBe(1);
+    expect(estimateSleepCycleDetails(oneNap(110, "woken")).sampleCount).toBe(0);
+    expect(estimateSleepCycleDetails(oneNap(110, null)).sampleCount).toBe(0);
+  });
+});
+
+// collectCycleNapSamples reads cycleSleeps ?? trendSleeps ?? extendedSleeps
+// ?? recentSleeps — the FIRST defined window, even if it's empty of clean
+// self-wakes. A present-but-poisoned higher source must block fall-through
+// to a clean lower source.
+const precedenceBase = (): Pick<
+  BabyContext,
+  "birthdate" | "ageMonths" | "tz" | "customNapCount"
+> => ({ birthdate: "2025-06-12", ageMonths: 11, tz: "UTC", customNapCount: 1 });
+
+const precedenceRun = (
+  count: number,
+  durMin: number,
+  wokeBy: "self" | "woken" | null = "self",
+): SleepEntry[] => {
+  const out: SleepEntry[] = [];
+  for (let i = 0; i < count; i++) {
+    const d = i + 1;
+    const endMin = 10 * 60 + durMin;
+    out.push({
+      start_time: ts(d, 10),
+      end_time: ts(d, Math.floor(endMin / 60), endMin % 60),
+      type: "nap",
+      woke_by: wokeBy,
+    });
+    out.push({ start_time: ts(d, 19), end_time: ts(d + 1, 6), type: "night" });
+  }
+  return out;
+};
+
+describe("cycle estimator v2: source fall-through precedence", () => {
+  const base = precedenceBase;
+  const run = precedenceRun;
+
+  it("uses the highest-priority defined window even when lower ones are clean", () => {
+    // cycleSleeps poisoned (woken) → no samples; clean recentSleeps ignored.
+    const cyclePoisoned: BabyContext = {
+      ...base(),
+      cycleSleeps: run(8, 110, "woken"),
+      recentSleeps: run(8, 110, "self"),
+    };
+    expect(estimateSleepCycleDetails(cyclePoisoned).source).toBe("age-default");
+
+    // No cycleSleeps → trendSleeps wins; poisoned trend still blocks recent.
+    const trendPoisoned: BabyContext = {
+      ...base(),
+      trendSleeps: run(8, 110, "woken"),
+      recentSleeps: run(8, 110, "self"),
+    };
+    expect(estimateSleepCycleDetails(trendPoisoned).source).toBe("age-default");
+
+    // No cycle/trend → extendedSleeps wins; poisoned extended blocks recent.
+    const extendedPoisoned: BabyContext = {
+      ...base(),
+      extendedSleeps: run(8, 110, "woken"),
+      recentSleeps: run(8, 110, "self"),
+    };
+    expect(estimateSleepCycleDetails(extendedPoisoned).source).toBe("age-default");
+  });
+
+  it("falls through to the next window only when the higher one is undefined", () => {
+    // Clean data in each tier in turn — each should learn the same 55m cycle.
+    for (const ctx of [
+      { ...base(), cycleSleeps: run(8, 110) },
+      { ...base(), trendSleeps: run(8, 110) },
+      { ...base(), extendedSleeps: run(8, 110) },
+      { ...base(), recentSleeps: run(8, 110) },
+    ] as BabyContext[]) {
+      const e = estimateSleepCycleDetails(ctx);
+      expect(e.source).toBe("learned");
+      expect(e.minutes).toBe(55);
+    }
+  });
+});
+
 // ─── Standalone tests that don't fit the table shape ────────────────────────
 
 describe("cycle estimator v2: prior bands match the literature", () => {
