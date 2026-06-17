@@ -91,15 +91,8 @@ is for tracked product/engine/test work.
 
 ## Quick wins
 
-- **Server-TZ leaks in sibling helpers.** Thread baby/family tz into
-  `classifySleepType`/`classifySleepTypeByHour`, `calculateAgeMonths`, and
-  `computeStrategySignals` (still use process/client-local calendar fields).
-  See [[feedback_server_tz]].
 - **Low-confidence firm caps.** Optionally cap low-confidence napBudget
   urgency at `advisory` in `engine/nap-budget.ts`.
-- **Arc time math uses browser-local TZ.** `arc-utils.ts` `hourOfDay`/configs
-  use `Date.getHours()`; travel/remote-browser shifts arc geometry while
-  predictions stay baby-tz. Use baby/family tz.
 - **"Give up and try later" guidance.** When `awakeMs > nextNap + ~20min` and
   no active sleep, surface a directive "vurder å gi seg og prøv igjen om ~20
   min" banner. Ties into existing overdue logic; consider a per-baby latency
