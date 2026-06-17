@@ -85,6 +85,7 @@ import { GET as eventsGET, POST as eventsPOST } from "../../src/routes/api/event
 import { GET as stateGET } from "../../src/routes/api/state/+server.js";
 import { GET as sleepsGET } from "../../src/routes/api/sleeps/+server.js";
 import { GET as diapersGET } from "../../src/routes/api/diapers/+server.js";
+import { GET as nightWakingsGET } from "../../src/routes/api/night-wakings/+server.js";
 import { GET as wakeupsGET } from "../../src/routes/api/wakeups/+server.js";
 import { GET as exportGET } from "../../src/routes/api/export/+server.js";
 import { POST as importNapperPOST } from "../../src/routes/api/import/napper/+server.js";
@@ -115,6 +116,7 @@ const routes: {
   { pattern: "/api/state", GET: stateGET as Handler },
   { pattern: "/api/sleeps", GET: sleepsGET as Handler },
   { pattern: "/api/diapers", GET: diapersGET as Handler },
+  { pattern: "/api/night-wakings", GET: nightWakingsGET as Handler },
   { pattern: "/api/wakeups", GET: wakeupsGET as Handler },
   { pattern: "/api/export", GET: exportGET as Handler },
   { pattern: "/api/import/napper", POST: importNapperPOST as Handler },
@@ -347,6 +349,19 @@ export function addDiaper(
   db.prepare(
     "INSERT INTO diaper_log (baby_id, time, type, amount, domain_id) VALUES (?, ?, ?, ?, ?)",
   ).run(babyId, time, type, amount, did);
+  return did;
+}
+
+export function addNightWaking(
+  babyId: number,
+  startTime: string,
+  endTime: string | null = null,
+  domainId?: string,
+) {
+  const did = domainId || generateNightWakingId();
+  db.prepare(
+    "INSERT INTO night_waking (baby_id, start_time, end_time, domain_id) VALUES (?, ?, ?, ?)",
+  ).run(babyId, startTime, endTime, did);
   return did;
 }
 

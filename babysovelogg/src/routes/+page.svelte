@@ -126,6 +126,36 @@
 	const staleActiveSleep = $derived(s.staleActiveSleep);
 	const todaySleeps = $derived(s.todaySleeps);
 	const prediction = $derived(s.prediction);
+	// A freshly-onboarded baby has no sleep data at all. The engine still emits
+	// age-default nap predictions, so the moment a wake time is seeded it can
+	// flag those guessed naps as "skipped" and push a rescue/extra-nap — which
+	// reads as presumptuous before we've learned anything. Treat the baby as a
+	// cold start until *any* real sleep signal exists, and hide the skip/rescue/
+	// budget nudges (the plain arc + "next nap" guess still show).
+	const hasAnySleepHistory = $derived(
+		!!prediction?.calibration ||
+			(prediction?.longestStretch ?? 0) > 0 ||
+			(prediction?.totalSleep24h ?? 0) > 0 ||
+			!!s.priorOvernightSleep ||
+			(s.todaySleeps?.length ?? 0) > 0,
+	);
+	const isColdStart = $derived(
+		!!baby && !hasAnySleepHistory && !(activeSleep && !activeSleep.end_time),
+	);
+	// What the arc / Timer / banners actually render. Strips the data-hungry
+	// nudges on a cold start; identical to `prediction` otherwise.
+	const displayPrediction = $derived(
+		isColdStart && prediction
+			? {
+					...prediction,
+					skippedNap: null,
+					postSkipPlan: null,
+					rescueNap: null,
+					napBudget: null,
+					continuationWindow: null,
+				}
+			: prediction,
+	);
 	const stats = $derived(s.stats);
 	const ageMonths = $derived(s.ageMonths);
 	const todayWakeUp = $derived(s.todayWakeUp);
@@ -315,12 +345,12 @@
 	// overrides so the arc stops painting a phantom natural window past
 	// the actionable target.
 	const arcActiveWakeOverride = $derived.by(() => {
-		if (!arcActiveSleep || !prediction) return null;
-		if (arcActiveSleep.type === 'nap' && prediction.napBudget?.wakeBy) {
-			return prediction.napBudget.wakeBy;
+		if (!arcActiveSleep || !displayPrediction) return null;
+		if (arcActiveSleep.type === 'nap' && displayPrediction.napBudget?.wakeBy) {
+			return displayPrediction.napBudget.wakeBy;
 		}
-		if (prediction.rescueNap?.recommendedWakeTime) {
-			return prediction.rescueNap.recommendedWakeTime;
+		if (displayPrediction.rescueNap?.recommendedWakeTime) {
+			return displayPrediction.rescueNap.recommendedWakeTime;
 		}
 		return null;
 	});
@@ -341,12 +371,12 @@
 	// Skipped-nap visuals: keep the missed slot on the arc + render the rescue
 	// window when the engine suggests one. Earlier-bedtime suggestions live in
 	// the Timer, not the arc (they're a time shift, not a new blob).
-	const arcSkippedNap = $derived(prediction?.skippedNap ?? null);
+	const arcSkippedNap = $derived(displayPrediction?.skippedNap ?? null);
 	// Arc rescue blob spans the recommended start → wake-by cap, mirroring the
 	// "put down kl. X, vekk innan Y" Timer copy.
 	const arcRescueWindow = $derived(
-		prediction?.postSkipPlan?.kind === 'rescue'
-			? { earliest: prediction.postSkipPlan.recommendedStart, latest: prediction.postSkipPlan.wakeBy }
+		displayPrediction?.postSkipPlan?.kind === 'rescue'
+			? { earliest: displayPrediction.postSkipPlan.recommendedStart, latest: displayPrediction.postSkipPlan.wakeBy }
 			: null,
 	);
 
@@ -546,6 +576,11 @@
 		// Abandoned (>48h) open session: no meaningful recovery, so force the
 		// "when did they wake" onboarding regardless of time of day.
 		if (staleActiveSleep?.staleStatus === 'abandoned') return true;
+		// Brand-new baby with no history at all: guide them at any hour (the
+		// onboarding seed step may have been skipped). `calibration` is null
+		// until the engine has real sleep data, so this only fires on a cold
+		// start — this is what fixes "nothing shows" after onboarding past midday.
+		if (!s.priorOvernightSleep && !prediction?.calibration) return true;
 		const h = new Date().getHours();
 		return h >= 5 && h < 13;
 	});
@@ -814,8 +849,8 @@
 				{todaySleeps}
 				{ageMonths}
 				{baby}
-				napsAllDone={prediction?.napsAllDone && prediction?.postSkipPlan?.kind !== 'rescue'}
-				wakeCapActive={!!(activeSleep && !activeSleep.end_time && activeSleep.type === 'nap' && (prediction?.napBudget || prediction?.rescueNap))}
+				napsAllDone={displayPrediction?.napsAllDone && displayPrediction?.postSkipPlan?.kind !== 'rescue'}
+				wakeCapActive={!!(activeSleep && !activeSleep.end_time && activeSleep.type === 'nap' && (displayPrediction?.napBudget || displayPrediction?.rescueNap))}
 				{onSleepStarted}
 				{onSleepEnded}
 			/>
@@ -845,7 +880,7 @@
 			/>
 			<Timer
 				{activeSleep}
-				{prediction}
+				prediction={displayPrediction}
 				{todayWakeUp}
 				{todaySleeps}
 				{todayNightWakings}
@@ -873,8 +908,8 @@
 			{/if}
 		</div>
 
-		{#if prediction?.continuationWindow && (!activeSleep || activeSleep.end_time)}
-			{@const cw = prediction.continuationWindow}
+		{#if displayPrediction?.continuationWindow && (!activeSleep || activeSleep.end_time)}
+			{@const cw = displayPrediction.continuationWindow}
 			{@const closesIn = new Date(cw.closesAt).getTime() - now}
 			<div class="continuation-banner" data-testid="continuation-banner">
 				<div class="continuation-title">💤 Forleng luren</div>
@@ -891,8 +926,8 @@
 			</div>
 		{/if}
 
-		{#if prediction?.napBudget && activeSleep && !activeSleep.end_time && activeSleep.type === 'nap'}
-			{@const nb = prediction.napBudget}
+		{#if displayPrediction?.napBudget && activeSleep && !activeSleep.end_time && activeSleep.type === 'nap'}
+			{@const nb = displayPrediction.napBudget}
 			{@const wakeAt = new Date(nb.wakeBy)}
 			{@const wakeCountdown = wakeAt.getTime() - now}
 			<div class="nap-budget-banner" data-testid="nap-budget-banner">
@@ -917,8 +952,8 @@
 					{/if}
 				</div>
 				{#if showNapBudgetExplain}
-					{@const cyc = prediction.learnedSchedule?.sleepCycle}
-					{@const cycMin = cyc?.minutes ?? prediction.learnedSchedule?.sleepCycleMin ?? 55}
+					{@const cyc = displayPrediction.learnedSchedule?.sleepCycle}
+					{@const cycMin = cyc?.minutes ?? displayPrediction.learnedSchedule?.sleepCycleMin ?? 55}
 					{@const cycLabel = cyc?.source === 'learned' && cyc.confidence !== 'low'
 						? `hennar lærte syklus (${cycMin} min)`
 						: `typisk syklus for alderen (${cycMin} min)`}
@@ -935,22 +970,22 @@
 			</div>
 		{/if}
 
-		{#if prediction?.rescueNap && activeSleep && !activeSleep.end_time && activeSleep.type === 'nap'}
-			{@const recWake = new Date(prediction.rescueNap.recommendedWakeTime)}
+		{#if displayPrediction?.rescueNap && activeSleep && !activeSleep.end_time && activeSleep.type === 'nap'}
+			{@const recWake = new Date(displayPrediction.rescueNap.recommendedWakeTime)}
 			{@const recCountdown = recWake.getTime() - now}
 			<div class="rescue-nap-banner" data-testid="rescue-nap-banner">
 				<div class="rescue-nap-title">💡 Kort ekstralur</div>
 				<div class="rescue-nap-body">
 					{#if recCountdown > 0}
-						Tilrådd å vekka kl. {formatTime(prediction.rescueNap.recommendedWakeTime)} ({formatDuration(recCountdown)})
+						Tilrådd å vekka kl. {formatTime(displayPrediction.rescueNap.recommendedWakeTime)} ({formatDuration(recCountdown)})
 					{:else}
 						Tilrådd å vekka no — slike skal vere korte
 					{/if}
 				</div>
 				<div class="rescue-nap-hint">
-					{#if prediction.rescueNap.reason === 'short_prior_nap'}
+					{#if displayPrediction.rescueNap.reason === 'short_prior_nap'}
 						Førre lur var under forventa. Vekking i lett fase gjev mjukare oppvakning og held søvntrykket til natta.
-					{:else if prediction.rescueNap.reason === 'extra_nap'}
+					{:else if displayPrediction.rescueNap.reason === 'extra_nap'}
 						Ekstra lur utover forventa — vekking i lett fase gjev mjukare oppvakning og beskyttar leggetida.
 					{:else}
 						Kort førre lur + ekstra lur — vekking i lett fase beskyttar både mjuk oppvakning og leggetida.

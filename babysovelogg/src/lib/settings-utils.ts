@@ -40,6 +40,15 @@ export const POTTY_OPTIONS: PottyOption[] = [
 	{ value: true, label: '🚽 Pottetrening' },
 ];
 
+// --- First-day seed (onboarding) ---
+
+/** What the onboarding seed step captures for a freshly-created child: either
+ *  this morning's wake time (→ day.started) or tonight's bedtime (→ an active
+ *  night sleep). */
+export type SeedChoice =
+	| { kind: "wake"; date: string; time: string }
+	| { kind: "sleep"; date: string; time: string };
+
 // --- Event builders ---
 
 export interface SettingsPayload {

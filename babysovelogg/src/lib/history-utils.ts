@@ -76,15 +76,19 @@ export type HistoryEntry =
 
 // ── Data fetching ────────────────────────────────────────────────
 
-export async function fetchHistory(limit = 50): Promise<{
+export async function fetchHistory(
+	limit = 50,
+	baby?: 'all' | number,
+): Promise<{
 	sleeps: SleepLogRow[];
 	diapers: DiaperLogRow[];
 	nightWakings: NightWakingRow[];
 }> {
+	const q = baby != null ? `&baby=${baby}` : '';
 	const [sleeps, diapers, nightWakings] = await Promise.all([
-		fetch(`/api/sleeps?limit=${limit}`).then((r) => r.json()) as Promise<SleepLogRow[]>,
-		fetch(`/api/diapers?limit=${limit}`).then((r) => r.json()) as Promise<DiaperLogRow[]>,
-		fetch(`/api/night-wakings?limit=${limit}`).then((r) => r.json()) as Promise<NightWakingRow[]>,
+		fetch(`/api/sleeps?limit=${limit}${q}`).then((r) => r.json()) as Promise<SleepLogRow[]>,
+		fetch(`/api/diapers?limit=${limit}${q}`).then((r) => r.json()) as Promise<DiaperLogRow[]>,
+		fetch(`/api/night-wakings?limit=${limit}${q}`).then((r) => r.json()) as Promise<NightWakingRow[]>,
 	]);
 	return { sleeps, diapers, nightWakings };
 }

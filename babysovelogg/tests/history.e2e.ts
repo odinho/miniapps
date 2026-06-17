@@ -5,6 +5,7 @@ import {
   setWakeUpTime,
   seedBabyWithSleep,
   addActiveSleep,
+  addCompletedSleep,
   getDb,
   generateId,
 } from "./fixtures";
@@ -102,4 +103,29 @@ test('Active sleep shows "pågår…" in history', async ({ page }) => {
   // The active nap should show "pågår…"
   const activeItem = sleepItems.filter({ hasText: "pågår…" });
   await expect(activeItem.locator(".log-duration")).toHaveText("pågår…");
+});
+
+test("multi-baby log labels each entry and filters by child", async ({ page }) => {
+  const ada = createBaby("Ada", "2025-06-12");
+  const bo = createBaby("Bo", "2025-06-12");
+  const hr = 3600 * 1000;
+  const now = Date.now();
+  addCompletedSleep(ada, new Date(now - 5 * hr).toISOString(), new Date(now - 4 * hr).toISOString(), "nap");
+  addCompletedSleep(bo, new Date(now - 3 * hr).toISOString(), new Date(now - 2 * hr).toISOString(), "nap");
+
+  await page.goto("/history");
+
+  // Filter pills show only in multi-baby mode; default "Alle" shows both.
+  await expect(page.getByTestId("log-baby-filter")).toBeVisible({ timeout: 5000 });
+  await expect(page.locator(".sleep-log-item")).toHaveCount(2);
+  await expect(page.getByTestId("log-baby-chip")).toHaveCount(2);
+
+  // Narrow to Bo → only Bo's entry, labelled.
+  await page.getByTestId("log-baby-filter").getByRole("button", { name: "Bo", exact: true }).click();
+  await expect(page.locator(".sleep-log-item")).toHaveCount(1);
+  await expect(page.getByTestId("log-baby-chip")).toHaveText("Bo");
+
+  // Back to everyone.
+  await page.getByTestId("log-baby-filter").getByRole("button", { name: "Alle" }).click();
+  await expect(page.locator(".sleep-log-item")).toHaveCount(2);
 });

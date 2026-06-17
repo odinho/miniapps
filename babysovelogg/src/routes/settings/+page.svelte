@@ -8,9 +8,12 @@
 		POTTY_OPTIONS,
 		buildBabyEvent,
 		validateSettings,
+		type SeedChoice,
 	} from '$lib/settings-utils.js';
+	import { generateSleepId } from '$lib/identity.js';
 	import DateInput from '$lib/components/DateInput.svelte';
 	import TimeInput from '$lib/components/TimeInput.svelte';
+	import WakeOrSleepSeed from '$lib/components/WakeOrSleepSeed.svelte';
 	import {
 		isSupported as isNotifSupported,
 		getStatus as getNotifStatus,
@@ -56,6 +59,12 @@
 	let nameError = $state(false);
 	let dateError = $state(false);
 	let saving = $state(false);
+	// Non-null after creating a child during onboarding: render the first-day
+	// seed step (wake/bedtime) for that child instead of redirecting to home.
+	let seedBabyId = $state<number | null>(null);
+	const seedBaby = $derived(
+		seedBabyId != null ? (babies.find((b) => b.baby?.id === seedBabyId)?.baby ?? s.baby) : null,
+	);
 	let toast = $state<{ text: string; type: 'success' | 'error' | 'warning' } | null>(null);
 	let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -189,6 +198,10 @@
 			return;
 		}
 
+		// Capture before the await: sendEvents updates appState, which flips the
+		// reactive `isNew`/`isOnboarding` derivations the moment the new baby
+		// lands in state.
+		const creating = isNew;
 		saving = true;
 		const event = buildBabyEvent(
 			{
@@ -199,7 +212,7 @@
 				trackDiaper: trackDiaperEnabled,
 				targetBedtime: bedtimeEnabled ? (targetBedtime || '19:00') : null,
 			},
-			isNew,
+			creating,
 			baby?.id,
 		);
 
@@ -209,12 +222,81 @@
 				showToast(appState.error ?? 'Feil ved lagring', 'error');
 				return;
 			}
-			goto('/');
+			if (creating) {
+				// Newly created child → guide the first day via the seed step. The
+				// newest baby (primary alias) is the one we just made.
+				seedBabyId = sendResult.baby?.id ?? null;
+				if (seedBabyId == null) goto('/');
+			} else {
+				goto('/');
+			}
 		} catch (err) {
 			showToast(`Feil ved lagring: ${err instanceof Error ? err.message : 'ukjend feil'}`, 'error');
 		} finally {
 			saving = false;
 		}
+	}
+
+	// --- onboarding seed step ---
+	function seedToIso(seed: SeedChoice): string | null {
+		if (!/^\d{4}-\d{2}-\d{2}$/.test(seed.date) || !/^\d{2}:\d{2}$/.test(seed.time)) return null;
+		const candidate = new Date(`${seed.date}T${seed.time}:00`);
+		if (Number.isNaN(candidate.getTime())) return null;
+		return candidate.toISOString();
+	}
+
+	// Send the first-day seed for the just-created child. Returns true when it's
+	// safe to navigate on (sent OK, or nothing meaningful to send). A bad time is
+	// skipped silently rather than trapping the parent on the step.
+	async function sendSeed(seed: SeedChoice): Promise<boolean> {
+		if (seedBabyId == null) return true;
+		const iso = seedToIso(seed);
+		if (iso == null) return true;
+		const event =
+			seed.kind === 'wake'
+				? { type: 'day.started', payload: { babyId: seedBabyId, wakeTime: iso } }
+				: {
+						type: 'sleep.started',
+						payload: {
+							babyId: seedBabyId,
+							startTime: iso,
+							type: 'night',
+							sleepDomainId: generateSleepId(),
+						},
+					};
+		const result = await sync.sendEvents([event]);
+		if (result == null) {
+			showToast(appState.error ?? 'Feil ved lagring', 'error');
+			return false;
+		}
+		return true;
+	}
+
+	async function seedAndGo(seed: SeedChoice) {
+		if (saving) return;
+		saving = true;
+		try {
+			if (await sendSeed(seed)) goto('/');
+		} finally {
+			saving = false;
+		}
+	}
+
+	async function seedAndAddAnother(seed: SeedChoice) {
+		if (saving) return;
+		saving = true;
+		try {
+			if (await sendSeed(seed)) {
+				seedBabyId = null;
+				goto('/settings?new=1');
+			}
+		} finally {
+			saving = false;
+		}
+	}
+
+	function skipSeed() {
+		goto('/');
 	}
 
 	// Family-level twin/sibling override (null = auto-infer from age gap).
@@ -268,6 +350,17 @@
 
 <div class="view">
 	<div class="settings">
+		{#if seedBabyId != null && seedBaby}
+			<WakeOrSleepSeed
+				name={seedBaby.name}
+				timezone={seedBaby.timezone || 'UTC'}
+				busy={saving}
+				canAddAnother={canAddChild}
+				onSeed={seedAndGo}
+				onSeedAndAdd={seedAndAddAnother}
+				onSkip={skipSeed}
+			/>
+		{:else}
 		{#if isOnboarding}
 			<div class="onboarding-icon">👶</div>
 			<h1>Velkomen til Babysovelogg</h1>
@@ -280,26 +373,34 @@
 			<h1>Innstillingar{#if babies.length > 1 && baby}<span style="color: var(--text-light); font-weight: normal;"> · {baby.name}</span>{/if}</h1>
 		{/if}
 
-		<!-- Child tabs + add-child entry. Hidden during first-run onboarding.
-		     Max 2 children, so this is "this one / the other / add one" — no list. -->
-		{#if !isOnboarding && (babies.length > 1 || isCreatingNew || canAddChild)}
+		<!-- Child tabs. Hidden during first-run onboarding. Switching between the
+		     two children, or the "+ Nytt barn" placeholder while creating. The
+		     add-child entry at N=1 lives as a quiet link by the Namn label below. -->
+		{#if !isOnboarding && (babies.length > 1 || isCreatingNew)}
 			<div class="type-pills" style="margin-bottom: 16px;" data-testid="child-tabs">
-				{#if babies.length > 1 || isCreatingNew}
-					{#each babies as b (b.baby?.id)}
-						<button
-							class="type-pill"
-							class:active={!isCreatingNew && baby?.id === b.baby?.id}
-							onclick={() => goto(`/settings?baby=${b.baby?.id}`)}
-						>
-							{b.baby?.name}
-						</button>
-					{/each}
-				{/if}
-				{#if isCreatingNew}
-					<button class="type-pill active" disabled>+ Nytt barn</button>
-				{:else if canAddChild}
+				{#each babies as b (b.baby?.id)}
 					<button
 						class="type-pill"
+						class:active={!isCreatingNew && baby?.id === b.baby?.id}
+						onclick={() => goto(`/settings?baby=${b.baby?.id}`)}
+					>
+						{b.baby?.name}
+					</button>
+				{/each}
+				{#if isCreatingNew}
+					<button class="type-pill active" disabled>+ Nytt barn</button>
+				{/if}
+			</div>
+		{/if}
+
+		<!-- Baby name -->
+		<div class="form-group">
+			<div class="label-row">
+				<label for="baby-name">Namn</label>
+				{#if canAddChild && !isCreatingNew && babies.length === 1}
+					<button
+						type="button"
+						class="add-child-link"
 						data-testid="add-child"
 						onclick={() => goto('/settings?new=1')}
 					>
@@ -307,11 +408,6 @@
 					</button>
 				{/if}
 			</div>
-		{/if}
-
-		<!-- Baby name -->
-		<div class="form-group">
-			<label for="baby-name">Namn</label>
 			<input
 				id="baby-name"
 				type="text"
@@ -585,6 +681,7 @@
 			<div>Babysovelogg v{__APP_VERSION__}</div>
 			<div style="margin-top: 4px;">Søvnsporing for den vesle</div>
 		</div>
+		{/if}
 	</div>
 </div>
 
@@ -601,6 +698,29 @@
 {/if}
 
 <style>
+	/* Namn label row: label left, quiet "+ Legg til barn" link right (N=1). */
+	.label-row {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 8px;
+	}
+
+	.add-child-link {
+		background: none;
+		border: none;
+		padding: 0;
+		font: inherit;
+		font-size: 0.85rem;
+		color: var(--lavender-dark);
+		cursor: pointer;
+		white-space: nowrap;
+	}
+
+	.add-child-link:hover {
+		text-decoration: underline;
+	}
+
 	.notif-prefs {
 		display: flex;
 		flex-direction: column;

@@ -1343,3 +1343,31 @@ Failing tests:
 Action: refresh snapshots with `bunx playwright test --update-snapshots`
 on a clean run, or tighten the per-test fixture so the visual output
 stops drifting per Chromium minor.
+
+## Multi-baby onboarding/log — deferred (P3, 2026-06-17)
+
+Shipped: guided "what next" seed step after creating a child (wake/bedtime,
+context-aware), add-another loop, cold-start home prompt at any hour, per-child
+log filter + name chips, subtle add-child link in settings, and suppressing the
+skipped-nap/rescue/budget nudges for a zero-data baby. Items deferred:
+
+- **Cold-start suggestion gating is zero-data only.** The home hides the
+  skipped-nap / rescue / nap-budget / continuation nudges only while a baby has
+  *no* sleep history (`isColdStart` in `routes/+page.svelte` → `displayPrediction`).
+  The user's broader ask was to gate engine suggestions on having "some data it
+  can reliably look at" — a baby with 1–2 logged naps (still age-default trust)
+  gets the nudges back even though predictions are barely learned. Consider
+  gating on calibration trust / a reliability threshold instead of pure
+  zero-data, ideally in the engine so arc/Timer/banners agree by construction.
+- **3+ children.** The whole family model hard-caps at 2 (`canAddChild`,
+  twin-vs-sibling mode, "begge" bulk actions, overlap roll-ups, `bothAsleep`,
+  `firstWake`). The user asked to "keep going / add three". Lifting the cap is a
+  large unit: generalise family mode (twin only meaningful pairwise), the
+  FamilyHome lanes already scale, but the bulk "begge" + overlap logic assume
+  exactly two. Scope it as its own effort before relaxing `canAddChild`.
+- **Off-day toggle + "+ Legg til søvn" target the primary baby in the log's
+  "Alle" view.** When the multi-baby log filter is on "Alle", `history/+page.svelte`
+  falls back to the primary baby for the day-header off-day toggle and the manual
+  add-sleep modal (per-child when a single child is selected). Low impact (the
+  per-child path is the common one); consider disabling the off-day toggle in the
+  "Alle" view or prompting which child.

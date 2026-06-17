@@ -4,13 +4,18 @@ import { db, resolveBaby } from "$lib/server/db.js";
 import { parseIntParam } from "$lib/server/request-helpers.js";
 
 export const GET: RequestHandler = ({ url }) => {
-  const baby = resolveBaby(url);
-  if (!baby) return json([]);
+  const allBabies = url.searchParams.get("baby") === "all";
+  const baby = allBabies ? null : resolveBaby(url);
+  if (!allBabies && !baby) return json([]);
 
   const from = url.searchParams.get("from");
   const limit = parseIntParam(url, "limit", { default: 50, min: 1, max: 1000 }) ?? 50;
-  let sql = "SELECT * FROM diaper_log WHERE baby_id = ? AND deleted = 0";
-  const params: (string | number)[] = [baby.id];
+  let sql = "SELECT * FROM diaper_log WHERE deleted = 0";
+  const params: (string | number)[] = [];
+  if (!allBabies) {
+    sql += " AND baby_id = ?";
+    params.push(baby!.id);
+  }
   if (from) {
     sql += " AND time >= ?";
     params.push(from);

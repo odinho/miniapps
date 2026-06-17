@@ -9,6 +9,7 @@ test("SSE: Context B sees sleep started in Context A without refresh", async ({
   await page.locator('#baby-name').fill("SSE-Baby");
   await fillDateInput(page.locator('input.date-input'), "2025-06-12");
   await page.getByRole("button", { name: "Kom i gang ✨" }).click();
+  await page.getByTestId("seed-primary").click();
   await expect(page.getByTestId("baby-name")).toHaveText("SSE-Baby", { timeout: 5000 });
 
   const ctx2 = await browser.newContext();
@@ -32,6 +33,7 @@ test("SSE: Both contexts work independently", async ({ page, browser }) => {
   await page.locator('#baby-name').fill("SSE-Baby2");
   await fillDateInput(page.locator('input.date-input'), "2025-06-12");
   await page.getByRole("button", { name: "Kom i gang ✨" }).click();
+  await page.getByTestId("seed-primary").click();
   await expect(page.getByTestId("baby-name")).toHaveText("SSE-Baby2", { timeout: 5000 });
 
   const ctx2 = await browser.newContext();

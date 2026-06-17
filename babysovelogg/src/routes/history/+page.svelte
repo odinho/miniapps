@@ -37,10 +37,32 @@
 	let addingWakingForNight = $state<SleepLogRow | null>(null);
 	let showManualSleep = $state(false);
 
-	const baby = $derived(appState.state.baby);
-	const offDays = $derived(appState.state.offDays);
+	const babies = $derived(appState.babies);
+	const isMulti = $derived(babies.length > 1);
+	// 'all' shows every child (with name chips); a number narrows to one child.
+	let selectedBaby = $state<'all' | number>('all');
 
-	const grouped = $derived(groupByDate(entries));
+	// The child that off-day toggles + "+ Legg til søvn" act on: the selected
+	// one, or the primary baby in the combined "Alle" view.
+	const baby = $derived(
+		selectedBaby !== 'all'
+			? (appState.babyById(selectedBaby)?.baby ?? appState.state.baby)
+			: appState.state.baby,
+	);
+	const offDays = $derived(
+		selectedBaby !== 'all'
+			? (appState.babyById(selectedBaby)?.offDays ?? appState.state.offDays)
+			: appState.state.offDays,
+	);
+
+	function babyName(id: number): string {
+		return appState.babyById(id)?.baby?.name ?? '';
+	}
+
+	const visibleEntries = $derived(
+		selectedBaby === 'all' ? entries : entries.filter((e) => e.baby_id === selectedBaby),
+	);
+	const grouped = $derived(groupByDate(visibleEntries));
 
 	let offDayBusyFor = $state<string | null>(null);
 	async function handleToggleOffDay(date: string) {
@@ -56,7 +78,9 @@
 	async function load() {
 		loading = true;
 		try {
-			const data = await fetchHistory();
+			const multi = babies.length > 1;
+			// Pull a larger window across babies so neither child gets truncated.
+			const data = await fetchHistory(multi ? 50 * babies.length : 50, multi ? 'all' : undefined);
 			entries = mergeEntries(data.sleeps, data.diapers, data.nightWakings);
 		} finally {
 			loading = false;
@@ -96,6 +120,9 @@
 	}
 
 	$effect(() => {
+		// Re-fetch when the family size becomes known (single ↔ multi flips the
+		// query from one baby to all). babies populates async after mount.
+		void babies.length;
 		load();
 	});
 </script>
@@ -115,11 +142,32 @@
 		{/if}
 	</div>
 
+	{#if isMulti}
+		<div class="type-pills" style="margin: 8px 0 4px;" data-testid="log-baby-filter">
+			<button
+				class="type-pill"
+				class:active={selectedBaby === 'all'}
+				onclick={() => (selectedBaby = 'all')}
+			>
+				Alle
+			</button>
+			{#each babies as b (b.baby?.id)}
+				<button
+					class="type-pill"
+					class:active={selectedBaby === b.baby?.id}
+					onclick={() => (selectedBaby = b.baby?.id ?? 'all')}
+				>
+					{b.baby?.name}
+				</button>
+			{/each}
+		</div>
+	{/if}
+
 	{#if loading}
 		<div class="history-empty">
 			<div style="font-size: 1.2rem; color: var(--text-light);">Lastar…</div>
 		</div>
-	{:else if entries.length === 0}
+	{:else if visibleEntries.length === 0}
 		<div class="history-empty">
 			<div style="font-size: 3rem; margin-bottom: 16px;">📋</div>
 			<div>Ingen oppføringar enno</div>
@@ -159,6 +207,7 @@
 						<div class="sleep-log-item" onclick={() => openSleepEdit(entry)}>
 							<span class="log-icon">{getSleepIcon(entry.type)}</span>
 							<div class="log-info">
+								{#if isMulti}<span class="log-baby-chip" data-testid="log-baby-chip">{babyName(entry.baby_id)}</span>{/if}
 								<div class="log-times">{formatSleepTimes(entry)}</div>
 								<div class="log-meta">
 									{getSleepTypeLabel(entry.type)}
@@ -197,6 +246,7 @@
 						<div class="sleep-log-item diaper-log-item" onclick={() => openDiaperEdit(entry)}>
 							<span class="log-icon">{getDiaperIcon(entry.type)}</span>
 							<div class="log-info">
+								{#if isMulti}<span class="log-baby-chip" data-testid="log-baby-chip">{babyName(entry.baby_id)}</span>{/if}
 								<div class="log-times">{formatTime(entry.time)}</div>
 								<div class="log-meta">{getDiaperMeta(entry)}</div>
 								{#if entry.note}
@@ -211,6 +261,7 @@
 						<div class="sleep-log-item night-waking-log-item" onclick={() => openNightWakingEdit(entry)} data-testid="night-waking-row">
 							<span class="log-icon">🌙</span>
 							<div class="log-info">
+								{#if isMulti}<span class="log-baby-chip" data-testid="log-baby-chip">{babyName(entry.baby_id)}</span>{/if}
 								<div class="log-times">
 									{formatTime(entry.start_time)}{entry.end_time ? `–${formatTime(entry.end_time)}` : ' (pågår)'}
 								</div>
@@ -282,6 +333,20 @@
 {/if}
 
 <style>
+	/* Per-child label in the combined multi-baby log. */
+	.log-baby-chip {
+		display: inline-block;
+		font-size: 0.65rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--lavender-dark);
+		background: color-mix(in srgb, var(--lavender) 30%, var(--white));
+		border-radius: 999px;
+		padding: 1px 8px;
+		margin-bottom: 3px;
+	}
+
 	.history-day-header {
 		display: flex;
 		justify-content: space-between;

@@ -92,6 +92,10 @@ test("can add a second child from settings", async ({ page, request }) => {
   await fillDateInput(page.locator("input.date-input"), "2025-06-12");
   await page.getByRole("button", { name: "Legg til barn" }).click();
 
+  // The new child gets the first-day seed step; confirm it to land on home.
+  await expect(page.getByTestId("seed-step")).toBeVisible({ timeout: 5000 });
+  await page.getByTestId("seed-primary").click();
+
   await expect(page).toHaveURL("/", { timeout: 5000 });
   expect(await babyNames(request)).toEqual(["Ada", "Bo"]);
 });
