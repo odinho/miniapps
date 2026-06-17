@@ -25,7 +25,7 @@
 #   deploy [family...]        build + rsync code, then restart families (default: all) and warm up
 #   restart <family|all>      restart instance(s) and warm up
 #   logs <family> [args...]   journalctl -u babysovelogg@<family> (extra args pass through, e.g. -f -n100)
-#   add <name>                onboard a family: pick port+slug, mint VAPID keys, patch ansible vars, run playbook, verify
+#   add <name> [slug]         onboard a family: pick port (+slug, or use the given one), mint VAPID keys, patch ansible vars, run playbook, verify
 #   inspect <family>          pull the family db to local/imports/ and run scripts/inspect-db.ts
 #   rebuild <family>          replay events / rebuild projections (POST /api/admin/rebuild on the family's port)
 #   backup [family|all]       rsync family data dir(s) into local/backups/
@@ -174,9 +174,10 @@ cmd_backup() {
 }
 
 cmd_add() {
-  [ $# -ge 1 ] || die "usage: add <name>"
-  local name="$1"
+  [ $# -ge 1 ] || die "usage: add <name> [slug]"
+  local name="$1" slug_arg="${2:-}"
   [[ "$name" =~ ^[a-z][a-z0-9]*$ ]] || die "family name must be lowercase alnum, starting with a letter"
+  [ -z "$slug_arg" ] || [[ "$slug_arg" =~ ^[a-z0-9-]+$ ]] || die "slug must be lowercase alnum/hyphen"
   [ -n "${ANSIBLE_DIR:-}" ] || die "ANSIBLE_DIR is not set (path to the provisioning repo's ansible/ dir)"
   local vars="$ANSIBLE_DIR/$VARS_FILE"
   [ -f "$vars" ] || die "vars file not found: $vars"
@@ -189,10 +190,20 @@ cmd_add() {
   port=$(( ${maxport:-$((PORT_MIN-1))} + 1 ))
   [ "$port" -ge "$PORT_MIN" ] || port="$PORT_MIN"
 
-  # Unguessable-but-typable slug suffix (no vowels/look-alikes).
+  # Slug: explicit arg wins (e.g. a guessable `sandbox` for a throwaway test
+  # instance); otherwise append an unguessable-but-typable suffix (no
+  # vowels/look-alikes) so the URL doubles as the credential.
   local suffix slug
-  suffix="$(tr -dc 'a-hjkmnp-z2-9' </dev/urandom | head -c 5)"
-  slug="$name-$suffix"
+  if [ -n "$slug_arg" ]; then
+    slug="$slug_arg"
+  else
+    # `head -c 5` closes the pipe early; tr then takes SIGPIPE off infinite
+    # /dev/urandom, which pipefail+errexit would turn into a silent abort. The
+    # trailing `|| true` keeps the substitution's status 0 — head already has
+    # its 5 bytes by then.
+    suffix="$(LC_ALL=C tr -dc 'a-hjkmnp-z2-9' </dev/urandom 2>/dev/null | head -c 5 || true)"
+    slug="$name-$suffix"
+  fi
 
   echo "==> mint VAPID keys for $name"
   local vapid pub priv
