@@ -132,6 +132,29 @@ Touch these in order:
 4. Unit tests in [`tests/unit/notification-scheduler.unit.ts`](../tests/unit/notification-scheduler.unit.ts)
 5. If new tables: update [`src/lib/server/projections.ts`](../src/lib/server/projections.ts) rebuild cleanup
 
+## Wall-clock assumptions
+
+The engine assumes a conventional day/night schedule. These anchors would
+fight an inverted schedule (e.g. bed 01:00, wake 12:00) — a baby awake at
+03:00 reads as "deep-night". Listed so the assumption is explicit; unusual
+schedules may need the strategy set manually.
+
+- `classifySleepType` / `classifySleepTypeByHour` (`engine/classification.ts:6,14`)
+  — auto-type a sleep by clock hour when the caller doesn't pass one
+  (before ~06:00 / after ~18:00 ⇒ `night`). Default `hour` is client-local
+  `new Date().getHours()`.
+- `shouldReclassifyAsNight` (`engine/classification.ts:46`) — baby-tz-aware
+  via `getHourInTz` when a `tz` is passed.
+- `getLocalMinuteOfDay` / habitual-anchor + plan scoring — bedtime habitual
+  anchor assumes a 17:00–23:00 range; `recommendBedtime` clamps there.
+- Longest sleep typed as "night" drives night-duration weighting.
+- DST transition detection uses local time (`engine/dst.ts`).
+- Arc geometry (`arc-utils.ts` `getDayArcConfig`/`getNightArcConfig`,
+  `hourOfDay`) uses browser-local `Date.getHours()`, not baby tz — travel or
+  a remote browser shifts arc geometry while predictions stay baby-tz.
+- Timer day-phase gates (`timer-state.ts:131` `deep-night`/evening) read
+  client-local hour.
+
 ## Easy Mistakes To Avoid
 
 - Updating projections but not optimistic client state
