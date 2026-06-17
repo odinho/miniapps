@@ -97,10 +97,6 @@ is for tracked product/engine/test work.
   no active sleep, surface a directive "vurder å gi seg og prøv igjen om ~20
   min" banner. Ties into existing overdue logic; consider a per-baby latency
   threshold.
-- **Cross-midnight end-sleep date (B31).** End-sleep modal uses HH:MM only and
-  infers the date; for a sleep started one day and ended the next the
-  inference can pick the wrong day. Derive from the previous wake anchor or add
-  an optional date override.
 ## Parked (keep — has a concrete future trigger)
 
 - **`getLearnedBedtimeWakeWindow` robustness — DO NOT re-ship blind.** The

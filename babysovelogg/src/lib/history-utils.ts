@@ -309,3 +309,19 @@ export function isoToTimeInput(iso: string): string {
 export function dateTimeToIso(dateStr: string, timeStr: string): string {
 	return new Date(`${dateStr}T${timeStr}`).toISOString();
 }
+
+/**
+ * Resolve a wake time entered as HH:MM (no date) into a full ISO instant,
+ * choosing the first occurrence of that clock time at or after the sleep
+ * start. Without this, a "00:30" wake on a 23:00 night-start would infer
+ * today's date from the wall clock and land before the start (B31). Local
+ * time, matching `dateTimeToIso`.
+ */
+export function firstWakeIsoAtOrAfter(startIso: string, hhmm: string): string {
+	const start = new Date(startIso);
+	const [h, m] = hhmm.split(':').map(Number);
+	const end = new Date(start);
+	end.setHours(h, m, 0, 0);
+	if (end.getTime() < start.getTime()) end.setDate(end.getDate() + 1);
+	return end.toISOString();
+}

@@ -7,6 +7,7 @@
 	import { formatDuration } from '$lib/utils.js';
 	import { toggleOffDay, localDateForOffDay } from '$lib/off-day-actions.js';
 	import { isWithinEndUndoWindow } from '$lib/end-undo.js';
+	import { dateTimeToIso, firstWakeIsoAtOrAfter } from '$lib/history-utils.js';
 	import TimeInput from './TimeInput.svelte';
 	import DateInput from './DateInput.svelte';
 
@@ -70,9 +71,19 @@
 
 	const summary = $derived(getBedtimeSummary(sleepSnapshot));
 
+	// The resolved wake instant. When the date picker is shown (stale resolve),
+	// trust the explicit date; otherwise infer the date as the first occurrence
+	// of wakeTime at or after the sleep start so a cross-midnight wake (e.g.
+	// 00:30 after a 23:00 start) lands on the right day instead of "today" (B31).
+	const wakeEndIso = $derived(
+		closingStale
+			? dateTimeToIso(wakeDate, `${wakeTime}:00`)
+			: firstWakeIsoAtOrAfter(sleepSnapshot.start_time, wakeTime),
+	);
+
 	const sleepDurationMs = $derived.by(() => {
 		const start = new Date(sleepSnapshot.start_time).getTime();
-		const end = new Date(`${wakeDate}T${wakeTime}:00`).getTime();
+		const end = new Date(wakeEndIso).getTime();
 		return Math.max(0, end - start);
 	});
 
@@ -121,7 +132,7 @@
 		busy = true;
 		try {
 			const endTimeIso = (closingStale || wakeTimeChanged)
-				? new Date(`${wakeDate}T${wakeTime}:00`).toISOString()
+				? wakeEndIso
 				: null;
 			const event = buildWakeUpEvent(sleepDomainId, wokeBy, notes, endTimeIso, wakeMood);
 			if (event) {
@@ -153,8 +164,7 @@
 	const offDayList = $derived(offDays ?? appState.state.offDays);
 	const wakeDateForOffDay = $derived.by(() => {
 		if (!offDayBaby) return null;
-		const wakeIso = new Date(`${wakeDate}T${wakeTime}:00`).toISOString();
-		return localDateForOffDay(wakeIso, offDayBaby.timezone || 'UTC');
+		return localDateForOffDay(wakeEndIso, offDayBaby.timezone || 'UTC');
 	});
 	const isOffDay = $derived(
 		wakeDateForOffDay != null && offDayList.includes(wakeDateForOffDay),

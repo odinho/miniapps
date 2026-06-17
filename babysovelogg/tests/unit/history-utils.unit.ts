@@ -31,6 +31,7 @@ import {
 	isoToTimeInput,
 	dateTimeToIso,
 	isEndAtOrBeforeStart,
+	firstWakeIsoAtOrAfter,
 } from '$lib/history-utils.js';
 import type { SleepLogRow, DiaperLogRow } from '$lib/types.js';
 
@@ -561,5 +562,31 @@ describe('isEndAtOrBeforeStart', () => {
 	});
 	test('null end (ongoing) is never before', () => {
 		expect(isEndAtOrBeforeStart('2026-06-10T18:39:00.000Z', null)).toBe(false);
+	});
+});
+
+describe('firstWakeIsoAtOrAfter', () => {
+	// Local-time construction + local getters keep these TZ-agnostic.
+	test('same-day wake keeps the start date', () => {
+		const start = new Date(2026, 2, 27, 14, 0, 0); // local 14:00
+		const end = new Date(firstWakeIsoAtOrAfter(start.toISOString(), '14:30'));
+		expect(end.getHours()).toBe(14);
+		expect(end.getMinutes()).toBe(30);
+		expect(end.getDate()).toBe(27);
+	});
+	test('cross-midnight wake rolls to the next day (B31)', () => {
+		const start = new Date(2026, 2, 27, 23, 0, 0); // local 23:00
+		const end = new Date(firstWakeIsoAtOrAfter(start.toISOString(), '00:30'));
+		expect(end.getTime()).toBeGreaterThan(start.getTime());
+		expect(end.getHours()).toBe(0);
+		expect(end.getMinutes()).toBe(30);
+		expect(end.getDate()).toBe(28);
+	});
+	test('result is always >= start and within 24h', () => {
+		const start = new Date(2026, 5, 10, 18, 39, 0);
+		const end = new Date(firstWakeIsoAtOrAfter(start.toISOString(), '04:00'));
+		const diff = end.getTime() - start.getTime();
+		expect(diff).toBeGreaterThan(0);
+		expect(diff).toBeLessThan(24 * 60 * 60 * 1000);
 	});
 });
