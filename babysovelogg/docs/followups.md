@@ -108,14 +108,8 @@ is for tracked product/engine/test work.
   infers the date; for a sleep started one day and ended the next the
   inference can pick the wrong day. Derive from the previous wake anchor or add
   an optional date override.
-- **Refresh E2E visual snapshots.** Known stale-Chromium drift (arc-scenes,
-  bugs B11, diaper-stats, stats headers). `bunx playwright test
-  --update-snapshots` on a clean run, or tighten the fixtures.
-
 ### Test coverage / infra quick wins
 
-- Make `dismissSheet()` strict (`tests/fixtures.ts` swallows failures). Pair
-  with the e2e snapshot refresh — both need an e2e run to validate.
 - E2E for the create-mode `NightWakingEditSheet` "Legg til nattvaking" button.
 
 ## Parked (keep — has a concrete future trigger)

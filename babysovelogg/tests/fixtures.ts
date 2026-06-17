@@ -312,11 +312,16 @@ export async function dismissSheet(page: Page) {
   const overlay = page.getByTestId("modal-overlay");
   try {
     await overlay.waitFor({ state: "visible", timeout: 3000 });
-    await page.getByRole("button", { name: "Ferdig" }).click();
-    await overlay.waitFor({ state: "hidden", timeout: 3000 });
   } catch {
-    // No sheet visible, that's fine
+    // No sheet appeared — nothing to dismiss. (Only the "did a sheet open?"
+    // step is best-effort; see below.)
+    return;
   }
+  // A sheet IS up: dismissing it must actually work. Don't swallow a failed
+  // click or a sheet that won't close — that would hide broken modal behaviour
+  // (the whole point of the strict mode).
+  await page.getByRole("button", { name: "Ferdig" }).click();
+  await overlay.waitFor({ state: "hidden", timeout: 3000 });
 }
 
 /** Fill a custom DateInput component (DD.MM.YYYY text input) with an ISO date string (YYYY-MM-DD).
