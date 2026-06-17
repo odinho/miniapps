@@ -59,12 +59,6 @@ is for tracked product/engine/test work.
   `{ cutShort, fulfilledQuota, recoveryWarranted }` (quota looser + age-aware).
   Land when the next nap-budget / cycle work touches this code.
 
-- **NapBudget established caps land mid-cycle.** `computeNapBudget` uses
-  `napBudgetMin − EARLY_WAKE_LEAD_MIN` in established mode → mid-cycle wake, a
-  parent reported the baby cried. Candidate: round the established cap DOWN to
-  the nearest sleep-cycle boundary. Validate with a prod-db backtest
-  (see [[reference_prod_db]]) before shipping — don't change the cap blind.
-
 - **Cold-start suggestion gating is zero-data only.** The home hides
   skipped-nap / rescue / nap-budget / continuation nudges only while a baby
   has *no* history (`isColdStart` in `routes/+page.svelte`). Broader ask: gate
@@ -84,6 +78,14 @@ is for tracked product/engine/test work.
   overnight totals. Pairs with the emerging/schedule learning unit above.
 
 ## Parked (keep — has a concrete future trigger)
+
+- **NapBudget established caps land mid-cycle — DON'T tune blind.**
+  `computeNapBudget` uses `napBudgetMin − EARLY_WAKE_LEAD_MIN` in established
+  mode → mid-cycle wake; a parent reported the baby cried. Candidate: round the
+  established cap DOWN to the nearest sleep-cycle boundary. The repo discipline
+  requires validating cap-math changes against a **prod-db backtest**
+  ([[reference_prod_db]]) before shipping — can't be done from the committed
+  fixtures alone, so this waits for a prod-db pass.
 
 - **`getLearnedBedtimeWakeWindow` robustness — DO NOT re-ship blind.** The
   obvious fix (day-aware samples + robust prior-blended estimate +
