@@ -118,9 +118,6 @@ is for tracked product/engine/test work.
   infers the date; for a sleep started one day and ended the next the
   inference can pick the wrong day. Derive from the previous wake anchor or add
   an optional date override.
-- **Multi-baby log "Alle" view targets primary baby.** Off-day toggle and
-  "+ Legg til søvn" fall back to the primary baby in `history/+page.svelte`'s
-  "Alle" filter. Disable or prompt for child instead.
 - **Refresh E2E visual snapshots.** Known stale-Chromium drift (arc-scenes,
   bugs B11, diaper-stats, stats headers). `bunx playwright test
   --update-snapshots` on a clean run, or tighten the fixtures.

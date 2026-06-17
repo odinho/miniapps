@@ -42,17 +42,24 @@
 	// 'all' shows every child (with name chips); a number narrows to one child.
 	let selectedBaby = $state<'all' | number>('all');
 
-	// The child that off-day toggles + "+ Legg til søvn" act on: the selected
-	// one, or the primary baby in the combined "Alle" view.
+	// The child that off-day toggles + "+ Legg til søvn" act on. In the
+	// combined "Alle" view with more than one child the target is ambiguous,
+	// so we yield null — that disables the off-day toggle (`!baby`) and hides
+	// the add-sleep button rather than silently acting on the primary baby.
+	// With a single child "Alle" is unambiguous and resolves to that baby.
 	const baby = $derived(
 		selectedBaby !== 'all'
 			? (appState.babyById(selectedBaby)?.baby ?? appState.state.baby)
-			: appState.state.baby,
+			: isMulti
+				? null
+				: appState.state.baby,
 	);
 	const offDays = $derived(
 		selectedBaby !== 'all'
 			? (appState.babyById(selectedBaby)?.offDays ?? appState.state.offDays)
-			: appState.state.offDays,
+			: isMulti
+				? []
+				: appState.state.offDays,
 	);
 
 	function babyName(id: number): string {
