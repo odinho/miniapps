@@ -1562,3 +1562,15 @@ html, body {
   border-radius: var(--radius-sm);
   padding: 4px 10px;
 }
+
+/* Night theme: --text/--cream flip light, so the day-mode "dark chip" inversion
+   would render light-on-light. Pin the toast to a dark surface with light text
+   and keep the additive chip's text dark on its gold fill. */
+[data-theme="night"] .undo-toast {
+  background: var(--white); /* #1e2746 — dark navy surface */
+  color: var(--text); /* #e0d8f0 — light */
+}
+
+[data-theme="night"] .undo-toast .btn-additive {
+  color: var(--cream); /* #1a1a2e — dark text on the gold fill */
+}
