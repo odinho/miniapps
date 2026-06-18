@@ -12,9 +12,10 @@ import { formatTime } from './utils.js';
 
 export interface ArcProps {
 	isNightMode: boolean;
+	tz?: string;
 	todaySleeps: Array<{ start_time: string; end_time: string | null; type: 'nap' | 'night' }>;
 	activeSleep: { start_time: string; type: 'nap' | 'night' } | null;
-	prediction: { nextNap: string; bedtime?: string; predictedNaps?: Array<{ startTime: string; endTime: string }> } | null;
+	prediction: { nextNap: string; bedtime?: string; predictedNaps?: Array<{ startTime: string; endTime: string }>; napDurationMin?: number | null } | null;
 	wakeUpTime: string | null;
 	bedtime: string | null;
 	nightEnd: string | null;
@@ -76,6 +77,7 @@ export function buildArcProps(b: BabyState, nowMs: number): ArcProps {
 				nextNap: prediction.nextNap,
 				bedtime: prediction.bedtime ?? undefined,
 				predictedNaps: prediction.predictedNaps ?? undefined,
+				napDurationMin: prediction.learnedSchedule?.napDurationMin ?? null,
 			}
 		: null;
 
@@ -153,6 +155,7 @@ export function buildArcProps(b: BabyState, nowMs: number): ArcProps {
 
 	return {
 		isNightMode,
+		tz: baby?.timezone || undefined,
 		todaySleeps: arcSleeps,
 		activeSleep: arcActiveSleep,
 		prediction: arcPrediction,

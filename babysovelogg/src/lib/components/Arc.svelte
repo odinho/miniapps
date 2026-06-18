@@ -11,8 +11,11 @@
 			nextNap: string;
 			bedtime?: string;
 			predictedNaps?: Array<{ startTime: string; endTime: string }>;
+			napDurationMin?: number | null;
 		} | null;
 		isNightMode: boolean;
+		/** Baby IANA timezone for arc hour math (defaults to runtime tz). */
+		tz?: string;
 		wakeUpTime?: string | null;
 		startTimeLabel?: string | null;
 		endTimeLabel?: string | null;
@@ -66,6 +69,7 @@
 		activeSleep,
 		prediction,
 		isNightMode,
+		tz,
 		wakeUpTime = null,
 		startTimeLabel = null,
 		endTimeLabel = null,
@@ -105,6 +109,7 @@
 			prediction,
 			isNightMode,
 			now,
+			tz,
 			wakeUpTime,
 			startTimeLabel,
 			endTimeLabel,

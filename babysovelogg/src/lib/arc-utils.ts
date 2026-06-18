@@ -1,8 +1,18 @@
 // Pure SVG arc math — no DOM, no Svelte, fully testable.
 
+import { getHourInTz } from "./tz.js";
+
+// Arc hour math is baby-tz-aware (the rest of the engine is): a travelling
+// family or a remote browser must not shift arc geometry while predictions
+// stay in baby tz. The tz rides on the config so every time→fraction call
+// shares the same frame without re-plumbing each call site. Defaults to the
+// runtime's own tz so no-arg callers (tests, dev playground) behave as before.
+const SYSTEM_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 export interface ArcConfig {
   arcStartHour: number;
   arcEndHour: number;
+  tz: string;
 }
 
 // The arc time-fraction math must agree with the labels painted on the
@@ -22,55 +32,53 @@ export function getDayArcConfig(
   wakeUpTime?: string | null,
   bedtime?: string | null,
   now?: Date,
+  tz: string = SYSTEM_TZ,
 ): ArcConfig {
   let arcStartHour = 6;
   if (wakeUpTime) {
-    const wake = new Date(wakeUpTime);
-    arcStartHour = wake.getHours() + wake.getMinutes() / 60;
+    arcStartHour = getHourInTz(new Date(wakeUpTime), tz);
   }
   let arcEndHour = arcStartHour + 12;
   if (bedtime) {
-    const bt = new Date(bedtime);
-    const btHour = bt.getHours() + bt.getMinutes() / 60;
+    const btHour = getHourInTz(new Date(bedtime), tz);
     if (btHour > arcStartHour) arcEndHour = btHour;
   }
   if (now) {
-    const nowHour = now.getHours() + now.getMinutes() / 60;
+    const nowHour = getHourInTz(now, tz);
     if (nowHour > arcEndHour) arcEndHour = nowHour;
   }
-  return { arcStartHour, arcEndHour };
+  return { arcStartHour, arcEndHour, tz };
 }
 
 export function getNightArcConfig(
   bedtime?: string | null,
   nightEnd?: string | null,
   now?: Date,
+  tz: string = SYSTEM_TZ,
 ): ArcConfig {
   let arcStartHour = 18;
   if (bedtime) {
-    const bt = new Date(bedtime);
-    let h = bt.getHours() + bt.getMinutes() / 60;
+    let h = getHourInTz(new Date(bedtime), tz);
     if (h < 12) h += 24;
     arcStartHour = h;
   }
   let arcEndHour = 30;
   if (nightEnd) {
-    const ne = new Date(nightEnd);
-    let h = ne.getHours() + ne.getMinutes() / 60;
+    let h = getHourInTz(new Date(nightEnd), tz);
     if (h < 12) h += 24;
     arcEndHour = h;
   }
   if (arcEndHour <= arcStartHour) arcEndHour = arcStartHour + 12;
   if (now) {
-    let nowH = now.getHours() + now.getMinutes() / 60;
+    let nowH = getHourInTz(now, tz);
     if (nowH < 12) nowH += 24;
     if (nowH > arcEndHour) arcEndHour = nowH;
   }
-  return { arcStartHour, arcEndHour };
+  return { arcStartHour, arcEndHour, tz };
 }
 
-function hourOfDay(d: Date): number {
-  return d.getHours() + d.getMinutes() / 60;
+function hourOfDay(d: Date, tz: string): number {
+  return getHourInTz(d, tz);
 }
 
 // Night arcs cross midnight (arcEndHour > 24). For times after midnight,
@@ -84,13 +92,13 @@ function applyNightWrap(h: number, config: ArcConfig): number {
 }
 
 export function timeToArcFraction(d: Date, config: ArcConfig): number {
-  const h = applyNightWrap(hourOfDay(d), config);
+  const h = applyNightWrap(hourOfDay(d, config.tz), config);
   const frac = (h - config.arcStartHour) / (config.arcEndHour - config.arcStartHour);
   return Math.max(0, Math.min(1, frac));
 }
 
 export function timeToArcFractionRaw(d: Date, config: ArcConfig): number {
-  const h = applyNightWrap(hourOfDay(d), config);
+  const h = applyNightWrap(hourOfDay(d, config.tz), config);
   return (h - config.arcStartHour) / (config.arcEndHour - config.arcStartHour);
 }
 
@@ -156,6 +164,10 @@ export interface SleepBubble {
   predictionIndex?: number;
 }
 
+/** Width of a placeholder ghost when no learned nap duration is available
+ *  (cold start). Used only as a last resort — see `napDurationMin`. */
+export const FALLBACK_GHOST_MIN = 45;
+
 /** Build bubble list from app state inputs.
  *
  * `now` is required to filter predicted naps that overlap with the active
@@ -172,9 +184,14 @@ export function collectBubbles(
     nextNap: string;
     bedtime?: string;
     predictedNaps?: Array<{ startTime: string; endTime: string }>;
+    /** Learned typical nap length (min). Sizes fallback/placeholder ghosts so
+     *  they reflect the baby's own data instead of a fixed 45-min invention.
+     *  Null/absent on cold start → falls back to FALLBACK_GHOST_MIN. */
+    napDurationMin?: number | null;
   } | null,
   now: Date,
 ): SleepBubble[] {
+  const ghostDurMs = (prediction?.napDurationMin ?? FALLBACK_GHOST_MIN) * 60000;
   const bubbles: SleepBubble[] = [];
 
   for (let si = 0; si < todaySleeps.length; si++) {
@@ -222,7 +239,7 @@ export function collectBubbles(
       const predTime = new Date(prediction.nextNap);
       bubbles.push({
         startTime: predTime,
-        endTime: new Date(predTime.getTime() + 45 * 60000),
+        endTime: new Date(predTime.getTime() + ghostDurMs),
         type: "nap",
         status: "predicted",
       });
@@ -242,7 +259,7 @@ export function collectBubbles(
     if (!(activeSleep && activeSleep.type === "night")) {
       bubbles.push({
         startTime: bedtime,
-        endTime: new Date(bedtime.getTime() + 45 * 60000),
+        endTime: new Date(bedtime.getTime() + ghostDurMs),
         type: "night",
         status: "predicted",
         predictionIndex: 0,

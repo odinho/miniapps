@@ -9,6 +9,7 @@ import {
   collectBubbles,
   isAtArcEndpoint,
   ARC_ENDPOINT_PROXIMITY,
+  FALLBACK_GHOST_MIN,
 } from "$lib/arc-utils.js";
 
 describe("getDayArcConfig", () => {
@@ -319,6 +320,66 @@ describe("collectBubbles", () => {
       bedtime: "2026-03-27T18:30:00",
     }, NOW);
     expect(bubbles.filter((b) => b.status === "predicted")).toHaveLength(0);
+  });
+});
+
+describe("baby-timezone arc math", () => {
+  // 05:30 UTC. On 2026-03-27 Oslo is still CET (+1; DST starts 2026-03-29),
+  // so this instant is 06:30 in Oslo, 14:30 in Tokyo, 05:30 in UTC. The arc
+  // must read the baby's tz, not the browser's. Pre-fix this used
+  // Date.getHours() (browser tz) and a travelling family saw a skewed arc.
+  const ISO = "2026-03-27T05:30:00Z";
+
+  it("getDayArcConfig derives arcStartHour in the supplied tz", () => {
+    expect(getDayArcConfig(ISO, null, undefined, "UTC").arcStartHour).toBeCloseTo(5.5, 5);
+    expect(getDayArcConfig(ISO, null, undefined, "Europe/Oslo").arcStartHour).toBeCloseTo(6.5, 5);
+    expect(getDayArcConfig(ISO, null, undefined, "Asia/Tokyo").arcStartHour).toBeCloseTo(14.5, 5);
+  });
+
+  it("getNightArcConfig derives anchors in the supplied tz (with night-wrap)", () => {
+    // Bedtime 19:00 UTC = 20:00 Oslo; nightEnd 05:00 UTC = 06:00 Oslo → 30.
+    const c = getNightArcConfig("2026-03-27T19:00:00Z", "2026-03-28T05:00:00Z", undefined, "Europe/Oslo");
+    expect(c.arcStartHour).toBeCloseTo(20, 5);
+    expect(c.arcEndHour).toBeCloseTo(30, 5);
+  });
+
+  it("timeToArcFraction reads tz off the config", () => {
+    const c = getDayArcConfig(ISO, null, undefined, "Europe/Oslo"); // start 6.5, end 18.5
+    // 12:30 UTC = 13:30 Oslo → (13.5 - 6.5) / 12 = 0.5833…
+    const frac = timeToArcFraction(new Date("2026-03-27T12:30:00Z"), c);
+    expect(frac).toBeCloseTo((13.5 - 6.5) / 12, 5);
+  });
+
+  it("config carries its tz for downstream fraction math", () => {
+    expect(getDayArcConfig(ISO, null, undefined, "Europe/Oslo").tz).toBe("Europe/Oslo");
+    expect(getNightArcConfig(null, null, undefined, "Asia/Tokyo").tz).toBe("Asia/Tokyo");
+  });
+});
+
+describe("collectBubbles — learned-duration ghosts (no invented 45-min blobs)", () => {
+  const NOW = new Date("2026-03-27T12:00:00");
+
+  it("sizes the fallback nextNap ghost from learned napDurationMin", () => {
+    const bubbles = collectBubbles([], null, { nextNap: "2026-03-27T13:00:00", napDurationMin: 70 }, NOW);
+    expect(bubbles).toHaveLength(1);
+    expect(bubbles[0].endTime!.getTime() - bubbles[0].startTime.getTime()).toBe(70 * 60000);
+  });
+
+  it("sizes the bedtime ghost from learned napDurationMin", () => {
+    const bubbles = collectBubbles(
+      [],
+      null,
+      { nextNap: "2026-03-27T13:00:00", bedtime: "2026-03-27T19:00:00", napDurationMin: 80 },
+      NOW,
+    );
+    const night = bubbles.filter((b) => b.type === "night");
+    expect(night).toHaveLength(1);
+    expect(night[0].endTime!.getTime() - night[0].startTime.getTime()).toBe(80 * 60000);
+  });
+
+  it("falls back to FALLBACK_GHOST_MIN when napDurationMin is null (cold start)", () => {
+    const bubbles = collectBubbles([], null, { nextNap: "2026-03-27T13:00:00", napDurationMin: null }, NOW);
+    expect(bubbles[0].endTime!.getTime() - bubbles[0].startTime.getTime()).toBe(FALLBACK_GHOST_MIN * 60000);
   });
 });
 

@@ -93,28 +93,23 @@ is for tracked product/engine/test work.
 
 Restored 2026-06-18 from the 2026-05-20 Codex arc/trend/wake-rec critique
 (full report: `local/codex-arc-trend-critique.md`, not committed). `composeArc`
-in `arc-scene.ts` is already a pure function — good foundation. The blocker
-for overlaying two babies on one arc is the fixed time domain (item 1); do
-that first, then the twin double-line unit becomes tractable.
+in `arc-scene.ts` is already a pure function — good foundation.
 
-- **⭐ Dynamic arc time domain (foundation for the twin arc).**
-  `getDayArcConfig` / `getNightArcConfig` in `src/lib/arc-utils.ts:8-19`
-  return fixed 12-hour windows. `timeToArcFraction` clamps overruns. The
-  composed arc therefore clamps the active bubble end + wake marker into the
-  endpoint when sleep outlives the window — the night-mode screenshot where
-  the wake target disappears off the right. Need: derive arc start/end from
-  actual wake/bedtime ± padding ± min span; rescale segments into that domain
-  instead of clamping meaning into decoration. The `arc-utils.unit.ts:14-33`
-  tests currently pin the fixed-domain behavior — must be updated alongside.
-
-- **Arc time math uses browser local TZ, not baby TZ.** `arc-utils.ts:11,21`
-  use `Date.getHours()`. The rest of the engine is baby-tz-aware. Travel or a
-  remote browser shifts arc geometry while predictions stay in baby tz.
-
-- **Arc fallback ghosts invent 45-min sleep blobs.** Skipped-nap and bedtime
-  fallback both render a 45-min placeholder (`src/lib/arc-utils.ts:168-201`,
-  `arc-scene.ts:449`). It's a visual placeholder that reads as engine output.
-  Pull duration from `getLearnedNapDuration` / confidence ranges instead.
+> 2026-06-18: re-audited the restored bullets against the code. Three were
+> already shipped or are now done:
+> - **Dynamic arc time domain** — SHIPPED 2026-05-21 (`348ef27` anchor arc
+>   math to actual bedtime+wake, `8d8320b` extend past expected wake), the day
+>   after the critique. The configs already derive the domain from anchors and
+>   `now` extends the window; the "wake target falls off the right edge" bug is
+>   fixed via `composeArc.endEventFrac`. The restored text ("fixed 12-hour
+>   windows") was stale. Only "± padding ± min span" was ever left, and that's
+>   cosmetic (padding would push real events away from the endpoint labels) —
+>   dropped as not-worth-doing.
+> - **Baby-TZ arc math** — DONE. `arc-utils.ts` now threads baby IANA tz
+>   through `ArcConfig`/config builders/`timeToArcFraction` via `getHourInTz`.
+> - **Fallback ghosts** — DONE. `collectBubbles` + the skipped blob size
+>   placeholder ghosts from `prediction.learnedSchedule.napDurationMin`
+>   (fallback `FALLBACK_GHOST_MIN` only on cold start).
 
 - **Day-arc start-click can't reach the overnight it labels.** `arcStartLabel`
   reads `todayWakeUp.wake_time` from the overnight that started before midnight,
@@ -136,6 +131,13 @@ that first, then the twin double-line unit becomes tractable.
   stats overlay) + stacked or translucent lanes; gate on `family.isTwinMode`.
   Design pass with Codex first; confirm whether double-line beats the existing
   two-lane Heim layout before building.
+
+- **`active-night-13min` arc-scene e2e snapshot is stale on `main`.** Fails
+  (~917px / 0.01 ratio, over the 0.005 threshold) on a clean checkout,
+  independent of any source change — the committed baseline
+  (`tests/arc-scenes.e2e.ts-snapshots/active-night-13min-chromium-linux.png`)
+  drifted from current rendering. Re-baseline with `--update-snapshots` after
+  confirming the live scene looks right; the other 10 arc scenes still pass.
 
 ## Engine architecture refactors (big simplifications, each its own PR)
 

@@ -20,6 +20,7 @@ import {
   timeToArcFraction,
   timeToArcFractionRaw,
   collectBubbles,
+  FALLBACK_GHOST_MIN,
   type ArcConfig,
 } from "./arc-utils.js";
 import { formatTime, formatDuration } from "./utils.js";
@@ -50,9 +51,13 @@ export interface ComposeArcInput {
     nextNap: string;
     bedtime?: string;
     predictedNaps?: Array<{ startTime: string; endTime: string }>;
+    /** Learned typical nap length (min); sizes placeholder ghosts. */
+    napDurationMin?: number | null;
   } | null;
   isNightMode: boolean;
   now: Date;
+  /** Baby IANA timezone for arc hour math (defaults to runtime tz). */
+  tz?: string;
   wakeUpTime?: string | null;
   startTimeLabel?: string | null;
   endTimeLabel?: string | null;
@@ -253,12 +258,13 @@ export function composeArc(input: ComposeArcInput): ArcScene {
     bedtime = null,
     nightEnd = null,
     nightWakings = [],
+    tz,
     geometry = DEFAULT_ARC_GEOMETRY,
   } = input;
 
   const config = isNightMode
-    ? getNightArcConfig(bedtime, nightEnd, now)
-    : getDayArcConfig(wakeUpTime, bedtime, now);
+    ? getNightArcConfig(bedtime, nightEnd, now, tz)
+    : getDayArcConfig(wakeUpTime, bedtime, now, tz);
   const { cx, cy, r, trackWidth } = geometry;
 
   const trackD = describeArc(cx, cy, r, 0, 1);
@@ -481,9 +487,10 @@ export function composeArc(input: ComposeArcInput): ArcScene {
 
   let skippedBlob: SceneSkippedBlob | null = null;
   if (skippedNap) {
+    const ghostMs = (prediction?.napDurationMin ?? FALLBACK_GHOST_MIN) * 60_000;
     const plannedMs = new Date(skippedNap.plannedAt).getTime();
     const loFrac = timeToArcFraction(new Date(plannedMs), config);
-    const hiFrac = timeToArcFraction(new Date(plannedMs + 45 * 60_000), config);
+    const hiFrac = timeToArcFraction(new Date(plannedMs + ghostMs), config);
     if (hiFrac - loFrac >= 0.005) {
       const d = describeArc(cx, cy, r, loFrac, hiFrac);
       const labelFrac = Math.min(loFrac + 0.02, hiFrac);
