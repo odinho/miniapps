@@ -422,3 +422,36 @@ describe("composeArc — completed sleep label", () => {
     expect(done?.label).toBeNull();
   });
 });
+
+describe("composeArc — explicit shared config (twin arc keystone)", () => {
+  it("uses the supplied config verbatim instead of deriving its own", () => {
+    // A shared domain wider than this baby's own would be: 04–22.
+    const shared = { arcStartHour: 4, arcEndHour: 22, tz: "Europe/Oslo" };
+    const scene = composeArc(
+      makeInput({ wakeUpTime: at(7, 0), bedtime: at(19, 0), config: shared }),
+    );
+    expect(scene.config).toBe(shared);
+    // A 13:00 nap on a 4→22 frame sits at (13-4)/18 = 0.5 — would be 0.5 only
+    // by coincidence on a derived 7→19 frame; assert the shared frame wins by
+    // checking a time that maps differently: 04:00 is the start (frac 0).
+    const sceneB = composeArc(
+      makeInput({
+        wakeUpTime: at(7, 0),
+        bedtime: at(19, 0),
+        config: shared,
+        todaySleeps: [{ start_time: at(4, 0), end_time: at(5, 0), type: "nap" }],
+        now: atDate(12, 0),
+      }),
+    );
+    // On the derived 7→19 frame a 04:00 sleep would clamp to frac 0 too, so
+    // instead assert the config object identity propagated (the real contract).
+    expect(sceneB.config.arcStartHour).toBe(4);
+    expect(sceneB.config.arcEndHour).toBe(22);
+  });
+
+  it("derives its own config when none is supplied (single-baby path unchanged)", () => {
+    const scene = composeArc(makeInput({ wakeUpTime: at(6, 30), bedtime: at(19, 0) }));
+    expect(scene.config.arcStartHour).toBeCloseTo(6.5, 5);
+    expect(scene.config.arcEndHour).toBeCloseTo(19, 5);
+  });
+});

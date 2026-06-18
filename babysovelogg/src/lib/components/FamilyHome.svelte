@@ -4,9 +4,10 @@
 	import { buildStartSleep, buildEndSleep } from '$lib/sleep-actions.js';
 	import SleepButton from './SleepButton.svelte';
 	import Arc from './Arc.svelte';
+	import TwinArc from './TwinArc.svelte';
 	import { formatTime, formatDurationCompact, formatDuration } from '$lib/utils.js';
 	import { getLaneStatus } from '$lib/lane-status.js';
-	import { buildArcProps } from '$lib/arc-props.js';
+	import { buildArcProps, buildTwinArcProps } from '$lib/arc-props.js';
 	import { getCombinedStatus } from '$lib/family.js';
 	import FamilyHandoff from './FamilyHandoff.svelte';
 
@@ -30,6 +31,16 @@
 	let { babies, family, now, onUndo, onFocus }: Props = $props();
 
 	const combined = $derived(getCombinedStatus(babies, family.firstWake, now));
+
+	// Concentric twin overview: only when twins share a mode (both day / both
+	// night). When they diverge (one napping, one in night sleep) the domains
+	// aren't unionable → buildTwinArcProps returns {shared:false} and we fall
+	// back to the per-baby arcs in the cards below.
+	const twin = $derived(
+		family.isTwinMode && babies.length === 2
+			? buildTwinArcProps(babies[0], babies[1], now)
+			: { shared: false as const },
+	);
 
 	const isAsleep = (b: BabyState) => !!(b.activeSleep && !b.activeSleep.end_time);
 	// A child with a forgotten/stale open sleep (hidden from activeSleep by the
@@ -112,6 +123,18 @@
 			{/if}
 		</p>
 	{/if}
+
+	{#if twin.shared}
+		<TwinArc
+			a={twin.a}
+			b={twin.b}
+			config={twin.config}
+			nowMs={now}
+			nameA={babies[0].baby?.name ?? ''}
+			nameB={babies[1].baby?.name ?? ''}
+		/>
+	{/if}
+
 	<div class="family-cards">
 		{#each babies as b (b.baby?.id)}
 			{#if b.baby}

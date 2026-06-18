@@ -9,6 +9,7 @@
 // own, so two children in different day/night phases each read correctly).
 import type { BabyState } from './stores/app.svelte.js';
 import { formatTime } from './utils.js';
+import { getDayArcConfig, getNightArcConfig, unionArcConfig, type ArcConfig } from './arc-utils.js';
 
 export interface ArcProps {
 	isNightMode: boolean;
@@ -37,6 +38,37 @@ export function computeIsNightMode(b: BabyState, nowMs: number): boolean {
 	if (todayWakeUp) return false;
 	const h = new Date(nowMs).getHours();
 	return h < 6 || h >= 18;
+}
+
+/** One baby's contribution to a shared time domain (its own derived config). */
+function configForProps(p: ArcProps, now: Date): ArcConfig {
+	return p.isNightMode
+		? getNightArcConfig(p.bedtime, p.nightEnd, now, p.tz)
+		: getDayArcConfig(p.wakeUpTime, p.bedtime, now, p.tz);
+}
+
+export type TwinArcProps =
+	| { shared: true; config: ArcConfig; a: ArcProps; b: ArcProps }
+	| { shared: false };
+
+/**
+ * Decide whether two babies can share one (concentric) twin arc and, if so,
+ * compute the union time domain both lanes render against.
+ *
+ * A shared arc is only coherent when both babies are in the SAME mode: day and
+ * night configs live in different hour frames (absolute vs wrapped 18–30) and
+ * can't be unioned. When they differ (one napping, one in night sleep) the
+ * caller should fall back to two separate per-baby arcs. Returns `{shared:false}`
+ * unless both have baby data and agree on `isNightMode`.
+ */
+export function buildTwinArcProps(a: BabyState, b: BabyState, nowMs: number): TwinArcProps {
+	if (!a.baby || !b.baby) return { shared: false };
+	const pa = buildArcProps(a, nowMs);
+	const pb = buildArcProps(b, nowMs);
+	if (pa.isNightMode !== pb.isNightMode) return { shared: false };
+	const now = new Date(nowMs);
+	const config = unionArcConfig(configForProps(pa, now), configForProps(pb, now));
+	return { shared: true, config, a: pa, b: pb };
 }
 
 export function buildArcProps(b: BabyState, nowMs: number): ArcProps {

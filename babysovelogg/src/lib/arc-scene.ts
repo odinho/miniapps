@@ -81,6 +81,13 @@ export interface ComposeArcInput {
    */
   nightWakings?: Array<{ startTime: string; endTime: string | null; domainId: string }>;
   geometry?: ArcGeometry;
+  /**
+   * Explicit time-domain override. When set, composeArc uses this instead of
+   * deriving the config from its own anchors. The twin arc passes ONE shared
+   * (union) config to both lanes so their segments are radially aligned. The
+   * single-baby path leaves it undefined and derives as before.
+   */
+  config?: ArcConfig;
 }
 
 type BubbleStatus = "completed" | "active" | "predicted";
@@ -262,9 +269,11 @@ export function composeArc(input: ComposeArcInput): ArcScene {
     geometry = DEFAULT_ARC_GEOMETRY,
   } = input;
 
-  const config = isNightMode
-    ? getNightArcConfig(bedtime, nightEnd, now, tz)
-    : getDayArcConfig(wakeUpTime, bedtime, now, tz);
+  const config =
+    input.config ??
+    (isNightMode
+      ? getNightArcConfig(bedtime, nightEnd, now, tz)
+      : getDayArcConfig(wakeUpTime, bedtime, now, tz));
   const { cx, cy, r, trackWidth } = geometry;
 
   const trackD = describeArc(cx, cy, r, 0, 1);

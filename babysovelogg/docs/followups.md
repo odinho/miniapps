@@ -119,18 +119,32 @@ in `arc-scene.ts` is already a pure function — good foundation.
   (Note: 2b1f402 "day-start tap edits the prior overnight" may have addressed
   this — verify before re-opening.)
 
-- **NEW (2026-06-18): twin double-line arc on the home Arc.** Goal: render two
-  babies as two lines/lanes on the *live* home Arc, not just the `/stats` charts
-  (twin overlay already shipped there — P3-1/S2-2b/S2-3). This was deliberately
-  de-scoped in `multi-child-support.md:268-277` ("two lanes on Heim … matters
-  more than two pretty arcs"), so it's a new intent, not a regression. Depends
-  on the Dynamic arc time domain item above: two babies need a SHARED derived
-  domain (union of both wake/bedtime spans) before their segments can be
-  overlaid coherently. Likely shape: extend `ArcScene`/`composeArc` to carry
-  N child series with per-child colour (reuse `--moon` / `--peach-dark` from the
-  stats overlay) + stacked or translucent lanes; gate on `family.isTwinMode`.
-  Design pass with Codex first; confirm whether double-line beats the existing
-  two-lane Heim layout before building.
+- **Twin concentric arc — SHIPPED (first version, 2026-06-18), open polish.**
+  Built as a CONCENTRIC two-ring arc (not the bug-prone same-radius overlay):
+  baby A outer (r=130, full chrome), baby B inner (r=99, track + bubbles +
+  night-wakings only), both on ONE shared union domain (`composeArc` gained an
+  optional `config?: ArcConfig`; `unionArcConfig` + `buildTwinArcProps` compute
+  it). Gated on `family.isTwinMode` AND both babies in the same mode (day/night
+  frames aren't unionable → falls back to per-baby arcs). `TwinArc.svelte` +
+  dev page `/dev/twin-arc` + `twin-arc.e2e.ts`. Both Codex design passes agreed
+  concentric > overlay and that it's only marginally better than the existing
+  two-lane FamilyHome. Open decisions for the user:
+    - **Placement/dedup:** the concentric arc currently renders as an *overview
+      above* the per-baby cards, which still show their own small arcs → three
+      arcs on screen. Decide: replace the per-card arcs (needs relocating the
+      in-hollow status text) vs keep overview-only vs a toggle.
+    - **Identity:** babies are distinguished by RADIUS + a legend, NOT recolour
+      (keeps nap=peach/night=moon). Revisit if radius alone reads ambiguously.
+    - No baby-2 confidence band / second endpoint / second now-marker (dropped
+      by design). Click-through to focus is via the cards, not the arc.
+
+- **All arc-scenes pixel baselines drift ~1–2% on local Linux.** Not just
+  `active-night-13min` (above) — the whole `arc-scenes.e2e.ts` suite fails
+  ~0.01–0.02 ratio on a clean checkout here, isolated to the sun/moon emoji
+  endpoints (font/glyph rendering vs the committed baseline env). `morning-empty`
+  drifts too, proving it's environmental, not logic. Regenerate all baselines in
+  the canonical CI env with `--update-snapshots`. (The twin-arc snapshots use a
+  looser 0.04 tolerance to ride this out.)
 
 - **`active-night-13min` arc-scene e2e snapshot is stale on `main`.** Fails
   (~917px / 0.01 ratio, over the 0.005 threshold) on a clean checkout,

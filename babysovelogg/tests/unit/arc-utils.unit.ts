@@ -10,6 +10,7 @@ import {
   isAtArcEndpoint,
   ARC_ENDPOINT_PROXIMITY,
   FALLBACK_GHOST_MIN,
+  unionArcConfig,
 } from "$lib/arc-utils.js";
 
 describe("getDayArcConfig", () => {
@@ -353,6 +354,32 @@ describe("baby-timezone arc math", () => {
   it("config carries its tz for downstream fraction math", () => {
     expect(getDayArcConfig(ISO, null, undefined, "Europe/Oslo").tz).toBe("Europe/Oslo");
     expect(getNightArcConfig(null, null, undefined, "Asia/Tokyo").tz).toBe("Asia/Tokyo");
+  });
+});
+
+describe("unionArcConfig — shared twin domain", () => {
+  it("spans the widest start→end of both babies", () => {
+    // Baby A wakes 06:30 → bed 19:00; Baby B wakes 07:15 → bed 19:45.
+    const a = getDayArcConfig("2026-03-27T06:30:00", "2026-03-27T19:00:00");
+    const b = getDayArcConfig("2026-03-27T07:15:00", "2026-03-27T19:45:00");
+    const u = unionArcConfig(a, b);
+    expect(u.arcStartHour).toBe(Math.min(a.arcStartHour, b.arcStartHour));
+    expect(u.arcEndHour).toBe(Math.max(a.arcEndHour, b.arcEndHour));
+    expect(u.arcStartHour).toBeLessThanOrEqual(a.arcStartHour);
+    expect(u.arcStartHour).toBeLessThanOrEqual(b.arcStartHour);
+    expect(u.arcEndHour).toBeGreaterThanOrEqual(a.arcEndHour);
+    expect(u.arcEndHour).toBeGreaterThanOrEqual(b.arcEndHour);
+  });
+
+  it("keeps the shared tz and unions night (wrapped) frames too", () => {
+    const a = getNightArcConfig("2026-03-27T19:30:00Z", "2026-03-28T06:00:00Z", undefined, "Europe/Oslo");
+    const b = getNightArcConfig("2026-03-27T20:15:00Z", "2026-03-28T05:30:00Z", undefined, "Europe/Oslo");
+    const u = unionArcConfig(a, b);
+    expect(u.tz).toBe("Europe/Oslo");
+    // Earliest bedtime anchors the start, latest wake anchors the end.
+    expect(u.arcStartHour).toBe(Math.min(a.arcStartHour, b.arcStartHour));
+    expect(u.arcEndHour).toBe(Math.max(a.arcEndHour, b.arcEndHour));
+    expect(u.arcEndHour).toBeGreaterThan(24); // still wrapped past midnight
   });
 });
 

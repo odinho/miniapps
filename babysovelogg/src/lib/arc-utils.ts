@@ -81,6 +81,22 @@ function hourOfDay(d: Date, tz: string): number {
   return getHourInTz(d, tz);
 }
 
+/**
+ * Union of two arc configs: the widest start→end span that contains both, so
+ * two babies overlaid on one (twin) arc share a single time→fraction frame and
+ * their segments align radially. Only meaningful when both configs are in the
+ * SAME frame — day configs use absolute hours, night configs use wrapped
+ * 18–30 hours, and the two are not unionable (the caller must gate on a shared
+ * mode first). tz is shared (both babies live in one household tz).
+ */
+export function unionArcConfig(a: ArcConfig, b: ArcConfig): ArcConfig {
+  return {
+    arcStartHour: Math.min(a.arcStartHour, b.arcStartHour),
+    arcEndHour: Math.max(a.arcEndHour, b.arcEndHour),
+    tz: a.tz,
+  };
+}
+
 // Night arcs cross midnight (arcEndHour > 24). For times after midnight,
 // hourOfDay() returns 0..6 but the arc thinks of them as 24..30. Wrap when
 // the arc itself crosses midnight; the < 12 cutoff distinguishes
