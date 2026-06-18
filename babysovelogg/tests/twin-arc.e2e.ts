@@ -12,7 +12,7 @@ const test = baseTest.extend({
   },
 });
 
-const SCENE_IDS = ["twin-scene-day", "twin-scene-night"] as const;
+const SCENE_IDS = ["twin-scene-day", "twin-scene-night", "twin-scene-fresh"] as const;
 
 for (const id of SCENE_IDS) {
   test(`twin arc: ${id}`, async ({ page, baseURL }) => {
@@ -31,8 +31,10 @@ for (const id of SCENE_IDS) {
 test("twin arc: both lanes + a single shared now-line + legend render", async ({ page, baseURL }) => {
   await page.goto(`${baseURL}/dev/twin-arc`);
   const day = page.getByTestId("twin-scene-day").locator(".twin-arc");
-  // Two background tracks (outer + inner lanes) on the shared domain.
-  await expect(day.locator(".sleep-arc > path")).not.toHaveCount(0);
+  // Two distinct background tracks must exist — the inner lane carries its own
+  // distinctive stroke. A regression collapsing to one lane drops this to 0.
+  await expect(day.locator('.sleep-arc > path[stroke="var(--cream-dark)"]')).toHaveCount(1);
+  await expect(day.locator(".sleep-arc > path").first()).toBeVisible();
   // Exactly one shared now-line crosses both rings (not one per baby).
   await expect(day.locator(".sleep-arc > line")).toHaveCount(1);
   // Legend names both twins.
@@ -44,4 +46,13 @@ test("twin arc: both lanes + a single shared now-line + legend render", async ({
   const night = page.getByTestId("twin-scene-night").locator(".twin-arc");
   await expect(night.locator('.sleep-arc path[stroke="rgba(192, 57, 43, 0.95)"]')).toHaveCount(1);
   await expect(night.locator(".sleep-arc > line")).toHaveCount(1);
+});
+
+test("twin arc: a just-started active sleep renders an endpoint halo (not dropped)", async ({ page, baseURL }) => {
+  // composeArc suppresses a very-short active bubble that hugs an endpoint into
+  // an endpoint halo. TwinArc must render that halo on BOTH lanes, else the
+  // active-sleep state silently vanishes in twin mode (Codex review).
+  await page.goto(`${baseURL}/dev/twin-arc`);
+  const fresh = page.getByTestId("twin-scene-fresh").locator(".twin-arc");
+  await expect(fresh.locator(".arc-endpoint-halo")).not.toHaveCount(0);
 });

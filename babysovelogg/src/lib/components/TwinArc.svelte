@@ -50,7 +50,7 @@
 </script>
 
 <div class="twin-arc" data-testid="twin-arc">
-	<svg viewBox="0 0 {G.size} {G.size}" width="100%" class="sleep-arc">
+	<svg viewBox="0 0 {G.size} {G.size}" width="100%" class="sleep-arc" role="img" aria-label="Tvillingboge: {nameA} (ytre ring) og {nameB} (indre ring)">
 		<defs>
 			<filter id="twin-arc-glow" x="-50%" y="-50%" width="200%" height="200%">
 				<feGaussianBlur stdDeviation="4" result="glow" />
@@ -95,6 +95,15 @@
 		{#each inner.nightWakingOverlays as ov (ov.domainId)}
 			<path d={ov.d} fill="none" stroke="rgba(192, 57, 43, 0.95)" stroke-width={INNER.trackWidth - 1} stroke-linecap="round" opacity={ov.active ? 1 : 0.9} class:arc-active-pulse={ov.active} />
 		{/each}
+		<!-- Inner active-sleep endpoint halo: composeArc suppresses a very-short
+			 active bubble that hugs an endpoint into a halo, so without this the
+			 baby-B active state would silently vanish on the inner lane. -->
+		{#if inner.start.activeHalo}
+			<circle cx={inner.start.pt.x} cy={inner.start.pt.y} r="13" fill="none" stroke={colorVar(inner.start.activeHalo.color)} stroke-width="2.5" opacity="0.85" class="arc-endpoint-halo arc-active-pulse" />
+		{/if}
+		{#if inner.end.activeHalo}
+			<circle cx={inner.end.pt.x} cy={inner.end.pt.y} r="13" fill="none" stroke={colorVar(inner.end.activeHalo.color)} stroke-width="2.5" opacity="0.85" class="arc-endpoint-halo arc-active-pulse" />
+		{/if}
 
 		<!-- Outer (baby A) bubbles -->
 		{#each outer.bubbles as bub}
@@ -116,10 +125,16 @@
 
 		<!-- Endpoints (shared domain → one sun/moon pair, drawn last) -->
 		<g class="arc-endpoint-icon">
+			{#if outer.start.activeHalo}
+				<circle cx={outer.start.pt.x} cy={outer.start.pt.y} r="20" fill="none" stroke={colorVar(outer.start.activeHalo.color)} stroke-width="2.5" opacity="0.85" class="arc-endpoint-halo arc-active-pulse" />
+			{/if}
 			<circle cx={outer.start.pt.x} cy={outer.start.pt.y} r="16" fill={outer.start.glow} />
 			<text x={outer.start.pt.x} y={outer.start.pt.y + 1} font-size="18" text-anchor="middle" dominant-baseline="middle">{outer.start.icon}</text>
 		</g>
 		<g class="arc-endpoint-icon">
+			{#if outer.end.activeHalo}
+				<circle cx={outer.end.pt.x} cy={outer.end.pt.y} r="20" fill="none" stroke={colorVar(outer.end.activeHalo.color)} stroke-width="2.5" opacity="0.85" class="arc-endpoint-halo arc-active-pulse" />
+			{/if}
 			<circle cx={outer.end.pt.x} cy={outer.end.pt.y} r="16" fill={outer.end.glow} />
 			<text x={outer.end.pt.x} y={outer.end.pt.y + 1} font-size="18" text-anchor="middle" dominant-baseline="middle">{outer.end.icon}</text>
 		</g>

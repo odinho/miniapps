@@ -137,6 +137,12 @@ in `arc-scene.ts` is already a pure function — good foundation.
       (keeps nap=peach/night=moon). Revisit if radius alone reads ambiguously.
     - No baby-2 confidence band / second endpoint / second now-marker (dropped
       by design). Click-through to focus is via the cards, not the arc.
+    - **Moon endpoint** shows baby A's bedtime, not the later shared-domain end
+      when baby B goes to bed later (Codex WARN). Decide whether the shared
+      end-marker should track the domain end instead.
+    - `unionArcConfig` keeps `a.tz` without asserting both tz match — fine while
+      tz is household-level, but the exported helper would silently produce an
+      incoherent frame if ever called cross-zone.
 
 - **All arc-scenes pixel baselines drift ~1–2% on local Linux.** Not just
   `active-night-13min` (above) — the whole `arc-scenes.e2e.ts` suite fails

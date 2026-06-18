@@ -96,6 +96,22 @@
 		getNightArcConfig(nightB.bedtime, nightB.nightEnd, undefined, 'Europe/Oslo'),
 	);
 	const nightNow = baseMs + 26 * 3600_000;
+
+	// --- Fresh-night scenario: baby A *just* started night sleep (very short,
+	// hugging the bedtime endpoint) → composeArc suppresses the bubble into an
+	// endpoint halo. Guards that the halo still renders in twin mode. ---
+	const freshNow = baseMs + 19 * 3600_000 + 35 * 60_000; // 19:35, 5 min in
+	const freshA: ArcProps = {
+		...nightA,
+		activeSleep: { start_time: iso(19, 30), type: 'night' },
+		bedtime: iso(19, 30),
+		startTimeLabel: '19:30',
+	};
+	const freshB: ArcProps = { ...nightB, activeSleep: { start_time: iso(19, 32), type: 'night' }, bedtime: iso(19, 32), startTimeLabel: '19:32' };
+	const freshConfig = unionArcConfig(
+		getNightArcConfig(freshA.bedtime, freshA.nightEnd, undefined, 'Europe/Oslo'),
+		getNightArcConfig(freshB.bedtime, freshB.nightEnd, undefined, 'Europe/Oslo'),
+	);
 </script>
 
 <div class="wrap">
@@ -106,6 +122,10 @@
 	<div class="scene-card" data-testid="twin-scene-night">
 		<h2>Tvilling — natt (begge søv)</h2>
 		<TwinArc a={nightA} b={nightB} config={nightConfig} nowMs={nightNow} nameA="Aud" nameB="Bjørn" />
+	</div>
+	<div class="scene-card" data-testid="twin-scene-fresh">
+		<h2>Tvilling — nettopp sovna (halo ved endepunkt)</h2>
+		<TwinArc a={freshA} b={freshB} config={freshConfig} nowMs={freshNow} nameA="Aud" nameB="Bjørn" />
 	</div>
 </div>
 
