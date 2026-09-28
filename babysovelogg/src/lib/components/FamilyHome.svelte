@@ -189,12 +189,12 @@
 		<div class="family-bulk" data-testid="family-bulk">
 			{#if anyAwake}
 				<button class="btn btn-primary" data-testid="sleep-both" onclick={sleepBoth} disabled={busy}>
-					🌙 Både sove
+					🌙 Båe to søv
 				</button>
 			{/if}
 			{#if anyAsleep}
 				<button class="btn btn-primary" data-testid="wake-both" onclick={wakeBoth} disabled={busy}>
-					☀️ Både vakna
+					☀️ Båe to vakna
 				</button>
 			{/if}
 		</div>
